@@ -93,7 +93,34 @@ npm install
 npm run dev                          # http://localhost:5173
 ```
 
-Backend farklı bir adresteyse `cp .env.example .env` ile `VITE_API_BASE`'i ayarlayın.
+Backend farklı bir adresteyse `cp .env.example .env` ile `VITE_API_URL`'i ayarlayın.
+
+---
+
+## Deploy (Render.com)
+
+İki ayrı servis: **backend** (web service) + **frontend** (static site). Kök dizindeki
+[`render.yaml`](render.yaml) blueprint bunları tanımlar; ya elle girin:
+
+### Backend — Web Service
+- **Root Directory:** `backend`
+- **Build Command:** `pip install -r requirements.txt`
+- **Start Command:** `uvicorn app.api.main:app --host 0.0.0.0 --port $PORT` (ayrıca [`backend/Procfile`](backend/Procfile)'da hazır)
+- **Environment Variables:** `APP_PASSWORD`, `ANTHROPIC_API_KEY`, `FINNHUB_API_KEY`,
+  `NEWSAPI_KEY`, `FRONTEND_URL` (frontend'in Render adresi — CORS için),
+  `NEWSRADAR_SEED_ON_START=on` (kalıcı olmayan diskte açılışta seed).
+
+### Frontend — Static Site
+- **Root Directory:** `frontend`
+- **Build Command:** `npm install && npm run build`
+- **Publish Directory:** `dist`
+- **Environment Variable:** `VITE_API_URL` = backend servisinin adresi (örn. `https://newsradar-api.onrender.com`)
+
+> **SQLite & kalıcılık:** Render bedava katmanında disk **kalıcı değildir** — her deploy/
+> yeniden başlatmada `newsradar.db` sıfırlanır. `NEWSRADAR_SEED_ON_START=on` ile açılışta
+> varsayılan izleme listesi tekrar eklenir; haber verisi için bir kez **Yenile**'ye basın.
+> Kalıcılık isterseniz ücretli **Persistent Disk** ekleyip `NEWSRADAR_DB`'yi mount yoluna
+> (örn. `/var/data/newsradar.db`) ayarlayın.
 
 ---
 

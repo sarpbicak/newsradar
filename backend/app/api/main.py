@@ -12,6 +12,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .. import scheduler
+from ..config import get_settings
 from ..db.database import init_db
 from . import routes_auth, routes_chat, routes_dashboard, routes_entities, routes_refresh
 from .routes_auth import require_auth
@@ -22,6 +23,11 @@ logging.basicConfig(level=logging.INFO)
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
+    # Deploy: kalıcı olmayan diskte DB boş başlamasın diye opsiyonel oto-seed.
+    if get_settings().seed_on_start:
+        from ..seed import seed
+
+        seed()
     scheduler.start()
     yield
     scheduler.shutdown()
@@ -29,13 +35,11 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="NewsRadar API", version="1.0", lifespan=lifespan)
 
-# Kişisel araç: yerel Vite geliştirme sunucusuna izin ver.
+# CORS: yerel Vite + FRONTEND_URL (deploy'da Render frontend domain'i).
+# İzinli origin'ler ortam değişkeninden okunur (bkz. config.cors_origins).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=get_settings().cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

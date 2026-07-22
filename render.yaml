@@ -1,0 +1,46 @@
+# Render.com blueprint — iki servis: backend (web) + frontend (static site).
+# Render Dashboard → "New +" → "Blueprint" ile bu dosyayı okutabilirsiniz;
+# ya da servisleri elle oluşturup aşağıdaki ayarları girebilirsiniz.
+
+services:
+  # ------------------------- Backend (FastAPI) ------------------------- #
+  - type: web
+    name: newsradar-api
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      # Sırlar — Render Dashboard'da elle girin (repoya gitmez).
+      - key: APP_PASSWORD
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: FINNHUB_API_KEY
+        sync: false
+      - key: NEWSAPI_KEY
+        sync: false
+      # Frontend static site'ın adresi (deploy sonrası doldurun).
+      - key: FRONTEND_URL
+        sync: false
+      # Kalıcı olmayan diskte DB boş başlamasın diye açılışta seed.
+      - key: NEWSRADAR_SEED_ON_START
+        value: "on"
+
+  # ---------------------- Frontend (static Vite) ---------------------- #
+  - type: web
+    name: newsradar-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      # Backend'in adresi (yukarıdaki servisin URL'i).
+      - key: VITE_API_URL
+        sync: false
+    routes:
+      # SPA fallback — tüm yolları index.html'e yönlendir.
+      - type: rewrite
+        source: /*
+        destination: /index.html

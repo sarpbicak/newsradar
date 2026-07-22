@@ -1,6 +1,11 @@
 // NewsRadar API istemcisi — REST uçları + sohbet için SSE streaming.
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+// Deploy'da Render backend adresi VITE_API_URL ile verilir; yereldeyse localhost.
+// (VITE_API_BASE eski isim — geriye uyumluluk için hâlâ kabul edilir.)
+const API_BASE =
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_API_BASE ||
+  "http://localhost:8000";
 
 // --- Oturum token'ı: localStorage'da saklanır, her istekte Bearer olarak gider ---
 const TOKEN_KEY = "newsradar_token";

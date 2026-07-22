@@ -39,12 +39,30 @@ class Settings:
         self.lookback_hours: int = int(_env("NEWSRADAR_LOOKBACK_HOURS", "48"))
         self.scheduler_enabled: bool = _env("NEWSRADAR_SCHEDULER", "on").lower() == "on"
 
+        # Deploy: frontend'in domain'i (CORS). Virgülle birden fazla verilebilir.
+        # Boşsa yalnızca yerel Vite (localhost:5173) izinli. "*" = tümüne izin.
+        self.frontend_url: str = _env("FRONTEND_URL", "")
+        # Deploy: açılışta varsayılan izleme listesini otomatik ekle (idempotent).
+        # Kalıcı olmayan diskte (Render bedava katman) DB boş başlamasın diye faydalı.
+        self.seed_on_start: bool = _env("NEWSRADAR_SEED_ON_START", "off").lower() == "on"
+
         db = _env("NEWSRADAR_DB", "newsradar.db")
         db_path = Path(db)
         if not db_path.is_absolute():
             db_path = _BACKEND_ROOT / db_path
         self.db_path: Path = db_path
         self.database_url: str = f"sqlite:///{self.db_path}"
+
+    @property
+    def cors_origins(self) -> list[str]:
+        """CORS izinli origin listesi: yerel dev + FRONTEND_URL (varsa)."""
+        dev = ["http://localhost:5173", "http://127.0.0.1:5173"]
+        if not self.frontend_url:
+            return dev
+        extra = [o.strip().rstrip("/") for o in self.frontend_url.split(",") if o.strip()]
+        if "*" in extra:
+            return ["*"]  # esnek kaçış: tüm origin'lere izin
+        return dev + extra
 
     # --- Sağlayıcı erişilebilirliği (anahtar var mı?) ---
     @property
