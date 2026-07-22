@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Sırlar & yerel DB
+.env
+.env.local
+.env.*.local
+# .env.example izlenir (şablon); diğer tüm .env* varyantları hariç
+.env.*
+!.env.example
+*.db
+*.db-wal
+*.db-shm
+
+# Node / Vite
+node_modules/
+dist/
+
+# OS
+.DS_Store
