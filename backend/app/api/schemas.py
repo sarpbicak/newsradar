@@ -78,6 +78,23 @@ class DeltaOut(BaseModel):
     sentiment_delta: float | None      # snapshot avg_sentiment farkı (yoksa None)
 
 
+class AnalystOut(BaseModel):
+    """Analist konsensüsü (GERÇEK veri — Finnhub; NewsRadar üretmez)."""
+
+    strong_buy: int
+    buy: int
+    hold: int
+    sell: int
+    strong_sell: int
+    total: int
+    period: str | None
+    # Hedef fiyatlar (Finnhub ücretsiz katmanda None; premium açılırsa dolar).
+    target_mean: float | None = None
+    target_high: float | None = None
+    target_low: float | None = None
+    fetched_at: datetime
+
+
 class EntityCardOut(BaseModel):
     """Overview kartı: entity + son değerlendirme + değişim + sayaçlar."""
 
@@ -99,6 +116,8 @@ class EntityCardOut(BaseModel):
     price: float | None = None
     change_percent: float | None = None
     price_updated_at: datetime | None = None
+    # Analist konsensüsü (yalnızca ticker + veri varsa; yoksa None).
+    analyst: AnalystOut | None = None
 
 
 class ArticleOut(BaseModel):

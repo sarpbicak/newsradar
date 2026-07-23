@@ -11,6 +11,7 @@ import {
   stanceLabel,
   timeAgo,
 } from "./ui.jsx";
+import AnalystConsensus from "./AnalystConsensus.jsx";
 
 export default function EntityCard({ card, onOpen }) {
   const a = card.analysis;
@@ -62,6 +63,9 @@ export default function EntityCard({ card, onOpen }) {
           />
         </div>
       )}
+
+      {/* Analist konsensüsü — kompakt (yalnızca ticker + veri varsa) */}
+      {card.analyst && <AnalystConsensus analyst={card.analyst} price={card.price} compact />}
 
       <SentimentGauge value={card.avg_sentiment} />
 

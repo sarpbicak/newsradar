@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from ..db.models import Entity
-from .base import NewsProvider, PriceProvider
+from .base import AnalystProvider, NewsProvider, PriceProvider
 from .finnhub import FinnhubProvider
+from .finnhub_analyst import FinnhubAnalystProvider
 from .finnhub_price import FinnhubPriceProvider
 from .newsapi import NewsApiProvider
 
@@ -14,8 +15,9 @@ _PROVIDERS: dict[str, NewsProvider] = {
     "keyword": NewsApiProvider(),
 }
 
-# Fiyat sağlayıcı (yalnızca ticker entity'ler için; tekil).
+# Fiyat + analist sağlayıcılar (yalnızca ticker entity'ler için; tekil).
 _PRICE_PROVIDER: PriceProvider = FinnhubPriceProvider()
+_ANALYST_PROVIDER: AnalystProvider = FinnhubAnalystProvider()
 
 
 def get_provider_for(entity: Entity) -> NewsProvider | None:
@@ -26,6 +28,11 @@ def get_provider_for(entity: Entity) -> NewsProvider | None:
 def get_price_provider() -> PriceProvider:
     """Fiyat sağlayıcısını döner (ticker entity'ler için)."""
     return _PRICE_PROVIDER
+
+
+def get_analyst_provider() -> AnalystProvider:
+    """Analist verisi sağlayıcısını döner (ticker entity'ler için)."""
+    return _ANALYST_PROVIDER
 
 
 def provider_status() -> dict[str, bool]:

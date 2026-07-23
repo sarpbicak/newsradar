@@ -1,6 +1,9 @@
 """Haber sağlayıcıları: soyut NewsProvider arayüzü + Finnhub/NewsAPI implementasyonları."""
 
 from .base import (
+    AnalystProvider,
+    AnalystRating,
+    AnalystResult,
     FetchedArticle,
     NewsProvider,
     PriceProvider,
@@ -8,15 +11,24 @@ from .base import (
     PriceResult,
     ProviderResult,
 )
-from .registry import get_price_provider, get_provider_for, provider_status
+from .registry import (
+    get_analyst_provider,
+    get_price_provider,
+    get_provider_for,
+    provider_status,
+)
 
 __all__ = [
+    "AnalystProvider",
+    "AnalystRating",
+    "AnalystResult",
     "FetchedArticle",
     "NewsProvider",
     "PriceProvider",
     "PriceQuote",
     "PriceResult",
     "ProviderResult",
+    "get_analyst_provider",
     "get_price_provider",
     "get_provider_for",
     "provider_status",

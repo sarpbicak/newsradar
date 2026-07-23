@@ -43,6 +43,14 @@ haber akışına dayalı bir hisse/varlık risk analistisin.
      what_to_verify'a spesifik bir doğrulama maddesi olarak ekle \
      (ör. 'bu değerleme ikincil piyasa mı, hangi platform?').
 
+9. ANALİST KONSENSÜSÜ (varsa). Bazı varlıklar için GERÇEK analist verisi (al/tut/sat \
+   dağılımı, varsa hedef fiyat) verilir. Bunu BİLGİ olarak kullanabilirsin: haber akışının \
+   bu konsensüsle uyumlu mu yoksa çelişiyor mu olduğunu yorumla (ör. "analistler ağırlıkla \
+   AL derken haber akışı olumsuz — dikkat"). KATI SINIRLAR: (a) KENDİ hedef fiyatını ÜRETME; \
+   yalnızca verilen analist rakamlarını aktarabilirsin, rakam İCAT ETME. (b) "Şu seviyeden al" \
+   DEME — sadece konsensüs ile haber akışının uyumunu değerlendir. (c) Analist verisi yoksa \
+   bundan hiç bahsetme.
+
 8. FİYAT VERİSİ (varsa). Bazı varlıklar için güncel fiyat + değişim % verilir. \
    Bunu YALNIZCA haberin fiyata yansıyıp yansımadığını değerlendirmek için kullan: \
    negatif haber akışı varken hisse zaten sert düşmüşse, bunu `what_to_verify`'a \
@@ -150,6 +158,24 @@ def _price_lines(price: dict | None) -> list[str]:
     ]
 
 
+def _analyst_lines(analyst: dict | None) -> list[str]:
+    """Analist konsensüsünü prompt satırına çevirir (yoksa boş — hiç bahsetme)."""
+    if not analyst:
+        return []
+    parts = [
+        f"güçlü al={analyst['strong_buy']}", f"al={analyst['buy']}",
+        f"tut={analyst['hold']}", f"sat={analyst['sell']}",
+        f"güçlü sat={analyst['strong_sell']}",
+    ]
+    line = (
+        "ANALİST KONSENSÜSÜ (GERÇEK veri; SEN üretme, sadece haber akışıyla uyumunu yorumla, "
+        f"hedef/seviye İCAT ETME): {analyst['total']} analist — " + ", ".join(parts) + "."
+    )
+    if analyst.get("target_mean") is not None:
+        line += f" Ortalama hedef fiyat={analyst['target_mean']}."
+    return [line]
+
+
 def build_entity_prompt(
     entity_name: str,
     entity_query: str,
@@ -157,6 +183,7 @@ def build_entity_prompt(
     analyzed: list[dict],
     price: dict | None = None,
     language: str = "en",
+    analyst: dict | None = None,
 ) -> str:
     """Entity-başı toplu değerlendirme için kullanıcı mesajı."""
     lines = [
@@ -165,6 +192,7 @@ def build_entity_prompt(
         language_line(language),
         utc_context_line(),
         *_price_lines(price),
+        *_analyst_lines(analyst),
         f"Aşağıda bu varlıkla ilgili, analiz edilmiş {len(analyzed)} haber var "
         "(en yeni önce). Bunlardan haber-akışı bazlı toplu bir değerlendirme üret ve "
         "'record_entity_assessment' aracıyla döndür.",

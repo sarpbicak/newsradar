@@ -190,6 +190,34 @@ class PriceSnapshot(Base):
     fetched_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
 
+class AnalystSnapshot(Base):
+    """Bir ticker entity için analist konsensüsü (her yenilemede append-only).
+
+    GERÇEK analist verisi (Finnhub) — NewsRadar/Claude üretmez, sadece saklar/aktarır.
+    Hedef fiyat alanları ücretsiz katmanda None (price-target premium).
+    """
+
+    __tablename__ = "analyst_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    entity_id: Mapped[int] = mapped_column(
+        ForeignKey("entities.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # Hedef fiyatlar (şimdilik None — premium uç).
+    target_high: Mapped[float | None] = mapped_column(Float, nullable=True)
+    target_low: Mapped[float | None] = mapped_column(Float, nullable=True)
+    target_mean: Mapped[float | None] = mapped_column(Float, nullable=True)
+    target_median: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Al/tut/sat dağılımı.
+    strong_buy: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    buy: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    hold: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    sell: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    strong_sell: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    period: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
 class EntityAnalysis(Base):
     """Bir entity için toplu (aggregate) Claude analizi — zaman içinde birden çok satır."""
 

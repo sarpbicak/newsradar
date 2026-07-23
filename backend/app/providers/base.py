@@ -96,3 +96,47 @@ class PriceProvider(ABC):
     def quote(self, entity: Entity) -> PriceResult:
         """Entity için anlık fiyat döner. Hata/anahtar yoksa warning ile döner, çökmez."""
         raise NotImplementedError
+
+
+# --------------------------------------------------------------------------- #
+#  Analist verisi sağlayıcı arayüzü (al/tut/sat + hedef fiyat)
+#  ÖNEMLİ: Bu GERÇEK analist konsensüsüdür — NewsRadar/Claude ÜRETMEZ, sadece aktarır.
+#  (Finnhub ücretsiz katmanda price-target kapalı → hedef alanları şimdilik None.)
+# --------------------------------------------------------------------------- #
+@dataclass
+class AnalystRating:
+    """Bir varlık için analist konsensüsü (en güncel dönem)."""
+
+    strong_buy: int = 0
+    buy: int = 0
+    hold: int = 0
+    sell: int = 0
+    strong_sell: int = 0
+    period: str | None = None
+    # Hedef fiyatlar — Finnhub ücretsiz katmanda YOK (premium). İleride doldurulabilir.
+    target_high: float | None = None
+    target_low: float | None = None
+    target_mean: float | None = None
+    target_median: float | None = None
+
+
+@dataclass
+class AnalystResult:
+    provider: str
+    rating: AnalystRating | None = None
+    warning: str | None = None
+
+
+class AnalystProvider(ABC):
+    """Bir analist-verisi kaynağının sözleşmesi. Yalnızca `type=ticker` için."""
+
+    name: str = "base-analyst"
+
+    @abstractmethod
+    def is_available(self) -> bool:
+        raise NotImplementedError
+
+    @abstractmethod
+    def fetch(self, entity: Entity) -> AnalystResult:
+        """Analist konsensüsü döner. Hata/anahtar yoksa warning ile döner, çökmez."""
+        raise NotImplementedError

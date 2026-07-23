@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 
 from .analysis.claude_client import ClaudeClient, MissingAPIKeyError
 from .analysis.pipeline import analyze_all_async
+from .analyst import refresh_analyst
 from .db.database import session_scope
 from .ingest import fetch_all
 from .prices import refresh_prices
@@ -115,11 +116,15 @@ def run_refresh(lookback_hours: int | None = None) -> RefreshSummary:
 
     _set_running(True, total=total)
     try:
-        # 0) Fiyat snapshot'ları (ticker entity'ler; ucuz, hata-toleranslı).
+        # 0) Fiyat + analist snapshot'ları (ticker entity'ler; ucuz, hata-toleranslı).
         try:
             summary.warnings.extend(refresh_prices())
         except Exception as exc:  # noqa: BLE001 — fiyat hatası yenilemeyi çökertmesin
             logger.warning("Fiyat çekme başarısız (atlandı): %s", exc)
+        try:
+            summary.warnings.extend(refresh_analyst())
+        except Exception as exc:  # noqa: BLE001 — analist hatası yenilemeyi çökertmesin
+            logger.warning("Analist çekme başarısız (atlandı): %s", exc)
 
         # 1) Çekme (Claude gerektirmez).
         with session_scope() as session:

@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session
 from ..config import get_settings
 from ..db.database import session_scope
 from ..db.models import PREFILTER_VERSION, Article, Entity, EntityAnalysis, Suggestion
+from ..analyst import analyst_context_for
 from ..prices import price_context_for
 from .claude_client import ClaudeClient, ClaudeError
 from .prompts import (
@@ -417,9 +418,11 @@ async def analyze_all_async(
         async with db_lock:
             payload = await asyncio.to_thread(_read_assessment_payload, t["id"])
             price_ctx = await asyncio.to_thread(price_context_for, t["id"])
+            analyst_ctx = await asyncio.to_thread(analyst_context_for, t["id"])
         if payload:
             user = build_entity_prompt(
-                t["name"], t["query"], t["type"], payload, price=price_ctx, language=t["language"]
+                t["name"], t["query"], t["type"], payload,
+                price=price_ctx, language=t["language"], analyst=analyst_ctx,
             )
             try:
                 adata = await _call(ENTITY_ANALYSIS_TOOL, user, 2000)
@@ -482,7 +485,8 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient) -> AnalyzeTotals:
     payload2 = _read_assessment_payload(entity_id)
     if payload2:
         user = build_entity_prompt(
-            name, query, etype, payload2, price=price_context_for(entity_id), language=lang
+            name, query, etype, payload2, price=price_context_for(entity_id),
+            language=lang, analyst=analyst_context_for(entity_id),
         )
         try:
             adata = client.call_tool(

@@ -7,9 +7,10 @@ from collections import Counter
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ..db.models import Article, Entity, EntityAnalysis, PriceSnapshot
+from ..db.models import AnalystSnapshot, Article, Entity, EntityAnalysis, PriceSnapshot
 from .schemas import (
     AnalysisOut,
+    AnalystOut,
     ArticleOut,
     DeltaOut,
     EntityCardOut,
@@ -110,6 +111,20 @@ def analysis_out(a: EntityAnalysis | None) -> AnalysisOut | None:
     )
 
 
+def _analyst_out(snap: AnalystSnapshot | None) -> AnalystOut | None:
+    if snap is None:
+        return None
+    total = snap.strong_buy + snap.buy + snap.hold + snap.sell + snap.strong_sell
+    if total == 0:
+        return None
+    return AnalystOut(
+        strong_buy=snap.strong_buy, buy=snap.buy, hold=snap.hold,
+        sell=snap.sell, strong_sell=snap.strong_sell, total=total, period=snap.period,
+        target_mean=snap.target_mean, target_high=snap.target_high, target_low=snap.target_low,
+        fetched_at=snap.fetched_at,
+    )
+
+
 def entity_card(session: Session, entity: Entity) -> EntityCardOut:
     """Overview kartı için entity özetini toplar."""
     article_count = session.scalar(
@@ -141,13 +156,21 @@ def entity_card(session: Session, entity: Entity) -> EntityCardOut:
     latest = _latest_analysis(session, entity.id)
     previous = _previous_analysis(session, entity.id)
 
-    # Fiyat: yalnızca ticker entity'lerde (keyword'de None kalır).
+    # Fiyat + analist: yalnızca ticker entity'lerde (keyword'de None kalır).
     price_snap = None
+    analyst = None
     if entity.type == "ticker":
         price_snap = session.scalar(
             select(PriceSnapshot)
             .where(PriceSnapshot.entity_id == entity.id)
             .order_by(PriceSnapshot.fetched_at.desc())
+        )
+        analyst = _analyst_out(
+            session.scalar(
+                select(AnalystSnapshot)
+                .where(AnalystSnapshot.entity_id == entity.id)
+                .order_by(AnalystSnapshot.fetched_at.desc())
+            )
         )
 
     return EntityCardOut(
@@ -168,6 +191,7 @@ def entity_card(session: Session, entity: Entity) -> EntityCardOut:
         price=price_snap.price if price_snap else None,
         change_percent=price_snap.change_percent if price_snap else None,
         price_updated_at=price_snap.fetched_at if price_snap else None,
+        analyst=analyst,
     )
 
 

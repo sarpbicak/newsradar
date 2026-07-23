@@ -8,6 +8,7 @@ import ChatPanel from "./ChatPanel.jsx";
 import SentimentChart from "./SentimentChart.jsx";
 import RiskHistoryChart from "./RiskHistoryChart.jsx";
 import PriceHistoryChart from "./PriceHistoryChart.jsx";
+import AnalystConsensus from "./AnalystConsensus.jsx";
 
 export default function EntityDetail({ entityId, onBack }) {
   const [data, setData] = useState(null);
@@ -122,6 +123,9 @@ export default function EntityDetail({ entityId, onBack }) {
           </div>
         </div>
       )}
+
+      {/* Analist konsensüsü (yalnızca ticker + veri varsa) */}
+      <AnalystConsensus analyst={entity.analyst} price={entity.price} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Risk üstte, fiyat altta — aynı tarih ekseninde okunur */}
