@@ -140,6 +140,11 @@ class Suggestion(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     ticker: Mapped[str | None] = mapped_column(String(20), nullable=True)
     is_public: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    # Ülke/borsa ipucu (Claude biliyorsa; add sırasında ABD-listeli mi kararı için).
+    country: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    exchange: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    # Bu öneri hangi entity'nin haberinden geldiyse onun dili (add'de keyword dili).
+    source_language: Mapped[str] = mapped_column(String(5), default="en", nullable=False)
     # Tekilleştirme anahtarı (ticker'a ya da isme göre normalize).
     norm_key: Mapped[str] = mapped_column(String(220), nullable=False)
     mention_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

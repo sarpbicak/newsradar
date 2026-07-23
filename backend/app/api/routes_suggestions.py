@@ -22,6 +22,38 @@ router = APIRouter(prefix="/suggestions", tags=["suggestions"])
 MIN_MENTIONS = 3   # bu sayının altındaki öneriler gösterilmez (gürültü filtresi)
 MAX_RESULTS = 10
 
+# ABD borsası sinyalleri (Finnhub ücretsiz katmanı yalnızca bunları kapsar).
+_US_COUNTRIES = {"us", "usa", "united states", "u.s.", "u.s.a.", "america"}
+_US_EXCHANGES = ("nasdaq", "nyse", "new york", "amex", "cboe", "bats")
+
+
+def _is_us_listed(sug: Suggestion) -> bool:
+    """Öneri ABD borsasında işlem gören halka açık bir şirket mi?
+
+    Ticker yalnızca EMİN olunca seçilir: halka açık + ABD ülke/borsa sinyali +
+    kaynak dili İngilizce + sembol mevcut. Aksi/belirsiz → keyword (güvenli).
+    """
+    if not sug.is_public or not sug.ticker:
+        return False
+    if (sug.source_language or "en") != "en":
+        return False  # ABD-dışı dilden gelen mention → keyword
+    country = (sug.country or "").strip().lower()
+    exchange = (sug.exchange or "").strip().lower()
+    us_country = country in _US_COUNTRIES
+    us_exchange = any(x in exchange for x in _US_EXCHANGES)
+    # ABD sinyali YOKSA (country/exchange boş ya da farklı) emin değiliz → keyword.
+    return us_country or us_exchange
+
+
+def resolve_add_target(sug: Suggestion) -> tuple[str, str, str]:
+    """Bu öneri eklenirse (type, query, language) ne olacağını döndürür.
+
+    add ucu ve liste gösterimi AYNI mantığı kullanır (sürpriz olmasın).
+    """
+    if _is_us_listed(sug):
+        return "ticker", sug.ticker.strip().upper(), "en"
+    return "keyword", sug.name.strip(), (sug.source_language or "en")
+
 
 def _watchlist_terms(db: Session) -> set[str]:
     """İzleme listesindeki tüm isim ve query'lerin lowercase kümesi (eşleşme için)."""
@@ -42,6 +74,7 @@ def _in_watchlist(sug: Suggestion, terms: set[str]) -> bool:
 
 def _suggestion_out(db: Session, sug: Suggestion, name_by_id: dict[int, str]) -> SuggestionOut:
     names = [name_by_id[i] for i in (sug.source_entity_ids or []) if i in name_by_id]
+    add_type, _query, add_lang = resolve_add_target(sug)
     return SuggestionOut(
         id=sug.id,
         name=sug.name,
@@ -51,6 +84,8 @@ def _suggestion_out(db: Session, sug: Suggestion, name_by_id: dict[int, str]) ->
         sample_rationale=sug.sample_rationale,
         source_entity_names=names,
         last_seen_at=sug.last_seen_at,
+        add_as_type=add_type,
+        add_as_language=add_lang if add_type == "keyword" else None,
     )
 
 
@@ -94,10 +129,9 @@ def add_suggestion(suggestion_id: int, db: Session = Depends(get_db)) -> EntityC
     if sug is None:
         raise HTTPException(status_code=404, detail="Öneri bulunamadı.")
 
-    if sug.ticker and sug.is_public:
-        etype, query = "ticker", sug.ticker.strip().upper()
-    else:
-        etype, query = "keyword", sug.name.strip()
+    # ABD borsası + halka açık + İngilizce kaynak ise ticker; aksi halde keyword
+    # + kaynak dili (Türk/Avrupa şirketleri Finnhub'da çalışmaz → keyword).
+    etype, query, language = resolve_add_target(sug)
 
     sug.dismissed = True  # her durumda öneriyi kaldır
 
@@ -108,7 +142,7 @@ def add_suggestion(suggestion_id: int, db: Session = Depends(get_db)) -> EntityC
     if existing is not None:
         return entity_card(db, existing)
 
-    entity = Entity(name=sug.name.strip(), type=etype, query=query)
+    entity = Entity(name=sug.name.strip(), type=etype, query=query, language=language)
     db.add(entity)
     try:
         db.flush()

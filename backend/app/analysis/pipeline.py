@@ -58,9 +58,13 @@ def _suggestion_key(name: str, ticker: str | None) -> str:
 
 
 def _accumulate_suggestions(
-    session: Session, entity_id: int, co_list: list[dict], rationale: str
+    session: Session, entity_id: int, source_language: str, co_list: list[dict], rationale: str
 ) -> None:
-    """Co-mentioned şirketleri suggestions tablosuna yaz/güncelle (upsert)."""
+    """Co-mentioned şirketleri suggestions tablosuna yaz/güncelle (upsert).
+
+    source_language: co-mention'ın geldiği entity'nin dili — keyword olarak
+    eklenecekse bu dil miras alınır (ilk görülende sabitlenir).
+    """
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     for c in co_list:
         key = _suggestion_key(c["name"], c["ticker"])
@@ -69,6 +73,8 @@ def _accumulate_suggestions(
             session.add(
                 Suggestion(
                     name=c["name"], ticker=c["ticker"], is_public=c["is_public"],
+                    country=c.get("country"), exchange=c.get("exchange"),
+                    source_language=source_language or "en",
                     norm_key=key, mention_count=1, source_entity_ids=[entity_id],
                     sample_rationale=rationale or None, first_seen_at=now, last_seen_at=now,
                 )
@@ -86,6 +92,10 @@ def _accumulate_suggestions(
                 sug.ticker = c["ticker"]
             if sug.is_public is None and c["is_public"] is not None:
                 sug.is_public = c["is_public"]
+            if not sug.country and c.get("country"):
+                sug.country = c["country"]
+            if not sug.exchange and c.get("exchange"):
+                sug.exchange = c["exchange"]
             ids = list(sug.source_entity_ids or [])
             if entity_id not in ids:
                 ids.append(entity_id)
@@ -179,6 +189,8 @@ def _apply_article_results(entity_id: int, batch_datas: list[dict]) -> dict:
     discarded = 0
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     with session_scope() as session:
+        source_entity = session.get(Entity, entity_id)
+        source_language = source_entity.language if source_entity else "en"
         for data in batch_datas:
             for raw in data.get("analyses", []):
                 try:
@@ -204,7 +216,7 @@ def _apply_article_results(entity_id: int, batch_datas: list[dict]) -> dict:
                 # Öneri biriktir: yalnızca İLGİLİ (kalan) makalelerin co-mention'ları.
                 if clean.get("co_mentioned"):
                     _accumulate_suggestions(
-                        session, entity_id, clean["co_mentioned"], clean["rationale"]
+                        session, entity_id, source_language, clean["co_mentioned"], clean["rationale"]
                     )
     return {"analyzed": analyzed, "discarded": discarded}
 

@@ -76,8 +76,22 @@ ARTICLE_ANALYSIS_TOOL = {
                                         "type": ["boolean", "null"],
                                         "description": "Halka açık mı; emin değilsen null",
                                     },
+                                    "country": {
+                                        "type": ["string", "null"],
+                                        "description": (
+                                            "Şirketin merkez/ana borsa ülkesi, ISO kodu "
+                                            "(US, TR, DE, FR...). Emin değilsen null."
+                                        ),
+                                    },
+                                    "exchange": {
+                                        "type": ["string", "null"],
+                                        "description": (
+                                            "İşlem gördüğü ana borsa biliniyorsa "
+                                            "(NASDAQ, NYSE, BIST, XETRA...), yoksa null."
+                                        ),
+                                    },
                                 },
-                                "required": ["name", "ticker", "is_public"],
+                                "required": ["name", "ticker", "is_public", "country", "exchange"],
                                 "additionalProperties": False,
                             },
                         },
@@ -163,7 +177,14 @@ def sanitize_co_mentioned(raw: object) -> list[dict]:
         ticker = str(ticker).strip().upper() if ticker else None
         is_public = c.get("is_public")
         is_public = is_public if isinstance(is_public, bool) else None
-        out.append({"name": name, "ticker": ticker or None, "is_public": is_public})
+        country = c.get("country")
+        country = str(country).strip() if country else None
+        exchange = c.get("exchange")
+        exchange = str(exchange).strip() if exchange else None
+        out.append({
+            "name": name, "ticker": ticker or None, "is_public": is_public,
+            "country": country or None, "exchange": exchange or None,
+        })
     return out
 
 

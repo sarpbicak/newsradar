@@ -55,6 +55,17 @@ export default function SuggestionsSection({ suggestions, onAdd, onDismiss }) {
                 </div>
               )}
 
+              {/* Eklenince ne olacağı — sürpriz olmasın */}
+              <div className="text-[11px] text-slate-500">
+                {s.add_as_type === "ticker" ? (
+                  <span className="text-sky-400">↳ ticker olarak eklenecek (ABD borsası)</span>
+                ) : (
+                  <span className="text-slate-400">
+                    ↳ keyword{s.add_as_language ? ` (${s.add_as_language})` : ""} olarak eklenecek
+                  </span>
+                )}
+              </div>
+
               <div className="mt-1 flex gap-2">
                 <button
                   onClick={() => handle(onAdd, s.id)}

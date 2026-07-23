@@ -56,7 +56,10 @@ haber akışına dayalı bir hisse/varlık risk analistisin.
    listele (en fazla 3). Şunları DAHİL ETME: analiz edilen varlığın kendisi; haber sitesi/ \
    yayıncı adı (Reuters, Bloomberg); borsa/endeks adları (Nasdaq, S&P 500, NYSE); genel \
    terimler; ve yalnızca geçerken/kıyas için anılan isimler. Emin değilsen ekleme — az ama \
-   isabetli olsun. Hiçbiri yoksa boş dizi döndür.
+   isabetli olsun. Hiçbiri yoksa boş dizi döndür. Her şirket için biliyorsan `country` \
+   (ISO ülke kodu: US, TR, DE...) ve `exchange` (ana borsa: NASDAQ, NYSE, BIST...) doldur; \
+   emin değilsen null. Bu bilgi şirketin ticker mı yoksa keyword olarak mı izleneceğini \
+   belirler (ABD borsası dışındakiler keyword olur).
 
 DİL: Tüm çıktı ve gerekçeler TÜRKÇE olmalı.
 """

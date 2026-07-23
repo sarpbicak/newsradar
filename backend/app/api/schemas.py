@@ -128,6 +128,9 @@ class SuggestionOut(BaseModel):
     sample_rationale: str | None
     source_entity_names: list[str]
     last_seen_at: datetime
+    # Eklenince ne olacağı (kullanıcıya önceden göstermek için).
+    add_as_type: str            # "ticker" | "keyword"
+    add_as_language: str | None  # keyword ise dil, ticker ise None
 
 
 class RiskPointOut(BaseModel):
