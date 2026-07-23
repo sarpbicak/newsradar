@@ -2,6 +2,7 @@
 import React, { useMemo, useState } from "react";
 import EntityCard from "./EntityCard.jsx";
 import WatchlistManager from "./WatchlistManager.jsx";
+import SuggestionsSection from "./SuggestionsSection.jsx";
 import { stanceLabel } from "./ui.jsx";
 
 // Değişim büyüklüğü: risk farkı + yön değişimi (ağır) + duygu farkı.
@@ -44,7 +45,15 @@ const SORTS = {
   alpha: { label: "Alfabetik", fn: (a, b) => a.name.localeCompare(b.name, "tr") },
 };
 
-export default function Overview({ cards, onOpen, onCreate, onDelete }) {
+export default function Overview({
+  cards,
+  onOpen,
+  onCreate,
+  onDelete,
+  suggestions,
+  onAddSuggestion,
+  onDismissSuggestion,
+}) {
   const [sort, setSort] = useState("change");
 
   const sorted = useMemo(() => [...cards].sort(SORTS[sort].fn), [cards, sort]);
@@ -116,6 +125,12 @@ export default function Overview({ cards, onOpen, onCreate, onDelete }) {
           </div>
         </>
       )}
+
+      <SuggestionsSection
+        suggestions={suggestions}
+        onAdd={onAddSuggestion}
+        onDismiss={onDismissSuggestion}
+      />
 
       <WatchlistManager cards={cards} onCreate={onCreate} onDelete={onDelete} />
     </div>

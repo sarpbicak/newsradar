@@ -122,6 +122,33 @@ class Article(Base):
     )
 
 
+class Suggestion(Base):
+    """Öneri: analiz edilen haberlerde geçen ama izleme listesinde OLMAYAN şirketler.
+
+    Co-mentioned varlıklardan biriktirilir. `norm_key` ile tekilleştirilir:
+    ticker varsa 't:TICKER', yoksa 'n:isim' (lowercase). Filtreleme (izleme
+    listesinde olanları/dismissed/az anılanları eleme) LİSTELEME anında yapılır.
+    """
+
+    __tablename__ = "suggestions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    ticker: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    is_public: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    # Tekilleştirme anahtarı (ticker'a ya da isme göre normalize).
+    norm_key: Mapped[str] = mapped_column(String(220), nullable=False)
+    mention_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Hangi entity'lerin haberlerinde geçti (id listesi).
+    source_entity_ids: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    sample_rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    dismissed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    __table_args__ = (UniqueConstraint("norm_key", name="uq_suggestion_norm"),)
+
+
 class EntityAnalysis(Base):
     """Bir entity için toplu (aggregate) Claude analizi — zaman içinde birden çok satır."""
 

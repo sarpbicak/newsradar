@@ -10,6 +10,7 @@ export default function App() {
   const [authed, setAuthed] = useState(() => !!getToken());
   const [cards, setCards] = useState([]);
   const [status, setStatus] = useState(null);
+  const [suggestions, setSuggestions] = useState([]);
   const [selected, setSelected] = useState(null); // entity id | null
   const [starting, setStarting] = useState(false); // 'Yenile'ye basıldı, sunucu henüz onaylamadı
   const [loadError, setLoadError] = useState(null);
@@ -26,9 +27,14 @@ export default function App() {
 
   const loadCards = useCallback(async () => {
     try {
-      const [c, s] = await Promise.all([api.listEntities(), api.status()]);
+      const [c, s, sug] = await Promise.all([
+        api.listEntities(),
+        api.status(),
+        api.listSuggestions(),
+      ]);
       setCards(c);
       setStatus(s);
+      setSuggestions(sug);
       setLoadError(null);
     } catch (e) {
       setLoadError(e.message);
@@ -49,10 +55,15 @@ export default function App() {
     let timer;
     async function tick() {
       try {
-        const [c, s] = await Promise.all([api.listEntities(), api.status()]);
+        const [c, s, sug] = await Promise.all([
+          api.listEntities(),
+          api.status(),
+          api.listSuggestions(),
+        ]);
         if (cancelled) return;
         setCards(c);
         setStatus(s);
+        setSuggestions(sug);
         setLoadError(null);
         if (s.is_running) {
           setStarting(false); // sunucu çalıştığını doğruladı
@@ -94,6 +105,7 @@ export default function App() {
     setSelected(null);
     setCards([]);
     setStatus(null);
+    setSuggestions([]);
   }
 
   // Giriş yapılmadıysa panoyu hiç yükleme — önce şifre ekranı.
@@ -120,6 +132,21 @@ export default function App() {
     await api.deleteEntity(id);
     if (selected === id) setSelected(null);
     await loadCards();
+  }
+
+  async function handleAddSuggestion(id) {
+    const entity = await api.addSuggestion(id);
+    await loadCards(); // entity listesi + öneriler otomatik güncellensin
+    setNotice({
+      type: "ok",
+      text: `${entity.name} izleme listesine eklendi — bir sonraki yenilemede analiz edilecek.`,
+      details: [],
+    });
+  }
+
+  async function handleDismissSuggestion(id) {
+    await api.dismissSuggestion(id);
+    setSuggestions((prev) => prev.filter((s) => s.id !== id));
   }
 
   // Eksik anahtar uyarıları (status'tan).
@@ -219,6 +246,9 @@ export default function App() {
             onOpen={setSelected}
             onCreate={handleCreate}
             onDelete={handleDelete}
+            suggestions={suggestions}
+            onAddSuggestion={handleAddSuggestion}
+            onDismissSuggestion={handleDismissSuggestion}
           />
         ) : (
           <EntityDetail entityId={selected} onBack={() => setSelected(null)} />

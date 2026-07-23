@@ -55,10 +55,36 @@ ARTICLE_ANALYSIS_TOOL = {
                             "type": "string",
                             "description": "Tek cümlelik gerekçe, TÜRKÇE.",
                         },
+                        "co_mentioned_entities": {
+                            "type": "array",
+                            "description": (
+                                "Bu haberin İÇERİĞİNDE anlamlı biçimde geçen, haberin "
+                                "konusu olan DİĞER şirketler (en fazla 3). Analiz edilen "
+                                "varlığın KENDİSİNİ, haber sitesi/borsa adını, genel "
+                                "terimleri (S&P 500, Nasdaq) ve yalnızca geçerken anılan "
+                                "isimleri EKLEME. Hiçbiri yoksa boş dizi ([]) döndür."
+                            ),
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {"type": "string", "description": "Şirket adı, örn. AMD"},
+                                    "ticker": {
+                                        "type": ["string", "null"],
+                                        "description": "Borsa sembolü biliniyorsa (AMD), yoksa null",
+                                    },
+                                    "is_public": {
+                                        "type": ["boolean", "null"],
+                                        "description": "Halka açık mı; emin değilsen null",
+                                    },
+                                },
+                                "required": ["name", "ticker", "is_public"],
+                                "additionalProperties": False,
+                            },
+                        },
                     },
                     "required": [
                         "id", "sentiment", "event_type", "risk_flags",
-                        "impact_horizon", "relevance", "rationale",
+                        "impact_horizon", "relevance", "rationale", "co_mentioned_entities",
                     ],
                     "additionalProperties": False,
                 },
@@ -119,6 +145,28 @@ def clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
 
 
+def sanitize_co_mentioned(raw: object) -> list[dict]:
+    """Co-mentioned şirket listesini güvenli hale getirir (en fazla 3, toleranslı).
+
+    Eski analizlerde bu alan olmayabilir; eksik/bozuk girdi boş liste döner (hata değil).
+    """
+    out: list[dict] = []
+    if not isinstance(raw, list):
+        return out
+    for c in raw[:3]:
+        if not isinstance(c, dict):
+            continue
+        name = str(c.get("name", "")).strip()
+        if not name:
+            continue
+        ticker = c.get("ticker")
+        ticker = str(ticker).strip().upper() if ticker else None
+        is_public = c.get("is_public")
+        is_public = is_public if isinstance(is_public, bool) else None
+        out.append({"name": name, "ticker": ticker or None, "is_public": is_public})
+    return out
+
+
 def sanitize_article_analysis(item: dict) -> dict:
     """Claude'dan gelen tek makale analizini güvenli aralıklara çeker."""
     return {
@@ -129,6 +177,8 @@ def sanitize_article_analysis(item: dict) -> dict:
         "impact_horizon": item.get("impact_horizon") if item.get("impact_horizon") in IMPACT_HORIZONS else "short",
         "relevance": clamp(float(item.get("relevance", 0.0)), 0.0, 1.0),
         "rationale": str(item.get("rationale", "")).strip(),
+        # Yeni alan; eski çıktılarda yoksa boş liste (kod tolere eder).
+        "co_mentioned": sanitize_co_mentioned(item.get("co_mentioned_entities")),
     }
 
 

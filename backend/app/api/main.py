@@ -14,7 +14,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from .. import scheduler
 from ..config import get_settings
 from ..db.database import init_db
-from . import routes_auth, routes_chat, routes_dashboard, routes_entities, routes_refresh
+from . import (
+    routes_auth,
+    routes_chat,
+    routes_dashboard,
+    routes_entities,
+    routes_refresh,
+    routes_suggestions,
+)
 from .routes_auth import require_auth
 
 logging.basicConfig(level=logging.INFO)
@@ -54,6 +61,7 @@ app.include_router(routes_entities.router, dependencies=_protected)
 app.include_router(routes_dashboard.router, dependencies=_protected)
 app.include_router(routes_refresh.router, dependencies=_protected)
 app.include_router(routes_chat.router, dependencies=_protected)
+app.include_router(routes_suggestions.router, dependencies=_protected)
 
 
 @app.get("/health", tags=["health"])

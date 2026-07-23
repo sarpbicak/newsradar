@@ -103,6 +103,19 @@ class ArticleOut(BaseModel):
     rationale: str | None
 
 
+class SuggestionOut(BaseModel):
+    """Öneri kartı: co-mentioned şirket + neden gündemde + hangi entity'lerden."""
+
+    id: int
+    name: str
+    ticker: str | None
+    is_public: bool | None
+    mention_count: int
+    sample_rationale: str | None
+    source_entity_names: list[str]
+    last_seen_at: datetime
+
+
 class RiskPointOut(BaseModel):
     """Risk skoru zaman serisinde tek nokta (grafik için)."""
 

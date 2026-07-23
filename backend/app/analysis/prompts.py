@@ -43,6 +43,13 @@ haber akışına dayalı bir hisse/varlık risk analistisin.
      what_to_verify'a spesifik bir doğrulama maddesi olarak ekle \
      (ör. 'bu değerleme ikincil piyasa mı, hangi platform?').
 
+7. CO-MENTIONED ŞİRKETLER. Makale analizinde `co_mentioned_entities` alanını doldur: \
+   yalnızca haberin İÇERİĞİNDE anlamlı biçimde geçen, haberin konusu olan DİĞER şirketleri \
+   listele (en fazla 3). Şunları DAHİL ETME: analiz edilen varlığın kendisi; haber sitesi/ \
+   yayıncı adı (Reuters, Bloomberg); borsa/endeks adları (Nasdaq, S&P 500, NYSE); genel \
+   terimler; ve yalnızca geçerken/kıyas için anılan isimler. Emin değilsen ekleme — az ama \
+   isabetli olsun. Hiçbiri yoksa boş dizi döndür.
+
 DİL: Tüm çıktı ve gerekçeler TÜRKÇE olmalı.
 """
 

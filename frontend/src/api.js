@@ -89,6 +89,10 @@ export const api = {
   deleteEntity: (id) => req(`/entities/${id}`, { method: "DELETE" }),
   dashboard: (id) => req(`/entities/${id}/dashboard`),
   refresh: () => req("/refresh", { method: "POST" }),
+  // Öneriler (co-mentioned şirketler)
+  listSuggestions: () => req("/suggestions"),
+  dismissSuggestion: (id) => req(`/suggestions/${id}/dismiss`, { method: "POST" }),
+  addSuggestion: (id) => req(`/suggestions/${id}/add`, { method: "POST" }),
 };
 
 // Sohbet: POST /chat text/event-stream döner. EventSource yalnızca GET

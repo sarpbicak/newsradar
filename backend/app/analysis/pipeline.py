@@ -20,14 +20,14 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from ..config import get_settings
 from ..db.database import session_scope
-from ..db.models import Article, Entity, EntityAnalysis
+from ..db.models import Article, Entity, EntityAnalysis, Suggestion
 from .claude_client import ClaudeClient, ClaudeError
 from .prompts import (
     SYSTEM_PROMPT,
@@ -46,6 +46,63 @@ logger = logging.getLogger("newsradar.analysis")
 
 AGGREGATE_LOOKBACK = 20  # entity değerlendirmesinde kaç son makale bağlam olarak verilir
 MAX_ANALYSIS_HISTORY = 100  # entity başına saklanacak en fazla değerlendirme kaydı
+SUGGESTION_TTL_DAYS = 30    # bu süreden eski + az anılan öneriler temizlenir
+
+
+def _suggestion_key(name: str, ticker: str | None) -> str:
+    """Öneri tekilleştirme anahtarı: ticker varsa ona, yoksa isme göre."""
+    if ticker:
+        return f"t:{ticker.strip().upper()}"
+    return f"n:{name.strip().lower()}"
+
+
+def _accumulate_suggestions(
+    session: Session, entity_id: int, co_list: list[dict], rationale: str
+) -> None:
+    """Co-mentioned şirketleri suggestions tablosuna yaz/güncelle (upsert)."""
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    for c in co_list:
+        key = _suggestion_key(c["name"], c["ticker"])
+        sug = session.scalar(select(Suggestion).where(Suggestion.norm_key == key))
+        if sug is None:
+            session.add(
+                Suggestion(
+                    name=c["name"], ticker=c["ticker"], is_public=c["is_public"],
+                    norm_key=key, mention_count=1, source_entity_ids=[entity_id],
+                    sample_rationale=rationale or None, first_seen_at=now, last_seen_at=now,
+                )
+            )
+            # autoflush=False: aynı session'da sonraki aynı-şirket aramaları bunu
+            # bulabilsin diye hemen flush et (yoksa mükerrer insert → unique hatası).
+            session.flush()
+        else:
+            sug.mention_count += 1
+            sug.last_seen_at = now
+            if rationale:
+                sug.sample_rationale = rationale
+            # Eksik bilgiyi sonradan öğrenilirse doldur.
+            if not sug.ticker and c["ticker"]:
+                sug.ticker = c["ticker"]
+            if sug.is_public is None and c["is_public"] is not None:
+                sug.is_public = c["is_public"]
+            ids = list(sug.source_entity_ids or [])
+            if entity_id not in ids:
+                ids.append(entity_id)
+                sug.source_entity_ids = ids  # yeni liste ata → değişiklik algılansın
+
+
+def prune_stale_suggestions() -> int:
+    """30 günden beri görülmemiş ve hâlâ az anılan (<3) önerileri temizler."""
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=SUGGESTION_TTL_DAYS)
+    with session_scope() as session:
+        stale = session.scalars(
+            select(Suggestion.id).where(
+                Suggestion.mention_count < 3, Suggestion.last_seen_at < cutoff
+            )
+        ).all()
+        if stale:
+            session.execute(delete(Suggestion).where(Suggestion.id.in_(stale)))
+        return len(stale)
 
 
 @dataclass
@@ -143,6 +200,11 @@ def _apply_article_results(entity_id: int, batch_datas: list[dict]) -> dict:
                 article.analyzed = True
                 article.analyzed_at = now
                 analyzed += 1
+                # Öneri biriktir: yalnızca İLGİLİ (kalan) makalelerin co-mention'ları.
+                if clean.get("co_mentioned"):
+                    _accumulate_suggestions(
+                        session, entity_id, clean["co_mentioned"], clean["rationale"]
+                    )
     return {"analyzed": analyzed, "discarded": discarded}
 
 
@@ -300,6 +362,11 @@ async def analyze_all_async(
     await asyncio.gather(
         *[_process_entity(t) for t in entity_tasks], return_exceptions=False
     )
+
+    # Bakım: tablo şişmesin diye eski/az anılan önerileri temizle.
+    async with db_lock:
+        await asyncio.to_thread(prune_stale_suggestions)
+
     return totals
 
 
