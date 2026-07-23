@@ -21,6 +21,7 @@ from . import (
     routes_entities,
     routes_refresh,
     routes_suggestions,
+    routes_symbols,
 )
 from .routes_auth import require_auth
 
@@ -62,6 +63,7 @@ app.include_router(routes_dashboard.router, dependencies=_protected)
 app.include_router(routes_refresh.router, dependencies=_protected)
 app.include_router(routes_chat.router, dependencies=_protected)
 app.include_router(routes_suggestions.router, dependencies=_protected)
+app.include_router(routes_symbols.router, dependencies=_protected)
 
 
 @app.get("/health", tags=["health"])

@@ -174,6 +174,15 @@ class RefreshAck(BaseModel):
     message: str
 
 
+class SymbolResultOut(BaseModel):
+    """Sembol arama sonucu (ticker eklerken otomatik tamamlama)."""
+
+    symbol: str
+    description: str
+    type: str
+    market: str  # "US" ya da yabancı borsa son eki (IS, DE, L...)
+
+
 class ProviderStatusOut(BaseModel):
     providers: dict[str, bool]
     claude: bool

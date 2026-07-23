@@ -89,6 +89,7 @@ export const api = {
   deleteEntity: (id) => req(`/entities/${id}`, { method: "DELETE" }),
   dashboard: (id) => req(`/entities/${id}/dashboard`),
   refresh: () => req("/refresh", { method: "POST" }),
+  searchSymbols: (q) => req(`/symbol-search?q=${encodeURIComponent(q)}`),
   // Öneriler (co-mentioned şirketler)
   listSuggestions: () => req("/suggestions"),
   dismissSuggestion: (id) => req(`/suggestions/${id}/dismiss`, { method: "POST" }),
