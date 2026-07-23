@@ -1,10 +1,18 @@
 // İzleme listesi yöneticisi: ticker/keyword tip seçiciyle ekle/çıkar.
 import React, { useState } from "react";
 
+const LANGUAGES = [
+  { code: "en", label: "İngilizce" },
+  { code: "tr", label: "Türkçe" },
+  { code: "de", label: "Almanca" },
+  { code: "fr", label: "Fransızca" },
+];
+
 export default function WatchlistManager({ cards, onCreate, onDelete }) {
   const [name, setName] = useState("");
   const [type, setType] = useState("ticker");
   const [query, setQuery] = useState("");
+  const [language, setLanguage] = useState("en");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
 
@@ -14,7 +22,9 @@ export default function WatchlistManager({ cards, onCreate, onDelete }) {
     setBusy(true);
     setErr(null);
     try {
-      await onCreate({ name: name.trim(), type, query: query.trim() });
+      // Dil yalnızca keyword aramasında anlamlı; ticker (Finnhub/ABD) hep en.
+      const lang = type === "keyword" ? language : "en";
+      await onCreate({ name: name.trim(), type, query: query.trim(), language: lang });
       setName("");
       setQuery("");
     } catch (e2) {
@@ -60,6 +70,23 @@ export default function WatchlistManager({ cards, onCreate, onDelete }) {
             className="w-32 rounded-md border border-ink-500 bg-ink-900 px-2 py-1 text-sm outline-none focus:border-accent"
           />
         </div>
+        {/* Dil yalnızca keyword aramasında görünür (ticker haberleri ABD/İngilizce). */}
+        {type === "keyword" && (
+          <div className="flex flex-col">
+            <label className="mb-1 text-[10px] uppercase text-slate-500">Dil</label>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              className="rounded-md border border-ink-500 bg-ink-900 px-2 py-1 text-sm outline-none focus:border-accent"
+            >
+              {LANGUAGES.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <button
           disabled={busy}
           className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
@@ -80,6 +107,11 @@ export default function WatchlistManager({ cards, onCreate, onDelete }) {
               {c.type === "ticker" ? "$" : "#"}
               {c.query}
             </span>
+            {c.language && c.language !== "en" && (
+              <span className="rounded bg-ink-600 px-1 text-[10px] uppercase text-slate-400">
+                {c.language}
+              </span>
+            )}
             <button
               onClick={() => onDelete(c.id)}
               title="Kaldır"

@@ -295,7 +295,10 @@ async def analyze_all_async(
             totals.prefiltered += pre
             batches = [payload[i : i + batch_size] for i in range(0, len(payload), batch_size)]
             entity_tasks.append(
-                {"id": e.id, "name": e.name, "query": e.query, "type": e.type, "batches": batches}
+                {
+                    "id": e.id, "name": e.name, "query": e.query, "type": e.type,
+                    "language": e.language, "batches": batches,
+                }
             )
         # session çıkışında prefiltered işaretleri commit edilir.
 
@@ -319,7 +322,7 @@ async def analyze_all_async(
             )
 
     async def _run_batch(t: dict, b: list[dict]):
-        user = build_article_batch_prompt(t["name"], t["query"], t["type"], b)
+        user = build_article_batch_prompt(t["name"], t["query"], t["type"], b, t["language"])
         try:
             return await _call(ARTICLE_ANALYSIS_TOOL, user, 4096)
         except ClaudeError as exc:
@@ -345,7 +348,9 @@ async def analyze_all_async(
             payload = await asyncio.to_thread(_read_assessment_payload, t["id"])
             price_ctx = await asyncio.to_thread(price_context_for, t["id"])
         if payload:
-            user = build_entity_prompt(t["name"], t["query"], t["type"], payload, price=price_ctx)
+            user = build_entity_prompt(
+                t["name"], t["query"], t["type"], payload, price=price_ctx, language=t["language"]
+            )
             try:
                 adata = await _call(ENTITY_ANALYSIS_TOOL, user, 2000)
                 async with db_lock:
@@ -383,14 +388,14 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient) -> AnalyzeTotals:
         entity = session.get(Entity, entity_id)
         if entity is None:
             return totals
-        name, query, etype = entity.name, entity.query, entity.type
+        name, query, etype, lang = entity.name, entity.query, entity.type, entity.language
         payload, pre = _prefilter(session, entity, max_articles)
         totals.prefiltered += pre
 
     batches = [payload[i : i + batch_size] for i in range(0, len(payload), batch_size)]
     batch_datas: list[dict] = []
     for b in batches:
-        user = build_article_batch_prompt(name, query, etype, b)
+        user = build_article_batch_prompt(name, query, etype, b, lang)
         try:
             batch_datas.append(
                 client.call_tool(
@@ -406,7 +411,9 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient) -> AnalyzeTotals:
 
     payload2 = _read_assessment_payload(entity_id)
     if payload2:
-        user = build_entity_prompt(name, query, etype, payload2, price=price_context_for(entity_id))
+        user = build_entity_prompt(
+            name, query, etype, payload2, price=price_context_for(entity_id), language=lang
+        )
         try:
             adata = client.call_tool(
                 system=SYSTEM_PROMPT, user=user, tool=ENTITY_ANALYSIS_TOOL, max_tokens=2000

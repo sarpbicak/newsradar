@@ -6,7 +6,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, field_validator
 
-from ..db.models import ENTITY_TYPES
+from ..db.models import ENTITY_LANGUAGES, ENTITY_TYPES
 
 
 # --------------------------- İstek modelleri --------------------------- #
@@ -14,12 +14,21 @@ class EntityCreate(BaseModel):
     name: str
     type: str
     query: str
+    language: str = "en"
 
     @field_validator("type")
     @classmethod
     def _valid_type(cls, v: str) -> str:
         if v not in ENTITY_TYPES:
             raise ValueError(f"type '{v}' geçersiz; {ENTITY_TYPES} olmalı.")
+        return v
+
+    @field_validator("language")
+    @classmethod
+    def _valid_language(cls, v: str) -> str:
+        v = (v or "en").strip().lower()
+        if v not in ENTITY_LANGUAGES:
+            raise ValueError(f"language '{v}' geçersiz; {ENTITY_LANGUAGES} olmalı.")
         return v
 
     @field_validator("name", "query")
@@ -76,6 +85,7 @@ class EntityCardOut(BaseModel):
     name: str
     type: str
     query: str
+    language: str = "en"
     active: bool
     article_count: int
     analyzed_count: int

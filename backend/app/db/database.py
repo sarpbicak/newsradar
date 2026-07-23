@@ -48,6 +48,7 @@ def init_db() -> None:
     # create_all mevcut tabloya kolon EKLEMEZ; eski DB'ler için elle ekle.
     _ensure_column("articles", "prefiltered", "BOOLEAN NOT NULL DEFAULT 0")
     _ensure_column("entity_analyses", "avg_sentiment", "FLOAT")
+    _ensure_column("entities", "language", "VARCHAR(5) NOT NULL DEFAULT 'en'")
 
 
 def _ensure_column(table: str, column: str, ddl_type: str) -> None:

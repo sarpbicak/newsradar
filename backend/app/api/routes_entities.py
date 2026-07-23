@@ -23,7 +23,9 @@ def list_entities(db: Session = Depends(get_db)) -> list[EntityCardOut]:
 
 @router.post("", response_model=EntityCardOut, status_code=201)
 def create_entity(payload: EntityCreate, db: Session = Depends(get_db)) -> EntityCardOut:
-    entity = Entity(name=payload.name, type=payload.type, query=payload.query)
+    entity = Entity(
+        name=payload.name, type=payload.type, query=payload.query, language=payload.language
+    )
     db.add(entity)
     try:
         db.flush()

@@ -27,6 +27,8 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 # İzin verilen değerler (uygulama seviyesinde doğrulama; SQLite enum zorlamaz).
 ENTITY_TYPES = ("ticker", "keyword")
+# Haber arama dili (NewsAPI `language` parametresi). Varsayılan İngilizce.
+ENTITY_LANGUAGES = ("en", "tr", "de", "fr")
 EVENT_TYPES = (
     "earnings", "product", "regulation", "lawsuit", "partnership",
     "funding", "macro", "leadership", "other",
@@ -64,6 +66,8 @@ class Entity(Base):
     type: Mapped[str] = mapped_column(String(20), nullable=False)  # ticker | keyword
     # ticker için sembol (TSLA); keyword için arama sorgusu ("Anthropic").
     query: Mapped[str] = mapped_column(String(200), nullable=False)
+    # Haber arama dili (özellikle keyword/NewsAPI için). Varsayılan 'en'.
+    language: Mapped[str] = mapped_column(String(5), default="en", nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 

@@ -78,6 +78,18 @@ def entity_type_line(entity_type: str) -> str:
     return f"Entity tipi: {label}"
 
 
+_LANG_LABELS = {"en": "İngilizce", "tr": "Türkçe", "de": "Almanca", "fr": "Fransızca"}
+
+
+def language_line(language: str) -> str:
+    """Prompt'a eklenecek kaynak-dil bağlam satırı (çıktı yine TÜRKÇE olacak)."""
+    label = _LANG_LABELS.get((language or "en").lower(), language)
+    return (
+        f"Kaynak haber dili: {label}. Haberler bu dilde olabilir; içeriği bu dilde "
+        "anla ama analiz ÇIKTINI yine TÜRKÇE üret."
+    )
+
+
 def utc_context_line() -> str:
     """Prompt'a bağlam olarak eklenecek güncel UTC zamanı (tek satır)."""
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -85,12 +97,17 @@ def utc_context_line() -> str:
 
 
 def build_article_batch_prompt(
-    entity_name: str, entity_query: str, entity_type: str, articles: list[dict]
+    entity_name: str,
+    entity_query: str,
+    entity_type: str,
+    articles: list[dict],
+    language: str = "en",
 ) -> str:
     """Makale-başı analiz için kullanıcı mesajı (batch)."""
     lines = [
         f"Varlık: {entity_name} (arama: {entity_query}).",
         entity_type_line(entity_type),
+        language_line(language),
         utc_context_line(),
         "",
         "Aşağıdaki haberleri BU varlık açısından analiz et. Her makale için "
@@ -134,11 +151,13 @@ def build_entity_prompt(
     entity_type: str,
     analyzed: list[dict],
     price: dict | None = None,
+    language: str = "en",
 ) -> str:
     """Entity-başı toplu değerlendirme için kullanıcı mesajı."""
     lines = [
         f"Varlık: {entity_name} (arama: {entity_query}).",
         entity_type_line(entity_type),
+        language_line(language),
         utc_context_line(),
         *_price_lines(price),
         f"Aşağıda bu varlıkla ilgili, analiz edilmiş {len(analyzed)} haber var "

@@ -37,11 +37,13 @@ class NewsApiProvider(NewsProvider):
             )
 
         query = entity.query.strip()
+        # Entity'nin dili NewsAPI `language` parametresine geçer (varsayılan en).
+        language = (getattr(entity, "language", None) or "en").strip().lower()
         params = {
             "q": query,
             "from": since.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
             "sortBy": "publishedAt",
-            "language": "en",
+            "language": language,
             "pageSize": _PAGE_SIZE,
             "apiKey": self._settings.newsapi_key,
         }

@@ -155,6 +155,7 @@ def entity_card(session: Session, entity: Entity) -> EntityCardOut:
         name=entity.name,
         type=entity.type,
         query=entity.query,
+        language=entity.language,
         active=entity.active,
         article_count=article_count,
         analyzed_count=analyzed_count,
