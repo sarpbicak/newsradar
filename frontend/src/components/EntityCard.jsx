@@ -19,14 +19,14 @@ export default function EntityCard({ card, onOpen }) {
   return (
     <button
       onClick={() => onOpen(card.id)}
-      className="group relative flex flex-col gap-3 overflow-hidden rounded-xl border border-ink-600 bg-ink-800 p-4 text-left transition hover:border-accent/50 hover:bg-ink-700"
+      className="group relative flex flex-col gap-3 overflow-hidden rounded-xl border border-ink-600 bg-ink-800 p-4 text-left shadow-card transition duration-200 hover:-translate-y-0.5 hover:border-accent/60 hover:shadow-card-hover"
     >
       {/* Yön durumuna göre sol kenar şeridi */}
       <span className="absolute inset-y-0 left-0 w-1" style={{ background: a ? dir : "transparent" }} />
 
       {/* 1. Ad + tip */}
       <div className="flex items-start justify-between gap-2">
-        <div className="font-semibold text-slate-100">{card.name}</div>
+        <div className="font-display font-semibold text-slate-100">{card.name}</div>
         <span className="shrink-0 font-mono text-[11px] text-slate-500">
           {card.type === "ticker" ? "$" : "#"}
           {card.query}
@@ -40,8 +40,9 @@ export default function EntityCard({ card, onOpen }) {
         </div>
       ) : (
         <>
-          {/* 2. Tek cümlelik hüküm (büyük, düz Türkçe) */}
-          <p className="text-[15px] font-medium leading-snug text-slate-100">
+          {/* 2. Tek cümlelik hüküm (büyük, düz Türkçe). Eski analizlerde verdict
+              yoksa özete düşer; her iki durumda da 3 satırla sınırlı ('3 saniye'). */}
+          <p className="line-clamp-3 font-display text-[15px] font-medium leading-snug text-slate-100">
             {a.headline_verdict || a.summary}
           </p>
 

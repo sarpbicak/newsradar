@@ -1,5 +1,48 @@
 // Paylaşılan UI atomları: rozetler, göstergeler, çipler.
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
+
+const REDUCED_MOTION =
+  typeof window !== "undefined" &&
+  window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+// Sayısal değerleri animasyonlu sayaçla gösterir (reduced-motion'da anında).
+export function AnimatedNumber({ value, decimals = 0, prefix = "", suffix = "" }) {
+  const [display, setDisplay] = useState(value ?? 0);
+  const fromRef = useRef(value ?? 0);
+  useEffect(() => {
+    const to = value ?? 0;
+    if (REDUCED_MOTION || fromRef.current === to) {
+      setDisplay(to);
+      fromRef.current = to;
+      return;
+    }
+    const from = fromRef.current;
+    const start = performance.now();
+    const dur = 500;
+    let raf;
+    const tick = (t) => {
+      const p = Math.min((t - start) / dur, 1);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setDisplay(from + (to - from) * eased);
+      if (p < 1) raf = requestAnimationFrame(tick);
+      else fromRef.current = to;
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return (
+    <span className="tabular-nums">
+      {prefix}
+      {display.toFixed(decimals)}
+      {suffix}
+    </span>
+  );
+}
+
+// Skeleton kutusu — yükleme sırasında layout zıplamasın.
+export function Skeleton({ className = "" }) {
+  return <div className={`skeleton ${className}`} />;
+}
 
 // --- Yön (stance) rozeti ---
 const STANCE = {
@@ -35,9 +78,11 @@ export function PriceDisplay({ price, changePercent, updatedAt, showTime = true 
   const up = (changePercent ?? 0) >= 0;
   return (
     <span className="inline-flex items-baseline gap-1.5">
-      <span className="font-semibold text-slate-100">${price.toFixed(2)}</span>
+      <span className="font-mono font-semibold text-slate-100">
+        <AnimatedNumber value={price} decimals={2} prefix="$" />
+      </span>
       {changePercent != null && (
-        <span className={`text-xs font-medium ${up ? "text-emerald-400" : "text-rose-400"}`}>
+        <span className={`font-mono text-xs font-medium ${up ? "text-emerald-400" : "text-rose-400"}`}>
           {up ? "+" : ""}
           {changePercent.toFixed(2)}%
         </span>
@@ -79,10 +124,10 @@ export function StanceBadge({ stance, conviction }) {
 
 // --- Risk skoru rengi (0 yeşil → 100 kırmızı) ---
 export function riskColor(score) {
-  if (score == null) return "#64748b";
-  if (score < 34) return "#34d399";
-  if (score < 67) return "#fbbf24";
-  return "#f87171";
+  if (score == null) return "#94a3b8";
+  if (score < 34) return "#16a34a";
+  if (score < 67) return "#d97706";
+  return "#dc2626";
 }
 
 export function RiskScore({ score }) {
@@ -91,7 +136,7 @@ export function RiskScore({ score }) {
     <div className="flex items-center gap-2">
       <div className="relative h-9 w-9 shrink-0">
         <svg viewBox="0 0 36 36" className="h-9 w-9 -rotate-90">
-          <circle cx="18" cy="18" r="15" fill="none" stroke="#1f2838" strokeWidth="4" />
+          <circle cx="18" cy="18" r="15" fill="none" stroke="#E4E8EF" strokeWidth="4" />
           <circle
             cx="18" cy="18" r="15" fill="none" stroke={color} strokeWidth="4"
             strokeDasharray={`${(2 * Math.PI * 15 * (score ?? 0)) / 100} ${2 * Math.PI * 15}`}
@@ -114,7 +159,7 @@ export function RiskScore({ score }) {
 export function SentimentGauge({ value }) {
   const v = value ?? 0;
   const pct = ((v + 1) / 2) * 100; // -1..1 -> 0..100
-  const color = v > 0.15 ? "#34d399" : v < -0.15 ? "#f87171" : "#94a3b8";
+  const color = v > 0.15 ? "#16a34a" : v < -0.15 ? "#dc2626" : "#94a3b8";
   return (
     <div className="w-full">
       <div className="flex justify-between text-[10px] text-slate-500 mb-1">
@@ -125,7 +170,7 @@ export function SentimentGauge({ value }) {
         <span>+</span>
       </div>
       <div className="relative h-1.5 w-full rounded-full bg-ink-600">
-        <div className="absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full border-2 border-ink-900"
+        <div className="absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full border-2 border-white"
              style={{ left: `calc(${pct}% - 6px)`, background: color }} />
       </div>
     </div>

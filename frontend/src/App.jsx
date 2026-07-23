@@ -5,6 +5,7 @@ import { api, getToken, logout, setUnauthorizedHandler } from "./api.js";
 import Overview from "./components/Overview.jsx";
 import EntityDetail from "./components/EntityDetail.jsx";
 import Login from "./components/Login.jsx";
+import { Skeleton } from "./components/ui.jsx";
 
 export default function App() {
   const [authed, setAuthed] = useState(() => !!getToken());
@@ -13,6 +14,7 @@ export default function App() {
   const [suggestions, setSuggestions] = useState([]);
   const [selected, setSelected] = useState(null); // entity id | null
   const [starting, setStarting] = useState(false); // 'Yenile'ye basıldı, sunucu henüz onaylamadı
+  const [loaded, setLoaded] = useState(false); // ilk yükleme tamamlandı mı (skeleton için)
   const [loadError, setLoadError] = useState(null);
   const [notice, setNotice] = useState(null);
 
@@ -38,6 +40,8 @@ export default function App() {
       setLoadError(null);
     } catch (e) {
       setLoadError(e.message);
+    } finally {
+      setLoaded(true);
     }
   }, []);
 
@@ -159,12 +163,14 @@ export default function App() {
 
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-10 border-b border-ink-600 bg-ink-900/90 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-ink-600 bg-ink-900/80 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
-          <div className="flex items-center gap-2">
-            <span className="text-lg font-bold text-slate-100">📡 NewsRadar</span>
-            <span className="hidden text-xs text-slate-500 sm:inline">
-              haber akışı bazlı hisse risk analizi
+          <div className="flex items-baseline gap-2">
+            <span className="font-display text-lg font-bold tracking-tight text-slate-100">
+              📡 NewsRadar
+            </span>
+            <span className="hidden font-mono text-[11px] uppercase tracking-wide text-slate-500 sm:inline">
+              haber akışı · risk paneli
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -240,7 +246,19 @@ export default function App() {
           </div>
         )}
 
-        {selected == null ? (
+        {!loaded && selected == null ? (
+          /* İlk yükleme — layout zıplamasın diye iskelet kartlar */
+          <div className="stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="rounded-xl border border-ink-600 bg-ink-800 p-4 shadow-card">
+                <Skeleton className="mb-3 h-4 w-24" />
+                <Skeleton className="mb-3 h-8 w-full" />
+                <Skeleton className="mb-3 h-12 w-full" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+            ))}
+          </div>
+        ) : selected == null ? (
           <Overview
             cards={cards}
             onOpen={setSelected}
@@ -249,15 +267,26 @@ export default function App() {
             suggestions={suggestions}
             onAddSuggestion={handleAddSuggestion}
             onDismissSuggestion={handleDismissSuggestion}
+            scanning={isRefreshing}
           />
         ) : (
           <EntityDetail entityId={selected} onBack={() => setSelected(null)} />
         )}
       </main>
 
-      <footer className="mx-auto max-w-7xl px-6 py-6 text-center text-xs text-slate-600">
-        Haber akışı bazlı sinyal — fiyat tahmini değil, önce doğrula.
+      <footer className="mx-auto max-w-7xl px-6 pb-10 pt-6 text-center text-xs leading-relaxed text-slate-500">
+        Haber akışı bazlı sinyal — değerleme veya fiyat tahmini değil. Analist hedefleri
+        Finnhub konsensüs verisidir. Kararlar size aittir.
       </footer>
+
+      <a
+        className="signature"
+        href="https://github.com/sarpbicak"
+        target="_blank"
+        rel="noreferrer"
+      >
+        built by Sarp Bıçak
+      </a>
     </div>
   );
 }

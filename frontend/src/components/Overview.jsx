@@ -53,6 +53,7 @@ export default function Overview({
   suggestions,
   onAddSuggestion,
   onDismissSuggestion,
+  scanning = false,
 }) {
   const [sort, setSort] = useState("change");
 
@@ -79,7 +80,7 @@ export default function Overview({
               <button
                 key={c.id}
                 onClick={() => onOpen(c.id)}
-                className="flex w-full flex-wrap items-center gap-x-2 text-left text-sm text-slate-300 hover:text-white"
+                className="flex w-full flex-wrap items-center gap-x-2 text-left text-sm text-slate-300 hover:text-accent"
               >
                 <span className="font-semibold text-slate-100">{c.name}</span>
                 <span className="text-slate-400">{changeSummary(c)}</span>
@@ -118,7 +119,11 @@ export default function Overview({
             ))}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div
+            className={`stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ${
+              scanning ? "scan-host rounded-xl" : ""
+            }`}
+          >
             {sorted.map((c) => (
               <EntityCard key={c.id} card={c} onOpen={onOpen} />
             ))}

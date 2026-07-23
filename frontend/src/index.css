@@ -1,9 +1,20 @@
+/* Fontlar (bundled, offline-güvenli) */
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/space-grotesk/500.css";
+@import "@fontsource/space-grotesk/600.css";
+@import "@fontsource/space-grotesk/700.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
+  --grid: rgba(37, 99, 235, 0.05); /* blueprint çizgi rengi (çok soluk) */
 }
 
 html,
@@ -14,20 +25,100 @@ body,
 
 body {
   margin: 0;
-  background-color: #0a0e17;
-  color: #e5e9f0;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #0b1220;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Açık gri zemin + çok düşük opaklıkta ince blueprint grid + üstte soluk degrade */
+  background-color: #eef1f6;
+  background-image:
+    linear-gradient(180deg, rgba(37, 99, 235, 0.06), rgba(37, 99, 235, 0) 320px),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 100% 100%, 32px 32px, 32px 32px;
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* İnce kaydırma çubuğu (koyu tema) */
+/* Teknik/mono ve display fontları için yardımcı sınıflar */
+.font-display {
+  font-family: "Space Grotesk", Inter, system-ui, sans-serif;
+}
+
+/* İnce açık kaydırma çubuğu */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #2a3446;
+  background: #cbd2dd;
   border-radius: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* Kart giriş animasyonu — grid içinde sırayla (stagger) belirsin */
+.stagger > * {
+  animation: card-in 0.4s ease-out both;
+}
+.stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.stagger > *:nth-child(2) { animation-delay: 0.06s; }
+.stagger > *:nth-child(3) { animation-delay: 0.10s; }
+.stagger > *:nth-child(4) { animation-delay: 0.14s; }
+.stagger > *:nth-child(5) { animation-delay: 0.18s; }
+.stagger > *:nth-child(6) { animation-delay: 0.22s; }
+.stagger > *:nth-child(7) { animation-delay: 0.26s; }
+.stagger > *:nth-child(8) { animation-delay: 0.30s; }
+.stagger > *:nth-child(n + 9) { animation-delay: 0.34s; }
+
+/* Yenileme sırasında kart üstünden geçen ince tarama bandı */
+.scan-host { position: relative; overflow: hidden; }
+.scan-host::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(37, 99, 235, 0.10), transparent);
+  animation: scan 1.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Skeleton (iskelet) — layout zıplamasın */
+.skeleton {
+  background: linear-gradient(90deg, #eef1f6 25%, #e2e7f0 37%, #eef1f6 63%);
+  background-size: 400% 100%;
+  animation: skel 1.4s ease infinite;
+  border-radius: 6px;
+}
+@keyframes skel {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+/* İmza — sağ altta sabit, ince, düşük kontrast */
+.signature {
+  position: fixed;
+  right: 12px;
+  bottom: 10px;
+  z-index: 40;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: #aab2c0;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+.signature:hover {
+  color: #2563eb;
+}
+
+/* prefers-reduced-motion — ZORUNLU: kapalıysa tüm animasyonlar dursun */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .scan-host::after { display: none; }
 }
