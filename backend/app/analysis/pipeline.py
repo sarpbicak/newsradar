@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
@@ -131,15 +132,33 @@ class AnalyzeTotals:
 
 
 # ------------------------------ Ön-filtre ------------------------------ #
+def _normalize(text: str) -> str:
+    """Türkçe-güvenli normalizasyon: casefold + aksan/özel karakter duyarsız.
+
+    Python `.lower()` Türkçe için güvenilir değil (İ/ı, Ş, Ğ). Bunun yerine
+    casefold + Unicode NFKD ile birleştirici işaretleri (aksan/çengel) atarız;
+    böylece "ASELSAN'IN", "Türk", "Şişe" gibi haller ASCII karşılıklarıyla eşleşir.
+    """
+    text = (text or "").casefold()
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(c for c in text if not unicodedata.combining(c))
+    # Türkçe dotless ı (U+0131) NFKD ile ayrışmaz; noktalı i ile birleştir ki
+    # "Bankası" (ı) ↔ "BANKASI" (ascii I→i) eşleşsin. (ş/ğ/ç/ö/ü zaten NFKD ile çözülür.)
+    return text.replace("ı", "i")
+
+
 def _match_terms(name: str, query: str) -> list[str]:
-    """Bir makalenin bu entity'ye ait olup olmadığını ucuza sınamak için terimler."""
+    """Bir makalenin bu entity'ye ait olup olmadığını ucuza sınamak için terimler.
+
+    Terimler normalize edilmiş (Türkçe-güvenli) döner.
+    """
     terms: set[str] = set()
     for t in (query, name):
-        t = (t or "").strip().lower()
+        t = _normalize((t or "").strip())
         if len(t) >= 2:
             terms.add(t)
     # Çok kelimeli adlarda tek tek kelimeler de eşleşsin (ör. "Berkshire Hathaway").
-    for w in (name or "").lower().split():
+    for w in _normalize(name or "").split():
         if len(w) >= 3:
             terms.add(w)
     return list(terms)
@@ -164,11 +183,25 @@ def _prefilter(session: Session, entity: Entity, max_articles: int) -> tuple[lis
             .order_by(Article.published_at.desc().nullslast())
         ).all()
     )
+    # KEYWORD entity'lerde ön-filtre GEVŞEK: NewsAPI zaten o terimi aradığı için
+    # sonuç ilgili sayılır (isim gövdede geçip başlıkta geçmeyebilir, Türkçe
+    # kaynaklarda description null olabilir). Sadece tavan uygula, hiçbirini eleme —
+    # alaka güvencesi zaten Claude'un relevance skorunda (<0.3 elenir).
+    if entity.type != "ticker":
+        capped = pending[:max_articles]
+        payload = [
+            {"id": a.id, "title": a.title, "source": a.source, "description": a.description}
+            for a in capped
+        ]
+        return payload, 0
+
+    # TICKER: sıkı ön-filtre (token tasarrufu), ama Türkçe-güvenli ve
+    # başlık+açıklama üzerinden — boş açıklama tek başına eleme sebebi değil.
     terms = _match_terms(entity.name, entity.query)
     kept: list[Article] = []
     prefiltered = 0
     for a in pending:
-        haystack = f"{a.title} {a.description or ''}".lower()
+        haystack = _normalize(f"{a.title} {a.description or ''}")
         if terms and any(term in haystack for term in terms):
             kept.append(a)
         else:
