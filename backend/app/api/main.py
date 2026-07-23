@@ -31,6 +31,15 @@ logging.basicConfig(level=logging.INFO)
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
+    # Ön-filtre kuralı değiştiyse eski sürümle elenmiş makaleleri yeniden aç
+    # (Render'da elle SQL çalıştırılamadığı için açılışta otomatik; idempotent).
+    from ..analysis.pipeline import reconcile_prefilter
+
+    reopened = reconcile_prefilter()
+    if reopened:
+        logging.getLogger("newsradar").info(
+            "Ön-filtre reconcile: %d makale yeniden değerlendirmeye açıldı.", reopened
+        )
     # Deploy: kalıcı olmayan diskte DB boş başlamasın diye opsiyonel oto-seed.
     if get_settings().seed_on_start:
         from ..seed import seed

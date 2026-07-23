@@ -29,6 +29,11 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 ENTITY_TYPES = ("ticker", "keyword")
 # Haber arama dili (NewsAPI `language` parametresi). Varsayılan İngilizce.
 ENTITY_LANGUAGES = ("en", "tr", "de", "fr")
+
+# Ön-filtre kural sürümü. Kurallar değişince ARTIR → eski sürümle prefiltered
+# işaretlenen makaleler açılışta yeniden değerlendirmeye açılır (reconcile_prefilter).
+# v2: keyword'lerde ön-filtre gevşetildi + Türkçe-güvenli eşleşme.
+PREFILTER_VERSION = 2
 EVENT_TYPES = (
     "earnings", "product", "regulation", "lawsuit", "partnership",
     "funding", "macro", "leadership", "other",
@@ -107,6 +112,9 @@ class Article(Base):
     # gönderilmeden elenir ve burada işaretlenir (tekrar değerlendirilmez, ayrıca
     # url_hash korunduğu için tekrar çekilmez de). Panoda gösterilmez.
     prefiltered: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Bu makaleyi eleyen ön-filtre kuralının sürümü (0 = sürümsüz/eski). Güncel
+    # sürümün altındaysa reconcile ile yeniden değerlendirmeye açılır.
+    prefilter_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     # Makale-başı analiz (Claude doldurur; analiz edilene kadar analyzed=False)
     analyzed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

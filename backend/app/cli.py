@@ -134,11 +134,23 @@ def cmd_analyze(args: argparse.Namespace) -> None:
             }, ensure_ascii=False, indent=2))
 
 
+def cmd_reconcile(_args: argparse.Namespace) -> None:
+    """Eski ön-filtre sürümüyle elenmiş makaleleri yeniden değerlendirmeye açar."""
+    from .analysis.pipeline import reconcile_prefilter
+
+    init_db()
+    n = reconcile_prefilter()
+    print(f"Ön-filtre reconcile: {n} makale yeniden değerlendirmeye açıldı.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="newsradar-cli")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("status", help="Sağlayıcı anahtarları + izleme listesi").set_defaults(func=cmd_status)
+    sub.add_parser(
+        "reconcile", help="Eski ön-filtre sürümüyle elenen makaleleri yeniden aç"
+    ).set_defaults(func=cmd_reconcile)
 
     p_fetch = sub.add_parser("fetch", help="Haber çek + yazdır")
     p_fetch.add_argument("query", nargs="?", help="Tek entity (query, örn. TSLA). Boşsa hepsi.")

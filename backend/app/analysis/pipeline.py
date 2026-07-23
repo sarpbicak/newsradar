@@ -23,12 +23,12 @@ import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
 from ..config import get_settings
 from ..db.database import session_scope
-from ..db.models import Article, Entity, EntityAnalysis, Suggestion
+from ..db.models import PREFILTER_VERSION, Article, Entity, EntityAnalysis, Suggestion
 from ..prices import price_context_for
 from .claude_client import ClaudeClient, ClaudeError
 from .prompts import (
@@ -104,6 +104,27 @@ def _accumulate_suggestions(
             if entity_id not in ids:
                 ids.append(entity_id)
                 sug.source_entity_ids = ids  # yeni liste ata → değişiklik algılansın
+
+
+def reconcile_prefilter() -> int:
+    """Eski ön-filtre sürümüyle elenmiş makaleleri yeniden değerlendirmeye açar.
+
+    prefiltered=True ama prefilter_version güncelin (PREFILTER_VERSION) altındaysa →
+    prefiltered=False. Böylece kural değişince (sürüm artınca) açılışta bir kez etkili
+    olur; idempotent (sıfırlanan satırlar bir daha eşleşmez). Render'da da otomatik çalışır.
+
+    Not: yalnızca bayrağı açar — makaleler bir sonraki yenilemede analiz edilir.
+    """
+    with session_scope() as session:
+        result = session.execute(
+            update(Article)
+            .where(
+                Article.prefiltered.is_(True),
+                Article.prefilter_version < PREFILTER_VERSION,
+            )
+            .values(prefiltered=False)
+        )
+        return result.rowcount or 0
 
 
 def prune_stale_suggestions() -> int:
@@ -206,6 +227,7 @@ def _prefilter(session: Session, entity: Entity, max_articles: int) -> tuple[lis
             kept.append(a)
         else:
             a.prefiltered = True
+            a.prefilter_version = PREFILTER_VERSION  # hangi kuralın elediğini işaretle
             prefiltered += 1
 
     capped = kept[:max_articles]  # tavan: gerisi sonraki yenilemede işlenir
