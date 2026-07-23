@@ -41,10 +41,20 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False
 
 
 def init_db() -> None:
-    """Tabloları oluşturur (yoksa). Uygulama açılışında ve seed'de çağrılır."""
+    """Tabloları oluşturur (yoksa) + hafif kolon migration'ı. Açılışta/seed'de çağrılır."""
     from . import models  # noqa: F401 — modelleri Base'e kaydeder
 
     models.Base.metadata.create_all(bind=engine)
+    # create_all mevcut tabloya kolon EKLEMEZ; eski DB'ler için elle ekle.
+    _ensure_column("articles", "prefiltered", "BOOLEAN NOT NULL DEFAULT 0")
+
+
+def _ensure_column(table: str, column: str, ddl_type: str) -> None:
+    """SQLite: kolon yoksa ekler (idempotent basit migration)."""
+    with engine.begin() as conn:
+        cols = {row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table})")}
+        if column not in cols:
+            conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {column} {ddl_type}")
 
 
 @contextmanager

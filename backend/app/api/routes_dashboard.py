@@ -26,7 +26,7 @@ def entity_dashboard(
 
     articles = db.scalars(
         select(Article)
-        .where(Article.entity_id == entity_id)
+        .where(Article.entity_id == entity_id, Article.prefiltered.is_(False))
         .order_by(Article.published_at.desc().nullslast(), Article.fetched_at.desc())
         .limit(limit)
     ).all()

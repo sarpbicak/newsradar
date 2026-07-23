@@ -99,6 +99,11 @@ class Article(Base):
     provider: Mapped[str] = mapped_column(String(40), default="", nullable=False)
     fetched_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
+    # Ön-filtre: entity adı/ticker'ı başlık+açıklamada hiç geçmiyorsa Claude'a
+    # gönderilmeden elenir ve burada işaretlenir (tekrar değerlendirilmez, ayrıca
+    # url_hash korunduğu için tekrar çekilmez de). Panoda gösterilmez.
+    prefiltered: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
     # Makale-başı analiz (Claude doldurur; analiz edilene kadar analyzed=False)
     analyzed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     analyzed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

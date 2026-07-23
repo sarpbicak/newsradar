@@ -1,4 +1,4 @@
-"""Yenileme ucu: POST /refresh — çek + analiz et; zamanlayıcı aç/kapat bayrağı."""
+"""Yenileme uçları: POST /refresh (asenkron) + GET /status (süreç durumu dahil)."""
 
 from __future__ import annotations
 
@@ -6,41 +6,48 @@ from fastapi import APIRouter, Query
 
 from .. import scheduler
 from ..providers import provider_status
-from ..refresh import run_refresh
-from .schemas import ProviderStatusOut, RefreshOut
+from ..refresh import get_state, start_background_refresh
+from .schemas import ProviderStatusOut, RefreshAck
 
 router = APIRouter(tags=["refresh"])
 
 
-@router.post("/refresh", response_model=RefreshOut)
+@router.post("/refresh", response_model=RefreshAck)
 def refresh(
     hours: int | None = Query(None, description="Geriye dönük pencere (saat)"),
     scheduler_enabled: bool | None = Query(
         None, description="Saatlik otomatik yenilemeyi aç/kapat"
     ),
-) -> RefreshOut:
-    """Elle yenileme tetikler; opsiyonel olarak zamanlayıcı bayrağını değiştirir."""
+) -> RefreshAck:
+    """Yenilemeyi ARKA PLANDA başlatır ve hemen döner (tarama 1-2 dk sürebilir).
+
+    Frontend, ilerlemeyi /status'u yoklayarak takip eder. Zaten bir tarama
+    çalışıyorsa yenisi başlatılmaz.
+    """
     if scheduler_enabled is not None:
         scheduler.set_enabled(scheduler_enabled)
 
-    summary = run_refresh(hours)
-    return RefreshOut(
-        fetched_new=summary.fetched_new,
-        analyzed=summary.analyzed,
-        discarded=summary.discarded,
-        entity_assessments=summary.entity_assessments,
-        warnings=summary.warnings,
-        scheduler_enabled=scheduler.is_enabled(),
+    started = start_background_refresh(hours)
+    return RefreshAck(
+        started=started,
+        is_running=True,
+        message="Yenileme başlatıldı." if started else "Yenileme zaten çalışıyor.",
     )
 
 
 @router.get("/status", response_model=ProviderStatusOut)
 def status() -> ProviderStatusOut:
-    """Sağlayıcı anahtarı durumu + Claude + zamanlayıcı (UI uyarıları için)."""
+    """Sağlayıcı/Claude/zamanlayıcı durumu + yenileme süreci (is_running, ilerleme)."""
     from ..config import get_settings
 
+    st = get_state()
     return ProviderStatusOut(
         providers=provider_status(),
         claude=get_settings().claude_available,
         scheduler_enabled=scheduler.is_enabled(),
+        is_running=st["is_running"],
+        progress_done=st["progress_done"],
+        progress_total=st["progress_total"],
+        last_completed_at=st["last_completed_at"],
+        last_summary=st["last_summary"],
     )

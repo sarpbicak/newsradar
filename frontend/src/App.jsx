@@ -11,9 +11,13 @@ export default function App() {
   const [cards, setCards] = useState([]);
   const [status, setStatus] = useState(null);
   const [selected, setSelected] = useState(null); // entity id | null
-  const [refreshing, setRefreshing] = useState(false);
+  const [starting, setStarting] = useState(false); // 'Yenile'ye basıldı, sunucu henüz onaylamadı
   const [loadError, setLoadError] = useState(null);
   const [notice, setNotice] = useState(null);
+
+  // Tarama sürüyor mu: sunucu durumu VEYA iyimser 'başlatılıyor' bayrağı.
+  const running = !!status?.is_running;
+  const isRefreshing = starting || running;
 
   // Herhangi bir istek 401 dönerse (token süresi dolmuş/geçersiz) giriş ekranına dön.
   useEffect(() => {
@@ -31,9 +35,58 @@ export default function App() {
     }
   }, []);
 
+  // Giriş yapılınca ilk yükleme. Devam eden bir tarama varsa status.is_running
+  // ile yakalanır → aşağıdaki polling efekti otomatik devreye girer.
   useEffect(() => {
     if (authed) loadCards();
   }, [authed, loadCards]);
+
+  // Bir tarama sürerken her 5 sn'de bir status + kartları yenile (canlı ilerleme).
+  // Tarama bitince verileri son bir kez çekip tamamlanma bildirimini göster.
+  useEffect(() => {
+    if (!authed || !isRefreshing) return;
+    let cancelled = false;
+    let timer;
+    async function tick() {
+      try {
+        const [c, s] = await Promise.all([api.listEntities(), api.status()]);
+        if (cancelled) return;
+        setCards(c);
+        setStatus(s);
+        setLoadError(null);
+        if (s.is_running) {
+          setStarting(false); // sunucu çalıştığını doğruladı
+          timer = setTimeout(tick, 5000);
+        } else {
+          // Tamamlandı → özet bildirimi (status.last_summary'den).
+          setStarting(false);
+          const sm = s.last_summary;
+          if (sm) {
+            const parts = [`${sm.fetched_new} yeni haber`, `${sm.analyzed} analiz`];
+            if (sm.prefiltered) parts.push(`${sm.prefiltered} ön-filtre`);
+            if (sm.discarded) parts.push(`${sm.discarded} elenen`);
+            setNotice({
+              type: sm.warnings.length ? "warn" : "ok",
+              text: `Yenilendi: ${parts.join(" · ")}.` +
+                (sm.warnings.length ? ` ${sm.warnings.length} uyarı.` : ""),
+              details: sm.warnings,
+            });
+          }
+          // isRefreshing artık false → efekt temizlenir, döngü durur.
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setLoadError(e.message);
+          timer = setTimeout(tick, 5000);
+        }
+      }
+    }
+    tick();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [authed, isRefreshing]);
 
   function handleLogout() {
     logout();
@@ -47,23 +100,15 @@ export default function App() {
   if (!authed) return <Login onSuccess={() => setAuthed(true)} />;
 
   async function handleRefresh() {
-    setRefreshing(true);
     setNotice(null);
+    setStarting(true); // iyimser: polling hemen başlasın
     try {
-      const r = await api.refresh();
-      await loadCards();
-      const parts = [`${r.fetched_new} yeni haber`, `${r.analyzed} analiz`];
-      if (r.discarded) parts.push(`${r.discarded} elenen`);
-      setNotice({
-        type: r.warnings.length ? "warn" : "ok",
-        text: `Yenilendi: ${parts.join(" · ")}.` +
-          (r.warnings.length ? ` ${r.warnings.length} uyarı.` : ""),
-        details: r.warnings,
-      });
+      await api.refresh(); // anında döner; tarama arka planda
+      const s = await api.status();
+      setStatus(s);
     } catch (e) {
-      setNotice({ type: "warn", text: `Yenileme hatası: ${e.message}`, details: [] });
-    } finally {
-      setRefreshing(false);
+      setStarting(false);
+      setNotice({ type: "warn", text: `Yenileme başlatılamadı: ${e.message}`, details: [] });
     }
   }
 
@@ -98,13 +143,15 @@ export default function App() {
           <div className="flex items-center gap-2">
             <button
               onClick={handleRefresh}
-              disabled={refreshing}
-              className="flex items-center gap-2 rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+              disabled={isRefreshing}
+              className="flex items-center gap-2 rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-white disabled:opacity-70"
             >
-              {refreshing ? (
+              {isRefreshing ? (
                 <>
                   <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                  Yenileniyor…
+                  {running
+                    ? `Yenileniyor… (${status.progress_done}/${status.progress_total})`
+                    : "Başlatılıyor…"}
                 </>
               ) : (
                 <>↻ Yenile</>
@@ -124,6 +171,20 @@ export default function App() {
         {loadError && (
           <div className="mb-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
             API'ye bağlanılamadı: {loadError}. Backend çalışıyor mu? (uvicorn app.api.main:app)
+          </div>
+        )}
+
+        {isRefreshing && (
+          <div className="mb-4 flex items-center gap-3 rounded-lg border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-slate-200">
+            <span className="inline-block h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-accent/40 border-t-accent" />
+            {running ? (
+              <span>
+                Tarama sürüyor… <strong>{status.progress_done}/{status.progress_total}</strong> şirket işlendi.
+                Bittiğinde pano otomatik güncellenecek — sayfayı kapatabilirsiniz.
+              </span>
+            ) : (
+              <span>Yenileme başlatılıyor…</span>
+            )}
           </div>
         )}
 

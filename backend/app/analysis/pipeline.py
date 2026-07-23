@@ -1,18 +1,23 @@
-"""Claude analiz hattı.
+"""Claude analiz hattı — ucuz ön-filtre + entity başına tavan + paralel çağrı.
 
-Akış:
-  analyze_entity(session, entity):
-    1. Bu entity'nin analiz EDİLMEMİŞ makalelerini al (analyzed=False).
-    2. 10'arlı gruplar halinde Claude'a gönder (token tasarrufu), makale-başı JSON al.
-    3. Sonuçları makalelere yaz; relevance < 0.3 olanlar elenir (silinir).
-    4. Analiz edilmiş son ~N makaleyle entity-başı toplu değerlendirme üret ve kaydet.
+Akış (analyze_all_async):
+  1. ÖN-FİLTRE (ucuz, Claude'suz): entity adı/ticker'ı başlık+açıklamada hiç
+     geçmeyen makaleler DB'de `prefiltered=True` işaretlenir ve hiç gönderilmez.
+  2. TAVAN: entity başına en fazla `max_articles_per_entity` makale (en yeniler
+     öncelikli); artanı bir sonraki yenilemeye kalır (analyzed=False).
+  3. PARALEL analiz: makaleler `batch_size`'lik gruplar halinde, aynı anda
+     `analysis_concurrency` çağrı (asyncio.Semaphore) ile Claude'a gönderilir.
+     DB erişimi tek bir asyncio kilidiyle serileştirilir (SQLite 'locked' önlenir);
+     ağ çağrıları paraleldir.
+  4. Makale sonuçları yazılır (relevance < eşik → elenir), sonra entity-başı
+     toplu değerlendirme üretilir.
 
-Dayanıklılık: bir batch veya entity hata verirse loglanır ve gerisi devam eder —
-tek bir API hatası tüm işi çökertmez.
+Dayanıklılık: bir batch/entity hata verirse loglanır ve gerisi devam eder.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -20,6 +25,8 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..config import get_settings
+from ..db.database import session_scope
 from ..db.models import Article, Entity, EntityAnalysis
 from .claude_client import ClaudeClient, ClaudeError
 from .prompts import (
@@ -37,179 +44,287 @@ from .schemas import (
 
 logger = logging.getLogger("newsradar.analysis")
 
-BATCH_SIZE = 10          # makale-başı çağrı başına en fazla makale
 AGGREGATE_LOOKBACK = 20  # entity değerlendirmesinde kaç son makale bağlam olarak verilir
 
 
 @dataclass
-class AnalyzeResult:
-    """Bir entity için analiz özeti."""
+class AnalyzeTotals:
+    """Tüm yenileme için analiz sayaçları."""
 
-    entity_id: int
-    entity_name: str
-    analyzed: int = 0            # makale-başı analiz edilen
+    prefiltered: int = 0        # ön-filtrede elenen (Claude'a hiç gitmedi)
+    analyzed: int = 0           # makale-başı analiz edilen
     discarded: int = 0          # relevance < eşik → elenen
-    entity_assessment: bool = False  # entity-başı değerlendirme üretildi mi
+    entity_assessments: int = 0  # entity-başı değerlendirme üretilen
     warnings: list[str] = field(default_factory=list)
 
 
-def analyze_entity(
-    session: Session,
-    entity: Entity,
-    client: ClaudeClient | None = None,
-) -> AnalyzeResult:
-    """Bir entity için makale-başı + entity-başı analizi çalıştırır."""
-    result = AnalyzeResult(entity_id=entity.id, entity_name=entity.name)
-    client = client or ClaudeClient()
+# ------------------------------ Ön-filtre ------------------------------ #
+def _match_terms(name: str, query: str) -> list[str]:
+    """Bir makalenin bu entity'ye ait olup olmadığını ucuza sınamak için terimler."""
+    terms: set[str] = set()
+    for t in (query, name):
+        t = (t or "").strip().lower()
+        if len(t) >= 2:
+            terms.add(t)
+    # Çok kelimeli adlarda tek tek kelimeler de eşleşsin (ör. "Berkshire Hathaway").
+    for w in (name or "").lower().split():
+        if len(w) >= 3:
+            terms.add(w)
+    return list(terms)
 
-    # 1) Analiz edilmemiş makaleler (asla aynı makaleye iki kez ödeme yapma).
+
+def _prefilter(session: Session, entity: Entity, max_articles: int) -> tuple[list[dict], int]:
+    """Bekleyen makaleleri ön-filtreden geçirir; kabul edilenlerin payload'ını döner.
+
+    - Adı/ticker'ı hiç geçmeyenler `prefiltered=True` işaretlenir (Claude'a gitmez).
+    - Kabul edilenler en yeniden eskiye sıralı; ilk `max_articles` alınır, gerisi
+      bir sonraki yenilemeye kalır (analyzed=False, prefiltered=False).
+    Döner: (payload listesi, ön-filtrede elenen sayısı).
+    """
     pending: list[Article] = list(
         session.scalars(
             select(Article)
-            .where(Article.entity_id == entity.id, Article.analyzed.is_(False))
+            .where(
+                Article.entity_id == entity.id,
+                Article.analyzed.is_(False),
+                Article.prefiltered.is_(False),
+            )
             .order_by(Article.published_at.desc().nullslast())
         ).all()
     )
+    terms = _match_terms(entity.name, entity.query)
+    kept: list[Article] = []
+    prefiltered = 0
+    for a in pending:
+        haystack = f"{a.title} {a.description or ''}".lower()
+        if terms and any(term in haystack for term in terms):
+            kept.append(a)
+        else:
+            a.prefiltered = True
+            prefiltered += 1
 
-    # 2-3) Makale-başı analiz, 10'arlı gruplar halinde.
-    for start in range(0, len(pending), BATCH_SIZE):
-        batch = pending[start : start + BATCH_SIZE]
-        try:
-            _analyze_batch(session, entity, batch, client, result)
-        except ClaudeError as exc:
-            msg = f"Makale batch analizi başarısız (atlandı): {exc}"
-            logger.warning(msg)
-            result.warnings.append(msg)
-            # Bu batch analiz edilemedi; makaleler analyzed=False kalır (sonra tekrar denenir).
-
-    # autoflush=False olduğundan, aşağıdaki entity sorgusunun makale-başı
-    # değişiklikleri (analyzed=True, silmeler) görmesi için önce flush et.
-    session.flush()
-
-    # 4) Entity-başı toplu değerlendirme (analiz edilmiş, ilgili makalelerden).
-    try:
-        _assess_entity(session, entity, client, result)
-    except ClaudeError as exc:
-        msg = f"Entity değerlendirmesi başarısız: {exc}"
-        logger.warning(msg)
-        result.warnings.append(msg)
-
-    session.flush()
-    return result
-
-
-def _analyze_batch(
-    session: Session,
-    entity: Entity,
-    batch: list[Article],
-    client: ClaudeClient,
-    result: AnalyzeResult,
-) -> None:
-    """Tek bir makale grubunu analiz eder ve sonuçları yazar."""
+    capped = kept[:max_articles]  # tavan: gerisi sonraki yenilemede işlenir
     payload = [
         {"id": a.id, "title": a.title, "source": a.source, "description": a.description}
-        for a in batch
+        for a in capped
     ]
-    user = build_article_batch_prompt(entity.name, entity.query, entity.type, payload)
-    data = client.call_tool(
-        system=SYSTEM_PROMPT,
-        user=user,
-        tool=ARTICLE_ANALYSIS_TOOL,
-        max_tokens=4096,
-    )
+    return payload, prefiltered
 
-    by_id = {a.id: a for a in batch}
+
+# ------------------------- DB yazma yardımcıları ------------------------- #
+# Bunlar to_thread ile ayrı thread'de ama tek bir asyncio kilidiyle SIRAYLA
+# çağrılır — aynı anda tek SQLite yazarı olur (WAL + 'locked' güvenliği).
+def _apply_article_results(entity_id: int, batch_datas: list[dict]) -> dict:
+    """Makale-başı analiz sonuçlarını DB'ye yazar; alakasızları eler."""
+    analyzed = 0
+    discarded = 0
     now = datetime.now(timezone.utc).replace(tzinfo=None)
-    for raw in data.get("analyses", []):
-        try:
-            clean = sanitize_article_analysis(raw)
-        except (KeyError, ValueError, TypeError):
-            continue
-        article = by_id.get(clean["id"])
-        if article is None:
-            continue
-        if clean["relevance"] < RELEVANCE_THRESHOLD:
-            # Alakasız: makaleyi ele (sil) — gürültüyü panelde tutma.
-            session.delete(article)
-            result.discarded += 1
-            continue
-        article.sentiment = clean["sentiment"]
-        article.event_type = clean["event_type"]
-        article.risk_flags = clean["risk_flags"]
-        article.impact_horizon = clean["impact_horizon"]
-        article.relevance = clean["relevance"]
-        article.rationale = clean["rationale"]
-        article.analyzed = True
-        article.analyzed_at = now
-        result.analyzed += 1
+    with session_scope() as session:
+        for data in batch_datas:
+            for raw in data.get("analyses", []):
+                try:
+                    clean = sanitize_article_analysis(raw)
+                except (KeyError, ValueError, TypeError):
+                    continue
+                article = session.get(Article, clean["id"])
+                if article is None or article.entity_id != entity_id:
+                    continue
+                if clean["relevance"] < RELEVANCE_THRESHOLD:
+                    session.delete(article)  # alakasız → panelde gürültü tutma
+                    discarded += 1
+                    continue
+                article.sentiment = clean["sentiment"]
+                article.event_type = clean["event_type"]
+                article.risk_flags = clean["risk_flags"]
+                article.impact_horizon = clean["impact_horizon"]
+                article.relevance = clean["relevance"]
+                article.rationale = clean["rationale"]
+                article.analyzed = True
+                article.analyzed_at = now
+                analyzed += 1
+    return {"analyzed": analyzed, "discarded": discarded}
 
 
-def _assess_entity(
-    session: Session,
-    entity: Entity,
-    client: ClaudeClient,
-    result: AnalyzeResult,
-) -> None:
-    """Analiz edilmiş son makalelerden entity-başı değerlendirme üretir ve kaydeder."""
-    analyzed_articles: list[Article] = list(
-        session.scalars(
+def _read_assessment_payload(entity_id: int) -> list[dict]:
+    """Entity değerlendirmesi için son analiz edilmiş makalelerden bağlam payload'ı."""
+    with session_scope() as session:
+        articles = session.scalars(
             select(Article)
-            .where(Article.entity_id == entity.id, Article.analyzed.is_(True))
+            .where(Article.entity_id == entity_id, Article.analyzed.is_(True))
             .order_by(Article.published_at.desc().nullslast())
             .limit(AGGREGATE_LOOKBACK)
         ).all()
-    )
-    if not analyzed_articles:
-        return  # değerlendirilecek analiz yok
+        return [
+            {
+                "title": a.title,
+                "sentiment": a.sentiment or 0.0,
+                "event_type": a.event_type or "other",
+                "impact_horizon": a.impact_horizon or "short",
+                "risk_flags": a.risk_flags or [],
+                "rationale": a.rationale or "",
+            }
+            for a in articles
+        ]
 
-    payload = [
-        {
-            "title": a.title,
-            "sentiment": a.sentiment or 0.0,
-            "event_type": a.event_type or "other",
-            "impact_horizon": a.impact_horizon or "short",
-            "risk_flags": a.risk_flags or [],
-            "rationale": a.rationale or "",
-        }
-        for a in analyzed_articles
-    ]
-    user = build_entity_prompt(entity.name, entity.query, entity.type, payload)
-    data = client.call_tool(
-        system=SYSTEM_PROMPT,
-        user=user,
-        tool=ENTITY_ANALYSIS_TOOL,
-        max_tokens=2000,
-    )
+
+def _write_assessment(entity_id: int, data: dict, considered: int) -> None:
+    """Entity-başı değerlendirmeyi kaydeder."""
     clean = sanitize_entity_analysis(data)
-
-    session.add(
-        EntityAnalysis(
-            entity_id=entity.id,
-            risk_score=clean["risk_score"],
-            sentiment_trend=clean["sentiment_trend"],
-            top_drivers=clean["top_drivers"],
-            summary=clean["summary"],
-            stance=clean["stance"],
-            conviction=clean["conviction"],
-            what_to_verify=clean["what_to_verify"],
-            invalidation=clean["invalidation"],
-            articles_considered=len(analyzed_articles),
+    with session_scope() as session:
+        session.add(
+            EntityAnalysis(
+                entity_id=entity_id,
+                risk_score=clean["risk_score"],
+                sentiment_trend=clean["sentiment_trend"],
+                top_drivers=clean["top_drivers"],
+                summary=clean["summary"],
+                stance=clean["stance"],
+                conviction=clean["conviction"],
+                what_to_verify=clean["what_to_verify"],
+                invalidation=clean["invalidation"],
+                articles_considered=considered,
+            )
         )
-    )
-    result.entity_assessment = True
 
 
-def analyze_all(session: Session, client: ClaudeClient | None = None) -> list[AnalyzeResult]:
-    """Aktif tüm entity'ler için analizi çalıştırır (tek entity hatası hattı durdurmaz)."""
-    client = client or ClaudeClient()
-    entities = session.scalars(select(Entity).where(Entity.active.is_(True))).all()
-    results: list[AnalyzeResult] = []
-    for e in entities:
+# ------------------------- Paralel orkestrasyon ------------------------- #
+async def analyze_all_async(
+    client: ClaudeClient,
+    progress_cb=None,
+) -> AnalyzeTotals:
+    """Aktif tüm entity'ler için ön-filtre + paralel analiz + değerlendirme.
+
+    progress_cb(done, total): her entity tamamlandığında çağrılır (ilerleme için).
+    """
+    settings = get_settings()
+    batch_size = max(1, settings.batch_size)
+    max_articles = max(1, settings.max_articles_per_entity)
+    concurrency = max(1, settings.analysis_concurrency)
+
+    totals = AnalyzeTotals()
+
+    # --- Aşama 1: ön-filtre + batch listesi (DB, tek thread) ---
+    entity_tasks: list[dict] = []
+    with session_scope() as session:
+        entities = session.scalars(
+            select(Entity).where(Entity.active.is_(True))
+        ).all()
+        for e in entities:
+            payload, pre = _prefilter(session, e, max_articles)
+            totals.prefiltered += pre
+            batches = [payload[i : i + batch_size] for i in range(0, len(payload), batch_size)]
+            entity_tasks.append(
+                {"id": e.id, "name": e.name, "query": e.query, "type": e.type, "batches": batches}
+            )
+        # session çıkışında prefiltered işaretleri commit edilir.
+
+    total = len(entity_tasks)
+    done = 0
+    if progress_cb:
+        progress_cb(done, total)
+
+    sem = asyncio.Semaphore(concurrency)
+    db_lock = asyncio.Lock()
+
+    async def _call(tool, user, max_tokens):
+        """Semaphore altında tek Claude çağrısı (sync istemci → to_thread)."""
+        async with sem:
+            return await asyncio.to_thread(
+                client.call_tool,
+                system=SYSTEM_PROMPT,
+                user=user,
+                tool=tool,
+                max_tokens=max_tokens,
+            )
+
+    async def _run_batch(t: dict, b: list[dict]):
+        user = build_article_batch_prompt(t["name"], t["query"], t["type"], b)
         try:
-            results.append(analyze_entity(session, e, client))
-        except Exception as exc:  # noqa: BLE001 — bir entity çökse bile devam et
-            logger.exception("Entity analizi çöktü: %s", e.name)
-            r = AnalyzeResult(entity_id=e.id, entity_name=e.name)
-            r.warnings.append(f"Beklenmeyen hata: {exc}")
-            results.append(r)
-    return results
+            return await _call(ARTICLE_ANALYSIS_TOOL, user, 4096)
+        except ClaudeError as exc:
+            totals.warnings.append(f"[{t['name']}] makale batch atlandı: {exc}")
+            return None
+
+    async def _process_entity(t: dict):
+        nonlocal done
+        # 1) Makale batch'leri — hepsi paralel (global semaphore ile sınırlı).
+        #    Batch'ler hem entity içinde hem entity'ler arası eşzamanlı çalışır;
+        #    aynı anda en fazla `concurrency` çağrı olur.
+        raw = await asyncio.gather(*[_run_batch(t, b) for b in t["batches"]])
+        batch_datas: list[dict] = [d for d in raw if d]
+
+        # 2) Sonuçları yaz (DB kilidi altında, sırayla).
+        async with db_lock:
+            applied = await asyncio.to_thread(_apply_article_results, t["id"], batch_datas)
+        totals.analyzed += applied["analyzed"]
+        totals.discarded += applied["discarded"]
+
+        # 3) Değerlendirme payload'ını oku (DB), Claude çağır (paralel), yaz (DB).
+        async with db_lock:
+            payload = await asyncio.to_thread(_read_assessment_payload, t["id"])
+        if payload:
+            user = build_entity_prompt(t["name"], t["query"], t["type"], payload)
+            try:
+                adata = await _call(ENTITY_ANALYSIS_TOOL, user, 2000)
+                async with db_lock:
+                    await asyncio.to_thread(_write_assessment, t["id"], adata, len(payload))
+                totals.entity_assessments += 1
+            except ClaudeError as exc:
+                totals.warnings.append(f"[{t['name']}] değerlendirme başarısız: {exc}")
+
+        done += 1
+        if progress_cb:
+            progress_cb(done, total)
+
+    # Tüm entity'ler eşzamanlı; Claude çağrıları semaphore ile sınırlı.
+    await asyncio.gather(
+        *[_process_entity(t) for t in entity_tasks], return_exceptions=False
+    )
+    return totals
+
+
+def analyze_entity_sync(entity_id: int, client: ClaudeClient) -> AnalyzeTotals:
+    """CLI/test için tek entity'yi senkron analiz eder (ön-filtre + batch + değerlendirme)."""
+    settings = get_settings()
+    batch_size = max(1, settings.batch_size)
+    max_articles = max(1, settings.max_articles_per_entity)
+    totals = AnalyzeTotals()
+
+    with session_scope() as session:
+        entity = session.get(Entity, entity_id)
+        if entity is None:
+            return totals
+        name, query, etype = entity.name, entity.query, entity.type
+        payload, pre = _prefilter(session, entity, max_articles)
+        totals.prefiltered += pre
+
+    batches = [payload[i : i + batch_size] for i in range(0, len(payload), batch_size)]
+    batch_datas: list[dict] = []
+    for b in batches:
+        user = build_article_batch_prompt(name, query, etype, b)
+        try:
+            batch_datas.append(
+                client.call_tool(
+                    system=SYSTEM_PROMPT, user=user, tool=ARTICLE_ANALYSIS_TOOL, max_tokens=4096
+                )
+            )
+        except ClaudeError as exc:
+            totals.warnings.append(f"[{name}] makale batch atlandı: {exc}")
+
+    applied = _apply_article_results(entity_id, batch_datas)
+    totals.analyzed += applied["analyzed"]
+    totals.discarded += applied["discarded"]
+
+    payload2 = _read_assessment_payload(entity_id)
+    if payload2:
+        user = build_entity_prompt(name, query, etype, payload2)
+        try:
+            adata = client.call_tool(
+                system=SYSTEM_PROMPT, user=user, tool=ENTITY_ANALYSIS_TOOL, max_tokens=2000
+            )
+            _write_assessment(entity_id, adata, len(payload2))
+            totals.entity_assessments += 1
+        except ClaudeError as exc:
+            totals.warnings.append(f"[{name}] değerlendirme başarısız: {exc}")
+
+    return totals

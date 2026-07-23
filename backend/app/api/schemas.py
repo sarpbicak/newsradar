@@ -87,16 +87,32 @@ class DashboardOut(BaseModel):
     articles: list[ArticleOut]
 
 
-class RefreshOut(BaseModel):
+class RefreshSummaryOut(BaseModel):
+    """Son tamamlanan yenilemenin özeti (/status içinde)."""
+
     fetched_new: int
+    prefiltered: int
     analyzed: int
     discarded: int
     entity_assessments: int
     warnings: list[str]
-    scheduler_enabled: bool
+
+
+class RefreshAck(BaseModel):
+    """/refresh anında döner: tarama arka planda başladı mı."""
+
+    started: bool          # bu çağrı yeni bir tarama başlattı mı
+    is_running: bool       # şu an bir tarama çalışıyor mu
+    message: str
 
 
 class ProviderStatusOut(BaseModel):
     providers: dict[str, bool]
     claude: bool
     scheduler_enabled: bool
+    # Yenileme süreci durumu (polling için).
+    is_running: bool = False
+    progress_done: int = 0
+    progress_total: int = 0
+    last_completed_at: datetime | None = None
+    last_summary: RefreshSummaryOut | None = None

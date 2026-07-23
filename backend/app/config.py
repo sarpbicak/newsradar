@@ -39,6 +39,16 @@ class Settings:
         self.lookback_hours: int = int(_env("NEWSRADAR_LOOKBACK_HOURS", "48"))
         self.scheduler_enabled: bool = _env("NEWSRADAR_SCHEDULER", "on").lower() == "on"
 
+        # Analiz performans/maliyet ayarları (hepsi env'den; kod değişikliği gerekmez).
+        # batch_size: tek Claude çağrısında kaç makale analiz edilir.
+        # max_articles_per_entity: tek yenilemede entity başına tavan (en yeniler öncelikli).
+        # analysis_concurrency: aynı anda kaç Claude çağrısı (semaphore; rate limit için).
+        self.batch_size: int = int(_env("NEWSRADAR_BATCH_SIZE", "25"))
+        self.max_articles_per_entity: int = int(
+            _env("NEWSRADAR_MAX_ARTICLES_PER_ENTITY", "25")
+        )
+        self.analysis_concurrency: int = int(_env("NEWSRADAR_ANALYSIS_CONCURRENCY", "5"))
+
         # Deploy: frontend'in domain'i (CORS). Virgülle birden fazla verilebilir.
         # Boşsa yalnızca yerel Vite (localhost:5173) izinli. "*" = tümüne izin.
         self.frontend_url: str = _env("FRONTEND_URL", "")

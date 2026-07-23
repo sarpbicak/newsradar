@@ -74,7 +74,7 @@ def cmd_fetch(args: argparse.Namespace) -> None:
 
 def cmd_analyze(args: argparse.Namespace) -> None:
     from .analysis.claude_client import ClaudeClient, MissingAPIKeyError
-    from .analysis.pipeline import analyze_entity
+    from .analysis.pipeline import analyze_entity_sync
 
     init_db()
     try:
@@ -88,15 +88,18 @@ def cmd_analyze(args: argparse.Namespace) -> None:
         if not entity:
             print(f"'{args.query}' izleme listesinde yok.")
             sys.exit(1)
+        entity_id = entity.id
 
-        r = analyze_entity(session, entity, client)
-        print(f"\n=== {r.entity_name} analizi ===")
-        print(f"  Analiz edilen: {r.analyzed} | Elenen (alakasız): {r.discarded} | "
-              f"Entity değerlendirmesi: {'evet' if r.entity_assessment else 'hayır'}")
-        for w in r.warnings:
-            print(f"  ⚠ {w}")
+    totals = analyze_entity_sync(entity_id, client)
+    print(f"\n=== {args.query} analizi ===")
+    print(f"  Ön-filtrede elenen: {totals.prefiltered} | Analiz edilen: {totals.analyzed} | "
+          f"Elenen (alakasız): {totals.discarded} | "
+          f"Değerlendirme: {'evet' if totals.entity_assessments else 'hayır'}")
+    for w in totals.warnings:
+        print(f"  ⚠ {w}")
 
-        session.flush()
+    with session_scope() as session:
+        entity = session.scalar(select(Entity).where(Entity.query == args.query))
         print("\n--- Analiz edilmiş makaleler (JSON) ---")
         arts = session.scalars(
             select(Article).where(Article.entity_id == entity.id, Article.analyzed.is_(True))
