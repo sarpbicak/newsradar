@@ -8,7 +8,14 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..db.models import Article, Entity, EntityAnalysis
-from .schemas import AnalysisOut, ArticleOut, EntityCardOut
+from .schemas import (
+    AnalysisOut,
+    ArticleOut,
+    DeltaOut,
+    EntityCardOut,
+    PreviousAnalysisOut,
+    RiskPointOut,
+)
 
 
 def _latest_analysis(session: Session, entity_id: int) -> EntityAnalysis | None:
@@ -17,6 +24,61 @@ def _latest_analysis(session: Session, entity_id: int) -> EntityAnalysis | None:
         .where(EntityAnalysis.entity_id == entity_id)
         .order_by(EntityAnalysis.created_at.desc())
     )
+
+
+def _previous_analysis(session: Session, entity_id: int) -> EntityAnalysis | None:
+    """Son değerlendirmeden bir öncekini döner (yoksa None → yeterli geçmiş yok)."""
+    return session.scalar(
+        select(EntityAnalysis)
+        .where(EntityAnalysis.entity_id == entity_id)
+        .order_by(EntityAnalysis.created_at.desc())
+        .offset(1)
+        .limit(1)
+    )
+
+
+def _previous_out(prev: EntityAnalysis | None) -> PreviousAnalysisOut | None:
+    if prev is None:
+        return None
+    return PreviousAnalysisOut(
+        risk_score=prev.risk_score,
+        stance=prev.stance,
+        sentiment_trend=prev.sentiment_trend,
+        avg_sentiment=prev.avg_sentiment,
+        created_at=prev.created_at,
+    )
+
+
+def _delta_out(
+    latest: EntityAnalysis | None, prev: EntityAnalysis | None
+) -> DeltaOut | None:
+    """İki snapshot arasındaki değişim. Biri yoksa None (sessiz 'yeterli geçmiş yok')."""
+    if latest is None or prev is None:
+        return None
+    sentiment_delta = None
+    if latest.avg_sentiment is not None and prev.avg_sentiment is not None:
+        sentiment_delta = round(latest.avg_sentiment - prev.avg_sentiment, 3)
+    stance_changed = latest.stance != prev.stance
+    return DeltaOut(
+        risk_delta=latest.risk_score - prev.risk_score,
+        stance_changed=stance_changed,
+        previous_stance=prev.stance if stance_changed else None,
+        sentiment_delta=sentiment_delta,
+    )
+
+
+def risk_history(session: Session, entity_id: int, limit: int = 30) -> list[RiskPointOut]:
+    """Son ~N değerlendirmenin risk skoru zaman serisi (eski → yeni)."""
+    rows = session.scalars(
+        select(EntityAnalysis)
+        .where(EntityAnalysis.entity_id == entity_id)
+        .order_by(EntityAnalysis.created_at.desc())
+        .limit(limit)
+    ).all()
+    return [
+        RiskPointOut(created_at=r.created_at, risk_score=r.risk_score, stance=r.stance)
+        for r in reversed(rows)  # kronolojik: eski → yeni
+    ]
 
 
 def analysis_out(a: EntityAnalysis | None) -> AnalysisOut | None:
@@ -65,6 +127,7 @@ def entity_card(session: Session, entity: Entity) -> EntityCardOut:
     top_flags = [f for f, _ in counter.most_common(4)]
 
     latest = _latest_analysis(session, entity.id)
+    previous = _previous_analysis(session, entity.id)
 
     return EntityCardOut(
         id=entity.id,
@@ -78,6 +141,8 @@ def entity_card(session: Session, entity: Entity) -> EntityCardOut:
         top_flags=top_flags,
         last_updated=latest.created_at if latest else None,
         analysis=analysis_out(latest),
+        previous_analysis=_previous_out(previous),
+        delta=_delta_out(latest, previous),
     )
 
 

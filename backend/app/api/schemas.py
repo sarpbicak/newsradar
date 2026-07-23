@@ -50,8 +50,27 @@ class AnalysisOut(BaseModel):
     created_at: datetime
 
 
+class PreviousAnalysisOut(BaseModel):
+    """Bir önceki değerlendirme snapshot'ı (değişim karşılaştırması için)."""
+
+    risk_score: int
+    stance: str
+    sentiment_trend: str
+    avg_sentiment: float | None
+    created_at: datetime
+
+
+class DeltaOut(BaseModel):
+    """Son iki değerlendirme arasındaki değişim. Yeterli geçmiş yoksa None döner."""
+
+    risk_delta: int                    # + = risk arttı (kötü), - = azaldı (iyi)
+    stance_changed: bool
+    previous_stance: str | None        # yalnızca değiştiyse dolu
+    sentiment_delta: float | None      # snapshot avg_sentiment farkı (yoksa None)
+
+
 class EntityCardOut(BaseModel):
-    """Overview kartı: entity + son değerlendirme + sayaçlar."""
+    """Overview kartı: entity + son değerlendirme + değişim + sayaçlar."""
 
     id: int
     name: str
@@ -64,6 +83,8 @@ class EntityCardOut(BaseModel):
     top_flags: list[str]
     last_updated: datetime | None
     analysis: AnalysisOut | None
+    previous_analysis: PreviousAnalysisOut | None = None
+    delta: DeltaOut | None = None
 
 
 class ArticleOut(BaseModel):
@@ -82,9 +103,18 @@ class ArticleOut(BaseModel):
     rationale: str | None
 
 
+class RiskPointOut(BaseModel):
+    """Risk skoru zaman serisinde tek nokta (grafik için)."""
+
+    created_at: datetime
+    risk_score: int
+    stance: str
+
+
 class DashboardOut(BaseModel):
     entity: EntityCardOut
     articles: list[ArticleOut]
+    risk_history: list[RiskPointOut] = []
 
 
 class RefreshSummaryOut(BaseModel):

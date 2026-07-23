@@ -142,5 +142,7 @@ class EntityAnalysis(Base):
     what_to_verify: Mapped[list] = mapped_column(JSON, nullable=False)        # list[str], TR
     invalidation: Mapped[str] = mapped_column(Text, nullable=False)           # TR, tek cümle
     articles_considered: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Bu snapshot anındaki ortalama duygu (-1..1) — değişim (delta) hesabı için saklanır.
+    avg_sentiment: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     entity: Mapped["Entity"] = relationship(back_populates="analyses")

@@ -1,6 +1,15 @@
 // Overview ızgarasındaki tek entity kartı.
 import React from "react";
-import { StanceBadge, RiskScore, SentimentGauge, TrendArrow, FlagChip, timeAgo } from "./ui.jsx";
+import {
+  StanceBadge,
+  RiskScore,
+  RiskDelta,
+  SentimentGauge,
+  TrendArrow,
+  FlagChip,
+  stanceLabel,
+  timeAgo,
+} from "./ui.jsx";
 
 export default function EntityCard({ card, onOpen }) {
   const a = card.analysis;
@@ -26,8 +35,18 @@ export default function EntityCard({ card, onOpen }) {
         )}
       </div>
 
+      {/* Stance değişimi belirgin vurgu (ör. NÖTR → DÜŞÜŞ) */}
+      {a && card.delta?.stance_changed && (
+        <div className="flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[11px] font-bold text-amber-200">
+          ⚡ Yön değişti: {stanceLabel(card.delta.previous_stance)} → {stanceLabel(a.stance)}
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
-        <RiskScore score={a?.risk_score ?? null} />
+        <div className="flex items-center gap-2">
+          <RiskScore score={a?.risk_score ?? null} />
+          <RiskDelta delta={card.delta} />
+        </div>
         {a && <TrendArrow trend={a.sentiment_trend} />}
       </div>
 

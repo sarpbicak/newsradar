@@ -9,6 +9,26 @@ const STANCE = {
 };
 const CONVICTION = { low: "düşük", medium: "orta", high: "yüksek" };
 
+export function stanceLabel(stance) {
+  return (STANCE[stance] || STANCE.neutral).label;
+}
+
+// --- Risk değişim rozeti (son taramaya göre) ---
+// Risk için ARTIŞ kötü (kırmızı ▲), AZALIŞ iyi (yeşil ▼). Değişim yoksa gizli.
+export function RiskDelta({ delta }) {
+  if (!delta || !delta.risk_delta) return null;
+  const up = delta.risk_delta > 0;
+  return (
+    <span
+      className={`text-xs font-bold ${up ? "text-rose-400" : "text-emerald-400"}`}
+      title="son taramaya göre risk değişimi"
+    >
+      {up ? "▲+" : "▼"}
+      {delta.risk_delta}
+    </span>
+  );
+}
+
 export function StanceBadge({ stance, conviction }) {
   const s = STANCE[stance] || STANCE.neutral;
   return (

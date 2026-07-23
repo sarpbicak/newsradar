@@ -22,7 +22,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from ..config import get_settings
@@ -45,6 +45,7 @@ from .schemas import (
 logger = logging.getLogger("newsradar.analysis")
 
 AGGREGATE_LOOKBACK = 20  # entity değerlendirmesinde kaç son makale bağlam olarak verilir
+MAX_ANALYSIS_HISTORY = 100  # entity başına saklanacak en fazla değerlendirme kaydı
 
 
 @dataclass
@@ -167,8 +168,14 @@ def _read_assessment_payload(entity_id: int) -> list[dict]:
         ]
 
 
-def _write_assessment(entity_id: int, data: dict, considered: int) -> None:
-    """Entity-başı değerlendirmeyi kaydeder."""
+def _avg_sentiment(payload: list[dict]) -> float | None:
+    """Değerlendirmeye giren makalelerin ortalama duygusu (snapshot için)."""
+    vals = [p.get("sentiment") for p in payload if p.get("sentiment") is not None]
+    return round(sum(vals) / len(vals), 3) if vals else None
+
+
+def _write_assessment(entity_id: int, data: dict, considered: int, avg_sentiment: float | None) -> None:
+    """Entity-başı değerlendirmeyi APPEND-ONLY kaydeder ve geçmişi 100 kayıtla sınırlar."""
     clean = sanitize_entity_analysis(data)
     with session_scope() as session:
         session.add(
@@ -183,8 +190,19 @@ def _write_assessment(entity_id: int, data: dict, considered: int) -> None:
                 what_to_verify=clean["what_to_verify"],
                 invalidation=clean["invalidation"],
                 articles_considered=considered,
+                avg_sentiment=avg_sentiment,
             )
         )
+        session.flush()
+        # Geçmiş korunur ama DB şişmesin: en yeni 100 dışındaki eski kayıtları temizle.
+        stale = session.scalars(
+            select(EntityAnalysis.id)
+            .where(EntityAnalysis.entity_id == entity_id)
+            .order_by(EntityAnalysis.created_at.desc())
+            .offset(MAX_ANALYSIS_HISTORY)
+        ).all()
+        if stale:
+            session.execute(delete(EntityAnalysis).where(EntityAnalysis.id.in_(stale)))
 
 
 # ------------------------- Paralel orkestrasyon ------------------------- #
@@ -267,7 +285,9 @@ async def analyze_all_async(
             try:
                 adata = await _call(ENTITY_ANALYSIS_TOOL, user, 2000)
                 async with db_lock:
-                    await asyncio.to_thread(_write_assessment, t["id"], adata, len(payload))
+                    await asyncio.to_thread(
+                        _write_assessment, t["id"], adata, len(payload), _avg_sentiment(payload)
+                    )
                 totals.entity_assessments += 1
             except ClaudeError as exc:
                 totals.warnings.append(f"[{t['name']}] değerlendirme başarısız: {exc}")
@@ -322,7 +342,7 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient) -> AnalyzeTotals:
             adata = client.call_tool(
                 system=SYSTEM_PROMPT, user=user, tool=ENTITY_ANALYSIS_TOOL, max_tokens=2000
             )
-            _write_assessment(entity_id, adata, len(payload2))
+            _write_assessment(entity_id, adata, len(payload2), _avg_sentiment(payload2))
             totals.entity_assessments += 1
         except ClaudeError as exc:
             totals.warnings.append(f"[{name}] değerlendirme başarısız: {exc}")

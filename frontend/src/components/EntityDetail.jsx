@@ -2,10 +2,11 @@
 // invalidation, makale tablosu ve sohbet paneli.
 import React, { useEffect, useState } from "react";
 import { api } from "../api.js";
-import { StanceBadge, RiskScore, TrendArrow } from "./ui.jsx";
+import { StanceBadge, RiskScore, RiskDelta, TrendArrow, stanceLabel } from "./ui.jsx";
 import ArticleTable from "./ArticleTable.jsx";
 import ChatPanel from "./ChatPanel.jsx";
 import SentimentChart from "./SentimentChart.jsx";
+import RiskHistoryChart from "./RiskHistoryChart.jsx";
 
 export default function EntityDetail({ entityId, onBack }) {
   const [data, setData] = useState(null);
@@ -29,7 +30,7 @@ export default function EntityDetail({ entityId, onBack }) {
   if (error) return <div className="p-8 text-rose-400">Hata: {error}</div>;
   if (!data) return null;
 
-  const { entity, articles } = data;
+  const { entity, articles, risk_history } = data;
   const a = entity.analysis;
 
   return (
@@ -46,6 +47,11 @@ export default function EntityDetail({ entityId, onBack }) {
         </span>
         {a && <StanceBadge stance={a.stance} conviction={a.conviction} />}
         {a && <TrendArrow trend={a.sentiment_trend} />}
+        {a && entity.delta?.stance_changed && (
+          <span className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs font-bold text-amber-200">
+            ⚡ {stanceLabel(entity.delta.previous_stance)} → {stanceLabel(a.stance)}
+          </span>
+        )}
       </div>
 
       {!a ? (
@@ -58,8 +64,12 @@ export default function EntityDetail({ entityId, onBack }) {
           <div className="rounded-xl border border-ink-600 bg-ink-800 p-4 md:col-span-2">
             <div className="mb-2 flex items-center gap-3">
               <RiskScore score={a.risk_score} />
+              <RiskDelta delta={entity.delta} />
               <div className="text-xs text-slate-500">
                 {a.articles_considered} habere dayalı · {new Date(a.created_at).toLocaleString("tr-TR")}
+                {entity.previous_analysis && (
+                  <> · önceki: {entity.previous_analysis.risk_score}</>
+                )}
               </div>
             </div>
             <p className="text-sm leading-relaxed text-slate-200">{a.summary}</p>
@@ -103,7 +113,10 @@ export default function EntityDetail({ entityId, onBack }) {
         </div>
       )}
 
-      <SentimentChart articles={articles} />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <RiskHistoryChart history={risk_history} />
+        <SentimentChart articles={articles} />
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
