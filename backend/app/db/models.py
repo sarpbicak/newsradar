@@ -149,6 +149,26 @@ class Suggestion(Base):
     __table_args__ = (UniqueConstraint("norm_key", name="uq_suggestion_norm"),)
 
 
+class PriceSnapshot(Base):
+    """Bir ticker entity'nin anlık fiyat görüntüsü (her yenilemede append-only).
+
+    Fiyat TAHMİN için değil; haberin fiyata yansıyıp yansımadığını görmek için.
+    """
+
+    __tablename__ = "price_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    entity_id: Mapped[int] = mapped_column(
+        ForeignKey("entities.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    price: Mapped[float] = mapped_column(Float, nullable=False)
+    change_percent: Mapped[float | None] = mapped_column(Float, nullable=True)  # günlük %
+    previous_close: Mapped[float | None] = mapped_column(Float, nullable=True)
+    day_high: Mapped[float | None] = mapped_column(Float, nullable=True)
+    day_low: Mapped[float | None] = mapped_column(Float, nullable=True)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
 class EntityAnalysis(Base):
     """Bir entity için toplu (aggregate) Claude analizi — zaman içinde birden çok satır."""
 

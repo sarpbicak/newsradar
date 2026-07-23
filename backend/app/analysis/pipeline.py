@@ -28,6 +28,7 @@ from sqlalchemy.orm import Session
 from ..config import get_settings
 from ..db.database import session_scope
 from ..db.models import Article, Entity, EntityAnalysis, Suggestion
+from ..prices import price_context_for
 from .claude_client import ClaudeClient, ClaudeError
 from .prompts import (
     SYSTEM_PROMPT,
@@ -339,11 +340,12 @@ async def analyze_all_async(
         totals.analyzed += applied["analyzed"]
         totals.discarded += applied["discarded"]
 
-        # 3) Değerlendirme payload'ını oku (DB), Claude çağır (paralel), yaz (DB).
+        # 3) Değerlendirme payload'ını + fiyat bağlamını oku (DB), Claude çağır, yaz.
         async with db_lock:
             payload = await asyncio.to_thread(_read_assessment_payload, t["id"])
+            price_ctx = await asyncio.to_thread(price_context_for, t["id"])
         if payload:
-            user = build_entity_prompt(t["name"], t["query"], t["type"], payload)
+            user = build_entity_prompt(t["name"], t["query"], t["type"], payload, price=price_ctx)
             try:
                 adata = await _call(ENTITY_ANALYSIS_TOOL, user, 2000)
                 async with db_lock:
@@ -404,7 +406,7 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient) -> AnalyzeTotals:
 
     payload2 = _read_assessment_payload(entity_id)
     if payload2:
-        user = build_entity_prompt(name, query, etype, payload2)
+        user = build_entity_prompt(name, query, etype, payload2, price=price_context_for(entity_id))
         try:
             adata = client.call_tool(
                 system=SYSTEM_PROMPT, user=user, tool=ENTITY_ANALYSIS_TOOL, max_tokens=2000

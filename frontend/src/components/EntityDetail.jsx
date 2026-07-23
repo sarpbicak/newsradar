@@ -2,11 +2,12 @@
 // invalidation, makale tablosu ve sohbet paneli.
 import React, { useEffect, useState } from "react";
 import { api } from "../api.js";
-import { StanceBadge, RiskScore, RiskDelta, TrendArrow, stanceLabel } from "./ui.jsx";
+import { StanceBadge, RiskScore, RiskDelta, TrendArrow, PriceDisplay, stanceLabel } from "./ui.jsx";
 import ArticleTable from "./ArticleTable.jsx";
 import ChatPanel from "./ChatPanel.jsx";
 import SentimentChart from "./SentimentChart.jsx";
 import RiskHistoryChart from "./RiskHistoryChart.jsx";
+import PriceHistoryChart from "./PriceHistoryChart.jsx";
 
 export default function EntityDetail({ entityId, onBack }) {
   const [data, setData] = useState(null);
@@ -30,7 +31,7 @@ export default function EntityDetail({ entityId, onBack }) {
   if (error) return <div className="p-8 text-rose-400">Hata: {error}</div>;
   if (!data) return null;
 
-  const { entity, articles, risk_history } = data;
+  const { entity, articles, risk_history, price_history } = data;
   const a = entity.analysis;
 
   return (
@@ -50,6 +51,15 @@ export default function EntityDetail({ entityId, onBack }) {
         {a && entity.delta?.stance_changed && (
           <span className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs font-bold text-amber-200">
             ⚡ {stanceLabel(entity.delta.previous_stance)} → {stanceLabel(a.stance)}
+          </span>
+        )}
+        {entity.price != null && (
+          <span className="ml-auto">
+            <PriceDisplay
+              price={entity.price}
+              changePercent={entity.change_percent}
+              updatedAt={entity.price_updated_at}
+            />
           </span>
         )}
       </div>
@@ -114,7 +124,15 @@ export default function EntityDetail({ entityId, onBack }) {
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <RiskHistoryChart history={risk_history} />
+        {/* Risk üstte, fiyat altta — aynı tarih ekseninde okunur */}
+        <div className="space-y-4">
+          <RiskHistoryChart history={risk_history} />
+          <PriceHistoryChart
+            history={price_history}
+            updatedAt={entity.price_updated_at}
+            isTicker={entity.type === "ticker"}
+          />
+        </div>
         <SentimentChart articles={articles} />
       </div>
 

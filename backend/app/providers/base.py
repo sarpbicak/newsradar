@@ -56,3 +56,43 @@ class NewsProvider(ABC):
         istisna fırlatmamalı ki hat tek bir kaynak hatasında çökmesin.
         """
         raise NotImplementedError
+
+
+# --------------------------------------------------------------------------- #
+#  Fiyat sağlayıcı arayüzü (ayrı sözleşme; ileride başka sağlayıcı eklenebilir)
+#  ÖNEMLİ: Fiyat verisi TAHMİN için değil — haberin fiyata yansıyıp yansımadığını
+#  görmek içindir. Hedef fiyat/teknik sinyal üretilmez.
+# --------------------------------------------------------------------------- #
+@dataclass
+class PriceQuote:
+    """Bir varlığın anlık fiyat görüntüsü (snapshot)."""
+
+    price: float
+    change_percent: float | None = None   # günlük %
+    previous_close: float | None = None
+    day_high: float | None = None
+    day_low: float | None = None
+
+
+@dataclass
+class PriceResult:
+    """Fiyat çekme sonucu: quote (varsa) + kullanıcıya gösterilecek uyarı (varsa)."""
+
+    provider: str
+    quote: PriceQuote | None = None
+    warning: str | None = None
+
+
+class PriceProvider(ABC):
+    """Bir fiyat kaynağının sözleşmesi. Yalnızca `type=ticker` entity'ler için kullanılır."""
+
+    name: str = "base-price"
+
+    @abstractmethod
+    def is_available(self) -> bool:
+        raise NotImplementedError
+
+    @abstractmethod
+    def quote(self, entity: Entity) -> PriceResult:
+        """Entity için anlık fiyat döner. Hata/anahtar yoksa warning ile döner, çökmez."""
+        raise NotImplementedError

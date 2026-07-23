@@ -13,6 +13,29 @@ export function stanceLabel(stance) {
   return (STANCE[stance] || STANCE.neutral).label;
 }
 
+// --- Fiyat gösterimi (yalnızca ticker; price null ise hiç render etme) ---
+// Burada fiyat ARTIŞI yeşil (iyi), düşüş kırmızı — risk deltasının TERSİ.
+export function PriceDisplay({ price, changePercent, updatedAt, showTime = true }) {
+  if (price == null) return null;
+  const up = (changePercent ?? 0) >= 0;
+  return (
+    <span className="inline-flex items-baseline gap-1.5">
+      <span className="font-semibold text-slate-100">${price.toFixed(2)}</span>
+      {changePercent != null && (
+        <span className={`text-xs font-medium ${up ? "text-emerald-400" : "text-rose-400"}`}>
+          {up ? "+" : ""}
+          {changePercent.toFixed(2)}%
+        </span>
+      )}
+      {showTime && updatedAt && (
+        <span className="text-[10px] text-slate-500" title="fiyatın çekilme zamanı">
+          {timeAgo(updatedAt)}
+        </span>
+      )}
+    </span>
+  );
+}
+
 // --- Risk değişim rozeti (son taramaya göre) ---
 // Risk için ARTIŞ kötü (kırmızı ▲), AZALIŞ iyi (yeşil ▼). Değişim yoksa gizli.
 export function RiskDelta({ delta }) {

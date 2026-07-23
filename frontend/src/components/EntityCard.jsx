@@ -7,6 +7,7 @@ import {
   SentimentGauge,
   TrendArrow,
   FlagChip,
+  PriceDisplay,
   stanceLabel,
   timeAgo,
 } from "./ui.jsx";
@@ -49,6 +50,18 @@ export default function EntityCard({ card, onOpen }) {
         </div>
         {a && <TrendArrow trend={a.sentiment_trend} />}
       </div>
+
+      {/* Fiyat — yalnızca ticker entity'lerde (keyword'de card.price null → gizli) */}
+      {card.price != null && (
+        <div className="flex items-center justify-between border-t border-ink-700 pt-2">
+          <span className="text-[10px] uppercase text-slate-500">fiyat</span>
+          <PriceDisplay
+            price={card.price}
+            changePercent={card.change_percent}
+            updatedAt={card.price_updated_at}
+          />
+        </div>
+      )}
 
       <SentimentGauge value={card.avg_sentiment} />
 

@@ -17,6 +17,7 @@ from .analysis.claude_client import ClaudeClient, MissingAPIKeyError
 from .analysis.pipeline import analyze_all_async
 from .db.database import session_scope
 from .ingest import fetch_all
+from .prices import refresh_prices
 
 logger = logging.getLogger("newsradar.refresh")
 
@@ -114,6 +115,12 @@ def run_refresh(lookback_hours: int | None = None) -> RefreshSummary:
 
     _set_running(True, total=total)
     try:
+        # 0) Fiyat snapshot'ları (ticker entity'ler; ucuz, hata-toleranslı).
+        try:
+            summary.warnings.extend(refresh_prices())
+        except Exception as exc:  # noqa: BLE001 — fiyat hatası yenilemeyi çökertmesin
+            logger.warning("Fiyat çekme başarısız (atlandı): %s", exc)
+
         # 1) Çekme (Claude gerektirmez).
         with session_scope() as session:
             for r in fetch_all(session, lookback_hours):

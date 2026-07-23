@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from ..db.database import get_db
 from ..db.models import Article, Entity
 from .schemas import DashboardOut
-from .serializers import article_out, entity_card, risk_history
+from .serializers import article_out, entity_card, price_history, risk_history
 
 router = APIRouter(tags=["dashboard"])
 
@@ -35,4 +35,5 @@ def entity_dashboard(
         entity=entity_card(db, entity),
         articles=[article_out(a) for a in articles],
         risk_history=risk_history(db, entity_id, limit=30),
+        price_history=price_history(db, entity_id, limit=30),
     )

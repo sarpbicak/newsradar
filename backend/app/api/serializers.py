@@ -7,13 +7,14 @@ from collections import Counter
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ..db.models import Article, Entity, EntityAnalysis
+from ..db.models import Article, Entity, EntityAnalysis, PriceSnapshot
 from .schemas import (
     AnalysisOut,
     ArticleOut,
     DeltaOut,
     EntityCardOut,
     PreviousAnalysisOut,
+    PricePointOut,
     RiskPointOut,
 )
 
@@ -81,6 +82,17 @@ def risk_history(session: Session, entity_id: int, limit: int = 30) -> list[Risk
     ]
 
 
+def price_history(session: Session, entity_id: int, limit: int = 30) -> list[PricePointOut]:
+    """Son ~N fiyat snapshot'ı (eski → yeni). Ticker olmayan entity'de boş liste."""
+    rows = session.scalars(
+        select(PriceSnapshot)
+        .where(PriceSnapshot.entity_id == entity_id)
+        .order_by(PriceSnapshot.fetched_at.desc())
+        .limit(limit)
+    ).all()
+    return [PricePointOut(fetched_at=r.fetched_at, price=r.price) for r in reversed(rows)]
+
+
 def analysis_out(a: EntityAnalysis | None) -> AnalysisOut | None:
     if a is None:
         return None
@@ -129,6 +141,15 @@ def entity_card(session: Session, entity: Entity) -> EntityCardOut:
     latest = _latest_analysis(session, entity.id)
     previous = _previous_analysis(session, entity.id)
 
+    # Fiyat: yalnızca ticker entity'lerde (keyword'de None kalır).
+    price_snap = None
+    if entity.type == "ticker":
+        price_snap = session.scalar(
+            select(PriceSnapshot)
+            .where(PriceSnapshot.entity_id == entity.id)
+            .order_by(PriceSnapshot.fetched_at.desc())
+        )
+
     return EntityCardOut(
         id=entity.id,
         name=entity.name,
@@ -143,6 +164,9 @@ def entity_card(session: Session, entity: Entity) -> EntityCardOut:
         analysis=analysis_out(latest),
         previous_analysis=_previous_out(previous),
         delta=_delta_out(latest, previous),
+        price=price_snap.price if price_snap else None,
+        change_percent=price_snap.change_percent if price_snap else None,
+        price_updated_at=price_snap.fetched_at if price_snap else None,
     )
 
 

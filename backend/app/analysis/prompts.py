@@ -43,6 +43,14 @@ haber akışına dayalı bir hisse/varlık risk analistisin.
      what_to_verify'a spesifik bir doğrulama maddesi olarak ekle \
      (ör. 'bu değerleme ikincil piyasa mı, hangi platform?').
 
+8. FİYAT VERİSİ (varsa). Bazı varlıklar için güncel fiyat + değişim % verilir. \
+   Bunu YALNIZCA haberin fiyata yansıyıp yansımadığını değerlendirmek için kullan: \
+   negatif haber akışı varken hisse zaten sert düşmüşse, bunu `what_to_verify`'a \
+   ertelemek yerine doğrudan `summary`'de belirt (haber muhtemelen fiyatlanmış). \
+   ASLA hedef fiyat, alım/satım seviyesi, teknik analiz sinyali ya da gelecek fiyat \
+   tahmini üretme — fiyat sadece 'bu haber zaten yansıdı mı' sorusu içindir. Fiyat \
+   verisi YOKSA (ör. keyword/özel şirket) bunu belirt ve doğrulamayı kullanıcıya bırak.
+
 7. CO-MENTIONED ŞİRKETLER. Makale analizinde `co_mentioned_entities` alanını doldur: \
    yalnızca haberin İÇERİĞİNDE anlamlı biçimde geçen, haberin konusu olan DİĞER şirketleri \
    listele (en fazla 3). Şunları DAHİL ETME: analiz edilen varlığın kendisi; haber sitesi/ \
@@ -101,14 +109,38 @@ def build_article_batch_prompt(
     return "\n".join(lines)
 
 
+def _price_lines(price: dict | None) -> list[str]:
+    """Fiyat bağlamını prompt satırlarına çevirir (yoksa 'fiyat verisi yok')."""
+    if not price:
+        return [
+            "FİYAT VERİSİ: yok (bu varlık için fiyat çekilemiyor — ör. keyword/özel "
+            "şirket ya da ABD dışı borsa). Haberin fiyatlanıp fiyatlanmadığını sen "
+            "belirleyemezsin; doğrulamayı kullanıcıya bırak.",
+        ]
+    parts = [f"güncel fiyat={price['price']}"]
+    if price.get("change_percent") is not None:
+        parts.append(f"günlük değişim={price['change_percent']:+.2f}%")
+    if price.get("week_change_percent") is not None:
+        parts.append(f"~7 günlük değişim={price['week_change_percent']:+.2f}%")
+    return [
+        "FİYAT VERİSİ (yalnızca 'haber zaten fiyatlandı mı' için; tahmin/hedef ÜRETME): "
+        + ", ".join(parts) + ".",
+    ]
+
+
 def build_entity_prompt(
-    entity_name: str, entity_query: str, entity_type: str, analyzed: list[dict]
+    entity_name: str,
+    entity_query: str,
+    entity_type: str,
+    analyzed: list[dict],
+    price: dict | None = None,
 ) -> str:
     """Entity-başı toplu değerlendirme için kullanıcı mesajı."""
     lines = [
         f"Varlık: {entity_name} (arama: {entity_query}).",
         entity_type_line(entity_type),
         utc_context_line(),
+        *_price_lines(price),
         f"Aşağıda bu varlıkla ilgili, analiz edilmiş {len(analyzed)} haber var "
         "(en yeni önce). Bunlardan haber-akışı bazlı toplu bir değerlendirme üret ve "
         "'record_entity_assessment' aracıyla döndür.",

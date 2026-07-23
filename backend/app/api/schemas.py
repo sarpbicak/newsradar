@@ -85,6 +85,10 @@ class EntityCardOut(BaseModel):
     analysis: AnalysisOut | None
     previous_analysis: PreviousAnalysisOut | None = None
     delta: DeltaOut | None = None
+    # Fiyat (yalnızca ticker entity'lerde dolu; keyword'de None).
+    price: float | None = None
+    change_percent: float | None = None
+    price_updated_at: datetime | None = None
 
 
 class ArticleOut(BaseModel):
@@ -124,10 +128,18 @@ class RiskPointOut(BaseModel):
     stance: str
 
 
+class PricePointOut(BaseModel):
+    """Fiyat zaman serisinde tek nokta (grafik için)."""
+
+    fetched_at: datetime
+    price: float
+
+
 class DashboardOut(BaseModel):
     entity: EntityCardOut
     articles: list[ArticleOut]
     risk_history: list[RiskPointOut] = []
+    price_history: list[PricePointOut] = []
 
 
 class RefreshSummaryOut(BaseModel):
