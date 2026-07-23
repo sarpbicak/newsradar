@@ -90,8 +90,20 @@ ARTICLE_ANALYSIS_TOOL = {
                                             "(NASDAQ, NYSE, BIST, XETRA...), yoksa null."
                                         ),
                                     },
+                                    "why_relevant": {
+                                        "type": ["string", "null"],
+                                        "description": (
+                                            "BU şirketin (analiz edilen varlık değil, önerilen "
+                                            "şirket) neden gündemde olduğu — tek cümle TÜRKÇE, "
+                                            "ör. 'AMD, MI400 ile NVIDIA'nın veri merkezi payını "
+                                            "hedefliyor'. Emin değilsen null."
+                                        ),
+                                    },
                                 },
-                                "required": ["name", "ticker", "is_public", "country", "exchange"],
+                                "required": [
+                                    "name", "ticker", "is_public", "country", "exchange",
+                                    "why_relevant",
+                                ],
                                 "additionalProperties": False,
                             },
                         },
@@ -181,9 +193,12 @@ def sanitize_co_mentioned(raw: object) -> list[dict]:
         country = str(country).strip() if country else None
         exchange = c.get("exchange")
         exchange = str(exchange).strip() if exchange else None
+        why = c.get("why_relevant")
+        why = str(why).strip() if why else None
         out.append({
             "name": name, "ticker": ticker or None, "is_public": is_public,
             "country": country or None, "exchange": exchange or None,
+            "why_relevant": why or None,
         })
     return out
 

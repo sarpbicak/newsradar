@@ -45,8 +45,8 @@ export default function SuggestionsSection({ suggestions, onAdd, onDismiss }) {
                 </span>
               </div>
 
-              {s.sample_rationale && (
-                <p className="text-xs leading-relaxed text-slate-400">{s.sample_rationale}</p>
+              {s.why_relevant && (
+                <p className="text-xs leading-relaxed text-slate-400">{s.why_relevant}</p>
               )}
 
               {s.source_entity_names?.length > 0 && (

@@ -59,7 +59,9 @@ haber akışına dayalı bir hisse/varlık risk analistisin.
    isabetli olsun. Hiçbiri yoksa boş dizi döndür. Her şirket için biliyorsan `country` \
    (ISO ülke kodu: US, TR, DE...) ve `exchange` (ana borsa: NASDAQ, NYSE, BIST...) doldur; \
    emin değilsen null. Bu bilgi şirketin ticker mı yoksa keyword olarak mı izleneceğini \
-   belirler (ABD borsası dışındakiler keyword olur).
+   belirler (ABD borsası dışındakiler keyword olur). Ayrıca her şirket için `why_relevant`: \
+   O ŞİRKETİN (analiz edilen varlığın değil) neden gündemde olduğunu tek cümle TÜRKÇE yaz \
+   (ör. "AMD, MI400 ile NVIDIA'nın veri merkezi payını hedefliyor"). Emin değilsen null.
 
 DİL: Tüm çıktı ve gerekçeler TÜRKÇE olmalı.
 """

@@ -125,7 +125,7 @@ class SuggestionOut(BaseModel):
     ticker: str | None
     is_public: bool | None
     mention_count: int
-    sample_rationale: str | None
+    why_relevant: str | None    # önerilen şirketin neden gündemde olduğu (eski kayıtlarda None)
     source_entity_names: list[str]
     last_seen_at: datetime
     # Eklenince ne olacağı (kullanıcıya önceden göstermek için).

@@ -52,6 +52,7 @@ def init_db() -> None:
     _ensure_column("suggestions", "source_language", "VARCHAR(5) NOT NULL DEFAULT 'en'")
     _ensure_column("suggestions", "country", "VARCHAR(60)")
     _ensure_column("suggestions", "exchange", "VARCHAR(60)")
+    _ensure_column("suggestions", "why_relevant", "TEXT")
 
 
 def _ensure_column(table: str, column: str, ddl_type: str) -> None:

@@ -58,15 +58,18 @@ def _suggestion_key(name: str, ticker: str | None) -> str:
 
 
 def _accumulate_suggestions(
-    session: Session, entity_id: int, source_language: str, co_list: list[dict], rationale: str
+    session: Session, entity_id: int, source_language: str, co_list: list[dict]
 ) -> None:
     """Co-mentioned şirketleri suggestions tablosuna yaz/güncelle (upsert).
 
     source_language: co-mention'ın geldiği entity'nin dili — keyword olarak
     eklenecekse bu dil miras alınır (ilk görülende sabitlenir).
+    Gerekçe olarak her şirketin KENDİ `why_relevant`'ı kullanılır (makale-alaka
+    gerekçesi DEĞİL — o iç not kullanıcıya sızmasın).
     """
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     for c in co_list:
+        why = c.get("why_relevant")
         key = _suggestion_key(c["name"], c["ticker"])
         sug = session.scalar(select(Suggestion).where(Suggestion.norm_key == key))
         if sug is None:
@@ -76,7 +79,7 @@ def _accumulate_suggestions(
                     country=c.get("country"), exchange=c.get("exchange"),
                     source_language=source_language or "en",
                     norm_key=key, mention_count=1, source_entity_ids=[entity_id],
-                    sample_rationale=rationale or None, first_seen_at=now, last_seen_at=now,
+                    why_relevant=why, first_seen_at=now, last_seen_at=now,
                 )
             )
             # autoflush=False: aynı session'da sonraki aynı-şirket aramaları bunu
@@ -85,8 +88,8 @@ def _accumulate_suggestions(
         else:
             sug.mention_count += 1
             sug.last_seen_at = now
-            if rationale:
-                sug.sample_rationale = rationale
+            if why:
+                sug.why_relevant = why  # en güncel şirket-özel gerekçe
             # Eksik bilgiyi sonradan öğrenilirse doldur.
             if not sug.ticker and c["ticker"]:
                 sug.ticker = c["ticker"]
@@ -216,7 +219,7 @@ def _apply_article_results(entity_id: int, batch_datas: list[dict]) -> dict:
                 # Öneri biriktir: yalnızca İLGİLİ (kalan) makalelerin co-mention'ları.
                 if clean.get("co_mentioned"):
                     _accumulate_suggestions(
-                        session, entity_id, source_language, clean["co_mentioned"], clean["rationale"]
+                        session, entity_id, source_language, clean["co_mentioned"]
                     )
     return {"analyzed": analyzed, "discarded": discarded}
 

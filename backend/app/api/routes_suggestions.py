@@ -81,7 +81,7 @@ def _suggestion_out(db: Session, sug: Suggestion, name_by_id: dict[int, str]) ->
         ticker=sug.ticker,
         is_public=sug.is_public,
         mention_count=sug.mention_count,
-        sample_rationale=sug.sample_rationale,
+        why_relevant=sug.why_relevant,
         source_entity_names=names,
         last_seen_at=sug.last_seen_at,
         add_as_type=add_type,
