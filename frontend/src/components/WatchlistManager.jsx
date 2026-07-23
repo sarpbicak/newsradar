@@ -11,7 +11,7 @@ const LANGUAGES = [
   { code: "fr", label: "Fransızca" },
 ];
 
-export default function WatchlistManager({ cards, onCreate, onDelete }) {
+export default function WatchlistManager({ cards, onCreate, onDelete, embedded = false }) {
   const [name, setName] = useState("");
   const [type, setType] = useState("ticker");
   const [query, setQuery] = useState(""); // sembol (yalnızca ticker)
@@ -122,8 +122,8 @@ export default function WatchlistManager({ cards, onCreate, onDelete }) {
   const showDropdown = type === "ticker" && name.trim().length >= 2;
 
   return (
-    <div className="rounded-xl border border-ink-600 bg-ink-800 p-4">
-      <h3 className="mb-3 text-sm font-semibold text-slate-200">İzleme Listesi</h3>
+    <div className={embedded ? "" : "rounded-xl border border-ink-600 bg-ink-800 p-4"}>
+      {!embedded && <h3 className="mb-3 text-sm font-semibold text-slate-200">İzleme Listesi</h3>}
 
       <form onSubmit={submit} className="mb-3 flex flex-wrap items-end gap-2">
         {/* Tip */}

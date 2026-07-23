@@ -135,6 +135,16 @@ ENTITY_ANALYSIS_TOOL = {
     "input_schema": {
         "type": "object",
         "properties": {
+            "headline_verdict": {
+                "type": "string",
+                "description": (
+                    "Finans bilmeyen birine tek cümlelik, düz Türkçe HÜKÜM — en fazla 12 "
+                    "kelime, JARGON YOK. Kartın en üstünde büyük gösterilecek. Örnekler: "
+                    "'Haber akışı olumsuz — kısa vadede baskı var, kanıt güçlü', "
+                    "'Olumlu sinyaller ama az habere dayanıyor, temkinli ol', "
+                    "'Karışık tablo — net bir yön yok'."
+                ),
+            },
             "risk_score": {"type": "integer", "description": "0 (düşük) .. 100 (yüksek risk)"},
             "sentiment_trend": {"type": "string", "enum": list(SENTIMENT_TRENDS)},
             "top_drivers": {
@@ -156,7 +166,7 @@ ENTITY_ANALYSIS_TOOL = {
             },
         },
         "required": [
-            "risk_score", "sentiment_trend", "top_drivers", "summary",
+            "headline_verdict", "risk_score", "sentiment_trend", "top_drivers", "summary",
             "stance", "conviction", "what_to_verify", "invalidation",
         ],
         "additionalProperties": False,
@@ -225,7 +235,10 @@ def sanitize_entity_analysis(item: dict) -> dict:
     conviction = item.get("conviction")
     drivers = [str(d).strip() for d in item.get("top_drivers", []) if str(d).strip()]
     verify = [str(v).strip() for v in item.get("what_to_verify", []) if str(v).strip()]
+    # Hüküm cümlesi: en fazla 12 kelimeye kırp (jargonsuz, düz Türkçe).
+    verdict = " ".join(str(item.get("headline_verdict", "")).strip().split()[:12])
     return {
+        "headline_verdict": verdict,
         "risk_score": int(clamp(float(item.get("risk_score", 50)), 0, 100)),
         "sentiment_trend": trend if trend in SENTIMENT_TRENDS else "stable",
         "top_drivers": drivers[:3],

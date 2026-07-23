@@ -229,6 +229,9 @@ class EntityAnalysis(Base):
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
+    # Finans bilmeyen için tek cümlelik düz Türkçe hüküm (kartın başında). Eski
+    # kayıtlarda None → kart özete/yöne düşer.
+    headline_verdict: Mapped[str | None] = mapped_column(Text, nullable=True)
     risk_score: Mapped[int] = mapped_column(Integer, nullable=False)           # 0..100
     sentiment_trend: Mapped[str] = mapped_column(String(20), nullable=False)
     top_drivers: Mapped[list] = mapped_column(JSON, nullable=False)            # list[str], TR

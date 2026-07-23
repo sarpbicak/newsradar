@@ -65,6 +65,10 @@ export default function EntityDetail({ entityId, onBack }) {
         )}
       </div>
 
+      {a?.headline_verdict && (
+        <p className="text-lg font-medium leading-snug text-slate-100">{a.headline_verdict}</p>
+      )}
+
       {!a ? (
         <div className="rounded-xl border border-ink-600 bg-ink-800 p-6 text-slate-400">
           Bu varlık için henüz analiz yok. Üstteki <strong>Yenile</strong> düğmesine basın

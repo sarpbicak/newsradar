@@ -2,7 +2,7 @@
 // Öneri yoksa hiç render edilmez (boş başlık durmasın).
 import React, { useState } from "react";
 
-export default function SuggestionsSection({ suggestions, onAdd, onDismiss }) {
+export default function SuggestionsSection({ suggestions, onAdd, onDismiss, embedded = false }) {
   const [busyId, setBusyId] = useState(null);
 
   if (!suggestions || suggestions.length === 0) return null;
@@ -17,10 +17,12 @@ export default function SuggestionsSection({ suggestions, onAdd, onDismiss }) {
   }
 
   return (
-    <div className="rounded-xl border border-ink-600 bg-ink-800/60 p-4">
-      <div className="mb-1 text-sm font-semibold text-slate-200">
-        Bunları da izlemek ister misin?
-      </div>
+    <div className={embedded ? "" : "rounded-xl border border-ink-600 bg-ink-800/60 p-4"}>
+      {!embedded && (
+        <div className="mb-1 text-sm font-semibold text-slate-200">
+          Bunları da izlemek ister misin?
+        </div>
+      )}
       <div className="mb-3 text-[11px] text-slate-500">
         Haberlerinde sık geçen, izleme listende olmayan şirketler.
       </div>

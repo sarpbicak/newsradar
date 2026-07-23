@@ -100,17 +100,17 @@ export default function Overview({
         </div>
       ) : (
         <>
-          {/* Sıralama seçici */}
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-slate-500">Sırala:</span>
+          {/* Sıralama seçici — kompakt */}
+          <div className="flex items-center gap-1 text-[11px]">
+            <span className="mr-1 text-slate-500">Sırala:</span>
             {Object.entries(SORTS).map(([key, { label }]) => (
               <button
                 key={key}
                 onClick={() => setSort(key)}
-                className={`rounded-md border px-2.5 py-1 transition ${
+                className={`rounded px-2 py-0.5 transition ${
                   sort === key
-                    ? "border-accent/50 bg-accent/15 text-slate-100"
-                    : "border-ink-600 text-slate-400 hover:text-slate-200"
+                    ? "bg-accent/15 font-medium text-slate-100"
+                    : "text-slate-500 hover:text-slate-300"
                 }`}
               >
                 {label}
@@ -126,13 +126,38 @@ export default function Overview({
         </>
       )}
 
-      <SuggestionsSection
-        suggestions={suggestions}
-        onAdd={onAddSuggestion}
-        onDismiss={onDismissSuggestion}
-      />
+      {/* Öneriler — katlanabilir, varsayılan kapalı */}
+      {suggestions.length > 0 && (
+        <Collapsible title={`Öneriler (${suggestions.length})`}>
+          <SuggestionsSection
+            suggestions={suggestions}
+            onAdd={onAddSuggestion}
+            onDismiss={onDismissSuggestion}
+            embedded
+          />
+        </Collapsible>
+      )}
 
-      <WatchlistManager cards={cards} onCreate={onCreate} onDelete={onDelete} />
+      {/* İzleme listesi — katlanabilir, varsayılan kapalı */}
+      <Collapsible title={`İzleme listesi (${cards.length})`}>
+        <WatchlistManager cards={cards} onCreate={onCreate} onDelete={onDelete} embedded />
+      </Collapsible>
+    </div>
+  );
+}
+
+function Collapsible({ title, children }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-xl border border-ink-600 bg-ink-800/60">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between px-4 py-2.5 text-sm font-semibold text-slate-200"
+      >
+        <span>{title}</span>
+        <span className={`text-slate-500 transition ${open ? "rotate-90" : ""}`}>›</span>
+      </button>
+      {open && <div className="border-t border-ink-700 p-3">{children}</div>}
     </div>
   );
 }

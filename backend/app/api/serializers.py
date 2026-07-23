@@ -98,6 +98,7 @@ def analysis_out(a: EntityAnalysis | None) -> AnalysisOut | None:
     if a is None:
         return None
     return AnalysisOut(
+        headline_verdict=a.headline_verdict,
         risk_score=a.risk_score,
         sentiment_trend=a.sentiment_trend,
         top_drivers=a.top_drivers or [],
@@ -123,6 +124,41 @@ def _analyst_out(snap: AnalystSnapshot | None) -> AnalystOut | None:
         target_mean=snap.target_mean, target_high=snap.target_high, target_low=snap.target_low,
         fetched_at=snap.fetched_at,
     )
+
+
+def _horizon_and_evidence(
+    session: Session, entity_id: int, analysis: EntityAnalysis | None
+) -> tuple[str | None, str | None, int]:
+    """Kart için çoğunluk vade + kanıt gücü (conviction + haber sayısı + tutarlılık)."""
+    if analysis is None:
+        return None, None, 0
+    rows = session.execute(
+        select(Article.impact_horizon, Article.sentiment).where(
+            Article.entity_id == entity_id, Article.analyzed.is_(True)
+        )
+    ).all()
+    horizons = [h for h, _ in rows if h]
+    horizon = Counter(horizons).most_common(1)[0][0] if horizons else None
+
+    count = analysis.articles_considered or len(rows)
+    sentiments = [s for _, s in rows if s is not None]
+
+    # Kanıt puanı: kanaat + haber sayısı + duygu tutarlılığı.
+    score = {"high": 2, "medium": 1, "low": 0}.get(analysis.conviction, 0)
+    if count >= 8:
+        score += 1
+    elif count < 3:
+        score -= 1
+    if sentiments:
+        pos = sum(1 for s in sentiments if s > 0.1)
+        neg = sum(1 for s in sentiments if s < -0.1)
+        agree = max(pos, neg) / len(sentiments)
+        if agree >= 0.7:
+            score += 1
+        elif agree < 0.4:
+            score -= 1
+    strength = "strong" if score >= 3 else "medium" if score >= 1 else "weak"
+    return horizon, strength, count
 
 
 def entity_card(session: Session, entity: Entity) -> EntityCardOut:
@@ -155,6 +191,7 @@ def entity_card(session: Session, entity: Entity) -> EntityCardOut:
 
     latest = _latest_analysis(session, entity.id)
     previous = _previous_analysis(session, entity.id)
+    horizon, evidence_strength, evidence_count = _horizon_and_evidence(session, entity.id, latest)
 
     # Fiyat + analist: yalnızca ticker entity'lerde (keyword'de None kalır).
     price_snap = None
@@ -186,6 +223,9 @@ def entity_card(session: Session, entity: Entity) -> EntityCardOut:
         top_flags=top_flags,
         last_updated=latest.created_at if latest else None,
         analysis=analysis_out(latest),
+        horizon=horizon,
+        evidence_strength=evidence_strength,
+        evidence_count=evidence_count,
         previous_analysis=_previous_out(previous),
         delta=_delta_out(latest, previous),
         price=price_snap.price if price_snap else None,

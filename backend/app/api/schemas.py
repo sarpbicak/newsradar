@@ -47,6 +47,7 @@ class ChatRequest(BaseModel):
 
 # --------------------------- Yanıt modelleri --------------------------- #
 class AnalysisOut(BaseModel):
+    headline_verdict: str | None = None
     risk_score: int
     sentiment_trend: str
     top_drivers: list[str]
@@ -110,6 +111,10 @@ class EntityCardOut(BaseModel):
     top_flags: list[str]
     last_updated: datetime | None
     analysis: AnalysisOut | None
+    # Kart hiyerarşisi için türetilmiş "3 saniyelik" alanlar (analiz varsa dolu).
+    horizon: str | None = None            # çoğunluk vade: short | medium | long
+    evidence_strength: str | None = None  # strong | medium | weak
+    evidence_count: int = 0               # hükmün dayandığı analiz edilmiş haber sayısı
     previous_analysis: PreviousAnalysisOut | None = None
     delta: DeltaOut | None = None
     # Fiyat (yalnızca ticker entity'lerde dolu; keyword'de None).

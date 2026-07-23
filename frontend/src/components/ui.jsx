@@ -13,6 +13,21 @@ export function stanceLabel(stance) {
   return (STANCE[stance] || STANCE.neutral).label;
 }
 
+// Yön/vade/kanıt için renk + etiket yardımcıları (Verdict-First kart).
+const STANCE_COLOR = { bullish: "#16a34a", neutral: "#6b7280", bearish: "#dc2626" };
+export function stanceColor(stance) {
+  return STANCE_COLOR[stance] || STANCE_COLOR.neutral;
+}
+export function horizonLabel(h) {
+  return { short: "Kısa", medium: "Orta", long: "Uzun" }[h] || "—";
+}
+export function evidenceLabel(e) {
+  return { strong: "Güçlü", medium: "Orta", weak: "Zayıf" }[e] || "—";
+}
+export function evidenceColor(e) {
+  return { strong: "#16a34a", medium: "#d97706", weak: "#dc2626" }[e] || "#6b7280";
+}
+
 // --- Fiyat gösterimi (yalnızca ticker; price null ise hiç render etme) ---
 // Burada fiyat ARTIŞI yeşil (iyi), düşüş kırmızı — risk deltasının TERSİ.
 export function PriceDisplay({ price, changePercent, updatedAt, showTime = true }) {
