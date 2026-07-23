@@ -180,7 +180,10 @@ class SymbolResultOut(BaseModel):
     symbol: str
     description: str
     type: str
-    market: str  # "US" ya da yabancı borsa son eki (IS, DE, L...)
+    market: str              # "US" ya da yabancı borsa son eki (IS, DE, L...)
+    us_supported: bool       # Finnhub kapsıyor mu (ABD borsası)
+    exchange_name: str       # insan-okur borsa adı ("ABD", "Borsa İstanbul"...)
+    suggested_language: str  # keyword'e yönlendirilirse önerilen dil (IS→tr...)
 
 
 class ProviderStatusOut(BaseModel):

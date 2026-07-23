@@ -59,7 +59,25 @@ export default function WatchlistManager({ cards, onCreate, onDelete }) {
   }, [name, type]);
 
   function pickSymbol(r) {
-    skipSearch.current = true; // name güncellenince yeniden arama yapma
+    // ABD dışı borsa: ticker olarak eklenirse haber/fiyat gelmez → keyword'e yönlendir.
+    if (!r.us_supported) {
+      const ok = window.confirm(
+        `${r.symbol} — ${r.exchange_name}. Bu borsa için haber/fiyat verisi (Finnhub) yok; ` +
+          `keyword olarak eklemeniz önerilir.\n\nKeyword olarak devam edilsin mi?`
+      );
+      if (!ok) return;
+      // Tip keyword'e geç, ad dolsun, dil önerisi uygulansın. (type keyword olunca
+      // arama efekti erken döner; skipSearch gerekmez.)
+      setType("keyword");
+      setQuery("");
+      setLanguage(r.suggested_language || "en");
+      setName(r.description);
+      setResults([]);
+      setSearched(false);
+      return;
+    }
+    // ABD sembolü: ticker alanlarını doldur (name değişince yeniden arama yapma).
+    skipSearch.current = true;
     setName(r.description);
     setQuery(r.symbol);
     setResults([]);
@@ -146,13 +164,24 @@ export default function WatchlistManager({ cards, onCreate, onDelete }) {
                     key={r.symbol}
                     type="button"
                     onClick={() => pickSymbol(r)}
-                    className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-xs hover:bg-ink-700"
+                    className="block w-full px-3 py-1.5 text-left text-xs hover:bg-ink-700"
                   >
-                    <span className="truncate text-slate-200">{r.description}</span>
-                    <span className="shrink-0 font-mono text-slate-400">
-                      {r.symbol}
-                      <span className="ml-1 text-slate-600">({r.market})</span>
-                    </span>
+                    <div
+                      className={`flex items-center justify-between gap-2 ${
+                        r.us_supported ? "" : "opacity-60"
+                      }`}
+                    >
+                      <span className="truncate text-slate-200">{r.description}</span>
+                      <span className="shrink-0 font-mono text-slate-400">
+                        {r.symbol}
+                        <span className="ml-1 text-slate-600">({r.market})</span>
+                      </span>
+                    </div>
+                    {!r.us_supported && (
+                      <div className="mt-0.5 text-[10px] text-amber-400/80">
+                        ⚠ {r.exchange_name} — haber/fiyat yok, keyword önerilir
+                      </div>
+                    )}
                   </button>
                 ))}
               {!searching && searched && results.length === 0 && (

@@ -19,12 +19,41 @@ _BASE = "https://finnhub.io/api/v1"
 # Hisse senedi tipleri (Finnhub `type` alanı). Boş tip de kabul (bazı sonuçlarda yok).
 _STOCK_HINTS = ("stock", "adr", "equity", "reit", "dr")
 
+# Yabancı borsa son eki → insan-okur ad (Finnhub ücretsiz katmanı bunları kapsamaz).
+_EXCHANGE_NAMES = {
+    "IS": "Borsa İstanbul",
+    "DE": "XETRA (Frankfurt)",
+    "F": "Frankfurt",
+    "PA": "Euronext Paris",
+    "L": "Londra (LSE)",
+    "MC": "Bolsa de Madrid",
+    "MI": "Borsa Italiana",
+    "AS": "Euronext Amsterdam",
+    "BR": "Euronext Brüksel",
+    "LS": "Euronext Lizbon",
+    "SW": "SIX (İsviçre)",
+    "ST": "Nasdaq Stockholm",
+    "HE": "Nasdaq Helsinki",
+    "CO": "Nasdaq Kopenhag",
+    "OL": "Oslo Børs",
+    "VI": "Wiener Börse",
+    "WA": "GPW (Varşova)",
+    "AT": "Athens Exchange",
+    "TO": "Toronto (TSX)",
+    "HK": "Hong Kong",
+    "T": "Tokyo",
+}
+# Son ek → önerilen keyword dili (yoksa en).
+_SUFFIX_LANG = {
+    "IS": "tr",
+    "DE": "de", "F": "de", "VI": "de", "SW": "de",
+    "PA": "fr", "BR": "fr",
+}
 
-def _market_of(symbol: str) -> str:
-    """Sembolden pazar ipucu: nokta yoksa ABD, varsa son ekten (IS, DE, L...)."""
-    if "." in symbol:
-        return symbol.rsplit(".", 1)[-1].upper()
-    return "US"
+
+def _suffix_of(symbol: str) -> str | None:
+    """ABD-dışı sembol son eki (ASELS.E.IS → IS), yoksa None (ABD)."""
+    return symbol.rsplit(".", 1)[-1].upper() if "." in symbol else None
 
 
 def _is_stock(type_str: str) -> bool:
@@ -64,15 +93,21 @@ def search_symbols(query: str, limit: int = 8) -> list[dict]:
         if not _is_stock(r.get("type", "")):
             continue
         seen.add(symbol)
+        suffix = _suffix_of(symbol)
+        us_supported = suffix is None  # nokta yoksa ABD → Finnhub kapsıyor
         cleaned.append(
             {
                 "symbol": symbol,
                 "description": desc,
                 "type": (r.get("type") or "").strip(),
-                "market": _market_of(symbol),
+                "market": suffix or "US",
+                "us_supported": us_supported,
+                # ABD-dışı için insan-okur borsa adı + önerilen keyword dili.
+                "exchange_name": "ABD" if us_supported else _EXCHANGE_NAMES.get(suffix, suffix),
+                "suggested_language": "en" if us_supported else _SUFFIX_LANG.get(suffix, "en"),
             }
         )
 
-    # ABD (market=US) önde; grup içinde Finnhub'ın alaka sırası korunur (stable sort).
-    cleaned.sort(key=lambda x: x["market"] != "US")
+    # ABD-destekli (Finnhub kapsamı) önde; grup içinde Finnhub alaka sırası korunur.
+    cleaned.sort(key=lambda x: not x["us_supported"])
     return cleaned[:limit]
