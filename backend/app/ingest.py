@@ -107,6 +107,14 @@ def fetch_for_entity(
         )
         logger.warning("[%s] yazma hatası, entity atlandı: %s", entity.name, exc)
 
+    # Teşhis: her entity için sağlayıcı/çekme sonucu tek satırda loglanır. Böylece
+    # canlıda (Render logs) "AMD 0 haber mi çekiyor" doğrudan görülebilir.
+    logger.info(
+        "[%s] sağlayıcı=%s çekilen=%d yeni=%d tekrar=%d%s",
+        entity.name, outcome.provider, result.fetched, result.new_count,
+        result.duplicates,
+        f" UYARI: {'; '.join(result.warnings)}" if result.warnings else "",
+    )
     return result
 
 
