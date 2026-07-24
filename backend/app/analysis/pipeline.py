@@ -439,10 +439,25 @@ async def analyze_all_async(
         if progress_cb:
             progress_cb(done, total)
 
-    # Tüm entity'ler eşzamanlı; Claude çağrıları semaphore ile sınırlı.
-    await asyncio.gather(
-        *[_process_entity(t) for t in entity_tasks], return_exceptions=False
-    )
+    async def _process_entity_safe(t: dict):
+        """Bir entity'nin analizi beklenmedik hata atsa BİLE diğerleri sürsün.
+
+        Aksi halde (return_exceptions=False) tek entity'nin hatası tüm analizi
+        çökertir ve o hatadan sonraki entity'ler HİÇ işlenmez — bu, 'makaleler
+        çekilmiş ama analiz edilmemiş' takılı durumunun tipik sebebidir.
+        """
+        nonlocal done
+        try:
+            await _process_entity(t)
+        except Exception as exc:  # noqa: BLE001 — tek entity hatası hattı durdurmasın
+            logger.exception("Entity analiz task çöktü: %s", t["name"])
+            totals.warnings.append(f"[{t['name']}] analiz beklenmeyen hata (atlandı): {exc}")
+            done += 1
+            if progress_cb:
+                progress_cb(done, total)
+
+    # Tüm entity'ler eşzamanlı; Claude çağrıları semaphore ile sınırlı. Hata izole.
+    await asyncio.gather(*[_process_entity_safe(t) for t in entity_tasks])
 
     # Bakım: tablo şişmesin diye eski/az anılan önerileri temizle.
     async with db_lock:
