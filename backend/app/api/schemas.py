@@ -210,10 +210,22 @@ class SymbolResultOut(BaseModel):
     suggested_language: str  # keyword'e yönlendirilirse önerilen dil (IS→tr...)
 
 
+class NewsApiQuotaOut(BaseModel):
+    """NewsAPI kota durumu (rolling 24s)."""
+
+    used: int
+    limit: int
+    remaining: int
+    exhausted: bool
+    warn: bool
+    reset_in_hours: float
+
+
 class ProviderStatusOut(BaseModel):
     providers: dict[str, bool]
     claude: bool
     scheduler_enabled: bool
+    newsapi_quota: NewsApiQuotaOut | None = None
     # Yenileme süreci durumu (polling için).
     is_running: bool = False
     progress_done: int = 0

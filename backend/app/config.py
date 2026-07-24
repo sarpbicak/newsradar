@@ -38,6 +38,10 @@ class Settings:
         self.model: str = _env("NEWSRADAR_MODEL", "claude-sonnet-4-6")
         self.lookback_hours: int = int(_env("NEWSRADAR_LOOKBACK_HOURS", "48"))
         self.scheduler_enabled: bool = _env("NEWSRADAR_SCHEDULER", "on").lower() == "on"
+        # Otomatik yenileme aralığı (saat). Saatlik çok agresif; varsayılan 6.
+        self.scheduler_hours: int = max(1, int(_env("NEWSRADAR_SCHEDULER_HOURS", "6")))
+        # NewsAPI ücretsiz katman günlük istek sınırı (rolling 24s).
+        self.newsapi_daily_limit: int = int(_env("NEWSAPI_DAILY_LIMIT", "100"))
 
         # Analiz performans/maliyet ayarları (hepsi env'den; kod değişikliği gerekmez).
         # batch_size: tek Claude çağrısında kaç makale analiz edilir.

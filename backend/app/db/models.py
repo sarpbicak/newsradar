@@ -134,6 +134,20 @@ class Article(Base):
     )
 
 
+class ApiCall(Base):
+    """Sağlayıcı API çağrısı kaydı — kota takibi için (rolling 24 saat).
+
+    Özellikle NewsAPI ücretsiz katmanı (günde ~100 istek) sınırını aşmamak için
+    her gerçek çağrı burada zaman damgasıyla saklanır; son 24 saat sayılır.
+    """
+
+    __tablename__ = "api_calls"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    provider: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    called_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False, index=True)
+
+
 class Suggestion(Base):
     """Öneri: analiz edilen haberlerde geçen ama izleme listesinde OLMAYAN şirketler.
 

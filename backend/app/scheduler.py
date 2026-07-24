@@ -34,11 +34,13 @@ def start() -> None:
     global _scheduler, _enabled
     if _scheduler is not None:
         return
-    _enabled = get_settings().scheduler_enabled
+    settings = get_settings()
+    _enabled = settings.scheduler_enabled
+    hours = settings.scheduler_hours
     _scheduler = BackgroundScheduler(daemon=True)
-    _scheduler.add_job(_job, "interval", hours=1, id=_JOB_ID, max_instances=1)
+    _scheduler.add_job(_job, "interval", hours=hours, id=_JOB_ID, max_instances=1)
     _scheduler.start()
-    logger.info("Zamanlayıcı başladı (aktif=%s)", _enabled)
+    logger.info("Zamanlayıcı başladı (aktif=%s, her %d saatte)", _enabled, hours)
 
 
 def shutdown() -> None:

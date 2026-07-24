@@ -19,6 +19,7 @@ from .analyst import refresh_analyst
 from .db.database import session_scope
 from .ingest import fetch_all
 from .prices import refresh_prices
+from .quota import prune as prune_quota
 
 logger = logging.getLogger("newsradar.refresh")
 
@@ -88,7 +89,7 @@ def _record_completion(summary: RefreshSummary) -> None:
 
 
 # --------------------------- Çekirdek akış --------------------------- #
-def run_refresh(lookback_hours: int | None = None) -> RefreshSummary:
+def run_refresh(lookback_hours: int | None = None, manual: bool = False) -> RefreshSummary:
     """Tüm izleme listesi için çeker ve (anahtar varsa) analiz eder (senkron çekirdek).
 
     Aynı anda yalnızca tek bir refresh çalışır; biri sürerken ikincisi beklemeden
@@ -126,11 +127,12 @@ def run_refresh(lookback_hours: int | None = None) -> RefreshSummary:
         except Exception as exc:  # noqa: BLE001 — analist hatası yenilemeyi çökertmesin
             logger.warning("Analist çekme başarısız (atlandı): %s", exc)
 
-        # 1) Çekme (Claude gerektirmez).
+        # 1) Çekme (Claude gerektirmez). manual: elle Yenile'de kota-akıllı davran.
         with session_scope() as session:
-            for r in fetch_all(session, lookback_hours):
+            for r in fetch_all(session, lookback_hours, manual):
                 summary.fetched_new += r.new_count
                 summary.warnings.extend(f"[{r.entity_name}] {w}" for w in r.warnings)
+            prune_quota(session)  # eski api_call kayıtlarını temizle
 
         # 2) Analiz (ön-filtre + paralel). Anahtar yoksa çekme yine geçerli kalır.
         try:
@@ -158,12 +160,15 @@ def run_refresh(lookback_hours: int | None = None) -> RefreshSummary:
         _refresh_lock.release()
 
 
-def start_background_refresh(lookback_hours: int | None = None) -> bool:
-    """Yenilemeyi arka plan thread'inde başlatır. Zaten çalışıyorsa False döner."""
+def start_background_refresh(lookback_hours: int | None = None, manual: bool = True) -> bool:
+    """Yenilemeyi arka plan thread'inde başlatır (elle Yenile → manual=True).
+
+    Zaten çalışıyorsa False döner.
+    """
     if is_running():
         return False
     thread = threading.Thread(
-        target=run_refresh, args=(lookback_hours,), name="refresh", daemon=True
+        target=run_refresh, args=(lookback_hours, manual), name="refresh", daemon=True
     )
     thread.start()
     return True

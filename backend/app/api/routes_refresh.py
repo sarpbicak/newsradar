@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
 
 from .. import scheduler
+from ..db.database import get_db
 from ..providers import provider_status
+from ..quota import newsapi_usage
 from ..refresh import get_state, start_background_refresh
-from .schemas import ProviderStatusOut, RefreshAck
+from .schemas import NewsApiQuotaOut, ProviderStatusOut, RefreshAck
 
 router = APIRouter(tags=["refresh"])
 
@@ -36,15 +39,20 @@ def refresh(
 
 
 @router.get("/status", response_model=ProviderStatusOut)
-def status() -> ProviderStatusOut:
-    """Sağlayıcı/Claude/zamanlayıcı durumu + yenileme süreci (is_running, ilerleme)."""
+def status(db: Session = Depends(get_db)) -> ProviderStatusOut:
+    """Sağlayıcı/Claude/zamanlayıcı + yenileme süreci + NewsAPI kotası."""
     from ..config import get_settings
 
     st = get_state()
+    settings = get_settings()
+    quota = None
+    if settings.newsapi_available:
+        quota = NewsApiQuotaOut(**newsapi_usage(db))
     return ProviderStatusOut(
         providers=provider_status(),
-        claude=get_settings().claude_available,
+        claude=settings.claude_available,
         scheduler_enabled=scheduler.is_enabled(),
+        newsapi_quota=quota,
         is_running=st["is_running"],
         progress_done=st["progress_done"],
         progress_total=st["progress_total"],

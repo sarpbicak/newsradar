@@ -12,13 +12,17 @@ from datetime import datetime, timedelta, timezone
 
 import logging
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from .config import get_settings
 from .db.models import Article, Entity, url_hash
 from .providers import get_provider_for
+from .quota import newsapi_usage, record_call
+
+# Manuel yenilemede keyword entity bu kadar süre içinde çekildiyse NewsAPI'ye gidilmez.
+MANUAL_FRESH_HOURS = 2
 
 logger = logging.getLogger("newsradar.ingest")
 
@@ -39,12 +43,28 @@ class IngestResult:
         return len(self.new_articles)
 
 
+def _recently_fetched(session: Session, entity: Entity, hours: int) -> bool:
+    """Bu entity için son çekim `hours` saatten yeni mi (tazelik kontrolü)."""
+    latest = session.scalar(
+        select(func.max(Article.fetched_at)).where(Article.entity_id == entity.id)
+    )
+    if latest is None:
+        return False
+    return latest >= datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)
+
+
 def fetch_for_entity(
     session: Session,
     entity: Entity,
     lookback_hours: int | None = None,
+    manual: bool = False,
 ) -> IngestResult:
-    """Bir entity için haberleri çeker, dedupe eder, yenileri kaydeder."""
+    """Bir entity için haberleri çeker, dedupe eder, yenileri kaydeder.
+
+    manual=True (elle Yenile): keyword entity son 2 saatte çekildiyse NewsAPI'ye
+    hiç gidilmez (kota korunur). Ticker (Finnhub) kotası bol → her zaman çekilir.
+    NewsAPI kotası dolduysa çekme atlanır ve anlaşılır mesaj döner.
+    """
     settings = get_settings()
     hours = lookback_hours if lookback_hours is not None else settings.lookback_hours
     since = datetime.now(timezone.utc) - timedelta(hours=hours)
@@ -56,7 +76,38 @@ def fetch_for_entity(
         result.warnings.append(f"'{entity.type}' tipi için sağlayıcı yok.")
         return result
 
+    is_newsapi = provider.name == "newsapi"
+    if is_newsapi and provider.is_available():
+        # Tazelik: manuel yenilemede taze veri varsa NewsAPI'ye gitme.
+        if manual and _recently_fetched(session, entity, MANUAL_FRESH_HOURS):
+            result.warnings.append(
+                f"son {MANUAL_FRESH_HOURS} saatte çekildi — NewsAPI atlandı (mevcut veri kullanılıyor)"
+            )
+            logger.info("[%s] NewsAPI atlandı: taze veri", entity.name)
+            return result
+        # Kota: dolduysa hiç çağırma.
+        usage = newsapi_usage(session)
+        if usage["exhausted"]:
+            msg = (
+                f"NewsAPI kotası doldu ({usage['used']}/{usage['limit']}), "
+                f"{usage['reset_in_hours']} saat sonra sıfırlanır"
+            )
+            result.warnings.append(msg)
+            logger.warning("[%s] %s", entity.name, msg)
+            return result
+
     outcome = provider.fetch(entity, since)
+
+    # NewsAPI'ye gerçekten gidildiyse kotadan düş; ham 429'u anlaşılır mesaja çevir.
+    if is_newsapi and provider.is_available():
+        record_call(session, "newsapi")
+        if outcome.warning and ("429" in outcome.warning or "ratelimited" in outcome.warning.lower()):
+            usage = newsapi_usage(session)
+            outcome.warning = (
+                f"NewsAPI kotası doldu ({usage['used']}/{usage['limit']}), "
+                f"{usage['reset_in_hours']} saat sonra sıfırlanır"
+            )
+
     if outcome.warning:
         result.warnings.append(outcome.warning)
     result.fetched = len(outcome.articles)
@@ -118,12 +169,14 @@ def fetch_for_entity(
     return result
 
 
-def fetch_all(session: Session, lookback_hours: int | None = None) -> list[IngestResult]:
-    """Aktif tüm entity'ler için haberleri çeker."""
+def fetch_all(
+    session: Session, lookback_hours: int | None = None, manual: bool = False
+) -> list[IngestResult]:
+    """Aktif tüm entity'ler için haberleri çeker (manual: elle Yenile'de akıllı davran)."""
     entities = session.scalars(
         select(Entity).where(Entity.active.is_(True))
     ).all()
-    return [fetch_for_entity(session, e, lookback_hours) for e in entities]
+    return [fetch_for_entity(session, e, lookback_hours, manual) for e in entities]
 
 
 def _naive_utc(dt: datetime | None) -> datetime | None:

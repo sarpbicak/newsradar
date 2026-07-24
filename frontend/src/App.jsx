@@ -174,6 +174,21 @@ export default function App() {
             </span>
           </div>
           <div className="flex items-center gap-2">
+            {/* NewsAPI kota göstergesi */}
+            {status?.newsapi_quota && (
+              <span
+                className={`hidden font-mono text-[11px] sm:inline ${
+                  status.newsapi_quota.exhausted
+                    ? "text-rose-400"
+                    : status.newsapi_quota.warn
+                    ? "text-amber-400"
+                    : "text-slate-500"
+                }`}
+                title="NewsAPI günlük kota (rolling 24s)"
+              >
+                NewsAPI: {status.newsapi_quota.used}/{status.newsapi_quota.limit}
+              </span>
+            )}
             <button
               onClick={handleRefresh}
               disabled={isRefreshing}
@@ -217,6 +232,29 @@ export default function App() {
               </span>
             ) : (
               <span>Yenileme başlatılıyor…</span>
+            )}
+          </div>
+        )}
+
+        {status?.newsapi_quota?.warn && (
+          <div
+            className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
+              status.newsapi_quota.exhausted
+                ? "border-rose-500/30 bg-rose-500/10 text-rose-300"
+                : "border-amber-500/30 bg-amber-500/10 text-amber-200"
+            }`}
+          >
+            {status.newsapi_quota.exhausted ? (
+              <>
+                NewsAPI kotası doldu ({status.newsapi_quota.used}/{status.newsapi_quota.limit}),{" "}
+                <strong>{status.newsapi_quota.reset_in_hours} saat</strong> sonra sıfırlanır —
+                keyword (şirket/konu) haberleri bu süre boyunca güncellenmeyecek. Ticker'lar etkilenmez.
+              </>
+            ) : (
+              <>
+                NewsAPI kotası doluyor: {status.newsapi_quota.used}/{status.newsapi_quota.limit}{" "}
+                kullanıldı. Kalan {status.newsapi_quota.remaining} istek — dikkatli kullanın.
+              </>
             )}
           </div>
         )}
