@@ -33,7 +33,9 @@ ENTITY_LANGUAGES = ("en", "tr", "de", "fr")
 # Ön-filtre kural sürümü. Kurallar değişince ARTIR → eski sürümle prefiltered
 # işaretlenen makaleler açılışta yeniden değerlendirmeye açılır (reconcile_prefilter).
 # v2: keyword'lerde ön-filtre gevşetildi + Türkçe-güvenli eşleşme.
-PREFILTER_VERSION = 2
+# v3: eski sürümlerde (ör. AMD) yanlış/eski prefiltered kalıp drain olmayan makaleleri
+#     kurtarmak için sürüm artırıldı — deploy'da hepsi yeniden değerlendirmeye açılır.
+PREFILTER_VERSION = 3
 EVENT_TYPES = (
     "earnings", "product", "regulation", "lawsuit", "partnership",
     "funding", "macro", "leadership", "other",
