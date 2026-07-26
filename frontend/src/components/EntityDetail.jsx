@@ -32,7 +32,7 @@ export default function EntityDetail({ entityId, onBack }) {
   if (error) return <div className="p-8 text-rose-400">Hata: {error}</div>;
   if (!data) return null;
 
-  const { entity, articles, risk_history, price_history } = data;
+  const { entity, articles, risk_history, price_history, article_status: st } = data;
   const a = entity.analysis;
 
   return (
@@ -64,6 +64,30 @@ export default function EntityDetail({ entityId, onBack }) {
           </span>
         )}
       </div>
+
+      {/* Makale durum sayacı — teşhis için: 'çekildi ama analiz edilmedi' bir bakışta görünsün.
+          Bekleyen varken hiç analiz yoksa (takılma sinyali) vurgulu göster. */}
+      {st && (
+        <div
+          className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border px-3 py-2 font-mono text-xs ${
+            st.pending > 0 && st.analyzed === 0
+              ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
+              : "border-ink-600 bg-ink-800 text-slate-400"
+          }`}
+          title="Bekleyen makaleler bir sonraki yenilemede işlenir (yenileme başına en fazla tavan kadar)."
+        >
+          <span>{st.total} makale</span>
+          <span className="text-slate-600">·</span>
+          <span>{st.analyzed} analiz</span>
+          <span className="text-slate-600">·</span>
+          <span>{st.prefiltered} elenen</span>
+          <span className="text-slate-600">·</span>
+          <span className={st.pending > 0 ? "font-semibold" : ""}>{st.pending} bekliyor</span>
+          {st.pending > 0 && st.analyzed === 0 && (
+            <span className="ml-1 not-italic">— Yenile'ye basın; her yenileme bir grup işler.</span>
+          )}
+        </div>
+      )}
 
       {a?.headline_verdict && (
         <p className="text-lg font-medium leading-snug text-slate-100">{a.headline_verdict}</p>

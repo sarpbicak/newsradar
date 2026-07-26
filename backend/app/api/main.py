@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .. import scheduler
 from ..config import get_settings
 from ..db.database import init_db
+from ..db.models import PREFILTER_VERSION
 from . import (
     routes_auth,
     routes_chat,
@@ -35,11 +36,17 @@ async def lifespan(_app: FastAPI):
     # (Render'da elle SQL çalıştırılamadığı için açılışta otomatik; idempotent).
     from ..analysis.pipeline import reconcile_prefilter
 
-    reopened = reconcile_prefilter()
-    if reopened:
-        logging.getLogger("newsradar").info(
-            "Ön-filtre reconcile: %d makale yeniden değerlendirmeye açıldı.", reopened
+    # KOŞULSUZ logla (0 olsa bile) — reconcile'ın açılışta gerçekten çalıştığı
+    # loglardan tek bakışta doğrulansın; sessiz kalırsa "çalışmıyor mu?" şüphesi doğar.
+    _log = logging.getLogger("newsradar")
+    try:
+        reopened = reconcile_prefilter()
+        _log.info(
+            "Ön-filtre reconcile (v%d): %d makale yeniden değerlendirmeye açıldı.",
+            PREFILTER_VERSION, reopened,
         )
+    except Exception:  # noqa: BLE001 — reconcile hatası açılışı çökertmesin
+        _log.exception("Ön-filtre reconcile açılışta başarısız (atlandı).")
     # Deploy: kalıcı olmayan diskte DB boş başlamasın diye opsiyonel oto-seed.
     if get_settings().seed_on_start:
         from ..seed import seed

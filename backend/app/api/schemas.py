@@ -172,9 +172,23 @@ class PricePointOut(BaseModel):
     price: float
 
 
+class ArticleStatusOut(BaseModel):
+    """Bir entity'nin makale durum sayacı (detay sayfasında teşhis için).
+
+    'takıldı mı?' bir bakışta görünsün: çekilen ama analiz edilmeyen (bekleyen)
+    yığını burada belli olur — üç tur teşhis dönmeye gerek kalmadan.
+    """
+
+    total: int       # entity'ye ait tüm makaleler
+    analyzed: int    # analiz edilmiş (analyzed=True)
+    prefiltered: int  # ön-filtrede elenmiş (Claude'a hiç gitmedi)
+    pending: int     # bekleyen (analyzed=False, prefiltered=False) — bir sonraki yenilemede işlenir
+
+
 class DashboardOut(BaseModel):
     entity: EntityCardOut
     articles: list[ArticleOut]
+    article_status: ArticleStatusOut
     risk_history: list[RiskPointOut] = []
     price_history: list[PricePointOut] = []
 

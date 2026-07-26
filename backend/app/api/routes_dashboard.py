@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..db.database import get_db
 from ..db.models import Article, Entity
-from .schemas import DashboardOut
+from .schemas import ArticleStatusOut, DashboardOut
 from .serializers import article_out, entity_card, price_history, risk_history
 
 router = APIRouter(tags=["dashboard"])
@@ -31,9 +31,24 @@ def entity_dashboard(
         .limit(limit)
     ).all()
 
+    # Makale durum sayacı — TÜM makaleler üzerinden (gösterilen `limit` değil), böylece
+    # 'çekildi ama analiz edilmedi' takılması bir bakışta görünür.
+    def _count(*conds) -> int:
+        return db.scalar(
+            select(func.count()).select_from(Article).where(Article.entity_id == entity_id, *conds)
+        ) or 0
+
+    status = ArticleStatusOut(
+        total=_count(),
+        analyzed=_count(Article.analyzed.is_(True)),
+        prefiltered=_count(Article.prefiltered.is_(True)),
+        pending=_count(Article.analyzed.is_(False), Article.prefiltered.is_(False)),
+    )
+
     return DashboardOut(
         entity=entity_card(db, entity),
         articles=[article_out(a) for a in articles],
+        article_status=status,
         risk_history=risk_history(db, entity_id, limit=30),
         price_history=price_history(db, entity_id, limit=30),
     )

@@ -371,7 +371,15 @@ async def analyze_all_async(
             select(Entity).where(Entity.active.is_(True))
         ).all()
         for e in entities:
-            payload, pre = _prefilter(session, e, max_articles)
+            # Tek entity'nin ön-filtresi beklenmedik hata atsa BİLE diğerleri işlensin.
+            # (Bu döngü _process_entity_safe DIŞINDA; sarılmazsa tek entity tüm
+            #  analizi çökertir — 'çekiliyor ama analiz edilmiyor' tuzağı.)
+            try:
+                payload, pre = _prefilter(session, e, max_articles)
+            except Exception as exc:  # noqa: BLE001
+                logger.exception("Ön-filtre çöktü, entity atlandı: %s", e.name)
+                totals.warnings.append(f"[{e.name}] ön-filtre hatası (atlandı): {exc}")
+                continue
             totals.prefiltered += pre
             batches = [payload[i : i + batch_size] for i in range(0, len(payload), batch_size)]
             entity_tasks.append(
