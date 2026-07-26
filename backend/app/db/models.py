@@ -35,7 +35,10 @@ ENTITY_LANGUAGES = ("en", "tr", "de", "fr")
 # v2: keyword'lerde ön-filtre gevşetildi + Türkçe-güvenli eşleşme.
 # v3: eski sürümlerde (ör. AMD) yanlış/eski prefiltered kalıp drain olmayan makaleleri
 #     kurtarmak için sürüm artırıldı — deploy'da hepsi yeniden değerlendirmeye açılır.
-PREFILTER_VERSION = 3
+# v4: ticker ön-filtresi kaldırıldı — Finnhub company-news zaten entity-filtreli, başlık
+#     eşleşmesi "Lisa Su unveils Helios" gibi AMD haberlerini yanlış eliyordu. Takılı
+#     prefiltered makaleler açılışta açılır ve bu sefer analize girer.
+PREFILTER_VERSION = 4
 EVENT_TYPES = (
     "earnings", "product", "regulation", "lawsuit", "partnership",
     "funding", "macro", "leadership", "other",

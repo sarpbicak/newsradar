@@ -31,6 +31,7 @@ from ..db.database import session_scope
 from ..db.models import PREFILTER_VERSION, Article, Entity, EntityAnalysis, Suggestion
 from ..analyst import analyst_context_for
 from ..prices import price_context_for
+from ..providers import get_provider_for
 from .claude_client import ClaudeClient, ClaudeError
 from .prompts import (
     SYSTEM_PROMPT,
@@ -189,9 +190,15 @@ def _match_terms(name: str, query: str) -> list[str]:
 def _prefilter(session: Session, entity: Entity, max_articles: int) -> tuple[list[dict], int]:
     """Bekleyen makaleleri ön-filtreden geçirir; kabul edilenlerin payload'ını döner.
 
-    - Adı/ticker'ı hiç geçmeyenler `prefiltered=True` işaretlenir (Claude'a gitmez).
-    - Kabul edilenler en yeniden eskiye sıralı; ilk `max_articles` alınır, gerisi
-      bir sonraki yenilemeye kalır (analyzed=False, prefiltered=False).
+    ÖNEMLİ: Hem Finnhub (company-news, ticker'a göre) hem NewsAPI (arama terimine
+    göre) haberleri ZATEN entity'ye göre filtreliyor. Bu durumda ikinci bir
+    başlık-eşleşme kapısı gereksiz ve YANLIŞ eler — ör. "Lisa Su unveils Helios"
+    başlığında 'AMD' geçmez ama Finnhub bunu AMD haberi olarak döndürür. Bu yüzden
+    sağlayıcı entity-filtreliyse ön-filtre ATLANIR; alaka güvencesi tamamen
+    Claude'un relevance<0.3 elemesindedir.
+
+    Yalnızca sağlayıcı entity-filtreli DEĞİLSE (gelecekteki genel bir kaynak) sıkı
+    başlık-eşleşme ön-filtresi uygulanır.
     Döner: (payload listesi, ön-filtrede elenen sayısı).
     """
     pending: list[Article] = list(
@@ -205,11 +212,12 @@ def _prefilter(session: Session, entity: Entity, max_articles: int) -> tuple[lis
             .order_by(Article.published_at.desc().nullslast())
         ).all()
     )
-    # KEYWORD entity'lerde ön-filtre GEVŞEK: NewsAPI zaten o terimi aradığı için
-    # sonuç ilgili sayılır (isim gövdede geçip başlıkta geçmeyebilir, Türkçe
-    # kaynaklarda description null olabilir). Sadece tavan uygula, hiçbirini eleme —
-    # alaka güvencesi zaten Claude'un relevance skorunda (<0.3 elenir).
-    if entity.type != "ticker":
+
+    provider = get_provider_for(entity)
+    entity_filtered = provider.entity_filtered if provider else False
+
+    # GEVŞEK: sağlayıcı zaten entity'ye göre filtreli → sadece tavan uygula, eleme yok.
+    if entity_filtered:
         capped = pending[:max_articles]
         payload = [
             {"id": a.id, "title": a.title, "source": a.source, "description": a.description}
@@ -217,8 +225,8 @@ def _prefilter(session: Session, entity: Entity, max_articles: int) -> tuple[lis
         ]
         return payload, 0
 
-    # TICKER: sıkı ön-filtre (token tasarrufu), ama Türkçe-güvenli ve
-    # başlık+açıklama üzerinden — boş açıklama tek başına eleme sebebi değil.
+    # SIKI (yalnızca entity-filtreli OLMAYAN kaynaklar için): Türkçe-güvenli başlık
+    # eşleşmesi; başlık/açıklamada isim geçmeyenler elenir.
     terms = _match_terms(entity.name, entity.query)
     kept: list[Article] = []
     prefiltered = 0
@@ -228,10 +236,10 @@ def _prefilter(session: Session, entity: Entity, max_articles: int) -> tuple[lis
             kept.append(a)
         else:
             a.prefiltered = True
-            a.prefilter_version = PREFILTER_VERSION  # hangi kuralın elediğini işaretle
+            a.prefilter_version = PREFILTER_VERSION
             prefiltered += 1
 
-    capped = kept[:max_articles]  # tavan: gerisi sonraki yenilemede işlenir
+    capped = kept[:max_articles]
     payload = [
         {"id": a.id, "title": a.title, "source": a.source, "description": a.description}
         for a in capped

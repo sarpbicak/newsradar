@@ -43,6 +43,12 @@ class NewsProvider(ABC):
     #: Bu sağlayıcının hangi entity tipini beslediği ("ticker" | "keyword").
     entity_type: str = ""
 
+    #: Sağlayıcı haberleri ZATEN entity'ye göre filtreliyor mu? (Finnhub
+    #: company-news = ticker'a göre, NewsAPI = arama terimine göre → True.)
+    #: True ise ön-filtre atlanır (ikinci bir başlık-eşleşme kapısı gereksiz ve
+    #: yanlış eler); alaka güvencesi Claude'un relevance<0.3 elemesindedir.
+    entity_filtered: bool = True
+
     @abstractmethod
     def is_available(self) -> bool:
         """Gerekli API anahtarı var mı? Yoksa registry bu sağlayıcıyı atlar."""
