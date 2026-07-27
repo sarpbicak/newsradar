@@ -382,6 +382,12 @@ async def analyze_all_async(
                 continue
             totals.prefiltered += pre
             batches = [payload[i : i + batch_size] for i in range(0, len(payload), batch_size)]
+            # Entity-başı görünürlük: hangi entity kaç makaleyle analize giriyor.
+            # "analiz=23 ama AMD 0" gibi durumlar loglardan tek bakışta çözülür.
+            logger.info(
+                "[analiz] %s (id=%d, %s:%s) → analize=%d ön-filtre=%d batch=%d",
+                e.name, e.id, e.type, e.query, len(payload), pre, len(batches),
+            )
             entity_tasks.append(
                 {
                     "id": e.id, "name": e.name, "query": e.query, "type": e.type,
@@ -430,6 +436,13 @@ async def analyze_all_async(
             applied = await asyncio.to_thread(_apply_article_results, t["id"], batch_datas)
         totals.analyzed += applied["analyzed"]
         totals.discarded += applied["discarded"]
+        # Entity-başı sonuç: batch geldi mi, kaç analiz/eleme oldu. AMD gibi takılan
+        # bir entity'nin batch_datas boşsa (Claude hatası) burada görünür.
+        logger.info(
+            "[analiz] %s → batch_yanıt=%d/%d analiz=%d elenen=%d",
+            t["name"], len(batch_datas), len(t["batches"]),
+            applied["analyzed"], applied["discarded"],
+        )
 
         # 3) Değerlendirme payload'ını + fiyat bağlamını oku (DB), Claude çağır, yaz.
         async with db_lock:

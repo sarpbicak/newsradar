@@ -134,6 +134,94 @@ def cmd_analyze(args: argparse.Namespace) -> None:
             }, ensure_ascii=False, indent=2))
 
 
+def cmd_diagnose(args: argparse.Namespace) -> None:
+    """Bir entity'nin analiz-takılması tanısı — CLAUDE ÇAĞIRMAZ, anında çalışır.
+
+    Elle-eklenen ile öneri-eklenen entity arasındaki farkı + makale kırılımını +
+    ön-filtrenin kaç makale seçeceğini gösterir. Render Shell için:
+        python -m app.cli diagnose AMD
+    """
+    from sqlalchemy import func
+
+    from .analysis.pipeline import _prefilter
+    from .config import get_settings
+    from .providers import get_provider_for
+
+    init_db()
+    q = args.query.strip()
+    with session_scope() as session:
+        # 1) Bu query ile EŞLEŞEN TÜM entity'ler (duplikasyon/tuhaf-query yakalamak için:
+        #    tam, büyük/küçük harf duyarsız, $ önekli ve boşluklu varyantlar).
+        like = f"%{q.lstrip('$').strip()}%"
+        matches = session.scalars(
+            select(Entity).where(
+                (Entity.query == q) | (Entity.name.ilike(like)) | (Entity.query.ilike(like))
+            ).order_by(Entity.id)
+        ).all()
+        if not matches:
+            print(f"'{q}' ile eşleşen entity yok. Tam liste için: python -m app.cli status")
+            return
+        if len(matches) > 1:
+            print(f"⚠ DİKKAT: '{q}' ile eşleşen {len(matches)} entity var (duplikasyon olabilir):")
+
+        for e in matches:
+            print(f"\n=== Entity #{e.id}: {e.name!r} ===")
+            print(f"  type={e.type!r} query={e.query!r} language={e.language!r} "
+                  f"active={e.active} created_at={e.created_at}")
+            # repr ile gizli boşluk/$/kontrol karakterleri görünür olsun.
+            print(f"  query repr (gizli karakter kontrolü): {e.query!r}  (len={len(e.query)})")
+
+            # 2) Makale kırılımı — durum + kaynak + published_at null sayısı.
+            def c(*conds):
+                return session.scalar(select(func.count()).select_from(Article).where(
+                    Article.entity_id == e.id, *conds)) or 0
+
+            total = c()
+            analyzed = c(Article.analyzed.is_(True))
+            pre = c(Article.prefiltered.is_(True))
+            pending = c(Article.analyzed.is_(False), Article.prefiltered.is_(False))
+            null_pub = c(Article.published_at.is_(None))
+            print(f"  makaleler: toplam={total} analiz={analyzed} elenen(pre)={pre} "
+                  f"bekleyen={pending} | published_at NULL={null_pub}")
+            # prefilter_version dağılımı (reconcile takılması için).
+            ver_rows = session.execute(
+                select(Article.prefilter_version, func.count())
+                .where(Article.entity_id == e.id)
+                .group_by(Article.prefilter_version)
+            ).all()
+            if ver_rows:
+                print("  prefilter_version dağılımı:",
+                      ", ".join(f"v{v}={n}" for v, n in ver_rows))
+            prov_rows = session.execute(
+                select(Article.provider, func.count())
+                .where(Article.entity_id == e.id).group_by(Article.provider)
+            ).all()
+            if prov_rows:
+                print("  sağlayıcı dağılımı:",
+                      ", ".join(f"{p or '(boş)'}={n}" for p, n in prov_rows))
+
+            # 3) Sağlayıcı + entity_filtered.
+            provider = get_provider_for(e)
+            print(f"  get_provider_for → {provider.name if provider else None} "
+                  f"(entity_filtered={provider.entity_filtered if provider else 'N/A'})")
+
+            # 4) analyze döngüsüne giriyor mu? (active filtresi)
+            in_loop = e.active
+            print(f"  analyze_all_async'e giriyor mu (active=True)? {'EVET' if in_loop else 'HAYIR — atlanır!'}")
+
+            # 5) _prefilter Claude'suz kaç makale seçer? (gerçek fonksiyon).
+            settings = get_settings()
+            payload, would_pre = _prefilter(session, e, settings.max_articles_per_entity)
+            print(f"  _prefilter şu an seçer: analize={len(payload)} yeni-eleme={would_pre}")
+            if payload:
+                print(f"    örnek seçilen id'ler: {[p['id'] for p in payload[:5]]}…")
+            else:
+                print("    ⚠ _prefilter 0 makale seçti → analiz edilecek makale YOK "
+                      "(bekleyen makaleler varsa bu bir sorundur).")
+        # rollback (prefilter yan etki yaratmasın — diagnose salt-okunur olmalı)
+        session.rollback()
+
+
 def cmd_reconcile(_args: argparse.Namespace) -> None:
     """Eski ön-filtre sürümüyle elenmiş makaleleri yeniden değerlendirmeye açar."""
     from .analysis.pipeline import reconcile_prefilter
@@ -151,6 +239,12 @@ def main() -> None:
     sub.add_parser(
         "reconcile", help="Eski ön-filtre sürümüyle elenen makaleleri yeniden aç"
     ).set_defaults(func=cmd_reconcile)
+
+    p_diag = sub.add_parser(
+        "diagnose", help="Bir entity'nin analiz-takılması tanısı (Claude'suz, anında)"
+    )
+    p_diag.add_argument("query", help="Entity query ya da adı (örn. AMD)")
+    p_diag.set_defaults(func=cmd_diagnose)
 
     p_fetch = sub.add_parser("fetch", help="Haber çek + yazdır")
     p_fetch.add_argument("query", nargs="?", help="Tek entity (query, örn. TSLA). Boşsa hepsi.")
