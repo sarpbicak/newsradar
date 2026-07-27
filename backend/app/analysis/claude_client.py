@@ -81,6 +81,15 @@ class ClaudeClient:
             logger.error(msg)
             raise ClaudeError(msg) from exc
 
+        # KRİTİK: yanıt max_tokens'ta kesildiyse tool_use bloğu bulunsa BİLE input
+        # yarım/boş JSON olur → sessizce boş dict dönerdi. Bunu hata say (asla yutma).
+        if getattr(resp, "stop_reason", None) == "max_tokens":
+            msg = (f"Claude yanıtı max_tokens'ta kesildi (model={self.model}, "
+                   f"max_tokens={max_tokens}). Batch'i küçültün (NEWSRADAR_BATCH_SIZE) "
+                   "ya da NEWSRADAR_MAX_OUTPUT_TOKENS'ı artırın.")
+            logger.error(msg)
+            raise ClaudeError(msg)
+
         for block in resp.content:
             if block.type == "tool_use" and block.name == tool["name"]:
                 # input zaten sözlük olarak parse edilmiş halde gelir.

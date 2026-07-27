@@ -432,7 +432,7 @@ async def analyze_all_async(
     async def _run_batch(t: dict, b: list[dict]):
         user = build_article_batch_prompt(t["name"], t["query"], t["type"], b, t["language"])
         try:
-            return await _call(ARTICLE_ANALYSIS_TOOL, user, 4096)
+            return await _call(ARTICLE_ANALYSIS_TOOL, user, settings.max_output_tokens)
         except ClaudeError as exc:
             totals.warnings.append(f"[{t['name']}] makale batch atlandı: {exc}")
             return None
@@ -550,7 +550,8 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient) -> AnalyzeTotals:
         try:
             batch_datas.append(
                 client.call_tool(
-                    system=SYSTEM_PROMPT, user=user, tool=ARTICLE_ANALYSIS_TOOL, max_tokens=4096
+                    system=SYSTEM_PROMPT, user=user, tool=ARTICLE_ANALYSIS_TOOL,
+                    max_tokens=settings.max_output_tokens,
                 )
             )
         except ClaudeError as exc:

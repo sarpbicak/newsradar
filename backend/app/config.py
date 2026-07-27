@@ -49,11 +49,17 @@ class Settings:
         # batch_size: tek Claude çağrısında kaç makale analiz edilir.
         # max_articles_per_entity: tek yenilemede entity başına tavan (en yeniler öncelikli).
         # analysis_concurrency: aynı anda kaç Claude çağrısı (semaphore; rate limit için).
-        self.batch_size: int = int(_env("NEWSRADAR_BATCH_SIZE", "25"))
+        # batch_size: tek Claude çağrısında kaç makale. DİKKAT: büyüyen çıktı şeması
+        # (co_mentioned_entities + why_relevant) makale başına ~300 token → 25 makale
+        # 4096 max_tokens'a sığmaz, yanıt kesilir. Güvenli varsayılan 10.
+        self.batch_size: int = int(_env("NEWSRADAR_BATCH_SIZE", "10"))
         self.max_articles_per_entity: int = int(
             _env("NEWSRADAR_MAX_ARTICLES_PER_ENTITY", "25")
         )
         self.analysis_concurrency: int = int(_env("NEWSRADAR_ANALYSIS_CONCURRENCY", "5"))
+        # Makale-batch Claude çağrısı için üretim (output) token tavanı. Batch büyük
+        # ya da şema genişse artırın; yanıt kesilirse (stop_reason=max_tokens) hata verir.
+        self.max_output_tokens: int = int(_env("NEWSRADAR_MAX_OUTPUT_TOKENS", "8192"))
 
         # Deploy: frontend'in domain'i (CORS). Virgülle birden fazla verilebilir.
         # Boşsa yalnızca yerel Vite (localhost:5173) izinli. "*" = tümüne izin.
