@@ -84,17 +84,48 @@ def cmd_analyze(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     with session_scope() as session:
-        entity = session.scalar(select(Entity).where(Entity.query == args.query))
-        if not entity:
-            print(f"'{args.query}' izleme listesinde yok.")
+        # diagnose ile AYNI geniş eşleşmeyi kullan — hangi entity'ye çözüldüğü
+        # ve BİRDEN ÇOK eşleşme (duplikasyon) olup olmadığı görünsün.
+        q = args.query.strip()
+        matches = session.scalars(
+            select(Entity).where(Entity.query == q).order_by(Entity.id)
+        ).all()
+        if not matches:
+            # Tam eşleşme yoksa geniş ara (gizli karakter/duplikasyon ipucu).
+            like = f"%{q.lstrip('$').strip()}%"
+            alt = session.scalars(
+                select(Entity).where(Entity.name.ilike(like) | Entity.query.ilike(like))
+            ).all()
+            if alt:
+                print(f"'{q}' TAM eşleşmedi ama benzer entity(ler) var — query'de gizli "
+                      f"karakter olabilir. `diagnose {q}` ile kontrol edin:")
+                for e in alt:
+                    print(f"   #{e.id} {e.name!r} [{e.type}:{e.query!r}]")
+            else:
+                print(f"'{q}' izleme listesinde yok.")
             sys.exit(1)
+        if len(matches) > 1:
+            print(f"⚠ '{q}' ile {len(matches)} entity eşleşti (duplikasyon):")
+            for e in matches:
+                print(f"   #{e.id} {e.name!r} [{e.type}:{e.query!r}]")
+        entity = matches[0]
         entity_id = entity.id
+        print(f"→ analiz edilen entity: #{entity.id} {entity.name!r} "
+              f"[{entity.type}:{entity.query!r}] (query len={len(entity.query)})")
 
     totals = analyze_entity_sync(entity_id, client)
-    print(f"\n=== {args.query} analizi ===")
+    print(f"\n=== {args.query} analizi (entity #{entity_id}) ===")
     print(f"  Ön-filtrede elenen: {totals.prefiltered} | Analiz edilen: {totals.analyzed} | "
           f"Elenen (alakasız): {totals.discarded} | "
           f"Değerlendirme: {'evet' if totals.entity_assessments else 'hayır'}")
+    # Teşhis: _prefilter seçti ama analiz 0 ise sebep burada — Claude ne döndürdü, kaçı eşleşti.
+    print(f"  [teşhis] Claude döndürdü: {totals.returned} | eşleşmeyen id: {totals.unmatched}")
+    if totals.returned == 0 and totals.analyzed == 0 and not totals.warnings:
+        print("  ⚠ Claude 0 analiz döndürdü ve hata yok → ya _prefilter 0 seçti "
+              "(makale yok) ya da batch boş. `diagnose` ile _prefilter seçimini kıyaslayın.")
+    if totals.unmatched > 0:
+        print(f"  ⚠ Claude {totals.unmatched} analizi BAŞKA/uydurma id ile döndürdü → bu "
+              "entity'nin makalelerine eşleşmedi, sessizce kayboluyordu.")
     for w in totals.warnings:
         print(f"  ⚠ {w}")
 

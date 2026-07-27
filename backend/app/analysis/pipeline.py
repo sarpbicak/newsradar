@@ -151,6 +151,8 @@ class AnalyzeTotals:
     analyzed: int = 0           # makale-başı analiz edilen
     discarded: int = 0          # relevance < eşik → elenen
     entity_assessments: int = 0  # entity-başı değerlendirme üretilen
+    returned: int = 0           # Claude'un döndürdüğü toplam analiz (teşhis)
+    unmatched: int = 0          # döndürülüp bu entity'ye eşleşmeyen id (teşhis)
     warnings: list[str] = field(default_factory=list)
 
 
@@ -254,18 +256,26 @@ def _apply_article_results(entity_id: int, batch_datas: list[dict]) -> dict:
     """Makale-başı analiz sonuçlarını DB'ye yazar; alakasızları eler."""
     analyzed = 0
     discarded = 0
+    returned = 0    # Claude'un döndürdüğü toplam analiz sayısı
+    unmatched = 0   # döndürülen ama bu entity'nin makalesine eşleşmeyen id (Claude id uydurmuş/karıştırmış)
+    invalid = 0     # sanitize edilemeyen (bozuk şema) analiz
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     with session_scope() as session:
         source_entity = session.get(Entity, entity_id)
         source_language = source_entity.language if source_entity else "en"
         for data in batch_datas:
             for raw in data.get("analyses", []):
+                returned += 1
                 try:
                     clean = sanitize_article_analysis(raw)
                 except (KeyError, ValueError, TypeError):
+                    invalid += 1
                     continue
                 article = session.get(Article, clean["id"])
                 if article is None or article.entity_id != entity_id:
+                    # Claude, gönderilmeyen ya da başka entity'nin id'sini döndürdü →
+                    # sessizce kaybolurdu; artık sayılır ve loglanır.
+                    unmatched += 1
                     continue
                 if clean["relevance"] < RELEVANCE_THRESHOLD:
                     session.delete(article)  # alakasız → panelde gürültü tutma
@@ -285,7 +295,10 @@ def _apply_article_results(entity_id: int, batch_datas: list[dict]) -> dict:
                     _accumulate_suggestions(
                         session, entity_id, source_language, clean["co_mentioned"]
                     )
-    return {"analyzed": analyzed, "discarded": discarded}
+    return {
+        "analyzed": analyzed, "discarded": discarded,
+        "returned": returned, "unmatched": unmatched, "invalid": invalid,
+    }
 
 
 def _read_assessment_payload(entity_id: int) -> list[dict]:
@@ -436,11 +449,15 @@ async def analyze_all_async(
             applied = await asyncio.to_thread(_apply_article_results, t["id"], batch_datas)
         totals.analyzed += applied["analyzed"]
         totals.discarded += applied["discarded"]
+        totals.returned += applied["returned"]
+        totals.unmatched += applied["unmatched"]
         # Entity-başı sonuç: batch geldi mi, kaç analiz/eleme oldu. AMD gibi takılan
         # bir entity'nin batch_datas boşsa (Claude hatası) burada görünür.
         logger.info(
-            "[analiz] %s → batch_yanıt=%d/%d analiz=%d elenen=%d",
+            "[analiz] %s → batch_yanıt=%d/%d claude_döndürdü=%d eşleşmedi=%d bozuk=%d "
+            "analiz=%d elenen=%d",
             t["name"], len(batch_datas), len(t["batches"]),
+            applied["returned"], applied["unmatched"], applied["invalid"],
             applied["analyzed"], applied["discarded"],
         )
 
@@ -505,10 +522,16 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient) -> AnalyzeTotals:
     with session_scope() as session:
         entity = session.get(Entity, entity_id)
         if entity is None:
+            logger.warning("[analiz] entity id=%d bulunamadı — atlandı.", entity_id)
             return totals
         name, query, etype, lang = entity.name, entity.query, entity.type, entity.language
         payload, pre = _prefilter(session, entity, max_articles)
         totals.prefiltered += pre
+        # analyze_all_async ile AYNI seçim yolu; CLI'de de ne seçildiği görünsün.
+        logger.info(
+            "[analiz] %s (id=%d, %s:%r) → analize=%d ön-filtre=%d",
+            name, entity_id, etype, query, len(payload), pre,
+        )
 
     batches = [payload[i : i + batch_size] for i in range(0, len(payload), batch_size)]
     batch_datas: list[dict] = []
@@ -526,6 +549,15 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient) -> AnalyzeTotals:
     applied = _apply_article_results(entity_id, batch_datas)
     totals.analyzed += applied["analyzed"]
     totals.discarded += applied["discarded"]
+    logger.info(
+        "[analiz] %s → batch_yanıt=%d/%d claude_döndürdü=%d eşleşmedi=%d bozuk=%d "
+        "analiz=%d elenen=%d",
+        name, len(batch_datas), len(batches), applied["returned"],
+        applied["unmatched"], applied["invalid"], applied["analyzed"], applied["discarded"],
+    )
+    # Bu sayaçları CLI özetinde göstermek için totals'a iliştir (opsiyonel alanlar).
+    totals.returned = applied["returned"]
+    totals.unmatched = applied["unmatched"]
 
     payload2 = _read_assessment_payload(entity_id)
     if payload2:
