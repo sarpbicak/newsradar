@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import sys
 
 from sqlalchemy import select
@@ -115,17 +116,43 @@ def cmd_analyze(args: argparse.Namespace) -> None:
 
     totals = analyze_entity_sync(entity_id, client)
     print(f"\n=== {args.query} analizi (entity #{entity_id}) ===")
+    # KRİTİK: _prefilter'ın BU analiz yolunda batch'e kaç makale seçtiği. diagnose'un
+    # gösterdiği sayı ile karşılaştır — farklıysa iki komut farklı entity'ye çözülüyor.
+    print(f"  Batch'e giren makale (bu yolda _prefilter seçimi): {totals.selected}")
     print(f"  Ön-filtrede elenen: {totals.prefiltered} | Analiz edilen: {totals.analyzed} | "
           f"Elenen (alakasız): {totals.discarded} | "
           f"Değerlendirme: {'evet' if totals.entity_assessments else 'hayır'}")
-    # Teşhis: _prefilter seçti ama analiz 0 ise sebep burada — Claude ne döndürdü, kaçı eşleşti.
     print(f"  [teşhis] Claude döndürdü: {totals.returned} | eşleşmeyen id: {totals.unmatched}")
-    if totals.returned == 0 and totals.analyzed == 0 and not totals.warnings:
-        print("  ⚠ Claude 0 analiz döndürdü ve hata yok → ya _prefilter 0 seçti "
-              "(makale yok) ya da batch boş. `diagnose` ile _prefilter seçimini kıyaslayın.")
-    if totals.unmatched > 0:
-        print(f"  ⚠ Claude {totals.unmatched} analizi BAŞKA/uydurma id ile döndürdü → bu "
-              "entity'nin makalelerine eşleşmedi, sessizce kayboluyordu.")
+
+    # Analiz 0 çıktıysa: SEBEBİ tam burada ayrıştır ve hangi entity'de makale olduğunu göster.
+    if totals.analyzed == 0:
+        if totals.selected == 0:
+            print("\n  ⚠ SEBEP: _prefilter bu entity için 0 makale seçti (batch boş → "
+                  "Claude hiç çağrılmadı). Yani bu entity'de bekleyen makale YOK.")
+            # Aynı ad/query ile makalesi OLAN başka entity var mı? (çözüm farkını göster.)
+            from sqlalchemy import func
+
+            from .db.models import Article
+            like = f"%{args.query.strip().lstrip('$').strip()}%"
+            cands = db_scan_pending(client_query=args.query, like=like)
+            if cands:
+                print("  → Ama şu entity(ler)de BEKLEYEN makale var — analyze YANLIŞ "
+                      "entity'ye çözülmüş olabilir:")
+                for cid, cname, ctype, cq, pend in cands:
+                    marker = "  ← analyze bunu işledi" if cid == entity_id else ""
+                    print(f"     #{cid} {cname!r} [{ctype}:{cq!r}] bekleyen={pend}{marker}")
+                print("  Düzeltme: doğru entity'yi query'siyle analiz edin ya da fazla "
+                      "(boş) entity'yi silin.")
+        elif totals.returned == 0 and not totals.warnings:
+            print("\n  ⚠ SEBEP: _prefilter %d makale seçti ve batch gönderildi AMA Claude "
+                  "0 analiz döndürdü (hata da yok). Claude yanıtı boş — API/anahtar ya da "
+                  "model sorunu olabilir; ANTHROPIC_API_KEY ve modeli kontrol edin." % totals.selected)
+        elif totals.unmatched > 0:
+            print(f"\n  ⚠ SEBEP: Claude {totals.unmatched} analizi bu entity'nin "
+                  "makalelerine EŞLEŞMEYEN id ile döndürdü (sessizce kayboluyordu).")
+        elif totals.discarded > 0:
+            print(f"\n  ⚠ SEBEP: {totals.discarded} makale relevance<0.3 ile elendi "
+                  "(Claude alakasız buldu).")
     for w in totals.warnings:
         print(f"  ⚠ {w}")
 
@@ -163,6 +190,32 @@ def cmd_analyze(args: argparse.Namespace) -> None:
                 "what_to_verify": latest.what_to_verify,
                 "invalidation": latest.invalidation,
             }, ensure_ascii=False, indent=2))
+
+
+def db_scan_pending(client_query: str, like: str) -> list[tuple]:
+    """query/ad ile eşleşen ve BEKLEYEN (analyzed=False, prefiltered=False) makalesi olan
+    entity'leri döndürür: (id, name, type, query, pending_sayısı). Boş entity'ler hariç."""
+    from sqlalchemy import func
+
+    q = client_query.strip()
+    out: list[tuple] = []
+    with session_scope() as session:
+        ents = session.scalars(
+            select(Entity).where(
+                (Entity.query == q) | Entity.name.ilike(like) | Entity.query.ilike(like)
+            ).order_by(Entity.id)
+        ).all()
+        for e in ents:
+            pend = session.scalar(
+                select(func.count()).select_from(Article).where(
+                    Article.entity_id == e.id,
+                    Article.analyzed.is_(False),
+                    Article.prefiltered.is_(False),
+                )
+            ) or 0
+            if pend > 0:
+                out.append((e.id, e.name, e.type, e.query, pend))
+    return out
 
 
 def cmd_diagnose(args: argparse.Namespace) -> None:
@@ -263,6 +316,9 @@ def cmd_reconcile(_args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    # CLI'de de analiz hattının [analiz] loglarını göster (entity-başı görünürlük).
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    logging.getLogger("httpx").setLevel(logging.WARNING)  # gürültü azalt
     parser = argparse.ArgumentParser(prog="newsradar-cli")
     sub = parser.add_subparsers(dest="cmd", required=True)
 

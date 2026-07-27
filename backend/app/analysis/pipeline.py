@@ -153,6 +153,7 @@ class AnalyzeTotals:
     entity_assessments: int = 0  # entity-başı değerlendirme üretilen
     returned: int = 0           # Claude'un döndürdüğü toplam analiz (teşhis)
     unmatched: int = 0          # döndürülüp bu entity'ye eşleşmeyen id (teşhis)
+    selected: int = 0           # _prefilter'ın batch'e seçtiği makale sayısı (teşhis)
     warnings: list[str] = field(default_factory=list)
 
 
@@ -527,6 +528,7 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient) -> AnalyzeTotals:
         name, query, etype, lang = entity.name, entity.query, entity.type, entity.language
         payload, pre = _prefilter(session, entity, max_articles)
         totals.prefiltered += pre
+        totals.selected = len(payload)
         # analyze_all_async ile AYNI seçim yolu; CLI'de de ne seçildiği görünsün.
         logger.info(
             "[analiz] %s (id=%d, %s:%r) → analize=%d ön-filtre=%d",
