@@ -452,6 +452,14 @@ async def analyze_all_async(
         totals.discarded += applied["discarded"]
         totals.returned += applied["returned"]
         totals.unmatched += applied["unmatched"]
+        # SESSİZ ARIZA KORUMASI: makale gönderdik ama Claude 0 analiz döndürdüyse
+        # (ör. geçersiz model, boş yanıt) bunu bir uyarı olarak yüzeye çıkar — beş tur
+        # teşhise mal olan "sessizce 0" durumu bir daha görünmez kalmasın.
+        if t["batches"] and applied["returned"] == 0:
+            totals.warnings.append(
+                f"[{t['name']}] Claude 0 analiz döndürdü ({len(t['batches'])} batch "
+                "gönderildi) — model adı/yanıt sorunu olabilir (NEWSRADAR_MODEL?)."
+            )
         # Entity-başı sonuç: batch geldi mi, kaç analiz/eleme oldu. AMD gibi takılan
         # bir entity'nin batch_datas boşsa (Claude hatası) burada görünür.
         logger.info(
@@ -560,6 +568,12 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient) -> AnalyzeTotals:
     # Bu sayaçları CLI özetinde göstermek için totals'a iliştir (opsiyonel alanlar).
     totals.returned = applied["returned"]
     totals.unmatched = applied["unmatched"]
+    # SESSİZ ARIZA KORUMASI (bkz. _process_entity): batch gönderildi ama 0 döndüyse uyar.
+    if batches and applied["returned"] == 0:
+        totals.warnings.append(
+            f"[{name}] Claude 0 analiz döndürdü ({len(batches)} batch gönderildi) — "
+            "model adı/yanıt sorunu olabilir (NEWSRADAR_MODEL?)."
+        )
 
     payload2 = _read_assessment_payload(entity_id)
     if payload2:

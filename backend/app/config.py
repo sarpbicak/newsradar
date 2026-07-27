@@ -35,7 +35,9 @@ class Settings:
         # ve korumalı uçlar 503 döner — yani parola ayarlanmadan kimse giremez.
         self.app_password: str = os.getenv("APP_PASSWORD", "").strip()
 
-        self.model: str = _env("NEWSRADAR_MODEL", "claude-sonnet-4-6")
+        # NOT: Var olmayan bir model adı (ör. eski claude-sonnet-4-6) API'de sessiz
+        # boş/404 yanıta yol açıp analizi durdurur. Geçerli, güncel bir model kullanın.
+        self.model: str = _env("NEWSRADAR_MODEL", "claude-sonnet-4-5")
         self.lookback_hours: int = int(_env("NEWSRADAR_LOOKBACK_HOURS", "48"))
         self.scheduler_enabled: bool = _env("NEWSRADAR_SCHEDULER", "on").lower() == "on"
         # Otomatik yenileme aralığı (saat). Saatlik çok agresif; varsayılan 6.

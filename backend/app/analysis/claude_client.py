@@ -10,6 +10,7 @@ outputs desteklemediği için yapılandırılmış çıktıyı tool_choice ile z
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterator
 from typing import Any
 
@@ -17,9 +18,15 @@ import anthropic
 
 from ..config import get_settings
 
+logger = logging.getLogger("newsradar.claude")
+
 
 class ClaudeError(RuntimeError):
     """Claude çağrısı başarısız (ağ, yetki, boş yanıt...)."""
+
+
+class ModelNotFoundError(ClaudeError):
+    """Model adı geçersiz/bulunamadı (404). Genelde yanlış NEWSRADAR_MODEL değeri."""
 
 
 class MissingAPIKeyError(ClaudeError):
@@ -58,16 +65,33 @@ class ClaudeClient:
                 tool_choice={"type": "tool", "name": tool["name"]},
                 messages=[{"role": "user", "content": user}],
             )
+        except anthropic.NotFoundError as exc:
+            # 404 = model adı geçersiz/erişilemez. Bu, "Claude 0 döndürdü" sessiz
+            # arızasının klasik sebebi — AÇIK mesaj ver ve logla, asla yut.
+            msg = (f"Claude modeli '{self.model}' bulunamadı (404). NEWSRADAR_MODEL "
+                   "değerini geçerli bir model adıyla güncelleyin.")
+            logger.error(msg)
+            raise ModelNotFoundError(msg) from exc
         except anthropic.APIStatusError as exc:
-            raise ClaudeError(f"Claude API hatası ({exc.status_code}): {exc.message}") from exc
+            msg = f"Claude API hatası ({exc.status_code}): {exc.message}"
+            logger.error(msg)
+            raise ClaudeError(msg) from exc
         except anthropic.APIConnectionError as exc:
-            raise ClaudeError(f"Claude bağlantı hatası: {exc}") from exc
+            msg = f"Claude bağlantı hatası: {exc}"
+            logger.error(msg)
+            raise ClaudeError(msg) from exc
 
         for block in resp.content:
             if block.type == "tool_use" and block.name == tool["name"]:
                 # input zaten sözlük olarak parse edilmiş halde gelir.
                 return dict(block.input)
-        raise ClaudeError("Claude beklenen tool_use bloğunu döndürmedi.")
+        # tool_use bloğu yok: model beklenen aracı çağırmadı (boş/uyumsuz yanıt).
+        # stop_reason'ı da logla — teşhis için (ör. 'max_tokens', 'end_turn').
+        stop = getattr(resp, "stop_reason", "?")
+        msg = (f"Claude beklenen tool_use bloğunu döndürmedi (model={self.model}, "
+               f"stop_reason={stop}). Model/anahtar/yanıt sorunu olabilir.")
+        logger.error(msg)
+        raise ClaudeError(msg)
 
     def stream_chat(
         self,

@@ -130,9 +130,8 @@ def cmd_analyze(args: argparse.Namespace) -> None:
             print("\n  ⚠ SEBEP: _prefilter bu entity için 0 makale seçti (batch boş → "
                   "Claude hiç çağrılmadı). Yani bu entity'de bekleyen makale YOK.")
             # Aynı ad/query ile makalesi OLAN başka entity var mı? (çözüm farkını göster.)
-            from sqlalchemy import func
-
-            from .db.models import Article
+            # Not: Article/Entity modül başında import edildi — burada YENİDEN import ETME,
+            # yoksa fonksiyon kapsamında yerelleşir ve aşağıdaki JSON bölümü UnboundLocalError verir.
             like = f"%{args.query.strip().lstrip('$').strip()}%"
             cands = db_scan_pending(client_query=args.query, like=like)
             if cands:
