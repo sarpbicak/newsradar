@@ -2,7 +2,7 @@
 // invalidation, makale tablosu ve sohbet paneli.
 import React, { useEffect, useState } from "react";
 import { api } from "../api.js";
-import { StanceBadge, RiskScore, RiskDelta, TrendArrow, PriceDisplay, stanceLabel } from "./ui.jsx";
+import { StanceBadge, RiskScore, RiskDelta, TrendArrow, PriceDisplay, stanceLabel, SignalBand, InfoTip, TERM_HELP } from "./ui.jsx";
 import ArticleTable from "./ArticleTable.jsx";
 import ChatPanel from "./ChatPanel.jsx";
 import SentimentChart from "./SentimentChart.jsx";
@@ -90,7 +90,14 @@ export default function EntityDetail({ entityId, onBack }) {
       )}
 
       {a?.headline_verdict && (
-        <p className="text-lg font-medium leading-snug text-slate-100">{a.headline_verdict}</p>
+        <p className="text-xl font-semibold leading-snug text-slate-100">{a.headline_verdict}</p>
+      )}
+
+      {/* Genel sinyal bandı — yön + kanıtı tek görsele indirger */}
+      {a && (
+        <div className="max-w-md">
+          <SignalBand stance={a.stance} evidence={entity.evidence_strength} />
+        </div>
       )}
 
       {!a ? (
@@ -103,6 +110,7 @@ export default function EntityDetail({ entityId, onBack }) {
           <div className="rounded-xl border border-ink-600 bg-ink-800 p-4 md:col-span-2">
             <div className="mb-2 flex items-center gap-3">
               <RiskScore score={a.risk_score} />
+              <InfoTip text={TERM_HELP.risk} />
               <RiskDelta delta={entity.delta} />
               <div className="text-xs text-slate-500">
                 {a.articles_considered} habere dayalı · {new Date(a.created_at).toLocaleString("tr-TR")}
@@ -152,8 +160,8 @@ export default function EntityDetail({ entityId, onBack }) {
         </div>
       )}
 
-      {/* Analist konsensüsü (yalnızca ticker + veri varsa) */}
-      <AnalystConsensus analyst={entity.analyst} price={entity.price} />
+      {/* Analist konsensüsü — veri varsa tam gösterim, yoksa NEDEN yok açıklaması */}
+      <AnalystConsensus analyst={entity.analyst} price={entity.price} type={entity.type} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Risk üstte, fiyat altta — aynı tarih ekseninde okunur */}

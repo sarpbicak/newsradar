@@ -71,6 +71,110 @@ export function evidenceColor(e) {
   return { strong: "#16a34a", medium: "#d97706", weak: "#dc2626" }[e] || "#6b7280";
 }
 
+// --- Düz Türkçe terim açıklamaları (tooltip metinleri; jargon yok) ---
+export const TERM_HELP = {
+  signal:
+    "Genel sinyal: haberlerin yönünü ve ne kadar güvenilir olduğunu tek bir ölçekte " +
+    "birleştirir — güçlü olumsuzdan güçlü olumluya. Bir fiyat tahmini değil.",
+  direction:
+    "Yön: haberler genel olarak olumlu mu (yükseliş), olumsuz mu (düşüş), yoksa " +
+    "kararsız mı (nötr). Bir fiyat tahmini değil — haberlerin havası.",
+  horizon:
+    "Vade: haberlerin etkisinin ne kadar süreceği. Kısa = günler/haftalar, " +
+    "Orta = birkaç ay, Uzun = daha uzun vade.",
+  evidence:
+    "Kanıt gücü: bu değerlendirmenin kaç habere ve ne kadar tutarlı sinyale " +
+    "dayandığı. Zayıf = az/çelişkili haber, dikkatli ol. Güçlü = çok ve aynı yönde haber.",
+  risk:
+    "Risk skoru: 0 (düşük) – 100 (yüksek). Haberlerdeki risk işaretlerinin " +
+    "(dava, rekabet, düzenleme…) yoğunluğu.",
+  target:
+    "Hedef fiyat: gerçek analistlerin ortalama beklentisi — bizim tahminimiz değil.",
+  analyst:
+    "Analist konsensüsü: gerçek borsa analistlerinin al/tut/sat dağılımı (Finnhub). " +
+    "NewsRadar'ın kendi görüşü değil.",
+};
+
+// --- "?" ipucu — üstüne gelince/dokununca düz Türkçe açıklama gösterir ---
+// Not: kart bir <div role=button> olduğundan içinde <button> kullanmak GEÇERLİDİR.
+export function InfoTip({ text, className = "" }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className={`relative inline-flex ${className}`}>
+      <button
+        type="button"
+        aria-label="açıklama"
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          setOpen((o) => !o);
+        }}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onBlur={() => setOpen(false)}
+        className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-500 text-[9px] font-bold leading-none text-slate-500 transition hover:border-accent hover:text-accent"
+      >
+        ?
+      </button>
+      {open && (
+        <span
+          role="tooltip"
+          className="absolute bottom-full left-1/2 z-30 mb-1.5 w-52 max-w-[60vw] -translate-x-1/2 rounded-lg border border-ink-500 bg-ink-800 px-3 py-2 text-[11px] font-normal normal-case leading-snug tracking-normal text-slate-300 shadow-card-hover"
+          style={{ pointerEvents: "none" }}
+        >
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
+
+// --- Genel sinyal: yön + kanıt gücünü 5 kademeli tek ölçeğe indirger ---
+// Sol (güçlü olumsuz, kırmızı) → sağ (güçlü olumlu, yeşil). Fiyat tahmini DEĞİL.
+const SIGNAL_LEVELS = [
+  { key: -2, label: "Güçlü olumsuz", color: "#B91C1C" },
+  { key: -1, label: "Olumsuz", color: "#DC2626" },
+  { key: 0, label: "Nötr", color: "#7A8699" },
+  { key: 1, label: "Olumlu", color: "#16A34A" },
+  { key: 2, label: "Güçlü olumlu", color: "#15803D" },
+];
+
+export function overallSignal(stance, evidence) {
+  const base = stance === "bullish" ? 1 : stance === "bearish" ? -1 : 0;
+  const strong = evidence === "strong";
+  const level = base === 0 ? 0 : base > 0 ? (strong ? 2 : 1) : strong ? -2 : -1;
+  return SIGNAL_LEVELS.find((l) => l.key === level) || SIGNAL_LEVELS[2];
+}
+
+export function SignalBand({ stance, evidence, showLabel = true }) {
+  const sig = overallSignal(stance, evidence);
+  return (
+    <div>
+      {showLabel && (
+        <div className="mb-1 flex items-center justify-between">
+          <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+            Genel sinyal
+            <InfoTip text={TERM_HELP.signal} />
+          </span>
+          <span className="text-xs font-bold" style={{ color: sig.color }}>
+            {sig.label}
+          </span>
+        </div>
+      )}
+      <div className="flex gap-1" aria-label={`Genel sinyal: ${sig.label}`}>
+        {SIGNAL_LEVELS.map((l) => (
+          <div
+            key={l.key}
+            className="h-2 flex-1 rounded-full transition"
+            style={{ background: l.key === sig.key ? l.color : "#E4E8EF" }}
+            title={l.label}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // --- Fiyat gösterimi (yalnızca ticker; price null ise hiç render etme) ---
 // Burada fiyat ARTIŞI yeşil (iyi), düşüş kırmızı — risk deltasının TERSİ.
 export function PriceDisplay({ price, changePercent, updatedAt, showTime = true }) {

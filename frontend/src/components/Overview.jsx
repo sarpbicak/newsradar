@@ -69,6 +69,10 @@ export default function Overview({
 
   return (
     <div className="space-y-6">
+      {/* "Nasıl okunur" mini rehber — ilk açılışta görünür, kapatılınca o oturum
+          boyunca gizli (sessionStorage; localStorage değil). */}
+      <HowToGuide />
+
       {/* Değişim şeridi — hiçbir şey değişmediyse gösterme */}
       {changed.length > 0 && (
         <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
@@ -120,7 +124,7 @@ export default function Overview({
           </div>
 
           <div
-            className={`stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ${
+            className={`stagger grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ${
               scanning ? "scan-host rounded-xl" : ""
             }`}
           >
@@ -147,6 +151,66 @@ export default function Overview({
       <Collapsible title={`İzleme listesi (${cards.length})`}>
         <WatchlistManager cards={cards} onCreate={onCreate} onDelete={onDelete} embedded />
       </Collapsible>
+    </div>
+  );
+}
+
+// "Nasıl okunur" rehberi — finans bilmeyen kullanıcı için tek seferlik açıklama.
+// Kapatılınca sessionStorage'a yazılır → o tarayıcı oturumunda bir daha çıkmaz
+// (localStorage KULLANILMAZ; yeni oturumda tekrar hatırlatır).
+const GUIDE_KEY = "nr_guide_dismissed";
+function HowToGuide() {
+  const [dismissed, setDismissed] = useState(() => {
+    try {
+      return sessionStorage.getItem(GUIDE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  if (dismissed) return null;
+
+  function close() {
+    try {
+      sessionStorage.setItem(GUIDE_KEY, "1");
+    } catch {
+      /* sessionStorage yoksa yalnızca bu render için gizle */
+    }
+    setDismissed(true);
+  }
+
+  return (
+    <div className="relative rounded-xl border border-accent/30 bg-accent/5 p-4 pr-10">
+      <button
+        onClick={close}
+        aria-label="rehberi kapat"
+        className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-md text-slate-500 transition hover:bg-ink-700 hover:text-slate-200"
+      >
+        ✕
+      </button>
+      <div className="mb-2 text-sm font-semibold text-slate-100">📖 Panel nasıl okunur?</div>
+      <p className="text-sm leading-relaxed text-slate-400">
+        Her kart bir şirketin son haberlerinin özeti.{" "}
+        <strong className="font-semibold text-slate-200">Yön</strong> = haberler olumlu mu
+        olumsuz mu. <strong className="font-semibold text-slate-200">Kanıt</strong> = değerlendirme
+        ne kadar güvenilir (kaç habere dayanıyor).{" "}
+        <strong className="font-semibold text-slate-200">Hedef fiyat</strong> = gerçek analistlerin
+        beklentisi (bizim tahminimiz değil). En üstteki büyük cümle işin özeti.
+      </p>
+      {/* Renk anlamları — tutarlı: yeşil=olumlu, kırmızı=olumsuz/risk, gri=nötr/veri yok */}
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full" style={{ background: "#16A34A" }} /> yeşil = olumlu
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full" style={{ background: "#DC2626" }} /> kırmızı = olumsuz / risk
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full" style={{ background: "#7A8699" }} /> gri = nötr / veri yok
+        </span>
+      </div>
+      <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+        Bu bir yatırım tavsiyesi değil — haber akışının özeti. Kararlar sana ait.
+      </p>
     </div>
   );
 }

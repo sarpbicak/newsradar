@@ -1,7 +1,25 @@
 // Analist konsensüsü — GERÇEK veri (Finnhub), NewsRadar üretmez.
-// analyst yoksa (keyword entity ya da veri yok) hiç render edilmez.
+// Veri yoksa: kartta (compact) sessizce gizlenir; detayda BOŞLUK yerine NEDEN
+// veri olmadığını düz Türkçe açıklayan bir not gösterilir (özel şirket / desteklenmeyen borsa).
 // compact=true: kart için mini bar + kısa etiket. false: detay için tam gösterim.
 import React from "react";
+import { InfoTip, TERM_HELP } from "./ui.jsx";
+
+// Veri yokken gösterilecek açıklama (boşluk bir eksiklik değil, bir açıklama gibi görünsün).
+function noDataNote(type, hasPrice) {
+  if (type === "keyword") {
+    return "Bu şirket borsada işlem görmüyor (özel şirket) — hedef fiyat ve analist " +
+      "verisi yok. Değerlendirme sadece haber akışına dayanıyor.";
+  }
+  if (!hasPrice) {
+    // Ticker ama fiyat da yok → ABD dışı borsa (BIST/Avrupa) — kaynağımız kapsamıyor.
+    return "Bu borsa için fiyat ve analist verisi kaynağımızda yok (ör. Türkiye/Avrupa " +
+      "borsaları). Değerlendirme haber akışına dayanıyor.";
+  }
+  // Ticker + fiyat var ama analist verisi yok.
+  return "Bu şirket için analist konsensüsü şu an kaynağımızda yok. Değerlendirme " +
+    "haber akışına dayanıyor.";
+}
 
 const SEGMENTS = [
   { key: "strong_buy", label: "Güçlü Al", color: "#15803d" },
@@ -38,8 +56,21 @@ function Bar({ analyst }) {
   );
 }
 
-export default function AnalystConsensus({ analyst, price, compact = false }) {
-  if (!analyst || !analyst.total) return null;
+export default function AnalystConsensus({ analyst, price, type, compact = false }) {
+  // Veri yok: kartta gizle (kart sade kalsın); detayda açıklayıcı not göster.
+  if (!analyst || !analyst.total) {
+    if (compact) return null;
+    return (
+      <div className="rounded-xl border border-ink-600 bg-ink-800 p-4">
+        <div className="mb-1 flex items-center gap-1 text-[11px] uppercase text-slate-500">
+          Analist konsensüsü <InfoTip text={TERM_HELP.analyst} />
+        </div>
+        <p className="text-sm leading-relaxed text-slate-400">
+          {noDataNote(type, price != null)}
+        </p>
+      </div>
+    );
+  }
   const lean = consensusLabel(analyst);
 
   // Hedef fiyat (Finnhub ücretsiz katmanda None → gösterilmez; premium açılırsa dolar).
@@ -64,7 +95,9 @@ export default function AnalystConsensus({ analyst, price, compact = false }) {
   return (
     <div className="rounded-xl border border-ink-600 bg-ink-800 p-4">
       <div className="mb-2 flex items-baseline justify-between">
-        <span className="text-[11px] uppercase text-slate-500">Analist konsensüsü</span>
+        <span className="inline-flex items-center gap-1 text-[11px] uppercase text-slate-500">
+          Analist konsensüsü <InfoTip text={TERM_HELP.analyst} />
+        </span>
         <span className="text-xs font-semibold" style={{ color: lean.color }}>
           {lean.text}
         </span>
@@ -73,7 +106,9 @@ export default function AnalystConsensus({ analyst, price, compact = false }) {
       {target && price && (
         <div className="mb-3 flex items-baseline gap-2 text-sm">
           <span className="text-slate-400">${price.toFixed(2)}</span>
-          <span className="text-slate-500">→ hedef</span>
+          <span className="inline-flex items-center gap-0.5 text-slate-500">
+            → hedef <InfoTip text={TERM_HELP.target} />
+          </span>
           <span className="font-semibold tabular-nums text-slate-100">${target.toFixed(2)}</span>
           {pct != null && (
             <span className={pct >= 0 ? "text-emerald-400" : "text-rose-400"}>

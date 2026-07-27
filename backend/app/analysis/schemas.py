@@ -138,11 +138,18 @@ ENTITY_ANALYSIS_TOOL = {
             "headline_verdict": {
                 "type": "string",
                 "description": (
-                    "Finans bilmeyen birine tek cümlelik, düz Türkçe HÜKÜM — en fazla 12 "
-                    "kelime, JARGON YOK. Kartın en üstünde büyük gösterilecek. Örnekler: "
-                    "'Haber akışı olumsuz — kısa vadede baskı var, kanıt güçlü', "
-                    "'Olumlu sinyaller ama az habere dayanıyor, temkinli ol', "
-                    "'Karışık tablo — net bir yön yok'."
+                    "Finans bilmeyen bir LİSE ÖĞRENCİSİNİN anlayacağı tek cümlelik, düz "
+                    "Türkçe HÜKÜM — en fazla 20 kelime. Kartın en üstünde büyük gösterilecek. "
+                    "ŞU ÜÇ ŞEYİ İÇERMELİ: (a) haber akışının yönü (olumlu/olumsuz/kararsız), "
+                    "(b) ne kadar güvenilir olduğu (çok/az habere dayanıyor, tutarlı mı), "
+                    "(c) VARSA analist beklentisi ile haberlerin AYRIŞMASI ya da fiyatın zaten "
+                    "tepki verdiği. JARGON KESİNLİKLE YASAK: 'volatilite', 'momentum', "
+                    "'konsolidasyon', 'değerleme', 'katalizör' gibi kelimeler KULLANMA; "
+                    "günlük Türkçe kullan. İyi örnekler: "
+                    "'Haberler çok kötü, hisse zaten sert düştü — analistler yine de yükseliş "
+                    "bekliyor, dikkatli ol.', "
+                    "'Az sayıda olumlu haber var ama yeterli kanıt yok — acele etme.', "
+                    "'Güçlü olumlu haberler ve analistler de yüksek hedefte — tablo tutarlı.'"
                 ),
             },
             "risk_score": {"type": "integer", "description": "0 (düşük) .. 100 (yüksek risk)"},
@@ -235,8 +242,8 @@ def sanitize_entity_analysis(item: dict) -> dict:
     conviction = item.get("conviction")
     drivers = [str(d).strip() for d in item.get("top_drivers", []) if str(d).strip()]
     verify = [str(v).strip() for v in item.get("what_to_verify", []) if str(v).strip()]
-    # Hüküm cümlesi: en fazla 12 kelimeye kırp (jargonsuz, düz Türkçe).
-    verdict = " ".join(str(item.get("headline_verdict", "")).strip().split()[:12])
+    # Hüküm cümlesi: en fazla 20 kelimeye kırp (yön + güvenilirlik + ayrışma sığsın).
+    verdict = " ".join(str(item.get("headline_verdict", "")).strip().split()[:20])
     return {
         "headline_verdict": verdict,
         "risk_score": int(clamp(float(item.get("risk_score", 50)), 0, 100)),
