@@ -112,16 +112,24 @@ def analysis_out(a: EntityAnalysis | None) -> AnalysisOut | None:
     )
 
 
-def _analyst_out(snap: AnalystSnapshot | None) -> AnalystOut | None:
+def _analyst_out(snap: AnalystSnapshot | None, current_price: float | None = None) -> AnalystOut | None:
     if snap is None:
         return None
     total = snap.strong_buy + snap.buy + snap.hold + snap.sell + snap.strong_sell
-    if total == 0:
+    has_target = snap.target_mean is not None
+    # Tavsiye ya da hedeften en az biri olmalı (yalnızca hedef varsa da göster).
+    if total == 0 and not has_target:
         return None
+    # Upside % — GERÇEK hedef ile güncel fiyat farkı (tahmin değil, aritmetik).
+    upside = None
+    if has_target and current_price:
+        upside = round((snap.target_mean - current_price) / current_price * 100, 1)
     return AnalystOut(
         strong_buy=snap.strong_buy, buy=snap.buy, hold=snap.hold,
         sell=snap.sell, strong_sell=snap.strong_sell, total=total, period=snap.period,
         target_mean=snap.target_mean, target_high=snap.target_high, target_low=snap.target_low,
+        target_median=snap.target_median, target_consensus=snap.target_consensus,
+        current_price=current_price, upside_percent=upside,
         fetched_at=snap.fetched_at,
     )
 
@@ -207,7 +215,8 @@ def entity_card(session: Session, entity: Entity) -> EntityCardOut:
                 select(AnalystSnapshot)
                 .where(AnalystSnapshot.entity_id == entity.id)
                 .order_by(AnalystSnapshot.fetched_at.desc())
-            )
+            ),
+            current_price=price_snap.price if price_snap else None,
         )
 
     return EntityCardOut(

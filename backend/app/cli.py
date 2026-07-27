@@ -305,6 +305,86 @@ def cmd_diagnose(args: argparse.Namespace) -> None:
         session.rollback()
 
 
+def cmd_fmp_check(args: argparse.Namespace) -> None:
+    """FMP ücretsiz katmanı DOĞRULAMA — hedef fiyat uçları anahtarınla çalışıyor mu?
+
+    Kullanım (FMP_API_KEY .env'de olmalı):  python -m app.cli fmp-check AMD
+    Her ucun HTTP kodunu + örnek yanıtı + net hükmü basar. 200 + hedef verisi =
+    ÇALIŞIYOR. 401/402/403 = anahtar geçersiz ya da uç ücretsiz katman dışı.
+    """
+    import httpx
+
+    from .config import get_settings
+
+    settings = get_settings()
+    key = settings.fmp_api_key
+    if not key:
+        print("FMP_API_KEY tanımlı değil. backend/.env'e ekleyin:  FMP_API_KEY=...")
+        print("Ücretsiz anahtar: https://site.financialmodelingprep.com/developer/docs")
+        sys.exit(1)
+
+    sym = args.symbol.upper().strip()
+    # (insan-okur ad, URL, hangi alanları bekliyoruz)
+    endpoints = [
+        ("price-target-consensus (stable)",
+         "https://financialmodelingprep.com/stable/price-target-consensus",
+         {"symbol": sym}, "targetConsensus/targetHigh/targetLow"),
+        ("price-target-consensus (v4)",
+         "https://financialmodelingprep.com/api/v4/price-target-consensus",
+         {"symbol": sym}, "targetConsensus/targetHigh/targetLow"),
+        ("price-target-summary (stable)",
+         "https://financialmodelingprep.com/stable/price-target-summary",
+         {"symbol": sym}, "lastMonthAvgPriceTarget/lastQuarter..."),
+        ("price-target (v4, bireysel)",
+         "https://financialmodelingprep.com/api/v4/price-target",
+         {"symbol": sym}, "bireysel analist hedefleri"),
+        ("analyst-estimates (stable)",
+         "https://financialmodelingprep.com/stable/analyst-estimates",
+         {"symbol": sym}, "gelir/kazanç tahminleri"),
+    ]
+
+    print(f"FMP ücretsiz katman kontrolü — sembol: {sym}\n" + "=" * 60)
+    any_target = False
+    for name, url, params, expect in endpoints:
+        p = {**params, "apikey": key}
+        try:
+            resp = httpx.get(url, params=p, timeout=20.0)
+        except httpx.HTTPError as exc:
+            print(f"\n▸ {name}\n   BAĞLANTI HATASI: {exc}")
+            continue
+        code = resp.status_code
+        body = resp.text[:220].replace("\n", " ")
+        verdict = "?"
+        if code == 200:
+            low = body.lower()
+            if '"error' in low or "premium" in low or "exclusive" in low or "legacy" in low:
+                verdict = "⚠ 200 ama içerik hata/premium uyarısı (kapsam dışı olabilir)"
+            elif body.strip() in ("[]", "{}", ""):
+                verdict = "⚠ boş yanıt (bu sembol için veri yok olabilir)"
+            else:
+                verdict = "✓ ÇALIŞIYOR"
+                if "target" in low:
+                    any_target = True
+        elif code in (401,):
+            verdict = "✗ 401 — anahtar geçersiz"
+        elif code in (402, 403):
+            verdict = "✗ %d — ücretsiz katman bu ucu KAPSAMIYOR (premium)" % code
+        else:
+            verdict = f"✗ HTTP {code}"
+        print(f"\n▸ {name}  (beklenen: {expect})")
+        print(f"   HTTP {code} — {verdict}")
+        print(f"   yanıt: {body}")
+
+    print("\n" + "=" * 60)
+    if any_target:
+        print("SONUÇ: ✓ Hedef fiyat uçlarından en az biri ÇALIŞIYOR — NewsRadar gerçek "
+              "hedef fiyatı gösterebilir. Yenile'ye basınca AMD/NVDA hedefi dolacak.")
+    else:
+        print("SONUÇ: ✗ Hiçbir hedef fiyat ucu çalışmadı. Ücretsiz katman kapsamıyor "
+              "olabilir — Sarp'a bildir, alternatif (Alpha Vantage) konuşalım. "
+              "Bu durumda hedef fiyat GÖSTERİLMEZ (tavsiye/haber etkilenmez).")
+
+
 def cmd_reconcile(_args: argparse.Namespace) -> None:
     """Eski ön-filtre sürümüyle elenmiş makaleleri yeniden değerlendirmeye açar."""
     from .analysis.pipeline import reconcile_prefilter
@@ -331,6 +411,12 @@ def main() -> None:
     )
     p_diag.add_argument("query", help="Entity query ya da adı (örn. AMD)")
     p_diag.set_defaults(func=cmd_diagnose)
+
+    p_fmp = sub.add_parser(
+        "fmp-check", help="FMP ücretsiz katmanı hedef fiyat uçlarını doğrula"
+    )
+    p_fmp.add_argument("symbol", nargs="?", default="AAPL", help="Sembol (örn. AMD). Vars: AAPL")
+    p_fmp.set_defaults(func=cmd_fmp_check)
 
     p_fetch = sub.add_parser("fetch", help="Haber çek + yazdır")
     p_fetch.add_argument("query", nargs="?", help="Tek entity (query, örn. TSLA). Boşsa hepsi.")

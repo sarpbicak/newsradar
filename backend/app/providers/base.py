@@ -119,11 +119,14 @@ class AnalystRating:
     sell: int = 0
     strong_sell: int = 0
     period: str | None = None
-    # Hedef fiyatlar — Finnhub ücretsiz katmanda YOK (premium). İleride doldurulabilir.
+    # Hedef fiyatlar — GERÇEK analist verisi. Finnhub ücretsiz katmanda YOK (premium);
+    # FMP (Financial Modeling Prep) ücretsiz katmanı price-target-consensus ile sağlar.
+    # Kaynak ne olursa olsun bunlar GERÇEK analist rakamlarıdır — Claude ÜRETMEZ.
     target_high: float | None = None
     target_low: float | None = None
-    target_mean: float | None = None
+    target_mean: float | None = None      # ortalama/konsensüs hedef
     target_median: float | None = None
+    target_consensus: float | None = None  # FMP'nin açık "consensus" değeri (≈ mean)
 
 
 @dataclass

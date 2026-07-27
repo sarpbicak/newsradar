@@ -159,21 +159,43 @@ def _price_lines(price: dict | None) -> list[str]:
 
 
 def _analyst_lines(analyst: dict | None) -> list[str]:
-    """Analist konsensüsünü prompt satırına çevirir (yoksa boş — hiç bahsetme)."""
+    """Analist konsensüsünü prompt satırına çevirir (yoksa boş — hiç bahsetme).
+
+    Hem tavsiye (al/tut/sat) hem GERÇEK hedef fiyat (FMP) bağlam olarak verilir. Claude
+    bunları YALNIZCA haber akışıyla uyumunu yorumlamak için kullanır; rakam İCAT ETMEZ."""
     if not analyst:
         return []
-    parts = [
-        f"güçlü al={analyst['strong_buy']}", f"al={analyst['buy']}",
-        f"tut={analyst['hold']}", f"sat={analyst['sell']}",
-        f"güçlü sat={analyst['strong_sell']}",
-    ]
-    line = (
-        "ANALİST KONSENSÜSÜ (GERÇEK veri; SEN üretme, sadece haber akışıyla uyumunu yorumla, "
-        f"hedef/seviye İCAT ETME): {analyst['total']} analist — " + ", ".join(parts) + "."
-    )
-    if analyst.get("target_mean") is not None:
-        line += f" Ortalama hedef fiyat={analyst['target_mean']}."
-    return [line]
+    lines: list[str] = []
+    total = analyst.get("total", 0)
+    if total:
+        parts = [
+            f"güçlü al={analyst['strong_buy']}", f"al={analyst['buy']}",
+            f"tut={analyst['hold']}", f"sat={analyst['sell']}",
+            f"güçlü sat={analyst['strong_sell']}",
+        ]
+        lines.append(
+            "ANALİST TAVSİYESİ (GERÇEK veri; SEN üretme, hedef/seviye İCAT ETME, sadece haber "
+            f"akışıyla uyumunu yorumla): {total} analist — " + ", ".join(parts) + "."
+        )
+    # GERÇEK hedef fiyat (FMP price-target-consensus). Yoksa bu satır hiç eklenmez.
+    tm = analyst.get("target_mean")
+    if tm is not None:
+        target = f"ANALİST HEDEF FİYATI (GERÇEK, FMP konsensüsü — SEN ÜRETME, sadece aktar): ortalama={tm}"
+        if analyst.get("target_low") is not None and analyst.get("target_high") is not None:
+            target += f" (aralık {analyst['target_low']}–{analyst['target_high']})"
+        price = analyst.get("current_price")
+        up = analyst.get("upside_percent")
+        if price is not None and up is not None:
+            yon = "yukarıda" if up >= 0 else "aşağıda"
+            target += (
+                f". Güncel fiyat={price}; hedef, güncelin %{abs(up)} {yon}sında. "
+                "Haber akışı bu hedefle UYUMLU mu yoksa ÇELİŞİYOR mu değerlendir: haberler "
+                "olumsuz ama analistler yüksek hedef tutuyorsa (ya da tersi) bu AYRIŞMAYI "
+                "headline_verdict'te açıkça belirt (ör. 'haberler kötü ama analistler yüksek "
+                "hedefte — ayrışma var')."
+            )
+        lines.append(target)
+    return lines
 
 
 def build_entity_prompt(

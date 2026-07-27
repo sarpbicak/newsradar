@@ -80,7 +80,7 @@ class DeltaOut(BaseModel):
 
 
 class AnalystOut(BaseModel):
-    """Analist konsensüsü (GERÇEK veri — Finnhub; NewsRadar üretmez)."""
+    """Analist verisi (GERÇEK — tavsiye Finnhub, hedef fiyat FMP; NewsRadar ÜRETMEZ)."""
 
     strong_buy: int
     buy: int
@@ -89,10 +89,15 @@ class AnalystOut(BaseModel):
     strong_sell: int
     total: int
     period: str | None
-    # Hedef fiyatlar (Finnhub ücretsiz katmanda None; premium açılırsa dolar).
+    # Hedef fiyatlar — GERÇEK analist konsensüsü (FMP). Kaynak yoksa None (tahmin YOK).
     target_mean: float | None = None
     target_high: float | None = None
     target_low: float | None = None
+    target_median: float | None = None
+    target_consensus: float | None = None
+    # Güncel fiyata göre hedef farkı (%). Frontend renk/etiket için.
+    current_price: float | None = None
+    upside_percent: float | None = None
     fetched_at: datetime
 
 

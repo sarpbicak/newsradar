@@ -159,6 +159,9 @@ export default function App() {
     if (!status.providers.finnhub) missingKeys.push("FINNHUB_API_KEY (ticker haberleri)");
     if (!status.providers.newsapi) missingKeys.push("NEWSAPI_KEY (keyword haberleri)");
     if (!status.claude) missingKeys.push("ANTHROPIC_API_KEY (analiz)");
+    // FMP opsiyonel: yoksa yalnızca hedef fiyat gösterilmez (tavsiye/haber çalışır).
+    if (status.providers["fmp-target"] === false)
+      missingKeys.push("FMP_API_KEY (analist hedef fiyatı — opsiyonel)");
   }
 
   return (

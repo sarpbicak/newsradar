@@ -222,11 +222,13 @@ class AnalystSnapshot(Base):
     entity_id: Mapped[int] = mapped_column(
         ForeignKey("entities.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    # Hedef fiyatlar (şimdilik None — premium uç).
+    # Hedef fiyatlar — GERÇEK analist verisi (FMP price-target-consensus). Kaynak
+    # yoksa None (asla tahminle doldurulmaz). Finnhub premium olduğu için FMP kullanılır.
     target_high: Mapped[float | None] = mapped_column(Float, nullable=True)
     target_low: Mapped[float | None] = mapped_column(Float, nullable=True)
     target_mean: Mapped[float | None] = mapped_column(Float, nullable=True)
     target_median: Mapped[float | None] = mapped_column(Float, nullable=True)
+    target_consensus: Mapped[float | None] = mapped_column(Float, nullable=True)  # FMP consensus
     # Al/tut/sat dağılımı.
     strong_buy: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     buy: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
