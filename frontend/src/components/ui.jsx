@@ -56,8 +56,8 @@ export function stanceLabel(stance) {
   return (STANCE[stance] || STANCE.neutral).label;
 }
 
-// Yön/vade/kanıt için renk + etiket yardımcıları (Verdict-First kart).
-const STANCE_COLOR = { bullish: "#16a34a", neutral: "#6b7280", bearish: "#dc2626" };
+// Yön/vade/kanıt için renk + etiket yardımcıları. Koyu zeminde parlak sinyal tonları.
+const STANCE_COLOR = { bullish: "#3FD68C", neutral: "#8B8F9E", bearish: "#FF6B6B" };
 export function stanceColor(stance) {
   return STANCE_COLOR[stance] || STANCE_COLOR.neutral;
 }
@@ -68,7 +68,7 @@ export function evidenceLabel(e) {
   return { strong: "Güçlü", medium: "Orta", weak: "Zayıf" }[e] || "—";
 }
 export function evidenceColor(e) {
-  return { strong: "#16a34a", medium: "#d97706", weak: "#dc2626" }[e] || "#6b7280";
+  return { strong: "#3FD68C", medium: "#FBBF24", weak: "#FF6B6B" }[e] || "#8B8F9E";
 }
 
 // --- Düz Türkçe terim açıklamaları (tooltip metinleri; jargon yok) ---
@@ -132,11 +132,11 @@ export function InfoTip({ text, className = "" }) {
 // --- Genel sinyal: yön + kanıt gücünü 5 kademeli tek ölçeğe indirger ---
 // Sol (güçlü olumsuz, kırmızı) → sağ (güçlü olumlu, yeşil). Fiyat tahmini DEĞİL.
 const SIGNAL_LEVELS = [
-  { key: -2, label: "Güçlü olumsuz", color: "#B91C1C" },
-  { key: -1, label: "Olumsuz", color: "#DC2626" },
-  { key: 0, label: "Nötr", color: "#7A8699" },
-  { key: 1, label: "Olumlu", color: "#16A34A" },
-  { key: 2, label: "Güçlü olumlu", color: "#15803D" },
+  { key: -2, label: "Güçlü olumsuz", color: "#E84C4C" },
+  { key: -1, label: "Olumsuz", color: "#FF6B6B" },
+  { key: 0, label: "Nötr", color: "#8B8F9E" },
+  { key: 1, label: "Olumlu", color: "#3FD68C" },
+  { key: 2, label: "Güçlü olumlu", color: "#2FB873" },
 ];
 
 export function overallSignal(stance, evidence) {
@@ -154,24 +154,26 @@ export function SignalBand({ stance, evidence, showLabel = true }) {
     <div>
       {showLabel && (
         <div className="mb-1.5 flex items-center justify-between">
-          <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
             Genel sinyal
-            <InfoTip text={TERM_HELP.signal} />
           </span>
           <span className="text-xs font-bold" style={{ color: sig.color }}>
             {sig.label}
           </span>
         </div>
       )}
-      {/* Yumuşak spektrum (olumsuz→nötr→olumlu) + konum işaretçisi */}
+      {/* Yumuşak spektrum (olumsuz→nötr(mor)→olumlu) + konum işaretçisi. Koyu zemin. */}
       <div
         className="relative h-2 rounded-full"
-        style={{ background: "linear-gradient(90deg,#FCA5A5 0%,#FCD9B6 25%,#E6EAF1 50%,#C7ECC9 75%,#86EFAC 100%)" }}
+        style={{
+          background:
+            "linear-gradient(90deg, rgba(255,107,107,0.70) 0%, rgba(255,107,107,0.30) 28%, rgba(124,92,255,0.32) 50%, rgba(63,214,140,0.30) 72%, rgba(63,214,140,0.70) 100%)",
+        }}
         aria-label={`Genel sinyal: ${sig.label}`}
       >
         <span
-          className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white transition-all duration-300"
-          style={{ left: `${pos}%`, background: sig.color, boxShadow: "0 1px 4px rgba(16,24,40,0.25)" }}
+          className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-ink-800 transition-all duration-300"
+          style={{ left: `${pos}%`, background: sig.color, boxShadow: `0 0 8px ${sig.color}66` }}
           title={sig.label}
         />
       </div>
@@ -232,10 +234,10 @@ export function StanceBadge({ stance, conviction }) {
 
 // --- Risk skoru rengi (0 yeşil → 100 kırmızı) ---
 export function riskColor(score) {
-  if (score == null) return "#94a3b8";
-  if (score < 34) return "#16a34a";
-  if (score < 67) return "#d97706";
-  return "#dc2626";
+  if (score == null) return "#8B8F9E";
+  if (score < 34) return "#3FD68C";
+  if (score < 67) return "#FBBF24";
+  return "#FF6B6B";
 }
 
 export function RiskScore({ score }) {
@@ -244,7 +246,7 @@ export function RiskScore({ score }) {
     <div className="flex items-center gap-2">
       <div className="relative h-9 w-9 shrink-0">
         <svg viewBox="0 0 36 36" className="h-9 w-9 -rotate-90">
-          <circle cx="18" cy="18" r="15" fill="none" stroke="#E4E8EF" strokeWidth="4" />
+          <circle cx="18" cy="18" r="15" fill="none" stroke="#2B2F3B" strokeWidth="4" />
           <circle
             cx="18" cy="18" r="15" fill="none" stroke={color} strokeWidth="4"
             strokeDasharray={`${(2 * Math.PI * 15 * (score ?? 0)) / 100} ${2 * Math.PI * 15}`}
@@ -267,7 +269,7 @@ export function RiskScore({ score }) {
 export function SentimentGauge({ value }) {
   const v = value ?? 0;
   const pct = ((v + 1) / 2) * 100; // -1..1 -> 0..100
-  const color = v > 0.15 ? "#16a34a" : v < -0.15 ? "#dc2626" : "#94a3b8";
+  const color = v > 0.15 ? "#3FD68C" : v < -0.15 ? "#FF6B6B" : "#8B8F9E";
   return (
     <div className="w-full">
       <div className="flex justify-between text-[10px] text-slate-500 mb-1">

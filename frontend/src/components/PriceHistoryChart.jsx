@@ -48,17 +48,17 @@ export default function PriceHistoryChart({ history, updatedAt, isTicker }) {
       </div>
       <ResponsiveContainer width="100%" height={160}>
         <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -8 }}>
-          <CartesianGrid stroke="#E9EDF3" vertical={false} />
+          <CartesianGrid stroke="#232733" vertical={false} />
           <XAxis
             dataKey="date"
-            tick={{ fill: "#7A8699", fontSize: 9 }}
+            tick={{ fill: "#6B6F7E", fontSize: 9 }}
             axisLine={false}
             tickLine={false}
             minTickGap={24}
           />
           <YAxis
             domain={["auto", "auto"]}
-            tick={{ fill: "#7A8699", fontSize: 10 }}
+            tick={{ fill: "#6B6F7E", fontSize: 10 }}
             axisLine={false}
             tickLine={false}
             width={48}
@@ -66,20 +66,20 @@ export default function PriceHistoryChart({ history, updatedAt, isTicker }) {
           />
           <Tooltip
             contentStyle={{
-              background: "#FFFFFF",
+              background: "#191C26",
               border: "1px solid #E4E8EF",
               borderRadius: 8,
               fontSize: 12,
             }}
-            labelStyle={{ color: "#586074" }}
+            labelStyle={{ color: "#B4B8C4" }}
             formatter={(v) => [`$${v}`, "fiyat"]}
           />
           <Line
             type="monotone"
             dataKey="price"
-            stroke="#0284C7"
+            stroke="#60A5FA"
             strokeWidth={2}
-            dot={{ r: 2, fill: "#0284C7" }}
+            dot={{ r: 2, fill: "#60A5FA" }}
             isAnimationActive={false}
           />
         </LineChart>

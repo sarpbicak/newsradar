@@ -7,8 +7,6 @@ import {
   RiskDelta,
   PriceDisplay,
   SignalBand,
-  InfoTip,
-  TERM_HELP,
   stanceLabel,
   stanceColor,
   horizonLabel,
@@ -73,26 +71,20 @@ export default function EntityCard({ card, onOpen }) {
             </div>
           )}
 
-          {/* 4. Üç etiket: Yön / Vade / Kanıt — her birinde "?" açıklaması */}
+          {/* 4. Üç etiket: Yön / Vade / Kanıt (sade — açıklama header'daki "Nasıl okunur"da) */}
           <div className="grid grid-cols-3 divide-x divide-ink-700 rounded-lg border border-ink-700 text-center">
             <div className="px-1 py-2">
-              <div className="flex items-center justify-center gap-0.5 text-[10px] uppercase text-slate-500">
-                Yön <InfoTip text={TERM_HELP.direction} />
-              </div>
+              <div className="text-[10px] uppercase tracking-wide text-slate-500">Yön</div>
               <div className="text-sm font-bold" style={{ color: dir }}>
                 {stanceLabel(a.stance)}
               </div>
             </div>
             <div className="px-1 py-2">
-              <div className="flex items-center justify-center gap-0.5 text-[10px] uppercase text-slate-500">
-                Vade <InfoTip text={TERM_HELP.horizon} />
-              </div>
+              <div className="text-[10px] uppercase tracking-wide text-slate-500">Vade</div>
               <div className="text-sm font-bold text-slate-200">{horizonLabel(card.horizon)}</div>
             </div>
             <div className="px-1 py-2">
-              <div className="flex items-center justify-center gap-0.5 text-[10px] uppercase text-slate-500">
-                Kanıt <InfoTip text={TERM_HELP.evidence} />
-              </div>
+              <div className="text-[10px] uppercase tracking-wide text-slate-500">Kanıt</div>
               <div className="text-sm font-bold" style={{ color: evidenceColor(card.evidence_strength) }}>
                 {evidenceLabel(card.evidence_strength)}
               </div>

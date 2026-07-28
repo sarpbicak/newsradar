@@ -6,14 +6,16 @@ import Overview from "./components/Overview.jsx";
 import EntityDetail from "./components/EntityDetail.jsx";
 import Login from "./components/Login.jsx";
 import AdminPanel from "./components/AdminPanel.jsx";
+import HowToModal from "./components/HowToModal.jsx";
 import { Skeleton } from "./components/ui.jsx";
-import { RefreshCw, Menu, X, LogOut, ShieldCheck, LayoutDashboard, Radar } from "lucide-react";
+import { RefreshCw, Menu, X, LogOut, ShieldCheck, LayoutDashboard, Radar, HelpCircle } from "lucide-react";
 
 export default function App() {
   const [user, setUser] = useState(null);            // kişisel kullanıcı (null = çıkış)
   const [checkingSession, setCheckingSession] = useState(!!getUserToken());
   const [view, setView] = useState("dashboard");     // "dashboard" | "admin"
   const [menuOpen, setMenuOpen] = useState(false);   // mobil header menüsü
+  const [showHelp, setShowHelp] = useState(false);   // "nasıl okunur" modalı
   const authed = !!user;
   const [cards, setCards] = useState([]);
   const [status, setStatus] = useState(null);
@@ -225,6 +227,16 @@ export default function App() {
                     : "Başlatılıyor…"
                   : "Yenile"}
               </span>
+            </button>
+
+            {/* Nasıl okunur — her boyutta görünür ikon (modal açar) */}
+            <button
+              onClick={() => setShowHelp(true)}
+              title="Nasıl okunur?"
+              aria-label="Nasıl okunur?"
+              className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg text-slate-500 transition hover:bg-ink-700 hover:text-slate-200"
+            >
+              <HelpCircle className="h-5 w-5" />
             </button>
 
             {/* MASAÜSTÜ: kota + admin + kullanıcı + çıkış inline */}
@@ -440,6 +452,8 @@ export default function App() {
       >
         built by Sarp Bıçak
       </a>
+
+      <HowToModal open={showHelp} onClose={() => setShowHelp(false)} />
     </div>
   );
 }

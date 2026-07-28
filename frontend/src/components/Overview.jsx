@@ -36,6 +36,19 @@ function changeSummary(card) {
   return parts.join(" · ");
 }
 
+// İnce şerit için tek ok: iyileşti (↑ yeşil) mi kötüleşti (↓ kırmızı) mi.
+function changeDir(card) {
+  const d = card.delta || {};
+  let s = 0;
+  if (d.risk_delta) s -= d.risk_delta; // risk düştüyse iyi
+  if (d.sentiment_delta) s += d.sentiment_delta * 100;
+  if (d.stance_changed) {
+    if (card.analysis?.stance === "bullish") s += 30;
+    if (card.analysis?.stance === "bearish") s -= 30;
+  }
+  return s >= 0 ? { icon: "↑", cls: "text-emerald-400" } : { icon: "↓", cls: "text-rose-400" };
+}
+
 const SORTS = {
   change: { label: "En çok değişen", fn: (a, b) => changeScore(b) - changeScore(a) },
   risk: {
@@ -68,34 +81,25 @@ export default function Overview({
   );
 
   return (
-    <div className="space-y-6">
-      {/* "Nasıl okunur" mini rehber — ilk açılışta görünür, kapatılınca o oturum
-          boyunca gizli (sessionStorage; localStorage değil). */}
-      <HowToGuide />
-
-      {/* Değişim şeridi — hiçbir şey değişmediyse gösterme */}
+    <div className="space-y-5">
+      {/* Değişim ŞERİDİ — ince tek satır. Değişim yoksa hiç görünmez. */}
       {changed.length > 0 && (
-        <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
-          <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-accent">
-            Son taramaya göre
-          </div>
-          <div className="space-y-1.5">
-            {changed.map((c) => (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-ink-600 bg-ink-800/60 px-3 py-2 text-xs">
+          <span className="font-medium text-slate-500">Son tarama:</span>
+          {changed.map((c) => {
+            const dir = changeDir(c);
+            return (
               <button
                 key={c.id}
                 onClick={() => onOpen(c.id)}
-                className="flex w-full flex-wrap items-center gap-x-2 text-left text-sm text-slate-300 hover:text-accent"
+                className="inline-flex items-center gap-1 transition hover:text-slate-100"
+                title={changeSummary(c)}
               >
-                <span className="font-semibold text-slate-100">{c.name}</span>
-                <span className="text-slate-400">{changeSummary(c)}</span>
-                {c.delta?.stance_changed && (
-                  <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 text-[10px] font-semibold text-amber-200">
-                    yön değişti
-                  </span>
-                )}
+                <span className="font-medium text-slate-300">{c.name}</span>
+                <span className={`font-bold ${dir.cls}`}>{dir.icon}</span>
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
       )}
 
@@ -151,66 +155,6 @@ export default function Overview({
       <Collapsible title={`İzleme listesi (${cards.length})`}>
         <WatchlistManager cards={cards} onCreate={onCreate} onDelete={onDelete} embedded />
       </Collapsible>
-    </div>
-  );
-}
-
-// "Nasıl okunur" rehberi — finans bilmeyen kullanıcı için tek seferlik açıklama.
-// Kapatılınca sessionStorage'a yazılır → o tarayıcı oturumunda bir daha çıkmaz
-// (localStorage KULLANILMAZ; yeni oturumda tekrar hatırlatır).
-const GUIDE_KEY = "nr_guide_dismissed";
-function HowToGuide() {
-  const [dismissed, setDismissed] = useState(() => {
-    try {
-      return sessionStorage.getItem(GUIDE_KEY) === "1";
-    } catch {
-      return false;
-    }
-  });
-  if (dismissed) return null;
-
-  function close() {
-    try {
-      sessionStorage.setItem(GUIDE_KEY, "1");
-    } catch {
-      /* sessionStorage yoksa yalnızca bu render için gizle */
-    }
-    setDismissed(true);
-  }
-
-  return (
-    <div className="relative rounded-xl border border-accent/30 bg-accent/5 p-4 pr-10">
-      <button
-        onClick={close}
-        aria-label="rehberi kapat"
-        className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-md text-slate-500 transition hover:bg-ink-700 hover:text-slate-200"
-      >
-        ✕
-      </button>
-      <div className="mb-2 text-sm font-semibold text-slate-100">📖 Panel nasıl okunur?</div>
-      <p className="text-sm leading-relaxed text-slate-400">
-        Her kart bir şirketin son haberlerinin özeti.{" "}
-        <strong className="font-semibold text-slate-200">Yön</strong> = haberler olumlu mu
-        olumsuz mu. <strong className="font-semibold text-slate-200">Kanıt</strong> = değerlendirme
-        ne kadar güvenilir (kaç habere dayanıyor).{" "}
-        <strong className="font-semibold text-slate-200">Hedef fiyat</strong> = gerçek analistlerin
-        beklentisi (bizim tahminimiz değil). En üstteki büyük cümle işin özeti.
-      </p>
-      {/* Renk anlamları — tutarlı: yeşil=olumlu, kırmızı=olumsuz/risk, gri=nötr/veri yok */}
-      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full" style={{ background: "#16A34A" }} /> yeşil = olumlu
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full" style={{ background: "#DC2626" }} /> kırmızı = olumsuz / risk
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full" style={{ background: "#7A8699" }} /> gri = nötr / veri yok
-        </span>
-      </div>
-      <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
-        Bu bir yatırım tavsiyesi değil — haber akışının özeti. Kararlar sana ait.
-      </p>
     </div>
   );
 }

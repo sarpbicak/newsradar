@@ -13,8 +13,8 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: light;
-  --grid: rgba(37, 99, 235, 0.05); /* blueprint çizgi rengi (çok soluk) */
+  color-scheme: dark;
+  --grid: rgba(124, 92, 255, 0.045); /* mor grid çizgisi (çok soluk) */
 }
 
 html,
@@ -25,12 +25,12 @@ body,
 
 body {
   margin: 0;
-  color: #0b1220;
+  color: #e8e9ed;
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  /* Açık gri zemin + çok düşük opaklıkta ince blueprint grid + üstte soluk degrade */
-  background-color: #eef1f6;
+  /* Yumuşak koyu zemin + üstte soluk mor glow + çok düşük opaklıkta ince mor grid */
+  background-color: #0f1117;
   background-image:
-    linear-gradient(180deg, rgba(37, 99, 235, 0.06), rgba(37, 99, 235, 0) 320px),
+    radial-gradient(120% 60% at 50% -10%, rgba(124, 92, 255, 0.10), rgba(124, 92, 255, 0) 60%),
     linear-gradient(var(--grid) 1px, transparent 1px),
     linear-gradient(90deg, var(--grid) 1px, transparent 1px);
   background-size: 100% 100%, 32px 32px, 32px 32px;
@@ -52,10 +52,10 @@ body {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(38% 38% at 18% 28%, rgba(37, 99, 235, 0.10), transparent 70%),
-    radial-gradient(32% 32% at 82% 18%, rgba(139, 92, 246, 0.08), transparent 70%),
-    radial-gradient(42% 42% at 72% 82%, rgba(14, 165, 233, 0.07), transparent 70%);
-  filter: blur(44px);
+    radial-gradient(38% 38% at 18% 24%, rgba(124, 92, 255, 0.20), transparent 70%),
+    radial-gradient(32% 32% at 82% 16%, rgba(139, 124, 255, 0.15), transparent 70%),
+    radial-gradient(42% 42% at 74% 84%, rgba(96, 108, 255, 0.13), transparent 70%);
+  filter: blur(48px);
   will-change: transform;
   animation: aurora-drift 34s ease-in-out infinite alternate;
 }
@@ -79,8 +79,11 @@ body {
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd2dd;
+  background: #3a3f4e;
   border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #4a4f60;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -100,6 +103,15 @@ body {
 .stagger > *:nth-child(8) { animation-delay: 0.30s; }
 .stagger > *:nth-child(n + 9) { animation-delay: 0.34s; }
 
+/* Sekme değişiminde yumuşak geçiş */
+.tab-fade {
+  animation: tab-fade 0.28s ease-out both;
+}
+@keyframes tab-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* Yenileme sırasında kart üstünden geçen ince tarama bandı */
 .scan-host { position: relative; overflow: hidden; }
 .scan-host::after {
@@ -107,14 +119,14 @@ body {
   position: absolute;
   inset: 0 auto 0 0;
   width: 40%;
-  background: linear-gradient(90deg, transparent, rgba(37, 99, 235, 0.10), transparent);
+  background: linear-gradient(90deg, transparent, rgba(124, 92, 255, 0.14), transparent);
   animation: scan 1.4s ease-in-out infinite;
   pointer-events: none;
 }
 
 /* Skeleton (iskelet) — layout zıplamasın */
 .skeleton {
-  background: linear-gradient(90deg, #eef1f6 25%, #e2e7f0 37%, #eef1f6 63%);
+  background: linear-gradient(90deg, #191c26 25%, #232733 37%, #191c26 63%);
   background-size: 400% 100%;
   animation: skel 1.4s ease infinite;
   border-radius: 6px;
@@ -138,7 +150,7 @@ body {
   transition: color 0.2s ease;
 }
 .signature:hover {
-  color: #2563eb;
+  color: #8b7cff;
 }
 
 /* prefers-reduced-motion — ZORUNLU: kapalıysa tüm animasyonlar dursun */

@@ -1,37 +1,38 @@
 /** @type {import('tailwindcss').Config} */
-// AÇIK TEMA (HUD). Mevcut sınıf adları korunur; token'lar aydınlık palete remap edilir:
-//  - ink-*  = yüzeyler/kenarlıklar (koyu→açık)
-//  - slate-* = metin (ters çevrildi: yüksek numara = daha soluk, açık zeminde okunur)
-//  - accent = elektrik mavi
+// YUMUŞAK KOYU TEMA + MOR VURGU (Linear/Vercel tarzı). Saf siyah/beyaz YOK.
+//  - ink-*  = yüzeyler/kenarlıklar (koyu taban → bir tık açık kart → ince açık kenarlık)
+//  - slate-* = metin (küçük numara = açık/önemli, büyük numara = soluk)
+//  - accent = MOR (yalnızca vurgu). Sinyal renkleri (emerald/rose) MOR DEĞİL — sabit.
 export default {
   content: ["./index.html", "./src/**/*.{js,jsx}"],
   theme: {
     extend: {
       colors: {
-        // Yüzeyler: 900 = sayfa zemini (açık gri), 800 = kart (beyaz), 600/500 = kenarlık.
+        // Yüzeyler: 900 = sayfa zemini (yumuşak koyu), 800 = kart (bir tık açık),
+        // 700 = yükseltilmiş/hover/divide, 600/500 = ince/güçlü açık kenarlık.
         ink: {
-          900: "#EEF1F6", // sayfa zemini
-          800: "#FFFFFF", // kart yüzeyi (saf beyaz)
-          700: "#F1F4F8", // yükseltilmiş/hover/divide
-          600: "#E4E8EF", // ince kenarlık
-          500: "#D0D7E2", // güçlü kenarlık/input
+          900: "#0F1117", // sayfa zemini (yumuşak koyu slate — saf siyah değil)
+          800: "#191C26", // kart yüzeyi
+          700: "#232733", // yükseltilmiş/hover/divide
+          600: "#2B2F3B", // ince kenarlık (~rgba(255,255,255,0.06))
+          500: "#3A3F4E", // güçlü kenarlık/input
         },
-        accent: "#2563EB", // elektrik mavi
-        // Metin (Tailwind slate override; ters: küçük=koyu/önemli, büyük=soluk).
+        accent: "#7C5CFF", // MOR vurgu (marka; yalnızca aksan)
+        // Metin (koyu zeminde): küçük numara = açık/önemli, büyük = soluk.
         slate: {
-          100: "#0B1220", // birincil metin (neredeyse siyah)
-          200: "#1B2536",
-          300: "#33415A",
-          400: "#586074", // muted gövde metni
-          500: "#7A8699", // etiket/zaman damgası
-          600: "#98A2B3", // en soluk
-          700: "#B4BCC9",
+          100: "#E8E9ED", // birincil metin (kırık beyaz)
+          200: "#D3D5DD",
+          300: "#B4B8C4", // ikincil
+          400: "#8B8F9E", // muted gövde metni
+          500: "#6B6F7E", // etiket/zaman damgası
+          600: "#565A68", // en soluk
+          700: "#474B58",
         },
-        // Yön/durum tonları — açık zeminde okunacak kadar koyu.
-        emerald: { 200: "#16A34A", 300: "#16A34A", 400: "#16A34A", 500: "#15803D", 600: "#15803D" },
-        rose: { 200: "#DC2626", 300: "#DC2626", 400: "#DC2626", 500: "#B91C1C", 600: "#B91C1C" },
-        amber: { 200: "#B45309", 300: "#B45309", 400: "#D97706", 500: "#D97706", 600: "#B45309" },
-        sky: { 400: "#0284C7", 500: "#0369A1" },
+        // Yön/durum tonları — koyu zeminde okunaklı, PARLAK tonlar. (Mor DEĞİL.)
+        emerald: { 200: "#3FD68C", 300: "#3FD68C", 400: "#3FD68C", 500: "#34C77E", 600: "#2FB873" },
+        rose: { 200: "#FF6B6B", 300: "#FF6B6B", 400: "#FF6B6B", 500: "#F55A5A", 600: "#E84C4C" },
+        amber: { 200: "#FBBF24", 300: "#FBBF24", 400: "#F59E0B", 500: "#F59E0B", 600: "#FBBF24" },
+        sky: { 400: "#60A5FA", 500: "#3B82F6" },
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"],
@@ -39,8 +40,9 @@ export default {
         mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
       },
       boxShadow: {
-        card: "0 1px 2px rgba(16,24,40,0.04), 0 4px 16px rgba(16,24,40,0.06)",
-        "card-hover": "0 4px 8px rgba(16,24,40,0.06), 0 12px 32px rgba(37,99,235,0.12)",
+        // Koyu tema: derinlik ince ton farkı + yumuşak siyah gölge; hover'da mor glow.
+        card: "0 1px 2px rgba(0,0,0,0.35), 0 4px 16px rgba(0,0,0,0.28)",
+        "card-hover": "0 4px 12px rgba(0,0,0,0.35), 0 12px 32px rgba(124,92,255,0.22)",
       },
       keyframes: {
         "card-in": {
@@ -52,7 +54,7 @@ export default {
           "100%": { transform: "translateX(300%)" },
         },
         flash: {
-          "0%": { background: "rgba(37,99,235,0.18)" },
+          "0%": { background: "rgba(124,92,255,0.22)" },
           "100%": { background: "transparent" },
         },
       },

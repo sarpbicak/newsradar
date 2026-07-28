@@ -22,19 +22,19 @@ function noDataNote(type, hasPrice) {
 }
 
 const SEGMENTS = [
-  { key: "strong_buy", label: "Güçlü Al", color: "#15803d" },
-  { key: "buy", label: "Al", color: "#22c55e" },
-  { key: "hold", label: "Tut", color: "#9ca3af" },
-  { key: "sell", label: "Sat", color: "#ef4444" },
-  { key: "strong_sell", label: "Güçlü Sat", color: "#b91c1c" },
+  { key: "strong_buy", label: "Güçlü Al", color: "#2FB873" },
+  { key: "buy", label: "Al", color: "#3FD68C" },
+  { key: "hold", label: "Tut", color: "#8B8F9E" },
+  { key: "sell", label: "Sat", color: "#FF6B6B" },
+  { key: "strong_sell", label: "Güçlü Sat", color: "#E84C4C" },
 ];
 
 function consensusLabel(a) {
   const buyish = a.strong_buy + a.buy;
   const sellish = a.sell + a.strong_sell;
-  if (buyish > a.hold && buyish >= sellish) return { text: "Al ağırlıklı", color: "#16a34a" };
-  if (sellish > a.hold && sellish > buyish) return { text: "Sat ağırlıklı", color: "#dc2626" };
-  return { text: "Tut ağırlıklı", color: "#6b7280" };
+  if (buyish > a.hold && buyish >= sellish) return { text: "Al ağırlıklı", color: "#3FD68C" };
+  if (sellish > a.hold && sellish > buyish) return { text: "Sat ağırlıklı", color: "#FF6B6B" };
+  return { text: "Tut ağırlıklı", color: "#8B8F9E" };
 }
 
 function Bar({ analyst }) {
@@ -65,20 +65,20 @@ function TargetRangeBar({ low, high, mean, price }) {
         {/* düşük–yüksek analist aralığı */}
         <div
           className="absolute top-0 h-2 rounded-full"
-          style={{ left: pos(low), width: `${((high - low) / span) * 100}%`, background: "rgba(37,99,235,0.25)" }}
+          style={{ left: pos(low), width: `${((high - low) / span) * 100}%`, background: "rgba(124,92,255,0.35)" }}
         />
         {/* güncel fiyat işareti (dikey çizgi) */}
         {price != null && (
           <div
-            className="absolute top-1/2 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded bg-slate-300"
+            className="absolute top-1/2 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded bg-slate-100"
             style={{ left: pos(price) }}
             title={`Güncel fiyat $${price.toFixed(2)}`}
           />
         )}
         {/* ortalama hedef işareti (nokta) */}
         <div
-          className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white"
-          style={{ left: pos(mean), background: "#2563EB" }}
+          className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-ink-800"
+          style={{ left: pos(mean), background: "#8B7CFF" }}
           title={`Ortalama hedef $${mean.toFixed(2)}`}
         />
       </div>
