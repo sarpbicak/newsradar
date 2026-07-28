@@ -34,9 +34,12 @@ class Settings:
         # Yoksa hedef fiyat gösterilmez (tavsiye/haber etkilenmez).
         self.fmp_api_key: str = os.getenv("FMP_API_KEY", "").strip()
 
-        # Paylaşılan tek şifre (iki kişilik erişim kapısı). Boşsa giriş devre dışı
-        # ve korumalı uçlar 503 döner — yani parola ayarlanmadan kimse giremez.
+        # Paylaşılan tek şifre (Katman 1 — genel kapı). Boşsa giriş devre dışı ve
+        # korumalı uçlar 503 döner — yani parola ayarlanmadan kimse giremez.
         self.app_password: str = os.getenv("APP_PASSWORD", "").strip()
+        # Katman 2 — kişisel hesaplar. Bu kullanıcı adıyla kayıt olan admin olur.
+        # Boşsa: İLK kayıt olan kullanıcı otomatik admin olur.
+        self.admin_username: str = os.getenv("ADMIN_USERNAME", "").strip()
 
         # NOT: Geçersiz bir model adı API'de sessiz boş/404 yanıta yol açabilir;
         # yalnızca geçerli, güncel bir model kullanın.

@@ -7,30 +7,52 @@ const API_BASE =
   import.meta.env.VITE_API_BASE ||
   "http://localhost:8000";
 
-// --- Oturum token'ı: localStorage'da saklanır, her istekte Bearer olarak gider ---
-const TOKEN_KEY = "newsradar_token";
-let authToken = localStorage.getItem(TOKEN_KEY) || null;
+// --- İKİ KATMANLI oturum ---
+// Katman 1 (genel şifre) token'ı: register/login uçlarını açar.
+// Katman 2 (kişisel hesap) token'ı: tüm veri + admin uçlarına gider (user_id taşır).
+const GENERAL_KEY = "newsradar_token";        // (eski adı korundu — geriye uyum)
+const USER_KEY = "newsradar_user_token";
+let generalToken = localStorage.getItem(GENERAL_KEY) || null;
+let userToken = localStorage.getItem(USER_KEY) || null;
 
-export function getToken() {
-  return authToken;
+export function getGeneralToken() {
+  return generalToken;
+}
+export function getUserToken() {
+  return userToken;
+}
+export function setGeneralToken(t) {
+  generalToken = t || null;
+  if (generalToken) localStorage.setItem(GENERAL_KEY, generalToken);
+  else localStorage.removeItem(GENERAL_KEY);
+}
+export function setUserToken(t) {
+  userToken = t || null;
+  if (userToken) localStorage.setItem(USER_KEY, userToken);
+  else localStorage.removeItem(USER_KEY);
 }
 
-export function setToken(token) {
-  authToken = token || null;
-  if (authToken) localStorage.setItem(TOKEN_KEY, authToken);
-  else localStorage.removeItem(TOKEN_KEY);
-}
-
-// 401 alındığında App'in giriş ekranına dönebilmesi için geri çağrı.
+// Kişisel oturum 401 olunca App'in kişisel giriş ekranına dönmesi için geri çağrı.
 let onUnauthorized = null;
 export function setUnauthorizedHandler(fn) {
   onUnauthorized = fn;
 }
 
+// Veri/admin istekleri KİŞİSEL token ile gider.
 function authHeaders(extra = {}) {
   const h = { "Content-Type": "application/json", ...extra };
-  if (authToken) h.Authorization = `Bearer ${authToken}`;
+  if (userToken) h.Authorization = `Bearer ${userToken}`;
   return h;
+}
+
+async function parseError(res, fallback) {
+  let detail = fallback || res.statusText;
+  try {
+    detail = (await res.json()).detail || detail;
+  } catch {
+    /* yoksay */
+  }
+  return detail;
 }
 
 async function req(path, options = {}) {
@@ -39,49 +61,69 @@ async function req(path, options = {}) {
     headers: authHeaders(options.headers),
   });
   if (res.status === 401) {
-    setToken(null);
+    setUserToken(null); // kişisel oturum düştü → kişisel girişe dön (genel katman durur)
     onUnauthorized?.();
     throw new Error("Oturum geçersiz. Lütfen tekrar giriş yapın.");
   }
-  if (!res.ok) {
-    let detail = res.statusText;
-    try {
-      detail = (await res.json()).detail || detail;
-    } catch {
-      /* yoksay */
-    }
-    throw new Error(detail);
-  }
+  if (!res.ok) throw new Error(await parseError(res));
   if (res.status === 204) return null;
   return res.json();
 }
 
-// Parola ile giriş: doğruysa token'ı saklar ve döner, yanlışsa hata fırlatır.
-export async function login(password) {
+// Katman 1: genel şifre → genel token sakla.
+export async function generalLogin(password) {
   const res = await fetch(`${API_BASE}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ password }),
   });
-  if (!res.ok) {
-    let detail = "Giriş başarısız.";
-    try {
-      detail = (await res.json()).detail || detail;
-    } catch {
-      /* yoksay */
-    }
-    throw new Error(detail);
-  }
+  if (!res.ok) throw new Error(await parseError(res, "Giriş başarısız."));
   const { token } = await res.json();
-  setToken(token);
+  setGeneralToken(token);
   return token;
 }
 
+// Katman 2: kayıt/giriş — GENEL token ile korunur; kişisel token + user döner.
+async function userAuth(path, body) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(generalToken ? { Authorization: `Bearer ${generalToken}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+  if (res.status === 401 && generalToken) {
+    // Genel token geçersiz → Katman 1'e dön.
+    setGeneralToken(null);
+  }
+  if (!res.ok) throw new Error(await parseError(res, "İşlem başarısız."));
+  const data = await res.json();
+  setUserToken(data.token);
+  return data.user;
+}
+
+export function register(username, password) {
+  return userAuth("/users/register", { username, password });
+}
+export function userLogin(username, password) {
+  return userAuth("/users/login", { username, password });
+}
+
 export function logout() {
-  setToken(null);
+  setUserToken(null); // kişisel çıkış (genel katman korunur — istenirse ayrıca temizlenebilir)
+}
+export function logoutAll() {
+  setUserToken(null);
+  setGeneralToken(null);
 }
 
 export const api = {
+  me: () => req("/users/me"),
+  // Admin (yalnızca is_admin kullanıcı; değilse backend 403 döner)
+  adminUsers: () => req("/admin/users"),
+  adminUserDetail: (id) => req(`/admin/users/${id}`),
+  adminStats: () => req("/admin/stats"),
   status: () => req("/status"),
   listEntities: () => req("/entities"),
   createEntity: (payload) =>
@@ -106,7 +148,7 @@ export async function streamChat({ entityId, messages, onDelta, onError, onDone 
     body: JSON.stringify({ entity_id: entityId, messages }),
   });
   if (res.status === 401) {
-    setToken(null);
+    setUserToken(null);
     onUnauthorized?.();
     onError?.("Oturum geçersiz. Lütfen tekrar giriş yapın.");
     return;

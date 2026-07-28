@@ -18,8 +18,10 @@ from sqlalchemy.orm import Session
 from ..analysis.claude_client import ClaudeClient, ClaudeError, MissingAPIKeyError
 from ..analysis.prompts import SYSTEM_PROMPT, utc_context_line
 from ..db.database import get_db
-from ..db.models import Article, Entity, EntityAnalysis
+from ..db.models import Article, Entity, EntityAnalysis, User
+from .routes_auth import get_current_user
 from .schemas import ChatRequest
+from .usage import record_event
 
 router = APIRouter(tags=["chat"])
 
@@ -69,10 +71,15 @@ def _build_context(db: Session, entity: Entity) -> str:
 
 
 @router.post("/chat")
-def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> StreamingResponse:
+def chat(
+    payload: ChatRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> StreamingResponse:
     entity = db.get(Entity, payload.entity_id)
     if entity is None:
         raise HTTPException(status_code=404, detail="Entity bulunamadı.")
+    record_event(db, user.id, "chat", {"entity_id": entity.id, "name": entity.name})
 
     # Mesajları doğrula/normalize et (role user/assistant, string content).
     messages: list[dict] = []

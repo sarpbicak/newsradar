@@ -1,14 +1,18 @@
 // NewsRadar kök bileşeni: durum yükleme, genel görünüm/detay yönlendirme,
 // global yenileme, sağlayıcı uyarıları, footer.
 import React, { useCallback, useEffect, useState } from "react";
-import { api, getToken, logout, setUnauthorizedHandler } from "./api.js";
+import { api, getUserToken, logout, setUnauthorizedHandler } from "./api.js";
 import Overview from "./components/Overview.jsx";
 import EntityDetail from "./components/EntityDetail.jsx";
 import Login from "./components/Login.jsx";
+import AdminPanel from "./components/AdminPanel.jsx";
 import { Skeleton } from "./components/ui.jsx";
 
 export default function App() {
-  const [authed, setAuthed] = useState(() => !!getToken());
+  const [user, setUser] = useState(null);            // kişisel kullanıcı (null = çıkış)
+  const [checkingSession, setCheckingSession] = useState(!!getUserToken());
+  const [view, setView] = useState("dashboard");     // "dashboard" | "admin"
+  const authed = !!user;
   const [cards, setCards] = useState([]);
   const [status, setStatus] = useState(null);
   const [suggestions, setSuggestions] = useState([]);
@@ -22,9 +26,23 @@ export default function App() {
   const running = !!status?.is_running;
   const isRefreshing = starting || running;
 
-  // Herhangi bir istek 401 dönerse (token süresi dolmuş/geçersiz) giriş ekranına dön.
+  // Herhangi bir istek 401 dönerse (kişisel token geçersiz) kişisel girişe dön.
   useEffect(() => {
-    setUnauthorizedHandler(() => setAuthed(false));
+    setUnauthorizedHandler(() => setUser(null));
+  }, []);
+
+  // Açılışta kişisel token varsa doğrula (kim olduğumuzu öğren). Geçersizse çıkış.
+  useEffect(() => {
+    if (!getUserToken()) return;
+    let alive = true;
+    api
+      .me()
+      .then((u) => alive && setUser(u))
+      .catch(() => {})
+      .finally(() => alive && setCheckingSession(false));
+    return () => {
+      alive = false;
+    };
   }, []);
 
   const loadCards = useCallback(async () => {
@@ -104,16 +122,27 @@ export default function App() {
   }, [authed, isRefreshing]);
 
   function handleLogout() {
-    logout();
-    setAuthed(false);
+    logout(); // kişisel çıkış (genel katman korunur — sadece kişisel girişe döner)
+    setUser(null);
+    setView("dashboard");
     setSelected(null);
     setCards([]);
     setStatus(null);
     setSuggestions([]);
   }
 
-  // Giriş yapılmadıysa panoyu hiç yükleme — önce şifre ekranı.
-  if (!authed) return <Login onSuccess={() => setAuthed(true)} />;
+  // Oturum doğrulanıyorsa (token var, me() bekleniyor) boş bekle — flaş önlemek için.
+  if (!authed && checkingSession) return <div className="min-h-screen" />;
+  // Giriş yapılmadıysa panoyu hiç yükleme — iki aşamalı giriş ekranı.
+  if (!authed)
+    return (
+      <Login
+        onAuthed={(u) => {
+          setUser(u);
+          setCheckingSession(false);
+        }}
+      />
+    );
 
   async function handleRefresh() {
     setNotice(null);
@@ -208,6 +237,29 @@ export default function App() {
                 <>↻ Yenile</>
               )}
             </button>
+            {/* Admin sekmesi — yalnızca admin kullanıcı görür */}
+            {user?.is_admin && (
+              <button
+                onClick={() => setView((v) => (v === "admin" ? "dashboard" : "admin"))}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                  view === "admin"
+                    ? "bg-accent/15 text-accent"
+                    : "text-slate-500 hover:text-slate-200"
+                }`}
+              >
+                {view === "admin" ? "← Pano" : "Admin"}
+              </button>
+            )}
+            {/* Giriş yapan kullanıcı */}
+            <span className="hidden items-center gap-1 text-sm text-slate-400 sm:inline-flex">
+              <span className="text-slate-500">👤</span>
+              <span className="font-medium text-slate-300">{user?.username}</span>
+              {user?.is_admin && (
+                <span className="rounded bg-accent/15 px-1.5 text-[10px] font-semibold text-accent">
+                  admin
+                </span>
+              )}
+            </span>
             <button
               onClick={handleLogout}
               className="rounded-md border border-ink-500 px-3 py-1.5 text-sm text-slate-400 hover:text-slate-200"
@@ -219,6 +271,10 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-6">
+        {view === "admin" && user?.is_admin ? (
+          <AdminPanel />
+        ) : (
+        <>
         {loadError && (
           <div className="mb-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
             API'ye bağlanılamadı: {loadError}. Backend çalışıyor mu? (uvicorn app.api.main:app)
@@ -312,6 +368,8 @@ export default function App() {
           />
         ) : (
           <EntityDetail entityId={selected} onBack={() => setSelected(null)} />
+        )}
+        </>
         )}
       </main>
 

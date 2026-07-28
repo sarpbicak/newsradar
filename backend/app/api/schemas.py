@@ -45,6 +45,73 @@ class ChatRequest(BaseModel):
     messages: list[dict]  # [{role: 'user'|'assistant', content: str}, ...]
 
 
+# --------------------------- Kullanıcı hesapları --------------------------- #
+class RegisterIn(BaseModel):
+    username: str
+    password: str
+
+
+class UserLoginIn(BaseModel):
+    username: str
+    password: str
+
+
+class UserOut(BaseModel):
+    """Mevcut kullanıcı bilgisi (/users/me + kayıt/giriş yanıtı)."""
+
+    id: int
+    username: str
+    is_admin: bool
+    created_at: datetime
+    last_login_at: datetime | None = None
+
+
+class UserTokenOut(BaseModel):
+    """Kayıt/giriş sonrası: kişisel token + kullanıcı."""
+
+    token: str
+    user: UserOut
+
+
+# ------------------------------- Admin paneli ------------------------------ #
+class AdminUserRow(BaseModel):
+    """Admin kullanıcı listesi satırı: özet sayaçlar + son aktiflik."""
+
+    id: int
+    username: str
+    is_admin: bool
+    created_at: datetime
+    last_login_at: datetime | None
+    login_count: int
+    refresh_count: int
+    total_events: int
+    last_active_at: datetime | None
+
+
+class AdminEventOut(BaseModel):
+    event_type: str
+    detail: dict | None
+    created_at: datetime
+
+
+class AdminUserDetail(BaseModel):
+    """Tek kullanıcının detaylı kullanımı."""
+
+    user: UserOut
+    event_counts: dict[str, int]           # {event_type: adet}
+    top_entities: list[dict]               # [{name, count}] — en çok view alan
+    recent_events: list[AdminEventOut]     # son eylemler (zaman çizelgesi)
+
+
+class AdminStatsOut(BaseModel):
+    """Genel istatistikler."""
+
+    total_users: int
+    active_today: int                      # bugün en az 1 eylem yapan kullanıcı
+    refreshes_today: int
+    top_entities: list[dict]               # [{name, count}] — en popüler (view)
+
+
 # --------------------------- Yanıt modelleri --------------------------- #
 class AnalysisOut(BaseModel):
     headline_verdict: str | None = None

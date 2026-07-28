@@ -18,10 +18,12 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
+    func,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -237,6 +239,54 @@ class AnalystSnapshot(Base):
     strong_sell: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     period: Mapped[str | None] = mapped_column(String(20), nullable=True)
     fetched_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
+# İzin verilen kullanım eylemi tipleri (usage_events.event_type).
+USAGE_EVENT_TYPES = (
+    "login", "refresh", "view_entity", "add_entity", "remove_entity",
+    "chat", "add_suggestion", "dismiss_suggestion",
+)
+
+
+class User(Base):
+    """Kişisel hesap (Katman 2). Veri ORTAK — kullanıcı yalnızca 'kim yaptı' ayrımı için.
+
+    Şifre bcrypt ile hash'lenir (düz metin ASLA saklanmaz). username büyük/küçük
+    harf duyarsız benzersizdir (functional unique index).
+    """
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    username: Mapped[str] = mapped_column(String(50), nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(200), nullable=False)  # bcrypt
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # Büyük/küçük harf duyarsız benzersizlik (SQLite functional unique index).
+    __table_args__ = (
+        Index("uq_users_username_ci", func.lower(username), unique=True),
+    )
+
+
+class UsageEvent(Base):
+    """Bir kullanıcının anlamlı bir eylemi (login/refresh/view/...). Kullanım takibi.
+
+    detail: eyleme özgü serbest JSON (ör. {'entity_id': 8, 'name': 'AMD'}).
+    """
+
+    __tablename__ = "usage_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    event_type: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    detail: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=utcnow, nullable=False, index=True
+    )
 
 
 class EntityAnalysis(Base):

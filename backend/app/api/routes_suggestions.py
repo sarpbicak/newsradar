@@ -13,9 +13,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..db.database import get_db
-from ..db.models import Entity, Suggestion
+from ..db.models import Entity, Suggestion, User
+from .routes_auth import get_current_user
 from .schemas import EntityCardOut, SuggestionOut
 from .serializers import entity_card
+from .usage import record_event
 
 router = APIRouter(prefix="/suggestions", tags=["suggestions"])
 
@@ -112,15 +114,24 @@ def list_suggestions(db: Session = Depends(get_db)) -> list[SuggestionOut]:
 
 
 @router.post("/{suggestion_id}/dismiss", status_code=204)
-def dismiss_suggestion(suggestion_id: int, db: Session = Depends(get_db)) -> None:
+def dismiss_suggestion(
+    suggestion_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> None:
     sug = db.get(Suggestion, suggestion_id)
     if sug is None:
         raise HTTPException(status_code=404, detail="Öneri bulunamadı.")
     sug.dismissed = True
+    record_event(db, user.id, "dismiss_suggestion", {"name": sug.name})
 
 
 @router.post("/{suggestion_id}/add", response_model=EntityCardOut, status_code=201)
-def add_suggestion(suggestion_id: int, db: Session = Depends(get_db)) -> EntityCardOut:
+def add_suggestion(
+    suggestion_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> EntityCardOut:
     """Öneriyi izleme listesine entity olarak ekler ve öneriyi dismiss eder.
 
     Tip seçimi: ticker VAR ve is_public=True ise ticker; aksi halde keyword.
@@ -158,4 +169,5 @@ def add_suggestion(suggestion_id: int, db: Session = Depends(get_db)) -> EntityC
         if existing is not None:
             return entity_card(db, existing)
         raise HTTPException(status_code=409, detail="Entity eklenemedi.")
+    record_event(db, user.id, "add_suggestion", {"entity_id": entity.id, "name": entity.name})
     return entity_card(db, entity)

@@ -7,10 +7,13 @@ from sqlalchemy.orm import Session
 
 from .. import scheduler
 from ..db.database import get_db
+from ..db.models import User
 from ..providers import provider_status
 from ..quota import newsapi_usage
 from ..refresh import get_state, start_background_refresh
+from .routes_auth import get_current_user
 from .schemas import NewsApiQuotaOut, ProviderStatusOut, RefreshAck
+from .usage import record_event
 
 router = APIRouter(tags=["refresh"])
 
@@ -21,16 +24,21 @@ def refresh(
     scheduler_enabled: bool | None = Query(
         None, description="Saatlik otomatik yenilemeyi aç/kapat"
     ),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ) -> RefreshAck:
     """Yenilemeyi ARKA PLANDA başlatır ve hemen döner (tarama 1-2 dk sürebilir).
 
     Frontend, ilerlemeyi /status'u yoklayarak takip eder. Zaten bir tarama
-    çalışıyorsa yenisi başlatılmaz.
+    çalışıyorsa yenisi başlatılmaz. Elle yenileme kullanıcıya kaydedilir
+    (scheduler'ın otomatik yenilemesi kullanıcıya bağlı değildir, kaydedilmez).
     """
     if scheduler_enabled is not None:
         scheduler.set_enabled(scheduler_enabled)
 
     started = start_background_refresh(hours)
+    if started:
+        record_event(db, user.id, "refresh", None)
     return RefreshAck(
         started=started,
         is_running=True,

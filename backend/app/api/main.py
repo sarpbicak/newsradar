@@ -16,6 +16,7 @@ from ..config import get_settings
 from ..db.database import init_db
 from ..db.models import PREFILTER_VERSION
 from . import (
+    routes_admin,
     routes_auth,
     routes_chat,
     routes_dashboard,
@@ -23,8 +24,9 @@ from . import (
     routes_refresh,
     routes_suggestions,
     routes_symbols,
+    routes_users,
 )
-from .routes_auth import require_auth
+from .routes_auth import get_current_user
 
 logging.basicConfig(level=logging.INFO)
 
@@ -68,18 +70,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Giriş ucu (/auth/login) korumasız — token buradan alınır.
+# Katman 1 — genel şifre ucu (/auth/login) korumasız; genel token buradan alınır.
 app.include_router(routes_auth.router)
 
-# Tüm veri uçları paylaşılan-şifre kapısının arkasında: geçerli token olmadan
-# /entities, /entities/{id}/dashboard, /refresh, /status ve /chat'e erişilemez.
-_protected = [Depends(require_auth)]
-app.include_router(routes_entities.router, dependencies=_protected)
-app.include_router(routes_dashboard.router, dependencies=_protected)
-app.include_router(routes_refresh.router, dependencies=_protected)
-app.include_router(routes_chat.router, dependencies=_protected)
-app.include_router(routes_suggestions.router, dependencies=_protected)
-app.include_router(routes_symbols.router, dependencies=_protected)
+# Katman 2 — kişisel hesaplar. register/login GENEL şifre kapısının arkasında
+# (kendi route bağımlılıklarında), /users/me kişisel token ister.
+app.include_router(routes_users.router)
+
+# Tüm veri uçları artık KİŞİSEL token ister (get_current_user). Kişisel token ancak
+# genel şifre geçilip kayıt/giriş yapılınca alınır → iki katman da zorunlu.
+_user = [Depends(get_current_user)]
+app.include_router(routes_entities.router, dependencies=_user)
+app.include_router(routes_dashboard.router, dependencies=_user)
+app.include_router(routes_refresh.router, dependencies=_user)
+app.include_router(routes_chat.router, dependencies=_user)
+app.include_router(routes_suggestions.router, dependencies=_user)
+app.include_router(routes_symbols.router, dependencies=_user)
+
+# Admin paneli — yalnızca is_admin (router içinde require_admin).
+app.include_router(routes_admin.router)
 
 
 @app.get("/health", tags=["health"])
