@@ -7,11 +7,13 @@ import EntityDetail from "./components/EntityDetail.jsx";
 import Login from "./components/Login.jsx";
 import AdminPanel from "./components/AdminPanel.jsx";
 import { Skeleton } from "./components/ui.jsx";
+import { RefreshCw, Menu, X, LogOut, ShieldCheck, LayoutDashboard, Radar } from "lucide-react";
 
 export default function App() {
   const [user, setUser] = useState(null);            // kişisel kullanıcı (null = çıkış)
   const [checkingSession, setCheckingSession] = useState(!!getUserToken());
   const [view, setView] = useState("dashboard");     // "dashboard" | "admin"
+  const [menuOpen, setMenuOpen] = useState(false);   // mobil header menüsü
   const authed = !!user;
   const [cards, setCards] = useState([]);
   const [status, setStatus] = useState(null);
@@ -195,82 +197,134 @@ export default function App() {
 
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-10 border-b border-ink-600 bg-ink-900/80 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
-          <div className="flex items-baseline gap-2">
-            <span className="font-display text-lg font-bold tracking-tight text-slate-100">
-              📡 NewsRadar
+      {/* Soluk, yavaş hareket eden arka plan aurora (CSS; okunabilirliği bozmaz) */}
+      <div className="aurora-bg" aria-hidden="true" />
+      <header className="sticky top-0 z-10 border-b border-ink-600 bg-ink-900/70 backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 py-3 sm:px-6">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 font-display text-lg font-bold tracking-tight text-slate-100">
+              <Radar className="h-5 w-5 text-accent" />
+              NewsRadar
             </span>
             <span className="hidden font-mono text-[11px] uppercase tracking-wide text-slate-500 sm:inline">
               haber akışı · risk paneli
             </span>
           </div>
           <div className="flex items-center gap-2">
-            {/* NewsAPI kota göstergesi */}
-            {status?.newsapi_quota && (
-              <span
-                className={`hidden font-mono text-[11px] sm:inline ${
-                  status.newsapi_quota.exhausted
-                    ? "text-rose-400"
-                    : status.newsapi_quota.warn
-                    ? "text-amber-400"
-                    : "text-slate-500"
-                }`}
-                title="NewsAPI günlük kota (rolling 24s)"
-              >
-                NewsAPI: {status.newsapi_quota.used}/{status.newsapi_quota.limit}
-              </span>
-            )}
+            {/* Yenile — her zaman görünür (mobilde ikon, masaüstünde metin) */}
             <button
               onClick={handleRefresh}
               disabled={isRefreshing}
-              className="flex items-center gap-2 rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-white disabled:opacity-70"
+              className="inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:brightness-105 disabled:opacity-70 sm:px-4"
             >
-              {isRefreshing ? (
-                <>
-                  <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                  {running
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline">
+                {isRefreshing
+                  ? running
                     ? `Yenileniyor… (${status.progress_done}/${status.progress_total})`
-                    : "Başlatılıyor…"}
-                </>
-              ) : (
-                <>↻ Yenile</>
-              )}
+                    : "Başlatılıyor…"
+                  : "Yenile"}
+              </span>
             </button>
-            {/* Admin sekmesi — yalnızca admin kullanıcı görür */}
-            {user?.is_admin && (
-              <button
-                onClick={() => setView((v) => (v === "admin" ? "dashboard" : "admin"))}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
-                  view === "admin"
-                    ? "bg-accent/15 text-accent"
-                    : "text-slate-500 hover:text-slate-200"
-                }`}
-              >
-                {view === "admin" ? "← Pano" : "Admin"}
-              </button>
-            )}
-            {/* Giriş yapan kullanıcı */}
-            <span className="hidden items-center gap-1 text-sm text-slate-400 sm:inline-flex">
-              <span className="text-slate-500">👤</span>
-              <span className="font-medium text-slate-300">{user?.username}</span>
-              {user?.is_admin && (
-                <span className="rounded bg-accent/15 px-1.5 text-[10px] font-semibold text-accent">
-                  admin
+
+            {/* MASAÜSTÜ: kota + admin + kullanıcı + çıkış inline */}
+            <div className="hidden items-center gap-2 sm:flex">
+              {status?.newsapi_quota && (
+                <span
+                  className={`font-mono text-[11px] ${
+                    status.newsapi_quota.exhausted
+                      ? "text-rose-400"
+                      : status.newsapi_quota.warn
+                      ? "text-amber-400"
+                      : "text-slate-500"
+                  }`}
+                  title="NewsAPI günlük kota (rolling 24s)"
+                >
+                  NewsAPI: {status.newsapi_quota.used}/{status.newsapi_quota.limit}
                 </span>
               )}
-            </span>
-            <button
-              onClick={handleLogout}
-              className="rounded-md border border-ink-500 px-3 py-1.5 text-sm text-slate-400 hover:text-slate-200"
-            >
-              Çıkış
-            </button>
+              {user?.is_admin && (
+                <button
+                  onClick={() => setView((v) => (v === "admin" ? "dashboard" : "admin"))}
+                  className={`inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                    view === "admin"
+                      ? "bg-accent/15 text-accent"
+                      : "text-slate-500 hover:bg-ink-700 hover:text-slate-200"
+                  }`}
+                >
+                  {view === "admin" ? <LayoutDashboard className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
+                  {view === "admin" ? "Pano" : "Admin"}
+                </button>
+              )}
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-ink-700 px-2.5 py-1.5 text-sm text-slate-300">
+                <span className="font-medium">{user?.username}</span>
+                {user?.is_admin && (
+                  <span className="rounded bg-accent/15 px-1.5 text-[10px] font-semibold text-accent">admin</span>
+                )}
+              </span>
+              <button
+                onClick={handleLogout}
+                title="Çıkış"
+                className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border border-ink-500 text-slate-400 transition hover:bg-ink-700 hover:text-slate-200"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* MOBİL: hamburger menü */}
+            <div className="relative sm:hidden">
+              <button
+                onClick={() => setMenuOpen((o) => !o)}
+                aria-label="menü"
+                className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border border-ink-500 text-slate-500 transition hover:bg-ink-700 hover:text-slate-200"
+              >
+                {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </button>
+              {menuOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                  <div className="absolute right-0 top-full z-20 mt-2 w-60 rounded-xl border border-ink-500 bg-ink-800 p-2 shadow-card-hover">
+                    <div className="flex items-center justify-between gap-2 border-b border-ink-600 px-3 py-2">
+                      <span className="font-medium text-slate-200">{user?.username}</span>
+                      {user?.is_admin && (
+                        <span className="rounded bg-accent/15 px-1.5 text-[10px] font-semibold text-accent">admin</span>
+                      )}
+                    </div>
+                    {status?.newsapi_quota && (
+                      <div className="px-3 py-2 font-mono text-[11px] text-slate-500">
+                        NewsAPI: {status.newsapi_quota.used}/{status.newsapi_quota.limit}
+                      </div>
+                    )}
+                    {user?.is_admin && (
+                      <button
+                        onClick={() => {
+                          setView((v) => (v === "admin" ? "dashboard" : "admin"));
+                          setMenuOpen(false);
+                        }}
+                        className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-slate-300 hover:bg-ink-700"
+                      >
+                        {view === "admin" ? <LayoutDashboard className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
+                        {view === "admin" ? "Panoya dön" : "Admin paneli"}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        handleLogout();
+                        setMenuOpen(false);
+                      }}
+                      className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-slate-300 hover:bg-ink-700"
+                    >
+                      <LogOut className="h-4 w-4" /> Çıkış
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-6">
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
         {view === "admin" && user?.is_admin ? (
           <AdminPanel />
         ) : (

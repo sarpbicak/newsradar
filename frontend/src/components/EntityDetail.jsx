@@ -2,6 +2,7 @@
 // invalidation, makale tablosu ve sohbet paneli.
 import React, { useEffect, useState } from "react";
 import { api } from "../api.js";
+import { ChevronLeft } from "lucide-react";
 import { StanceBadge, RiskScore, RiskDelta, TrendArrow, PriceDisplay, stanceLabel, SignalBand, InfoTip, TERM_HELP } from "./ui.jsx";
 import ArticleTable from "./ArticleTable.jsx";
 import ChatPanel from "./ChatPanel.jsx";
@@ -37,12 +38,15 @@ export default function EntityDetail({ entityId, onBack }) {
 
   return (
     <div className="space-y-6">
-      <button onClick={onBack} className="text-sm text-slate-400 hover:text-slate-200">
-        ← genel görünüm
+      <button
+        onClick={onBack}
+        className="inline-flex min-h-[40px] items-center gap-1 rounded-lg pr-3 text-sm text-slate-500 transition hover:text-slate-200"
+      >
+        <ChevronLeft className="h-4 w-4" /> genel görünüm
       </button>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <h2 className="text-2xl font-semibold text-slate-100">{entity.name}</h2>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <h2 className="font-display text-2xl font-bold text-slate-100">{entity.name}</h2>
         <span className="font-mono text-sm text-slate-500">
           {entity.type === "ticker" ? "$" : "#"}
           {entity.query}

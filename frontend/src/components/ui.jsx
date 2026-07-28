@@ -148,10 +148,12 @@ export function overallSignal(stance, evidence) {
 
 export function SignalBand({ stance, evidence, showLabel = true }) {
   const sig = overallSignal(stance, evidence);
+  // -2..2 → %0..100 konum (olumsuz sol, olumlu sağ).
+  const pos = ((sig.key + 2) / 4) * 100;
   return (
     <div>
       {showLabel && (
-        <div className="mb-1 flex items-center justify-between">
+        <div className="mb-1.5 flex items-center justify-between">
           <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
             Genel sinyal
             <InfoTip text={TERM_HELP.signal} />
@@ -161,15 +163,17 @@ export function SignalBand({ stance, evidence, showLabel = true }) {
           </span>
         </div>
       )}
-      <div className="flex gap-1" aria-label={`Genel sinyal: ${sig.label}`}>
-        {SIGNAL_LEVELS.map((l) => (
-          <div
-            key={l.key}
-            className="h-2 flex-1 rounded-full transition"
-            style={{ background: l.key === sig.key ? l.color : "#E4E8EF" }}
-            title={l.label}
-          />
-        ))}
+      {/* Yumuşak spektrum (olumsuz→nötr→olumlu) + konum işaretçisi */}
+      <div
+        className="relative h-2 rounded-full"
+        style={{ background: "linear-gradient(90deg,#FCA5A5 0%,#FCD9B6 25%,#E6EAF1 50%,#C7ECC9 75%,#86EFAC 100%)" }}
+        aria-label={`Genel sinyal: ${sig.label}`}
+      >
+        <span
+          className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white transition-all duration-300"
+          style={{ left: `${pos}%`, background: sig.color, boxShadow: "0 1px 4px rgba(16,24,40,0.25)" }}
+          title={sig.label}
+        />
       </div>
     </div>
   );

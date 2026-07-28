@@ -43,6 +43,36 @@ body {
   font-family: "Space Grotesk", Inter, system-ui, sans-serif;
 }
 
+/* --- Arka plan aurora: çok soluk, yavaş hareket eden pastel degrade "blob"lar ---
+   Açık temada göze batmaz; içeriğin arkasında (z:-1), okunabilirliği bozmaz.
+   CSS-tabanlı (canvas yok → pil dostu). Mobilde hafifler; reduced-motion'da durur. */
+.aurora-bg {
+  position: fixed;
+  inset: -25%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 38% at 18% 28%, rgba(37, 99, 235, 0.10), transparent 70%),
+    radial-gradient(32% 32% at 82% 18%, rgba(139, 92, 246, 0.08), transparent 70%),
+    radial-gradient(42% 42% at 72% 82%, rgba(14, 165, 233, 0.07), transparent 70%);
+  filter: blur(44px);
+  will-change: transform;
+  animation: aurora-drift 34s ease-in-out infinite alternate;
+}
+@keyframes aurora-drift {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(2.5%, -2%, 0) scale(1.06); }
+  100% { transform: translate3d(-2%, 2%, 0) scale(1.03); }
+}
+/* Mobil: daha yavaş + daha soluk (performans/pil). */
+@media (max-width: 640px) {
+  .aurora-bg {
+    animation-duration: 50s;
+    filter: blur(32px);
+    opacity: 0.6;
+  }
+}
+
 /* İnce açık kaydırma çubuğu */
 ::-webkit-scrollbar {
   width: 10px;
