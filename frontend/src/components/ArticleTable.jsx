@@ -8,8 +8,8 @@ const RISK_FLAGS = ["regulatory","competition","financial","legal","product","su
 const EVENT_TYPES = ["earnings","product","regulation","lawsuit","partnership","funding","macro","leadership","other"];
 
 function sentimentColor(v) {
-  if (v == null) return "#8B8F9E";
-  return v > 0.15 ? "#3FD68C" : v < -0.15 ? "#FF6B6B" : "#8B8F9E";
+  if (v == null) return "#7A7770";
+  return v > 0.15 ? "#0F8A4C" : v < -0.15 ? "#C62828" : "#7A7770";
 }
 function sentimentLabel(v) {
   if (v == null) return "—";

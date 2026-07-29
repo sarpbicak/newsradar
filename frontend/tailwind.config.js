@@ -10,39 +10,43 @@ export default {
       colors: {
         // Yüzeyler: 900 = sayfa zemini (yumuşak koyu), 800 = kart (bir tık açık),
         // 700 = yükseltilmiş/hover/divide, 600/500 = ince/güçlü açık kenarlık.
+        // SICAK KAĞIT: 900 = kağıt zemini (krem), 800 = kart (beyaz), 700 = hover,
+        // 600/500 = sıcak açık kenarlıklar.
         ink: {
-          900: "#1A1D26", // sayfa zemini (yumuşak gri-lacivert — kömür karası değil)
-          800: "#272C3A", // kart yüzeyi (tabandan belirgin ayrışır)
-          700: "#313747", // yükseltilmiş/hover/divide
-          600: "#3A4152", // ince kenarlık (~rgba(255,255,255,0.10))
-          500: "#4A5164", // güçlü kenarlık/input
+          900: "#F7F5F1", // sayfa zemini (sıcak kağıt tonu)
+          800: "#FFFFFF", // kart yüzeyi (saf beyaz)
+          700: "#F1EEE8", // yükseltilmiş/hover/divide (sıcak açık)
+          600: "#E7E3DA", // ince kenarlık (~rgba(0,0,0,0.08) sıcak)
+          500: "#D8D3C7", // güçlü kenarlık/input
         },
-        accent: "#7C5CFF", // MOR vurgu (marka; yalnızca aksan)
-        // Metin (koyu zeminde): küçük numara = açık/önemli, büyük = soluk.
+        accent: "#6D4AFF", // MOR vurgu (kağıt zemininde çalışan ton)
+        // Metin (kağıt zeminde): küçük numara = koyu/önemli, büyük = soluk.
         slate: {
-          100: "#E8E9ED", // birincil metin (kırık beyaz)
-          200: "#D3D5DD",
-          300: "#B4B8C4", // ikincil
-          400: "#8B8F9E", // muted gövde metni
-          500: "#6B6F7E", // etiket/zaman damgası
-          600: "#565A68", // en soluk
-          700: "#474B58",
+          100: "#1A1A18", // birincil metin (sıcak siyah — tam siyah değil)
+          200: "#2A2A26",
+          300: "#45423C", // ikincil koyu
+          400: "#6B6862", // muted gövde metni (sıcak gri)
+          500: "#8A867E", // etiket/zaman damgası
+          600: "#A8A49B", // daha soluk
+          700: "#C4C0B6", // en soluk
         },
-        // Yön/durum tonları — koyu zeminde okunaklı, PARLAK tonlar. (Mor DEĞİL.)
-        emerald: { 200: "#3FD68C", 300: "#3FD68C", 400: "#3FD68C", 500: "#34C77E", 600: "#2FB873" },
-        rose: { 200: "#FF6B6B", 300: "#FF6B6B", 400: "#FF6B6B", 500: "#F55A5A", 600: "#E84C4C" },
-        amber: { 200: "#FBBF24", 300: "#FBBF24", 400: "#F59E0B", 500: "#F59E0B", 600: "#FBBF24" },
-        sky: { 400: "#60A5FA", 500: "#3B82F6" },
+        // Yön/durum tonları — kağıt zeminde okunaklı, DOYGUN. (Mor DEĞİL.)
+        emerald: { 200: "#0F8A4C", 300: "#0F8A4C", 400: "#0F8A4C", 500: "#0B7A42", 600: "#0B7A42" },
+        rose: { 200: "#C62828", 300: "#C62828", 400: "#C62828", 500: "#A81E1E", 600: "#A81E1E" },
+        amber: { 200: "#B45309", 300: "#B45309", 400: "#C77700", 500: "#B45309", 600: "#B45309" },
+        sky: { 400: "#2563EB", 500: "#1D4ED8" },
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"],
         display: ["Space Grotesk", "Inter", "system-ui", "sans-serif"],
+        // Editöryel hüküm cümlesi — gazete manşeti hissi.
+        serif: ["Source Serif 4", "Georgia", "Cambria", "Times New Roman", "serif"],
         mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
       },
       boxShadow: {
-        // Koyu tema: derinlik ince ton farkı + yumuşak siyah gölge; hover'da mor glow.
-        card: "0 1px 2px rgba(0,0,0,0.35), 0 4px 16px rgba(0,0,0,0.28)",
-        "card-hover": "0 4px 12px rgba(0,0,0,0.35), 0 12px 32px rgba(124,92,255,0.22)",
+        // Kağıt tema: çok yumuşak, dağınık, hafif gölge (üstte duran kart hissi).
+        card: "0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.04)",
+        "card-hover": "0 2px 6px rgba(0,0,0,0.06), 0 14px 32px rgba(109,74,255,0.10)",
       },
       keyframes: {
         "card-in": {

@@ -57,7 +57,7 @@ export function stanceLabel(stance) {
 }
 
 // Yön/vade/kanıt için renk + etiket yardımcıları. Koyu zeminde parlak sinyal tonları.
-const STANCE_COLOR = { bullish: "#3FD68C", neutral: "#8B8F9E", bearish: "#FF6B6B" };
+const STANCE_COLOR = { bullish: "#0F8A4C", neutral: "#7A7770", bearish: "#C62828" };
 export function stanceColor(stance) {
   return STANCE_COLOR[stance] || STANCE_COLOR.neutral;
 }
@@ -68,7 +68,7 @@ export function evidenceLabel(e) {
   return { strong: "Güçlü", medium: "Orta", weak: "Zayıf" }[e] || "—";
 }
 export function evidenceColor(e) {
-  return { strong: "#3FD68C", medium: "#FBBF24", weak: "#FF6B6B" }[e] || "#8B8F9E";
+  return { strong: "#0F8A4C", medium: "#B45309", weak: "#C62828" }[e] || "#7A7770";
 }
 
 // --- Düz Türkçe terim açıklamaları (tooltip metinleri; jargon yok) ---
@@ -132,11 +132,11 @@ export function InfoTip({ text, className = "" }) {
 // --- Genel sinyal: yön + kanıt gücünü 5 kademeli tek ölçeğe indirger ---
 // Sol (güçlü olumsuz, kırmızı) → sağ (güçlü olumlu, yeşil). Fiyat tahmini DEĞİL.
 const SIGNAL_LEVELS = [
-  { key: -2, label: "Güçlü olumsuz", color: "#E84C4C" },
-  { key: -1, label: "Olumsuz", color: "#FF6B6B" },
-  { key: 0, label: "Nötr", color: "#8B8F9E" },
-  { key: 1, label: "Olumlu", color: "#3FD68C" },
-  { key: 2, label: "Güçlü olumlu", color: "#2FB873" },
+  { key: -2, label: "Güçlü olumsuz", color: "#A81E1E" },
+  { key: -1, label: "Olumsuz", color: "#C62828" },
+  { key: 0, label: "Nötr", color: "#7A7770" },
+  { key: 1, label: "Olumlu", color: "#0F8A4C" },
+  { key: 2, label: "Güçlü olumlu", color: "#0B7A42" },
 ];
 
 export function overallSignal(stance, evidence) {
@@ -148,11 +148,11 @@ export function overallSignal(stance, evidence) {
 
 // Durum "pill" stili: güçlü uçlar dolu+beyaz metin; ortalar soluk dolgu+renkli metin.
 const PILL_STYLE = {
-  "2": { bg: "#2FB873", color: "#FFFFFF" },            // GÜÇLÜ OLUMLU
-  "1": { bg: "rgba(63,214,140,0.18)", color: "#3FD68C" }, // OLUMLU
-  "0": { bg: "rgba(139,143,158,0.20)", color: "#B4B8C4" }, // NÖTR
-  "-1": { bg: "rgba(255,107,107,0.16)", color: "#FF6B6B" }, // OLUMSUZ
-  "-2": { bg: "#E84C4C", color: "#FFFFFF" },           // GÜÇLÜ OLUMSUZ
+  "2": { bg: "#0B7A42", color: "#FFFFFF" },              // GÜÇLÜ OLUMLU (dolu)
+  "1": { bg: "rgba(15,138,76,0.12)", color: "#0F8A4C" }, // OLUMLU (soluk dolgu)
+  "0": { bg: "rgba(122,119,112,0.14)", color: "#6B6862" }, // NÖTR
+  "-1": { bg: "rgba(198,40,40,0.10)", color: "#C62828" }, // OLUMSUZ (soluk dolgu)
+  "-2": { bg: "#A81E1E", color: "#FFFFFF" },             // GÜÇLÜ OLUMSUZ (dolu)
 };
 
 // Büyük, dolgulu, uzaktan okunan DURUM etiketi (kartın en dikkat çekici öğesi).
@@ -194,13 +194,13 @@ export function SignalBand({ stance, evidence, showLabel = true, minimal = false
         className="relative h-2 rounded-full"
         style={{
           background:
-            "linear-gradient(90deg, rgba(255,107,107,0.70) 0%, rgba(255,107,107,0.30) 28%, rgba(124,92,255,0.32) 50%, rgba(63,214,140,0.30) 72%, rgba(63,214,140,0.70) 100%)",
+            "linear-gradient(90deg, rgba(198,40,40,0.55) 0%, rgba(198,40,40,0.22) 28%, rgba(109,74,255,0.24) 50%, rgba(15,138,76,0.22) 72%, rgba(15,138,76,0.55) 100%)",
         }}
         aria-label={`Genel sinyal: ${sig.label}`}
       >
         <span
           className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-ink-800 transition-all duration-300"
-          style={{ left: `${pos}%`, background: sig.color, boxShadow: `0 0 8px ${sig.color}66` }}
+          style={{ left: `${pos}%`, background: sig.color, boxShadow: `0 0 0 1px rgba(0,0,0,0.06)` }}
           title={sig.label}
         />
       </div>
@@ -261,10 +261,10 @@ export function StanceBadge({ stance, conviction }) {
 
 // --- Risk skoru rengi (0 yeşil → 100 kırmızı) ---
 export function riskColor(score) {
-  if (score == null) return "#8B8F9E";
-  if (score < 34) return "#3FD68C";
-  if (score < 67) return "#FBBF24";
-  return "#FF6B6B";
+  if (score == null) return "#7A7770";
+  if (score < 34) return "#0F8A4C";
+  if (score < 67) return "#B45309";
+  return "#C62828";
 }
 
 export function RiskScore({ score }) {
@@ -273,7 +273,7 @@ export function RiskScore({ score }) {
     <div className="flex items-center gap-2">
       <div className="relative h-9 w-9 shrink-0">
         <svg viewBox="0 0 36 36" className="h-9 w-9 -rotate-90">
-          <circle cx="18" cy="18" r="15" fill="none" stroke="#3A4152" strokeWidth="4" />
+          <circle cx="18" cy="18" r="15" fill="none" stroke="#E7E3DA" strokeWidth="4" />
           <circle
             cx="18" cy="18" r="15" fill="none" stroke={color} strokeWidth="4"
             strokeDasharray={`${(2 * Math.PI * 15 * (score ?? 0)) / 100} ${2 * Math.PI * 15}`}
@@ -296,7 +296,7 @@ export function RiskScore({ score }) {
 export function SentimentGauge({ value }) {
   const v = value ?? 0;
   const pct = ((v + 1) / 2) * 100; // -1..1 -> 0..100
-  const color = v > 0.15 ? "#3FD68C" : v < -0.15 ? "#FF6B6B" : "#8B8F9E";
+  const color = v > 0.15 ? "#0F8A4C" : v < -0.15 ? "#C62828" : "#7A7770";
   return (
     <div className="w-full">
       <div className="flex justify-between text-[10px] text-slate-500 mb-1">

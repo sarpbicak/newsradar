@@ -8,6 +8,39 @@ import React from "react";
 import { ArrowRight } from "lucide-react";
 import { SignalPill, overallSignal, AnimatedNumber, horizonLabel } from "./ui.jsx";
 
+// Kompakt analist barı — al/tut/sat segmentleri + baskın görüş + analist sayısı.
+const ANALYST_SEG = [
+  { key: "strong_buy", color: "#0B7A42" },
+  { key: "buy", color: "#0F8A4C" },
+  { key: "hold", color: "#A8A49B" },
+  { key: "sell", color: "#C62828" },
+  { key: "strong_sell", color: "#A81E1E" },
+];
+function analystLean(a) {
+  const buyish = a.strong_buy + a.buy;
+  const sellish = a.sell + a.strong_sell;
+  if (buyish > a.hold && buyish >= sellish) return { text: "Al ağırlıklı", color: "#0F8A4C" };
+  if (sellish > a.hold && sellish > buyish) return { text: "Sat ağırlıklı", color: "#C62828" };
+  return { text: "Tut ağırlıklı", color: "#7A7770" };
+}
+function AnalystMiniBar({ a }) {
+  const total = a.total || 1;
+  const lean = analystLean(a);
+  return (
+    <div className="flex items-center gap-2 text-[11px]">
+      <span className="whitespace-nowrap font-medium" style={{ color: lean.color }}>{lean.text}</span>
+      <div className="flex h-1.5 flex-1 overflow-hidden rounded-full bg-ink-700">
+        {ANALYST_SEG.map((s) => {
+          const n = a[s.key] || 0;
+          if (!n) return null;
+          return <div key={s.key} style={{ width: `${(n / total) * 100}%`, background: s.color }} />;
+        })}
+      </div>
+      <span className="whitespace-nowrap text-slate-500">{a.total} analist</span>
+    </div>
+  );
+}
+
 function PriceBox({ card }) {
   const isTicker = card.type === "ticker";
   const price = card.price;
@@ -108,14 +141,16 @@ export default function EntityCard({ card, onOpen }) {
 
       {a ? (
         <>
-          {/* Satır 2 — Hüküm cümlesi (TAM, kesme yok) */}
-          <p className="font-display text-[17px] font-semibold leading-snug text-slate-100">
+          {/* Satır 2 — Hüküm cümlesi (SERİF, editöryel; TAM, kesme yok) */}
+          <p className="font-serif text-[19px] font-semibold leading-snug text-slate-100">
             {a.headline_verdict || a.summary}
           </p>
 
-          {/* Satır 3 + 4 alta yapışır (tüm kartlar hizalı) */}
-          <div className="mt-auto space-y-3">
+          {/* Satır 3 + analist + meta alta yapışır (tüm kartlar hizalı) */}
+          <div className="mt-auto space-y-2.5">
             <PriceBox card={card} />
+            {/* Analist barı — yalnızca ticker + tavsiye verisi olan */}
+            {card.type === "ticker" && card.analyst?.total > 0 && <AnalystMiniBar a={card.analyst} />}
             <div className="text-xs text-slate-500">
               {horizonLabel(card.horizon)} vade
               <span className="text-slate-600"> · </span>

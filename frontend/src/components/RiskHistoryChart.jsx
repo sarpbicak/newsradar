@@ -13,7 +13,7 @@ import {
 } from "recharts";
 import { stanceLabel } from "./ui.jsx";
 
-const STANCE_COLOR = { bullish: "#3FD68C", neutral: "#8B8F9E", bearish: "#FF6B6B" };
+const STANCE_COLOR = { bullish: "#0F8A4C", neutral: "#7A7770", bearish: "#C62828" };
 
 function fmtDate(iso) {
   const d = new Date(iso);
@@ -53,8 +53,8 @@ export default function RiskHistoryChart({ history }) {
         cx={cx}
         cy={cy}
         r={changed ? 5 : 3}
-        fill={STANCE_COLOR[cur.stance] || "#8B8F9E"}
-        stroke={changed ? "#E8E9ED" : "none"}
+        fill={STANCE_COLOR[cur.stance] || "#7A7770"}
+        stroke={changed ? "#1A1A18" : "none"}
         strokeWidth={changed ? 1.5 : 0}
       />
     );
@@ -67,10 +67,10 @@ export default function RiskHistoryChart({ history }) {
       </div>
       <ResponsiveContainer width="100%" height={160}>
         <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -24 }}>
-          <CartesianGrid stroke="#313747" vertical={false} />
+          <CartesianGrid stroke="#E7E3DA" vertical={false} />
           <XAxis
             dataKey="date"
-            tick={{ fill: "#6B6F7E", fontSize: 9 }}
+            tick={{ fill: "#8A867E", fontSize: 9 }}
             axisLine={false}
             tickLine={false}
             minTickGap={24}
@@ -78,25 +78,25 @@ export default function RiskHistoryChart({ history }) {
           <YAxis
             domain={[0, 100]}
             ticks={[0, 50, 100]}
-            tick={{ fill: "#6B6F7E", fontSize: 10 }}
+            tick={{ fill: "#8A867E", fontSize: 10 }}
             axisLine={false}
             tickLine={false}
           />
-          <ReferenceLine y={50} stroke="#3A4152" />
+          <ReferenceLine y={50} stroke="#E7E3DA" />
           <Tooltip
             contentStyle={{
-              background: "#272C3A",
+              background: "#FFFFFF",
               border: "1px solid #E4E8EF",
               borderRadius: 8,
               fontSize: 12,
             }}
-            labelStyle={{ color: "#B4B8C4" }}
+            labelStyle={{ color: "#6B6862" }}
             formatter={(v, _n, p) => [`${v} · ${stanceLabel(p.payload.stance)}`, "risk"]}
           />
           <Line
             type="monotone"
             dataKey="risk"
-            stroke="#8B7CFF"
+            stroke="#6D4AFF"
             strokeWidth={2}
             dot={renderDot}
             isAnimationActive={false}

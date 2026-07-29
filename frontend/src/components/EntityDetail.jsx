@@ -86,7 +86,7 @@ export default function EntityDetail({ entityId, onBack }) {
         </div>
 
         {a?.headline_verdict && (
-          <p className="mt-3 font-display text-xl font-semibold leading-snug text-slate-100">
+          <p className="mt-3 font-serif text-2xl font-semibold leading-snug text-slate-100">
             {a.headline_verdict}
           </p>
         )}

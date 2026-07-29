@@ -12,7 +12,7 @@ import {
 } from "recharts";
 
 function color(v) {
-  return v > 0.15 ? "#3FD68C" : v < -0.15 ? "#FF6B6B" : "#8B8F9E";
+  return v > 0.15 ? "#0F8A4C" : v < -0.15 ? "#C62828" : "#7A7770";
 }
 
 export default function SentimentChart({ articles }) {
@@ -37,19 +37,19 @@ export default function SentimentChart({ articles }) {
       </div>
       <ResponsiveContainer width="100%" height={140}>
         <BarChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -24 }}>
-          <XAxis dataKey="i" tick={{ fill: "#6B6F7E", fontSize: 10 }} axisLine={false} tickLine={false} />
+          <XAxis dataKey="i" tick={{ fill: "#8A867E", fontSize: 10 }} axisLine={false} tickLine={false} />
           <YAxis
             domain={[-1, 1]}
             ticks={[-1, 0, 1]}
-            tick={{ fill: "#6B6F7E", fontSize: 10 }}
+            tick={{ fill: "#8A867E", fontSize: 10 }}
             axisLine={false}
             tickLine={false}
           />
-          <ReferenceLine y={0} stroke="#3A4152" />
+          <ReferenceLine y={0} stroke="#E7E3DA" />
           <Tooltip
             cursor={{ fill: "rgba(37,99,235,0.06)" }}
-            contentStyle={{ background: "#272C3A", border: "1px solid #E4E8EF", borderRadius: 8, fontSize: 12 }}
-            labelStyle={{ color: "#B4B8C4" }}
+            contentStyle={{ background: "#FFFFFF", border: "1px solid #E4E8EF", borderRadius: 8, fontSize: 12 }}
+            labelStyle={{ color: "#6B6862" }}
             formatter={(v) => [v.toFixed(2), "duygu"]}
             labelFormatter={(_, p) => p?.[0]?.payload?.title?.slice(0, 60) || ""}
           />

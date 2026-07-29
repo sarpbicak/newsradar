@@ -22,19 +22,19 @@ function noDataNote(type, hasPrice) {
 }
 
 const SEGMENTS = [
-  { key: "strong_buy", label: "Güçlü Al", color: "#2FB873" },
-  { key: "buy", label: "Al", color: "#3FD68C" },
-  { key: "hold", label: "Tut", color: "#8B8F9E" },
-  { key: "sell", label: "Sat", color: "#FF6B6B" },
-  { key: "strong_sell", label: "Güçlü Sat", color: "#E84C4C" },
+  { key: "strong_buy", label: "Güçlü Al", color: "#0B7A42" },
+  { key: "buy", label: "Al", color: "#0F8A4C" },
+  { key: "hold", label: "Tut", color: "#7A7770" },
+  { key: "sell", label: "Sat", color: "#C62828" },
+  { key: "strong_sell", label: "Güçlü Sat", color: "#A81E1E" },
 ];
 
 function consensusLabel(a) {
   const buyish = a.strong_buy + a.buy;
   const sellish = a.sell + a.strong_sell;
-  if (buyish > a.hold && buyish >= sellish) return { text: "Al ağırlıklı", color: "#3FD68C" };
-  if (sellish > a.hold && sellish > buyish) return { text: "Sat ağırlıklı", color: "#FF6B6B" };
-  return { text: "Tut ağırlıklı", color: "#8B8F9E" };
+  if (buyish > a.hold && buyish >= sellish) return { text: "Al ağırlıklı", color: "#0F8A4C" };
+  if (sellish > a.hold && sellish > buyish) return { text: "Sat ağırlıklı", color: "#C62828" };
+  return { text: "Tut ağırlıklı", color: "#7A7770" };
 }
 
 function Bar({ analyst }) {
