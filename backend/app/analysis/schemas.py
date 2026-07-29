@@ -152,6 +152,26 @@ ENTITY_ANALYSIS_TOOL = {
                     "'Güçlü olumlu haberler ve analistler de yüksek hedefte — tablo tutarlı.'"
                 ),
             },
+            "claude_take": {
+                "type": "string",
+                "description": (
+                    "'Claude ne düşünüyor?' — 3-5 cümlelik, KONUŞMA DİLİNDE, bütünsel bir "
+                    "yorum. Haber akışı + fiyat hareketi + analist konsensüsü + kanıt gücünü "
+                    "SENTEZLE; bir arkadaşın anlatır gibi düz Türkçe (jargon YOK). ŞUNLARI YAP: "
+                    "(a) net bir duruş al ('Bence asıl mesele şu…'); (b) zaman ufku ayır "
+                    "('kısa vadede …, ama 1-2 yıllık bakıyorsan …'); (c) çelişkileri açıkça söyle "
+                    "('haberler kötü ama analistler yüksek hedefte — bu ayrışma önemli'); "
+                    "(d) somut ne izlenmeli belirt ('asıl belirleyici şu tarihteki bilanço'). "
+                    "ŞUNLARI YAPMA: kendi hedef fiyatını UYDURMA (yalnızca verilen FMP analist "
+                    "hedefini aktarabilirsin; 'bence $X olur' ASLA); 'kesin yükselir/düşer' gibi "
+                    "kesinlik satma, belirsizliği dürüstçe söyle; değerleme yapamadığını, sadece "
+                    "haber akışı + fiyat + analist verisine baktığını gerektiğinde belirt "
+                    "(her cümlede tekrarlama). Örnek ton: 'Tablo ikiye bölünmüş: ürün tarafı "
+                    "güçlü ve analistler yukarı potansiyel görüyor, ama hisse sektörel makro "
+                    "baskıyla düştü. Kısa vadede bu baskı sürebilir; uzun vadede hikâye bozulmuş "
+                    "değil. Asıl belirleyici yaklaşan bilanço. Aceleye gerek yok ama izlemeye değer.'"
+                ),
+            },
             "risk_score": {"type": "integer", "description": "0 (düşük) .. 100 (yüksek risk)"},
             "sentiment_trend": {"type": "string", "enum": list(SENTIMENT_TRENDS)},
             "top_drivers": {
@@ -173,8 +193,8 @@ ENTITY_ANALYSIS_TOOL = {
             },
         },
         "required": [
-            "headline_verdict", "risk_score", "sentiment_trend", "top_drivers", "summary",
-            "stance", "conviction", "what_to_verify", "invalidation",
+            "headline_verdict", "claude_take", "risk_score", "sentiment_trend", "top_drivers",
+            "summary", "stance", "conviction", "what_to_verify", "invalidation",
         ],
         "additionalProperties": False,
     },
@@ -244,8 +264,11 @@ def sanitize_entity_analysis(item: dict) -> dict:
     verify = [str(v).strip() for v in item.get("what_to_verify", []) if str(v).strip()]
     # Hüküm cümlesi: en fazla 20 kelimeye kırp (yön + güvenilirlik + ayrışma sığsın).
     verdict = " ".join(str(item.get("headline_verdict", "")).strip().split()[:20])
+    # Claude yorumu: 3-5 cümle; en fazla ~120 kelimeye kırp (aşırı uzamasın).
+    take = " ".join(str(item.get("claude_take", "")).strip().split()[:120])
     return {
         "headline_verdict": verdict,
+        "claude_take": take,
         "risk_score": int(clamp(float(item.get("risk_score", 50)), 0, 100)),
         "sentiment_trend": trend if trend in SENTIMENT_TRENDS else "stable",
         "top_drivers": drivers[:3],

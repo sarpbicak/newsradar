@@ -338,6 +338,7 @@ def _write_assessment(entity_id: int, data: dict, considered: int, avg_sentiment
             EntityAnalysis(
                 entity_id=entity_id,
                 headline_verdict=clean["headline_verdict"],
+                claude_take=clean["claude_take"],
                 risk_score=clean["risk_score"],
                 sentiment_trend=clean["sentiment_trend"],
                 top_drivers=clean["top_drivers"],

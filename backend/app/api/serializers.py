@@ -99,6 +99,7 @@ def analysis_out(a: EntityAnalysis | None) -> AnalysisOut | None:
         return None
     return AnalysisOut(
         headline_verdict=a.headline_verdict,
+        claude_take=a.claude_take,
         risk_score=a.risk_score,
         sentiment_trend=a.sentiment_trend,
         top_drivers=a.top_drivers or [],

@@ -1,7 +1,7 @@
 // Entity detay: ÜSTTE sabit özet (ad · hüküm · sinyal · Yön/Vade/Kanıt · fiyat/hedef),
 // ALTTA sekmeler (Özet / Grafikler / Haberler / Analistler). Her şey aynı ekranda değil.
 import React, { useEffect, useState } from "react";
-import { ChevronLeft, FileText, TrendingUp, Newspaper, BarChart3 } from "lucide-react";
+import { ChevronLeft, FileText, TrendingUp, Newspaper, BarChart3, Sparkles } from "lucide-react";
 import { api } from "../api.js";
 import {
   StanceBadge, RiskScore, RiskDelta, TrendArrow, PriceDisplay, stanceLabel,
@@ -210,10 +210,24 @@ export default function EntityDetail({ entityId, onBack }) {
   );
 }
 
-// Özet sekmesi: risk + özet paragrafı + ana etkenler + doğrulama + invalidation.
+// Özet sekmesi: Claude yorumu (üstte) + risk + özet + ana etkenler + doğrulama + invalidation.
 function SummaryTab({ a, entity }) {
   return (
-    <div className="grid gap-4 md:grid-cols-3">
+    <div className="space-y-4">
+      {/* "Claude ne düşünüyor?" — bütünsel yorum (varsa) */}
+      {a.claude_take && (
+        <div className="rounded-xl border border-accent/30 bg-accent/10 p-5">
+          <div className="mb-2 flex items-center gap-2 font-display text-sm font-semibold text-accent">
+            <Sparkles className="h-4 w-4" /> Claude ne düşünüyor?
+          </div>
+          <p className="text-[15px] leading-relaxed text-slate-100">{a.claude_take}</p>
+          <p className="mt-3 text-[11px] text-slate-500">
+            Bu bir yorum, yatırım tavsiyesi değil — kararlar sana ait.
+          </p>
+        </div>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-3">
       <div className="rounded-xl border border-ink-600 bg-ink-800 p-5 md:col-span-2">
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <RiskScore score={a.risk_score} />
@@ -260,6 +274,7 @@ function SummaryTab({ a, entity }) {
           </div>
           <p className="text-sm text-slate-300">{a.invalidation}</p>
         </div>
+      </div>
       </div>
     </div>
   );
