@@ -11,11 +11,11 @@ export default {
         // Yüzeyler: 900 = sayfa zemini (yumuşak koyu), 800 = kart (bir tık açık),
         // 700 = yükseltilmiş/hover/divide, 600/500 = ince/güçlü açık kenarlık.
         ink: {
-          900: "#0F1117", // sayfa zemini (yumuşak koyu slate — saf siyah değil)
-          800: "#191C26", // kart yüzeyi
-          700: "#232733", // yükseltilmiş/hover/divide
-          600: "#2B2F3B", // ince kenarlık (~rgba(255,255,255,0.06))
-          500: "#3A3F4E", // güçlü kenarlık/input
+          900: "#1A1D26", // sayfa zemini (yumuşak gri-lacivert — kömür karası değil)
+          800: "#272C3A", // kart yüzeyi (tabandan belirgin ayrışır)
+          700: "#313747", // yükseltilmiş/hover/divide
+          600: "#3A4152", // ince kenarlık (~rgba(255,255,255,0.10))
+          500: "#4A5164", // güçlü kenarlık/input
         },
         accent: "#7C5CFF", // MOR vurgu (marka; yalnızca aksan)
         // Metin (koyu zeminde): küçük numara = açık/önemli, büyük = soluk.

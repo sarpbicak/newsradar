@@ -27,8 +27,8 @@ body {
   margin: 0;
   color: #e8e9ed;
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  /* Yumuşak koyu zemin + üstte soluk mor glow + çok düşük opaklıkta ince mor grid */
-  background-color: #0f1117;
+  /* Yumuşak gri-lacivert zemin + üstte soluk mor glow + çok düşük opaklıkta ince mor grid */
+  background-color: #1a1d26;
   background-image:
     radial-gradient(120% 60% at 50% -10%, rgba(124, 92, 255, 0.10), rgba(124, 92, 255, 0) 60%),
     linear-gradient(var(--grid) 1px, transparent 1px),
@@ -126,7 +126,7 @@ body {
 
 /* Skeleton (iskelet) — layout zıplamasın */
 .skeleton {
-  background: linear-gradient(90deg, #191c26 25%, #232733 37%, #191c26 63%);
+  background: linear-gradient(90deg, #272c3a 25%, #313747 37%, #272c3a 63%);
   background-size: 400% 100%;
   animation: skel 1.4s ease infinite;
   border-radius: 6px;

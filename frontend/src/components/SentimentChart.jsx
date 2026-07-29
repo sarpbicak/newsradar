@@ -45,10 +45,10 @@ export default function SentimentChart({ articles }) {
             axisLine={false}
             tickLine={false}
           />
-          <ReferenceLine y={0} stroke="#2B2F3B" />
+          <ReferenceLine y={0} stroke="#3A4152" />
           <Tooltip
             cursor={{ fill: "rgba(37,99,235,0.06)" }}
-            contentStyle={{ background: "#191C26", border: "1px solid #E4E8EF", borderRadius: 8, fontSize: 12 }}
+            contentStyle={{ background: "#272C3A", border: "1px solid #E4E8EF", borderRadius: 8, fontSize: 12 }}
             labelStyle={{ color: "#B4B8C4" }}
             formatter={(v) => [v.toFixed(2), "duygu"]}
             labelFormatter={(_, p) => p?.[0]?.payload?.title?.slice(0, 60) || ""}

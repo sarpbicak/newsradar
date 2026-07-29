@@ -67,7 +67,7 @@ export default function RiskHistoryChart({ history }) {
       </div>
       <ResponsiveContainer width="100%" height={160}>
         <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -24 }}>
-          <CartesianGrid stroke="#232733" vertical={false} />
+          <CartesianGrid stroke="#313747" vertical={false} />
           <XAxis
             dataKey="date"
             tick={{ fill: "#6B6F7E", fontSize: 9 }}
@@ -82,10 +82,10 @@ export default function RiskHistoryChart({ history }) {
             axisLine={false}
             tickLine={false}
           />
-          <ReferenceLine y={50} stroke="#2B2F3B" />
+          <ReferenceLine y={50} stroke="#3A4152" />
           <Tooltip
             contentStyle={{
-              background: "#191C26",
+              background: "#272C3A",
               border: "1px solid #E4E8EF",
               borderRadius: 8,
               fontSize: 12,

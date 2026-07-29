@@ -246,7 +246,7 @@ export function RiskScore({ score }) {
     <div className="flex items-center gap-2">
       <div className="relative h-9 w-9 shrink-0">
         <svg viewBox="0 0 36 36" className="h-9 w-9 -rotate-90">
-          <circle cx="18" cy="18" r="15" fill="none" stroke="#2B2F3B" strokeWidth="4" />
+          <circle cx="18" cy="18" r="15" fill="none" stroke="#3A4152" strokeWidth="4" />
           <circle
             cx="18" cy="18" r="15" fill="none" stroke={color} strokeWidth="4"
             strokeDasharray={`${(2 * Math.PI * 15 * (score ?? 0)) / 100} ${2 * Math.PI * 15}`}
