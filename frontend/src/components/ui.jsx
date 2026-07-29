@@ -146,6 +146,30 @@ export function overallSignal(stance, evidence) {
   return SIGNAL_LEVELS.find((l) => l.key === level) || SIGNAL_LEVELS[2];
 }
 
+// Durum "pill" stili: güçlü uçlar dolu+beyaz metin; ortalar soluk dolgu+renkli metin.
+const PILL_STYLE = {
+  "2": { bg: "#2FB873", color: "#FFFFFF" },            // GÜÇLÜ OLUMLU
+  "1": { bg: "rgba(63,214,140,0.18)", color: "#3FD68C" }, // OLUMLU
+  "0": { bg: "rgba(139,143,158,0.20)", color: "#B4B8C4" }, // NÖTR
+  "-1": { bg: "rgba(255,107,107,0.16)", color: "#FF6B6B" }, // OLUMSUZ
+  "-2": { bg: "#E84C4C", color: "#FFFFFF" },           // GÜÇLÜ OLUMSUZ
+};
+
+// Büyük, dolgulu, uzaktan okunan DURUM etiketi (kartın en dikkat çekici öğesi).
+export function SignalPill({ stance, evidence }) {
+  const sig = overallSignal(stance, evidence);
+  const st = PILL_STYLE[String(sig.key)] || PILL_STYLE["0"];
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wide"
+      style={{ background: st.bg, color: st.color }}
+    >
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: st.color }} />
+      {sig.label}
+    </span>
+  );
+}
+
 export function SignalBand({ stance, evidence, showLabel = true, minimal = false }) {
   const sig = overallSignal(stance, evidence);
   // -2..2 → %0..100 konum (olumsuz sol, olumlu sağ).

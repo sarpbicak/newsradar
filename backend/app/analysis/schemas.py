@@ -139,7 +139,8 @@ ENTITY_ANALYSIS_TOOL = {
                 "type": "string",
                 "description": (
                     "Finans bilmeyen bir LİSE ÖĞRENCİSİNİN anlayacağı tek cümlelik, düz "
-                    "Türkçe HÜKÜM — en fazla 20 kelime. Kartın en üstünde büyük gösterilecek. "
+                    "Türkçe HÜKÜM — EN FAZLA 14 KELİME (kartta 3 satıra sığmalı). "
+                    "Kartın en üstünde büyük gösterilecek. "
                     "ŞU ÜÇ ŞEYİ İÇERMELİ: (a) haber akışının yönü (olumlu/olumsuz/kararsız), "
                     "(b) ne kadar güvenilir olduğu (çok/az habere dayanıyor, tutarlı mı), "
                     "(c) VARSA analist beklentisi ile haberlerin AYRIŞMASI ya da fiyatın zaten "
@@ -262,8 +263,8 @@ def sanitize_entity_analysis(item: dict) -> dict:
     conviction = item.get("conviction")
     drivers = [str(d).strip() for d in item.get("top_drivers", []) if str(d).strip()]
     verify = [str(v).strip() for v in item.get("what_to_verify", []) if str(v).strip()]
-    # Hüküm cümlesi: en fazla 20 kelimeye kırp (yön + güvenilirlik + ayrışma sığsın).
-    verdict = " ".join(str(item.get("headline_verdict", "")).strip().split()[:20])
+    # Hüküm cümlesi: en fazla 14 kelimeye kırp (kartta 3 satırı aşmasın).
+    verdict = " ".join(str(item.get("headline_verdict", "")).strip().split()[:14])
     # Claude yorumu: 3-5 cümle; en fazla ~120 kelimeye kırp (aşırı uzamasın).
     take = " ".join(str(item.get("claude_take", "")).strip().split()[:120])
     return {
