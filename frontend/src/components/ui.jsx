@@ -146,17 +146,20 @@ export function overallSignal(stance, evidence) {
   return SIGNAL_LEVELS.find((l) => l.key === level) || SIGNAL_LEVELS[2];
 }
 
-export function SignalBand({ stance, evidence, showLabel = true }) {
+export function SignalBand({ stance, evidence, showLabel = true, minimal = false }) {
   const sig = overallSignal(stance, evidence);
   // -2..2 → %0..100 konum (olumsuz sol, olumlu sağ).
   const pos = ((sig.key + 2) / 4) * 100;
   return (
     <div>
       {showLabel && (
-        <div className="mb-1.5 flex items-center justify-between">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-            Genel sinyal
-          </span>
+        // minimal (kart): sadece sağda durum metni. Tam (detay): solda "Genel sinyal".
+        <div className={`mb-1.5 flex items-center ${minimal ? "justify-end" : "justify-between"}`}>
+          {!minimal && (
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              Genel sinyal
+            </span>
+          )}
           <span className="text-xs font-bold" style={{ color: sig.color }}>
             {sig.label}
           </span>
