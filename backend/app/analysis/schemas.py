@@ -130,7 +130,11 @@ ENTITY_ANALYSIS_TOOL = {
     "name": ENTITY_TOOL_NAME,
     "description": (
         "Bir varlık için haber-akışı bazlı toplu değerlendirmeyi kaydet. Yön (stance) "
-        "net olmalı; gerekçesiz BUY/SELL verme. Fiyat tahmini DEĞİL — haber sinyali."
+        "net olmalı; gerekçesiz BUY/SELL verme. Fiyat tahmini DEĞİL — haber sinyali. "
+        "ÇEŞİTLİLİK ZORUNLU: headline_verdict ve ai_take BU ŞİRKETE özgü SOMUT bir "
+        "ayrıntı içermeli (gerçek haberdeki ürün, iş kolu, olay, sayı ya da tarih). "
+        "Farklı şirketlere aynı kalıp cümleyi ('Güçlü olumlu haberler, tablo tutarlı' "
+        "gibi) YAPIŞTIRMA — her hüküm o şirketin haberinden ayırt edilebilir olmalı."
     ),
     "input_schema": {
         "type": "object",
@@ -146,11 +150,15 @@ ENTITY_ANALYSIS_TOOL = {
                     "(c) VARSA analist beklentisi ile haberlerin AYRIŞMASI ya da fiyatın zaten "
                     "tepki verdiği. JARGON KESİNLİKLE YASAK: 'volatilite', 'momentum', "
                     "'konsolidasyon', 'değerleme', 'katalizör' gibi kelimeler KULLANMA; "
-                    "günlük Türkçe kullan. İyi örnekler: "
-                    "'Haberler çok kötü, hisse zaten sert düştü — analistler yine de yükseliş "
-                    "bekliyor, dikkatli ol.', "
-                    "'Az sayıda olumlu haber var ama yeterli kanıt yok — acele etme.', "
-                    "'Güçlü olumlu haberler ve analistler de yüksek hedefte — tablo tutarlı.'"
+                    "günlük Türkçe kullan. "
+                    "ÇEŞİTLİLİK: bu şirketin haberinden SOMUT bir çapa kullan (ürün, iş "
+                    "kolu, olay, sayı ya da tarih) ki hüküm başka şirkete de uyan boş bir "
+                    "kalıp OLMASIN. 'Güçlü olumlu haberler, tablo tutarlı' gibi genel "
+                    "cümleyi tek başına yazma — neyin olumlu olduğunu somutla. İyi örnekler "
+                    "(kalıp değil, KANCA olarak oku): "
+                    "'Yeni çip siparişleri güçlü ama makro baskı hisseyi düşürdü — analistler yine de yukarı bakıyor.', "
+                    "'Bulut büyümesi yavaşladı, az sayıda haber var — kanıt zayıf, acele etme.', "
+                    "'Bilanço beklentiyi aştı ve analistler hedefi yükseltti — tablo tutarlı.'"
                 ),
             },
             "ai_take": {
@@ -162,7 +170,9 @@ ENTITY_ANALYSIS_TOOL = {
                     "(a) net bir duruş al ('Bence asıl mesele şu…'); (b) zaman ufku ayır "
                     "('kısa vadede …, ama 1-2 yıllık bakıyorsan …'); (c) çelişkileri açıkça söyle "
                     "('haberler kötü ama analistler yüksek hedefte — bu ayrışma önemli'); "
-                    "(d) somut ne izlenmeli belirt ('asıl belirleyici şu tarihteki bilanço'). "
+                    "(d) somut ne izlenmeli belirt ('asıl belirleyici şu tarihteki bilanço'); "
+                    "(e) BU şirkete özgü en az bir gerçek ayrıntıya (ürün adı, iş kolu, olay, "
+                    "sayı, tarih) yaslan — başka şirkete de uyan genel bir yorum YAZMA. "
                     "ŞUNLARI YAPMA: kendi hedef fiyatını UYDURMA (yalnızca verilen FMP analist "
                     "hedefini aktarabilirsin; 'bence $X olur' ASLA); 'kesin yükselir/düşer' gibi "
                     "kesinlik satma, belirsizliği dürüstçe söyle; değerleme yapamadığını, sadece "
