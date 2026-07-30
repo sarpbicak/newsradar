@@ -143,7 +143,7 @@ export default function EntityCard({ card, onOpen, big = false }) {
         }
       }}
       className={`group relative flex h-full cursor-pointer flex-col gap-4 overflow-hidden rounded-xl border bg-ink-800 text-left shadow-card transition duration-200 hover:-translate-y-0.5 hover:shadow-card-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
-        big ? "border-accent/30 p-6 pl-7" : "border-ink-600 p-5 pl-6 hover:border-accent/60"
+        big ? "border-ink-500 p-6 pl-7" : "border-ink-600 p-5 pl-6 hover:border-accent/60"
       }`}
     >
       {/* Sol kenar durum şeridi (pill rengiyle aynı; Katman 1'de daha kalın) */}

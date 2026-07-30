@@ -58,6 +58,7 @@ def init_db() -> None:
     _ensure_column("suggestions", "exchange", "VARCHAR(60)")
     _ensure_column("suggestions", "why_relevant", "TEXT")
     _ensure_column("analyst_snapshots", "target_consensus", "FLOAT")
+    _ensure_column("users", "guide_dismissed", "BOOLEAN NOT NULL DEFAULT 0")
 
 
 def _ensure_column(table: str, column: str, ddl_type: str) -> None:

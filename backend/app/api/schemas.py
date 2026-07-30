@@ -64,6 +64,7 @@ class UserOut(BaseModel):
     is_admin: bool
     created_at: datetime
     last_login_at: datetime | None = None
+    guide_dismissed: bool = False   # "NewsRadar ne yapar?" kutusu kapatıldı mı
 
 
 class UserTokenOut(BaseModel):

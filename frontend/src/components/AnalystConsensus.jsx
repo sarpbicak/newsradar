@@ -3,7 +3,6 @@
 // olmadığını düz Türkçe açıklayan bir not gösterilir (özel şirket / desteklenmeyen borsa).
 // compact=true: kart için kısa gösterim. false: detay için tam gösterim + hedef aralık barı.
 import React from "react";
-import { InfoTip, TERM_HELP } from "./ui.jsx";
 
 // Veri yokken gösterilecek açıklama (boşluk bir eksiklik değil, bir açıklama gibi görünsün).
 function noDataNote(type, hasPrice) {
@@ -100,7 +99,7 @@ function TargetLine({ price, mean, upside, compact }) {
     <div className={`flex items-baseline gap-1.5 ${compact ? "text-xs" : "text-sm"}`}>
       {price != null && <span className="tabular-nums text-slate-400">${price.toFixed(compact ? 0 : 2)}</span>}
       <span className="inline-flex items-center gap-0.5 text-slate-500">
-        → hedef {!compact && <InfoTip text={TERM_HELP.target} />}
+        → hedef
       </span>
       <span className="font-semibold tabular-nums text-slate-100">${mean.toFixed(compact ? 0 : 2)}</span>
       {up != null && (
@@ -122,7 +121,7 @@ export default function AnalystConsensus({ analyst, price, type, compact = false
     return (
       <div className="rounded-xl border border-ink-600 bg-ink-800 p-4">
         <div className="mb-1 flex items-center gap-1 text-[11px] uppercase text-slate-500">
-          Analist verisi <InfoTip text={TERM_HELP.analyst} />
+          Analist verisi
         </div>
         <p className="text-sm leading-relaxed text-slate-400">{noDataNote(type, price != null)}</p>
       </div>
@@ -160,7 +159,7 @@ export default function AnalystConsensus({ analyst, price, type, compact = false
     <div className="rounded-xl border border-ink-600 bg-ink-800 p-4">
       <div className="mb-2 flex items-baseline justify-between">
         <span className="inline-flex items-center gap-1 text-[11px] uppercase text-slate-500">
-          Analist verisi <InfoTip text={TERM_HELP.analyst} />
+          Analist verisi
         </span>
         {hasRec && (
           <span className="text-xs font-semibold" style={{ color: lean.color }}>{lean.text}</span>

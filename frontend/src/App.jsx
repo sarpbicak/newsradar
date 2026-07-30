@@ -1,12 +1,12 @@
 // NewsRadar kök bileşeni: durum yükleme, genel görünüm/detay yönlendirme,
 // global yenileme, sağlayıcı uyarıları, footer.
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { api, getUserToken, logout, setUnauthorizedHandler } from "./api.js";
 import Overview from "./components/Overview.jsx";
 import EntityDetail from "./components/EntityDetail.jsx";
 import Login from "./components/Login.jsx";
 import AdminPanel from "./components/AdminPanel.jsx";
-import HowToModal from "./components/HowToModal.jsx";
+import GuideBox from "./components/GuideBox.jsx";
 import { Skeleton } from "./components/ui.jsx";
 import { RefreshCw, Menu, X, LogOut, ShieldCheck, LayoutDashboard, Radar, HelpCircle } from "lucide-react";
 
@@ -15,7 +15,8 @@ export default function App() {
   const [checkingSession, setCheckingSession] = useState(!!getUserToken());
   const [view, setView] = useState("dashboard");     // "dashboard" | "admin"
   const [menuOpen, setMenuOpen] = useState(false);   // mobil header menüsü
-  const [showHelp, setShowHelp] = useState(false);   // "nasıl okunur" modalı
+  const [showGuide, setShowGuide] = useState(false); // "NewsRadar ne yapar?" kutusu
+  const guideAutoRef = useRef(false);                // oturumda bir kez otomatik aç
   const authed = !!user;
   const [cards, setCards] = useState([]);
   const [status, setStatus] = useState(null);
@@ -33,6 +34,25 @@ export default function App() {
   // Herhangi bir istek 401 dönerse (kişisel token geçersiz) kişisel girişe dön.
   useEffect(() => {
     setUnauthorizedHandler(() => setUser(null));
+  }, []);
+
+  // "NewsRadar ne yapar?" kutusu: daha önce kapatılmadıysa oturumda BİR kez otomatik aç.
+  useEffect(() => {
+    if (user && !user.guide_dismissed && !guideAutoRef.current) {
+      guideAutoRef.current = true;
+      setShowGuide(true);
+    }
+  }, [user]);
+
+  // Kutuyu kapat: tercihi backend'de kalıcı yap (bir daha otomatik açılmasın).
+  const closeGuide = useCallback(async () => {
+    setShowGuide(false);
+    try {
+      const u = await api.dismissGuide();
+      setUser(u);
+    } catch {
+      /* kapatma tercihi sunucuya yazılamadıysa yoksay — UI zaten kapandı */
+    }
   }, []);
 
   // Açılışta kişisel token varsa doğrula (kim olduğumuzu öğren). Geçersizse çıkış.
@@ -229,32 +249,20 @@ export default function App() {
               </span>
             </button>
 
-            {/* Nasıl okunur — her boyutta görünür ikon (modal açar) */}
+            {/* Nasıl çalışır — açıklama kutusunu tekrar açar */}
             <button
-              onClick={() => setShowHelp(true)}
-              title="Nasıl okunur?"
-              aria-label="Nasıl okunur?"
-              className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg text-slate-500 transition hover:bg-ink-700 hover:text-slate-200"
+              onClick={() => setShowGuide(true)}
+              title="Nasıl çalışır?"
+              aria-label="Nasıl çalışır?"
+              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-2.5 text-sm text-slate-500 transition hover:bg-ink-700 hover:text-slate-200"
             >
               <HelpCircle className="h-5 w-5" />
+              <span className="hidden md:inline">Nasıl çalışır?</span>
             </button>
 
-            {/* MASAÜSTÜ: kota + admin + kullanıcı + çıkış inline */}
+            {/* MASAÜSTÜ: admin + kullanıcı + çıkış inline (NewsAPI kotası header'da
+                gösterilmez — teknik iç detay; kota admin panelinde görünür) */}
             <div className="hidden items-center gap-2 sm:flex">
-              {status?.newsapi_quota && (
-                <span
-                  className={`font-mono text-[11px] ${
-                    status.newsapi_quota.exhausted
-                      ? "text-rose-400"
-                      : status.newsapi_quota.warn
-                      ? "text-amber-400"
-                      : "text-slate-500"
-                  }`}
-                  title="NewsAPI günlük kota (rolling 24s)"
-                >
-                  NewsAPI: {status.newsapi_quota.used}/{status.newsapi_quota.limit}
-                </span>
-              )}
               {user?.is_admin && (
                 <button
                   onClick={() => setView((v) => (v === "admin" ? "dashboard" : "admin"))}
@@ -302,11 +310,6 @@ export default function App() {
                         <span className="rounded bg-accent/15 px-1.5 text-[10px] font-semibold text-accent">admin</span>
                       )}
                     </div>
-                    {status?.newsapi_quota && (
-                      <div className="px-3 py-2 font-mono text-[11px] text-slate-500">
-                        NewsAPI: {status.newsapi_quota.used}/{status.newsapi_quota.limit}
-                      </div>
-                    )}
                     {user?.is_admin && (
                       <button
                         onClick={() => {
@@ -341,6 +344,8 @@ export default function App() {
           <AdminPanel />
         ) : (
         <>
+        {showGuide && <GuideBox onClose={closeGuide} />}
+
         {loadError && (
           <div className="mb-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
             API'ye bağlanılamadı: {loadError}. Backend çalışıyor mu? (uvicorn app.api.main:app)
@@ -460,7 +465,6 @@ export default function App() {
         built by Sarp Bıçak
       </a>
 
-      <HowToModal open={showHelp} onClose={() => setShowHelp(false)} />
     </div>
   );
 }

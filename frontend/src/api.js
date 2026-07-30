@@ -120,6 +120,7 @@ export function logoutAll() {
 
 export const api = {
   me: () => req("/users/me"),
+  dismissGuide: () => req("/users/me/guide-dismiss", { method: "POST" }),
   // Admin (yalnızca is_admin kullanıcı; değilse backend 403 döner)
   adminUsers: () => req("/admin/users"),
   adminUserDetail: (id) => req(`/admin/users/${id}`),

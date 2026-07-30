@@ -45,6 +45,7 @@ def _user_out(u: User) -> UserOut:
     return UserOut(
         id=u.id, username=u.username, is_admin=u.is_admin,
         created_at=u.created_at, last_login_at=u.last_login_at,
+        guide_dismissed=u.guide_dismissed,
     )
 
 
@@ -121,4 +122,11 @@ def login(payload: UserLoginIn, request: Request, db: Session = Depends(get_db))
 @router.get("/me", response_model=UserOut)
 def me(user: User = Depends(get_current_user)) -> UserOut:
     """Mevcut kişisel kullanıcı bilgisi (is_admin dahil)."""
+    return _user_out(user)
+
+
+@router.post("/me/guide-dismiss", response_model=UserOut)
+def dismiss_guide(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> UserOut:
+    """"NewsRadar ne yapar?" açıklama kutusunu kalıcı olarak kapat (kullanıcı tercihi)."""
+    user.guide_dismissed = True
     return _user_out(user)

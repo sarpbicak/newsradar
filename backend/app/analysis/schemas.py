@@ -134,7 +134,10 @@ ENTITY_ANALYSIS_TOOL = {
         "ÇEŞİTLİLİK ZORUNLU: headline_verdict ve ai_take BU ŞİRKETE özgü SOMUT bir "
         "ayrıntı içermeli (gerçek haberdeki ürün, iş kolu, olay, sayı ya da tarih). "
         "Farklı şirketlere aynı kalıp cümleyi ('Güçlü olumlu haberler, tablo tutarlı' "
-        "gibi) YAPIŞTIRMA — her hüküm o şirketin haberinden ayırt edilebilir olmalı."
+        "gibi) YAPIŞTIRMA — her hüküm o şirketin haberinden ayırt edilebilir olmalı. "
+        "BÜYÜK/KÜÇÜK HARF: tüm metin alanlarında normal Türkçe yazım — yalnızca cümle "
+        "başı ve özel isimler büyük harfle başlar. Cümle ortasında rastgele büyük harf "
+        "YOK ('analistler Yine de' YANLIŞ → 'analistler yine de' DOĞRU)."
     ),
     "input_schema": {
         "type": "object",
