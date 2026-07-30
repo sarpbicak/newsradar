@@ -173,6 +173,31 @@ def _horizon_and_evidence(
     return horizon, strength, count
 
 
+def _priority(analysis, delta, change_percent, analyst) -> tuple[int, str | None]:
+    """Kademeli düzen için öncelik skoru + baskın neden (Katman 1 seçimi).
+
+    yön değişti +3 · |risk farkı|≥8 +2 · |günlük %|≥3 +2 · haber↔analist ayrışması +1.
+    """
+    reasons: list[tuple[str, int]] = []
+    if delta is not None:
+        if delta.stance_changed:
+            reasons.append(("yön değişti", 3))
+        if abs(delta.risk_delta) >= 8:
+            reasons.append(("risk sıçraması", 2))
+    if change_percent is not None and abs(change_percent) >= 3:
+        reasons.append(("sert hareket", 2))
+    if analysis is not None and analyst is not None:
+        buyish = analyst.strong_buy + analyst.buy
+        sellish = analyst.sell + analyst.strong_sell
+        analyst_buy = buyish > sellish and buyish > analyst.hold
+        analyst_sell = sellish > buyish and sellish > analyst.hold
+        if (analysis.stance == "bearish" and analyst_buy) or (analysis.stance == "bullish" and analyst_sell):
+            reasons.append(("ayrışma", 1))
+    score = sum(w for _, w in reasons)
+    reason = max(reasons, key=lambda r: r[1])[0] if reasons else None
+    return score, reason
+
+
 def entity_card(session: Session, entity: Entity) -> EntityCardOut:
     """Overview kartı için entity özetini toplar."""
     article_count = session.scalar(
@@ -203,6 +228,7 @@ def entity_card(session: Session, entity: Entity) -> EntityCardOut:
 
     latest = _latest_analysis(session, entity.id)
     previous = _previous_analysis(session, entity.id)
+    delta = _delta_out(latest, previous)
     horizon, evidence_strength, evidence_count = _horizon_and_evidence(session, entity.id, latest)
 
     # Fiyat + analist: yalnızca ticker entity'lerde (keyword'de None kalır).
@@ -223,6 +249,9 @@ def entity_card(session: Session, entity: Entity) -> EntityCardOut:
             current_price=price_snap.price if price_snap else None,
         )
 
+    change_percent = price_snap.change_percent if price_snap else None
+    p_score, p_reason = _priority(latest, delta, change_percent, analyst)
+
     return EntityCardOut(
         id=entity.id,
         name=entity.name,
@@ -240,9 +269,11 @@ def entity_card(session: Session, entity: Entity) -> EntityCardOut:
         evidence_strength=evidence_strength,
         evidence_count=evidence_count,
         previous_analysis=_previous_out(previous),
-        delta=_delta_out(latest, previous),
+        delta=delta,
+        priority_score=p_score,
+        priority_reason=p_reason,
         price=price_snap.price if price_snap else None,
-        change_percent=price_snap.change_percent if price_snap else None,
+        change_percent=change_percent,
         price_updated_at=price_snap.fetched_at if price_snap else None,
         analyst=analyst,
     )

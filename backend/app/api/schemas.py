@@ -190,6 +190,11 @@ class EntityCardOut(BaseModel):
     evidence_count: int = 0               # hükmün dayandığı analiz edilmiş haber sayısı
     previous_analysis: PreviousAnalysisOut | None = None
     delta: DeltaOut | None = None
+    # Kademeli düzen: öncelik skoru + neden + katman (1 = "bugün önemli", 2 = liste).
+    # tier list_entities'te global sıralamayla atanır (skor ≥ 2 olan en yüksek 3 → tier 1).
+    priority_score: int = 0
+    priority_reason: str | None = None      # "yön değişti" | "sert hareket" | "ayrışma" | "risk sıçraması"
+    tier: int = 2
     # Fiyat (yalnızca ticker entity'lerde dolu; keyword'de None).
     price: float | None = None
     change_percent: float | None = None

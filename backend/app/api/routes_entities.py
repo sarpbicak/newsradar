@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -17,10 +19,25 @@ from .usage import record_event
 router = APIRouter(prefix="/entities", tags=["entities"])
 
 
+# Kademeli düzen (Katman 1): skoru ≥ bu eşik olan kartlar aday; en yüksek 3'ü "bugün önemli".
+TIER1_MIN_SCORE = 2
+TIER1_MAX_CARDS = 3
+
+
 @router.get("", response_model=list[EntityCardOut])
 def list_entities(db: Session = Depends(get_db)) -> list[EntityCardOut]:
     entities = db.scalars(select(Entity).order_by(Entity.created_at)).all()
-    return [entity_card(db, e) for e in entities]
+    cards = [entity_card(db, e) for e in entities]
+    # Katman 1 seçimi global: tüm kartlar kurulduktan sonra en yüksek skorlu 3 aday
+    # (skor ≥ eşik) tier=1 alır. Eşitlikte en son güncellenen öne geçer.
+    candidates = [c for c in cards if c.priority_score >= TIER1_MIN_SCORE]
+    candidates.sort(
+        key=lambda c: (c.priority_score, c.last_updated or datetime.min),
+        reverse=True,
+    )
+    for c in candidates[:TIER1_MAX_CARDS]:
+        c.tier = 1
+    return cards
 
 
 @router.post("", response_model=EntityCardOut, status_code=201)

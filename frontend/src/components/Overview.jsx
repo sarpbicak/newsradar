@@ -1,56 +1,11 @@
-// Genel görünüm: değişim şeridi + sıralama seçici + entity kartları + izleme listesi.
+// Genel görünüm: Katman 1 (bugün önemli — büyük kartlar) + Katman 2 (liste — satırlar).
 import React, { useMemo, useState } from "react";
-import EntityCard from "./EntityCard.jsx";
+import EntityCard, { EntityRow } from "./EntityCard.jsx";
 import WatchlistManager from "./WatchlistManager.jsx";
 import SuggestionsSection from "./SuggestionsSection.jsx";
-import { stanceLabel } from "./ui.jsx";
 
-// Değişim büyüklüğü: risk farkı + yön değişimi (ağır) + duygu farkı.
-function changeScore(card) {
-  const d = card.delta;
-  if (!d) return -1; // geçmiş yok → en alta
-  let s = Math.abs(d.risk_delta || 0);
-  if (d.stance_changed) s += 50;
-  if (d.sentiment_delta) s += Math.abs(d.sentiment_delta) * 20;
-  return s;
-}
-
-function hasChange(card) {
-  const d = card.delta;
-  return !!(
-    d && (d.risk_delta !== 0 || d.stance_changed || (d.sentiment_delta && d.sentiment_delta !== 0))
-  );
-}
-
-// "Tesla: risk 72→78 · NÖTR→DÜŞÜŞ" gibi tek satırlık değişim özeti.
-function changeSummary(card) {
-  const d = card.delta;
-  const a = card.analysis;
-  const parts = [];
-  if (d.risk_delta && card.previous_analysis)
-    parts.push(`risk ${card.previous_analysis.risk_score}→${a.risk_score}`);
-  if (d.stance_changed)
-    parts.push(`${stanceLabel(d.previous_stance)}→${stanceLabel(a.stance)}`);
-  if (d.sentiment_delta)
-    parts.push(`duygu ${d.sentiment_delta > 0 ? "+" : ""}${d.sentiment_delta}`);
-  return parts.join(" · ");
-}
-
-// İnce şerit için tek ok: iyileşti (↑ yeşil) mi kötüleşti (↓ kırmızı) mi.
-function changeDir(card) {
-  const d = card.delta || {};
-  let s = 0;
-  if (d.risk_delta) s -= d.risk_delta; // risk düştüyse iyi
-  if (d.sentiment_delta) s += d.sentiment_delta * 100;
-  if (d.stance_changed) {
-    if (card.analysis?.stance === "bullish") s += 30;
-    if (card.analysis?.stance === "bearish") s -= 30;
-  }
-  return s >= 0 ? { icon: "↑", cls: "text-emerald-400" } : { icon: "↓", cls: "text-rose-400" };
-}
-
+// Katman 2 sıralaması (Katman 1 zaten backend'de öncelik skoruyla seçilir).
 const SORTS = {
-  change: { label: "En çok değişen", fn: (a, b) => changeScore(b) - changeScore(a) },
   risk: {
     label: "Risk",
     fn: (a, b) => (b.analysis?.risk_score ?? -1) - (a.analysis?.risk_score ?? -1),
@@ -68,74 +23,83 @@ export default function Overview({
   onDismissSuggestion,
   scanning = false,
 }) {
-  const [sort, setSort] = useState("change");
+  const [sort, setSort] = useState("risk");
 
-  const sorted = useMemo(() => [...cards].sort(SORTS[sort].fn), [cards, sort]);
-  const changed = useMemo(
+  // Katman 1: backend tier=1 verdiği kartlar, öncelik skoruna göre sıralı (en yüksek → sol).
+  const tier1 = useMemo(
     () =>
       cards
-        .filter(hasChange)
-        .sort((a, b) => changeScore(b) - changeScore(a))
-        .slice(0, 3),
+        .filter((c) => c.tier === 1)
+        .sort((a, b) => (b.priority_score ?? 0) - (a.priority_score ?? 0)),
     [cards]
+  );
+  // Katman 2: kalan her şey, seçilen sıralamaya göre.
+  const tier2 = useMemo(
+    () => cards.filter((c) => c.tier !== 1).sort(SORTS[sort].fn),
+    [cards, sort]
   );
 
   return (
-    <div className="space-y-5">
-      {/* Değişim ŞERİDİ — ince tek satır. Değişim yoksa hiç görünmez. */}
-      {changed.length > 0 && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-ink-600 bg-ink-800/60 px-3 py-2 text-xs">
-          <span className="font-medium text-slate-500">Son tarama:</span>
-          {changed.map((c) => {
-            const dir = changeDir(c);
-            return (
-              <button
-                key={c.id}
-                onClick={() => onOpen(c.id)}
-                className="inline-flex items-center gap-1 transition hover:text-slate-100"
-                title={changeSummary(c)}
-              >
-                <span className="font-medium text-slate-300">{c.name}</span>
-                <span className={`font-bold ${dir.cls}`}>{dir.icon}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
+    <div className="space-y-6">
       {cards.length === 0 ? (
         <div className="rounded-xl border border-ink-600 bg-ink-800 p-8 text-center text-slate-400">
           İzleme listesi boş. Aşağıdan bir varlık ekleyin.
         </div>
       ) : (
         <>
-          {/* Sıralama seçici — kompakt */}
-          <div className="flex items-center gap-1 text-[11px]">
-            <span className="mr-1 text-slate-500">Sırala:</span>
-            {Object.entries(SORTS).map(([key, { label }]) => (
-              <button
-                key={key}
-                onClick={() => setSort(key)}
-                className={`rounded px-2 py-0.5 transition ${
-                  sort === key
-                    ? "bg-accent/15 font-medium text-slate-100"
-                    : "text-slate-500 hover:text-slate-300"
+          {/* ── KATMAN 1 — "Bugün önemli" ─────────────────────────────── */}
+          <section className="space-y-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Bugün önemli
+            </h2>
+            {tier1.length > 0 ? (
+              <div
+                className={`stagger grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 ${
+                  scanning ? "scan-host rounded-xl" : ""
                 }`}
               >
-                {label}
-              </button>
-            ))}
-          </div>
+                {tier1.map((c) => (
+                  <EntityCard key={c.id} card={c} onOpen={onOpen} big />
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-ink-600 bg-ink-800/50 px-4 py-6 text-center text-sm text-slate-400">
+                Bugün önemli bir değişiklik yok — tüm varlıklar aşağıdaki listede.
+              </div>
+            )}
+          </section>
 
-          <div
-            className={`stagger grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ${
-              scanning ? "scan-host rounded-xl" : ""
-            }`}
-          >
-            {sorted.map((c) => (
-              <EntityCard key={c.id} card={c} onOpen={onOpen} />
-            ))}
-          </div>
+          {/* ── KATMAN 2 — Tüm liste (sıkışık satırlar) ───────────────── */}
+          {tier2.length > 0 && (
+            <section className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Liste ({tier2.length})
+                </h2>
+                <div className="flex items-center gap-1 text-[11px]">
+                  <span className="mr-1 text-slate-500">Sırala:</span>
+                  {Object.entries(SORTS).map(([key, { label }]) => (
+                    <button
+                      key={key}
+                      onClick={() => setSort(key)}
+                      className={`rounded px-2 py-0.5 transition ${
+                        sort === key
+                          ? "bg-accent/15 font-medium text-slate-100"
+                          : "text-slate-500 hover:text-slate-300"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="stagger space-y-1.5">
+                {tier2.map((c) => (
+                  <EntityRow key={c.id} card={c} onOpen={onOpen} />
+                ))}
+              </div>
+            </section>
+          )}
         </>
       )}
 
