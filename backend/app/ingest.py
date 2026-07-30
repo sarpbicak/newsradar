@@ -36,7 +36,8 @@ class IngestResult:
     fetched: int = 0          # sağlayıcıdan gelen toplam
     new_articles: list[Article] = field(default_factory=list)
     duplicates: int = 0       # zaten DB'de olan
-    warnings: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)  # GERÇEK sorunlar (hata)
+    infos: list[str] = field(default_factory=list)     # NORMAL bilgi (tazelik/kota atlaması)
 
     @property
     def new_count(self) -> int:
@@ -80,20 +81,21 @@ def fetch_for_entity(
     if is_newsapi and provider.is_available():
         # Tazelik: manuel yenilemede taze veri varsa NewsAPI'ye gitme.
         if manual and _recently_fetched(session, entity, MANUAL_FRESH_HOURS):
-            result.warnings.append(
+            # NORMAL davranış (kota koruması) → info, uyarı DEĞİL.
+            result.infos.append(
                 f"son {MANUAL_FRESH_HOURS} saatte çekildi — NewsAPI atlandı (mevcut veri kullanılıyor)"
             )
             logger.info("[%s] NewsAPI atlandı: taze veri", entity.name)
             return result
-        # Kota: dolduysa hiç çağırma.
+        # Kota: dolduysa hiç çağırma (NORMAL kota koruması → info).
         usage = newsapi_usage(session)
         if usage["exhausted"]:
             msg = (
                 f"NewsAPI kotası doldu ({usage['used']}/{usage['limit']}), "
                 f"{usage['reset_in_hours']} saat sonra sıfırlanır"
             )
-            result.warnings.append(msg)
-            logger.warning("[%s] %s", entity.name, msg)
+            result.infos.append(msg)
+            logger.info("[%s] %s", entity.name, msg)
             return result
 
     outcome = provider.fetch(entity, since)
@@ -109,7 +111,11 @@ def fetch_for_entity(
             )
 
     if outcome.warning:
-        result.warnings.append(outcome.warning)
+        # NewsAPI kota mesajı NORMAL (kota koruması) → info; diğerleri gerçek hata → warning.
+        if "kotası doldu" in outcome.warning:
+            result.infos.append(outcome.warning)
+        else:
+            result.warnings.append(outcome.warning)
     result.fetched = len(outcome.articles)
 
     # Bu entity için mevcut url_hash'leri tek sorguda al (dedupe).

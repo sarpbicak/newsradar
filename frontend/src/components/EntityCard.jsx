@@ -98,8 +98,9 @@ function PriceBox({ card }) {
 
 export default function EntityCard({ card, onOpen }) {
   const a = card.analysis;
-  const sig = a ? overallSignal(a.stance, card.evidence_strength) : null;
-  const stripColor = sig ? sig.color : "transparent";
+  // Sol şerit rengi: analiz varsa duruma göre (5 durum + nötr gri); YOKSA açık gri.
+  // ASLA koyu/siyah — eski #3A4152 fallback'i kağıt temada siyah görünüyordu.
+  const stripColor = a ? overallSignal(a.stance, card.evidence_strength).color : "#D8D3C7";
   const changed = a && card.delta?.stance_changed;
 
   function open() {
@@ -120,7 +121,7 @@ export default function EntityCard({ card, onOpen }) {
       className="group relative flex h-full cursor-pointer flex-col gap-4 overflow-hidden rounded-xl border border-ink-600 bg-ink-800 p-5 pl-6 text-left shadow-card transition duration-200 hover:-translate-y-0.5 hover:border-accent/60 hover:shadow-card-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
     >
       {/* Sol kenar durum şeridi (pill rengiyle aynı) */}
-      <span className="absolute inset-y-0 left-0 w-1.5" style={{ background: a ? stripColor : "#3A4152" }} />
+      <span className="absolute inset-y-0 left-0 w-1.5" style={{ background: stripColor }} />
 
       {/* Satır 1 — Durum pill (sol) + ad/ticker (sağ, tek satır) */}
       <div className="flex items-start justify-between gap-3">

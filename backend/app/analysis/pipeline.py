@@ -379,13 +379,17 @@ def _apply_article_results(entity_id: int, batch_datas: list[dict]) -> dict:
 
 
 def _read_assessment_payload(entity_id: int) -> list[dict]:
-    """Entity değerlendirmesi için son analiz edilmiş makalelerden bağlam payload'ı."""
+    """Entity değerlendirmesi için son analiz edilmiş makalelerden bağlam payload'ı.
+
+    Lookback TAVANLA (max_articles_per_entity) tutarlı: 20'ye kilitlenmez; 40 makale
+    analiz edildiyse değerlendirme (ve karttaki 'N haber') 40'a kadar yansır."""
+    lookback = max(AGGREGATE_LOOKBACK, get_settings().max_articles_per_entity)
     with session_scope() as session:
         articles = session.scalars(
             select(Article)
             .where(Article.entity_id == entity_id, Article.analyzed.is_(True))
             .order_by(Article.published_at.desc().nullslast())
-            .limit(AGGREGATE_LOOKBACK)
+            .limit(lookback)
         ).all()
         return [
             {

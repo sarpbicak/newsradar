@@ -276,6 +276,7 @@ class RefreshSummaryOut(BaseModel):
     discarded: int
     entity_assessments: int
     warnings: list[str]
+    infos: list[str] = []
 
 
 class RefreshAck(BaseModel):

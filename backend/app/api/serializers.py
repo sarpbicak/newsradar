@@ -149,7 +149,10 @@ def _horizon_and_evidence(
     horizons = [h for h, _ in rows if h]
     horizon = Counter(horizons).most_common(1)[0][0] if horizons else None
 
-    count = analysis.articles_considered or len(rows)
+    # Karttaki "N haber": analiz edilmiş makale sayısı, TAVANLA sınırlı (cap ile tutarlı,
+    # eski 20-kilidi yerine). Kayıtlı articles_considered'a bağlı kalmaz → anında yansır.
+    from ..config import get_settings
+    count = min(len(rows), get_settings().max_articles_per_entity)
     sentiments = [s for _, s in rows if s is not None]
 
     # Kanıt puanı: kanaat + haber sayısı + duygu tutarlılığı.

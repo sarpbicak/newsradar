@@ -139,11 +139,15 @@ const SIGNAL_LEVELS = [
   { key: 2, label: "Güçlü olumlu", color: "#0B7A42" },
 ];
 
+// Beş durumun renk eşlemesi tek yerde. Beklenmedik stance/evidence (büyük-küçük harf,
+// boş) → NÖTR (gri #7A7770). ASLA koyu/siyaha düşmez.
+const NEUTRAL = SIGNAL_LEVELS.find((l) => l.key === 0); // { Nötr, #7A7770 }
 export function overallSignal(stance, evidence) {
-  const base = stance === "bullish" ? 1 : stance === "bearish" ? -1 : 0;
-  const strong = evidence === "strong";
+  const s = String(stance || "").toLowerCase();
+  const base = s === "bullish" ? 1 : s === "bearish" ? -1 : 0;
+  const strong = String(evidence || "").toLowerCase() === "strong";
   const level = base === 0 ? 0 : base > 0 ? (strong ? 2 : 1) : strong ? -2 : -1;
-  return SIGNAL_LEVELS.find((l) => l.key === level) || SIGNAL_LEVELS[2];
+  return SIGNAL_LEVELS.find((l) => l.key === level) || NEUTRAL;
 }
 
 // Durum "pill" stili: güçlü uçlar dolu+beyaz metin; ortalar soluk dolgu+renkli metin.

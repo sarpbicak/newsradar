@@ -102,11 +102,13 @@ export default function App() {
             const parts = [`${sm.fetched_new} yeni haber`, `${sm.analyzed} analiz`];
             if (sm.prefiltered) parts.push(`${sm.prefiltered} ön-filtre`);
             if (sm.discarded) parts.push(`${sm.discarded} elenen`);
+            const warns = sm.warnings || [];
             setNotice({
-              type: sm.warnings.length ? "warn" : "ok",
+              type: warns.length ? "warn" : "ok",
               text: `Yenilendi: ${parts.join(" · ")}.` +
-                (sm.warnings.length ? ` ${sm.warnings.length} uyarı.` : ""),
-              details: sm.warnings,
+                (warns.length ? ` ${warns.length} uyarı.` : ""),
+              details: warns,              // yalnızca GERÇEK uyarılar (amber kutu)
+              infos: sm.infos || [],       // normal atlamalar (soluk, küçük not)
             });
           }
           // isRefreshing artık false → efekt temizlenir, döngü durur.
@@ -405,6 +407,13 @@ export default function App() {
                   <li key={i}>{d}</li>
                 ))}
               </ul>
+            )}
+            {/* Normal atlamalar (tazelik/kota) — çok soluk, küçük not (hata değil) */}
+            {notice.infos?.length > 0 && (
+              <div className="mt-1.5 text-[11px] opacity-50">
+                {notice.infos.length} bilgi (kota koruması): {notice.infos.slice(0, 2).join(" · ")}
+                {notice.infos.length > 2 ? " …" : ""}
+              </div>
             )}
           </div>
         )}

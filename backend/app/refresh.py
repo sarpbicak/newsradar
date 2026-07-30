@@ -35,7 +35,8 @@ class RefreshSummary:
     analyzed: int = 0
     discarded: int = 0
     entity_assessments: int = 0
-    warnings: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)  # gerçek sorunlar
+    infos: list[str] = field(default_factory=list)     # normal bilgi (tazelik/kota atlaması)
 
 
 # --------------------------- Süreç durumu --------------------------- #
@@ -133,6 +134,7 @@ def run_refresh(lookback_hours: int | None = None, manual: bool = False) -> Refr
             for r in fetch_all(session, lookback_hours, manual):
                 summary.fetched_new += r.new_count
                 summary.warnings.extend(f"[{r.entity_name}] {w}" for w in r.warnings)
+                summary.infos.extend(f"[{r.entity_name}] {i}" for i in r.infos)
             prune_quota(session)  # eski api_call kayıtlarını temizle
 
         # 2) Analiz (ön-filtre + paralel). Anahtar yoksa çekme yine geçerli kalır.
