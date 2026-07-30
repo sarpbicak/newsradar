@@ -247,7 +247,7 @@ class AnalystSnapshot(Base):
 
 # İzin verilen kullanım eylemi tipleri (usage_events.event_type).
 USAGE_EVENT_TYPES = (
-    "login", "refresh", "view_entity", "add_entity", "remove_entity",
+    "login", "login_failed", "refresh", "view_entity", "add_entity", "remove_entity",
     "chat", "add_suggestion", "dismiss_suggestion",
 )
 

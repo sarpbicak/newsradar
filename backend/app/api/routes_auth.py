@@ -13,15 +13,17 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import time
 
 import bcrypt
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..config import get_settings
 from ..db.database import get_db
 from ..db.models import User
+from ..security import get_client_ip, login_limiter
 
 router = APIRouter(tags=["auth"])
 
@@ -41,22 +43,19 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 # ----------------------- Kişisel token (Katman 2) ------------------------- #
-# Durumsuz, imzalı token: "<user_id>.<hmac_sha256(app_password, 'user:<id>')>".
-# app_password imza anahtarı olarak kullanılır (zaten gizli); token user_id'yi taşır
-# ve sunucu yeniden başlasa da geçerli kalır. Şifre/hash token'a girmez.
-def make_user_token(user_id: int) -> str:
-    secret = get_settings().app_password
-    sig = hmac.new(secret.encode(), f"user:{user_id}".encode(), hashlib.sha256).hexdigest()
-    return f"{user_id}.{sig}"
+# Durumsuz, imzalı token: "<uid>.<iat>.<hmac_sha256(APP_SECRET, 'uid:iat:pwhash')>".
+# - iat (epoch sn): son kullanma süresi (TOKEN_TTL_DAYS) için.
+# - pwhash imzaya girer (token'da GÖRÜNMEZ): şifre değişince eski token'lar geçersiz olur.
+# - İmza sırrı APP_SECRET (yoksa APP_PASSWORD). Şifre/hash/e-posta token'da TAŞINMAZ.
+def _sign(uid: int, iat: int, password_hash: str, secret: str) -> str:
+    msg = f"{uid}:{iat}:{password_hash}".encode()
+    return hmac.new(secret.encode(), msg, hashlib.sha256).hexdigest()
 
 
-def _user_id_from_token(token: str, secret: str) -> int | None:
-    parts = token.split(".", 1)
-    if len(parts) != 2 or not parts[0].isdigit():
-        return None
-    uid, sig = parts
-    expected = hmac.new(secret.encode(), f"user:{uid}".encode(), hashlib.sha256).hexdigest()
-    return int(uid) if hmac.compare_digest(sig, expected) else None
+def make_user_token(user: User) -> str:
+    iat = int(time.time())
+    sig = _sign(user.id, iat, user.password_hash, get_settings().app_secret)
+    return f"{user.id}.{iat}.{sig}"
 
 
 def _bearer(authorization: str | None) -> str:
@@ -69,17 +68,31 @@ def get_current_user(
     authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ) -> User:
-    """Veri uçları için bağımlılık: geçerli KİŞİSEL token yoksa 401. User döner."""
+    """Veri uçları için bağımlılık: geçerli+süresi dolmamış KİŞİSEL token yoksa 401."""
     settings = get_settings()
-    if not settings.app_password:
-        raise HTTPException(status_code=503, detail="APP_PASSWORD ayarlanmamış; giriş devre dışı.")
+    if not settings.app_secret:
+        raise HTTPException(status_code=503, detail="APP_SECRET/APP_PASSWORD ayarlanmamış; giriş devre dışı.")
+    invalid = HTTPException(status_code=401, detail="Geçersiz veya süresi dolmuş oturum. Lütfen tekrar giriş yapın.")
+
     token = _bearer(authorization)
-    uid = _user_id_from_token(token, settings.app_password) if token else None
-    if uid is None:
-        raise HTTPException(status_code=401, detail="Geçersiz veya eksik oturum. Lütfen giriş yapın.")
+    parts = token.split(".") if token else []
+    if len(parts) != 3 or not parts[0].isdigit() or not parts[1].isdigit():
+        raise invalid  # eski 2-parçalı token dahil → yeniden giriş
+    uid, iat, sig = int(parts[0]), int(parts[1]), parts[2]
+
+    # Süre kontrolü (iat gelecekteyse de reddet — kurcalama).
+    now = int(time.time())
+    ttl = settings.token_ttl_days * 86400
+    if iat > now + 300 or now - iat > ttl:
+        raise invalid
+
     user = db.get(User, uid)
     if user is None:
-        raise HTTPException(status_code=401, detail="Kullanıcı bulunamadı. Lütfen tekrar giriş yapın.")
+        raise invalid
+    # İmza: kullanıcının GÜNCEL pwhash'iyle doğrula → şifre değiştiyse token geçersiz.
+    expected = _sign(uid, iat, user.password_hash, settings.app_secret)
+    if not hmac.compare_digest(sig, expected):
+        raise invalid
     return user
 
 
@@ -104,16 +117,23 @@ class LoginOut(BaseModel):
 
 
 @router.post("/auth/login", response_model=LoginOut)
-def login(payload: LoginIn) -> LoginOut:
-    """Parolayı doğrular; doğruysa oturum token'ı döner, yanlışsa 401."""
+def login(payload: LoginIn, request: Request) -> LoginOut:
+    """Parolayı doğrular; doğruysa oturum token'ı döner, yanlışsa 401. Hız-sınırlı."""
     settings = get_settings()
     if not settings.app_password:
         raise HTTPException(
             status_code=503,
             detail="APP_PASSWORD ayarlanmamış. backend/.env dosyasına ekleyin.",
         )
+    ip = get_client_ip(request)
+    locked = login_limiter.locked_seconds(ip)
+    if locked:
+        raise HTTPException(status_code=429, detail=f"Çok fazla deneme. {locked // 60 + 1} dk sonra tekrar deneyin.")
+    # Sabit-zamanlı karşılaştırma (zamanlama saldırısına karşı).
     if not hmac.compare_digest(payload.password, settings.app_password):
+        login_limiter.record_failure(ip)
         raise HTTPException(status_code=401, detail="Yanlış şifre.")
+    login_limiter.record_success(ip)
     return LoginOut(token=_expected_token(settings.app_password))
 
 

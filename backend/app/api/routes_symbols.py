@@ -11,6 +11,6 @@ router = APIRouter(tags=["symbols"])
 
 
 @router.get("/symbol-search", response_model=list[SymbolResultOut])
-def symbol_search(q: str = Query("", description="Şirket adı ya da sembol")) -> list[SymbolResultOut]:
+def symbol_search(q: str = Query("", max_length=100, description="Şirket adı ya da sembol")) -> list[SymbolResultOut]:
     """Finnhub /search üzerinden sembol önerileri. Anahtar yoksa/hata olursa boş liste."""
     return [SymbolResultOut(**r) for r in search_symbols(q)]

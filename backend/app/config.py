@@ -42,6 +42,14 @@ class Settings:
         # Katman 2 — kişisel hesaplar. Bu kullanıcı adıyla kayıt olan admin olur.
         # Boşsa: İLK kayıt olan kullanıcı otomatik admin olur.
         self.admin_username: str = os.getenv("ADMIN_USERNAME", "").strip()
+        # Oturum token'ı HMAC imza sırrı. Ayrı APP_SECRET önerilir; yoksa APP_PASSWORD'a
+        # düşer (kodda SABİT varsayılan YOK — ikisi de boşsa token üretilemez).
+        self.app_secret: str = os.getenv("APP_SECRET", "").strip() or self.app_password
+        # Token geçerlilik süresi (gün). Süresi geçmiş token 401 döner.
+        self.token_ttl_days: int = int(_env("NEWSRADAR_TOKEN_TTL_DAYS", "30"))
+        # Kayıt sınırı: en fazla bu kadar hesap açılabilir (genel şifreyi bilen biri
+        # sınırsız hesap açmasın). 0 = sınırsız.
+        self.max_users: int = int(_env("NEWSRADAR_MAX_USERS", "10"))
 
         # NOT: Geçersiz bir model adı API'de sessiz boş/404 yanıta yol açabilir;
         # yalnızca geçerli, güncel bir model kullanın.

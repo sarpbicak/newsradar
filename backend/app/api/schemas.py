@@ -4,16 +4,16 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from ..db.models import ENTITY_LANGUAGES, ENTITY_TYPES
 
 
 # --------------------------- İstek modelleri --------------------------- #
 class EntityCreate(BaseModel):
-    name: str
-    type: str
-    query: str
+    name: str = Field(max_length=200)
+    type: str = Field(max_length=20)
+    query: str = Field(max_length=200)
     language: str = "en"
 
     @field_validator("type")
@@ -42,18 +42,18 @@ class EntityCreate(BaseModel):
 
 class ChatRequest(BaseModel):
     entity_id: int
-    messages: list[dict]  # [{role: 'user'|'assistant', content: str}, ...]
+    messages: list[dict] = Field(max_length=50)  # aşırı uzun konuşma reddedilsin
 
 
 # --------------------------- Kullanıcı hesapları --------------------------- #
 class RegisterIn(BaseModel):
-    username: str
-    password: str
+    username: str = Field(max_length=100)   # detay doğrulama route'ta (regex 3–30)
+    password: str = Field(max_length=200)
 
 
 class UserLoginIn(BaseModel):
-    username: str
-    password: str
+    username: str = Field(max_length=100)
+    password: str = Field(max_length=200)
 
 
 class UserOut(BaseModel):

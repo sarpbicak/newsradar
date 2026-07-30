@@ -6,9 +6,10 @@
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from .. import scheduler
@@ -29,11 +30,23 @@ from . import (
 from .routes_auth import get_current_user
 
 logging.basicConfig(level=logging.INFO)
+# GÜVENLİK (kritik): httpx/httpcore INFO seviyesinde tam istek URL'ini loglar; bu URL
+# NewsAPI/Finnhub/FMP anahtarını query parametresi olarak taşır → loglara sır sızar.
+# Bu logger'ları WARNING'e çekerek URL loglamayı kapat.
+for _noisy in ("httpx", "httpcore", "openai", "anthropic"):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
+    # Güvenlik: ayrı APP_SECRET önerilir (token imza sırrı). Yoksa APP_PASSWORD'a
+    # düşülür — çalışır ama uyar; ikisi de boşsa giriş uçları zaten 503 döner.
+    if not os.getenv("APP_SECRET", "").strip():
+        logging.getLogger("newsradar").warning(
+            "APP_SECRET ayarlı değil — token imzası APP_PASSWORD'a düşüyor. "
+            "Üretimde ayrı, güçlü bir APP_SECRET ayarlayın."
+        )
     # Ön-filtre kuralı değiştiyse eski sürümle elenmiş makaleleri yeniden aç
     # (Render'da elle SQL çalıştırılamadığı için açılışta otomatik; idempotent).
     from ..analysis.pipeline import reconcile_prefilter
@@ -61,13 +74,27 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="NewsRadar API", version="1.0", lifespan=lifespan)
 
+
+# Temel güvenlik header'ları — her yanıta eklenir (ucuz sertleştirme).
+@app.middleware("http")
+async def _security_headers(request: Request, call_next):
+    resp = await call_next(request)
+    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+    resp.headers.setdefault("Referrer-Policy", "no-referrer")
+    resp.headers.setdefault("X-Frame-Options", "DENY")
+    return resp
+
+
 # CORS: yerel Vite + FRONTEND_URL (deploy'da Render frontend domain'i).
 # İzinli origin'ler ortam değişkeninden okunur (bkz. config.cors_origins).
+# allow_credentials=False (kimlik Authorization header ile taşınır, cookie yok) →
+# '*' origin bile kimlik hırsızlığına yol açmaz; yine de config '*'e izin vermez (bkz. cors_origins).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().cors_origins,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 # Katman 1 — genel şifre ucu (/auth/login) korumasız; genel token buradan alınır.
