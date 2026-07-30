@@ -77,7 +77,9 @@ class Settings:
         self.analysis_concurrency: int = int(_env("NEWSRADAR_ANALYSIS_CONCURRENCY", "5"))
         # Makale-batch Claude çağrısı için üretim (output) token tavanı. Batch büyük
         # ya da şema genişse artırın; yanıt kesilirse (stop_reason=max_tokens) hata verir.
-        self.max_output_tokens: int = int(_env("NEWSRADAR_MAX_OUTPUT_TOKENS", "8192"))
+        # Türkçe çıktı İngilizceden ~%50 fazla token yer; kesilmeyi önlemek için yüksek
+        # tavan (model bağlamı geniş, çıktı tavanı maliyeti artırmaz — yalnızca kesilmeyi önler).
+        self.max_output_tokens: int = int(_env("NEWSRADAR_MAX_OUTPUT_TOKENS", "16384"))
 
         # Deploy: frontend'in domain'i (CORS). Virgülle birden fazla verilebilir.
         # Boşsa yalnızca yerel Vite (localhost:5173) izinli. "*" = tümüne izin.

@@ -28,6 +28,14 @@ from .claude_client import ClaudeClient, ClaudeError, MissingAPIKeyError
 logger = logging.getLogger("newsradar.llm")
 
 _TEMPERATURE = 0.3  # yapılandırılmış çıktı için düşük (tutarlılık)
+# Kesilme (max_tokens) sinyali sağlayıcıya göre değişir: finish_reason ya da
+# native_finish_reason bunlardan biriyse yanıt yarım kalmıştır.
+_TRUNCATION_MARKERS = {"length", "max_tokens", "maxtokens", "max_output_tokens", "token_limit"}
+
+
+def _is_truncation(finish_reason, native_finish_reason) -> bool:
+    vals = {str(finish_reason).lower(), str(native_finish_reason).lower()}
+    return bool(vals & _TRUNCATION_MARKERS)
 
 
 class LLMProvider:
@@ -146,20 +154,27 @@ class OpenAICompatProvider(LLMProvider):
             }
 
         choice = resp.choices[0]
+        # OpenRouter bazı sağlayıcılarda kesilmeyi finish_reason yerine
+        # native_finish_reason'da bildirir; ikisini de kontrol et.
+        fr = getattr(choice, "finish_reason", None)
+        nfr = getattr(choice, "native_finish_reason", None)
+        truncated = _is_truncation(fr, nfr)
 
-        # KRİTİK: yanıt max_tokens'ta kesildiyse tool argümanları yarım/bozuk JSON olur →
-        # sessizce boş sayılırdı. Hata fırlat (asla yutma).
-        if choice.finish_reason == "length":
-            msg = (f"LLM yanıtı max_tokens'ta kesildi (model={self.model}, "
-                   f"max_tokens={max_tokens}). Batch'i küçültün (NEWSRADAR_BATCH_SIZE) "
-                   "ya da NEWSRADAR_MAX_OUTPUT_TOKENS'ı artırın.")
-            logger.error(msg)
-            raise ClaudeError(msg)
+        trunc_msg = (
+            f"LLM yanıtı max_tokens'ta kesildi (model={self.model}, max_tokens={max_tokens}, "
+            f"finish_reason={fr}/{nfr}). Batch'i küçültün (NEWSRADAR_BATCH_SIZE) ya da "
+            "NEWSRADAR_MAX_OUTPUT_TOKENS'ı artırın."
+        )
+
+        # KRİTİK: yanıt kesildiyse tool argümanları yarım/bozuk JSON olur → hata (asla yutma).
+        if truncated:
+            logger.error(trunc_msg)
+            raise ClaudeError(trunc_msg)
 
         tool_calls = getattr(choice.message, "tool_calls", None)
         if not tool_calls:
             msg = (f"LLM beklenen tool_call'ı döndürmedi (model={self.model}, "
-                   f"finish_reason={choice.finish_reason}). Model/yanıt sorunu olabilir.")
+                   f"finish_reason={fr}/{nfr}). Model/yanıt sorunu olabilir.")
             logger.error(msg)
             raise ClaudeError(msg)
 
@@ -167,9 +182,11 @@ class OpenAICompatProvider(LLMProvider):
         try:
             data = json.loads(raw_args)
         except (json.JSONDecodeError, TypeError) as exc:
-            msg = f"LLM tool argümanları JSON parse edilemedi: {exc}"
-            logger.error("%s | ham: %s", msg, str(raw_args)[:200])
-            raise ClaudeError(msg) from exc
+            # Parse hatası büyük olasılıkla KESİLME'dir (yarım JSON) — bunu böyle bildir ki
+            # otomatik yeniden-dene (batch bölme) tetiklensin.
+            logger.error("LLM JSON parse hatası (muhtemelen kesildi): %s | ham son 80: %s",
+                         exc, str(raw_args)[-80:])
+            raise ClaudeError(trunc_msg) from exc
         if not isinstance(data, dict):
             raise ClaudeError("LLM tool argümanları beklenen nesne (dict) değil.")
         return data

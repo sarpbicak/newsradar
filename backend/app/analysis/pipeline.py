@@ -48,7 +48,18 @@ from .schemas import (
 
 logger = logging.getLogger("newsradar.analysis")
 
+def _effective_batch_size(batch_size: int, language: str | None) -> int:
+    """İngilizce-dışı (ör. Türkçe) çıktı ~%50 fazla token yer → batch'i yarıya indir
+    (tek yanıtta kesilme riskini azalt)."""
+    if (language or "en").lower() != "en":
+        return max(1, batch_size // 2)
+    return batch_size
+
+
 AGGREGATE_LOOKBACK = 20  # entity değerlendirmesinde kaç son makale bağlam olarak verilir
+# Entity değerlendirme çıktısı (headline_verdict + ai_take + summary + drivers + ...);
+# Türkçe uzun metinler için 2000 azdı → 4096 (kesilmeyi önle).
+ENTITY_ASSESSMENT_MAX_TOKENS = 4096
 MAX_ANALYSIS_HISTORY = 100  # entity başına saklanacak en fazla değerlendirme kaydı
 SUGGESTION_TTL_DAYS = 30    # bu süreden eski + az anılan öneriler temizlenir
 
@@ -396,12 +407,13 @@ async def analyze_all_async(
                 totals.warnings.append(f"[{e.name}] ön-filtre hatası (atlandı): {exc}")
                 continue
             totals.prefiltered += pre
-            batches = [payload[i : i + batch_size] for i in range(0, len(payload), batch_size)]
+            ebs = _effective_batch_size(batch_size, e.language)  # Türkçe → yarı batch
+            batches = [payload[i : i + ebs] for i in range(0, len(payload), ebs)]
             # Entity-başı görünürlük: hangi entity kaç makaleyle analize giriyor.
             # "analiz=23 ama AMD 0" gibi durumlar loglardan tek bakışta çözülür.
             logger.info(
-                "[analiz] %s (id=%d, %s:%s) → analize=%d ön-filtre=%d batch=%d",
-                e.name, e.id, e.type, e.query, len(payload), pre, len(batches),
+                "[analiz] %s (id=%d, %s:%s) → analize=%d ön-filtre=%d batch=%d (batch_size=%d)",
+                e.name, e.id, e.type, e.query, len(payload), pre, len(batches), ebs,
             )
             entity_tasks.append(
                 {
@@ -431,12 +443,24 @@ async def analyze_all_async(
             )
 
     async def _run_batch(t: dict, b: list[dict]):
+        """Bir batch'i analiz eder. KESİLME/parse hatasında batch'i İKİYE bölüp yeniden
+        dener (tek uzun yanıt yüzünden entity tümden boş kalmasın)."""
         user = build_article_batch_prompt(t["name"], t["query"], t["type"], b, t["language"])
         try:
             return await _call(ARTICLE_ANALYSIS_TOOL, user, settings.max_output_tokens)
         except ClaudeError as exc:
-            totals.warnings.append(f"[{t['name']}] makale batch atlandı: {exc}")
-            return None
+            if len(b) <= 1:
+                totals.warnings.append(f"[{t['name']}] makale atlandı (tek makale, kesildi): {exc}")
+                return None
+            mid = len(b) // 2
+            logger.info("[analiz] %s batch kesildi → %d makale 2'ye bölünüp yeniden deneniyor",
+                        t["name"], len(b))
+            halves = await asyncio.gather(_run_batch(t, b[:mid]), _run_batch(t, b[mid:]))
+            merged: list[dict] = []
+            for h in halves:
+                if h:
+                    merged.extend(h.get("analyses", []))
+            return {"analyses": merged} if merged else None
 
     async def _process_entity(t: dict):
         nonlocal done
@@ -453,13 +477,13 @@ async def analyze_all_async(
         totals.discarded += applied["discarded"]
         totals.returned += applied["returned"]
         totals.unmatched += applied["unmatched"]
-        # SESSİZ ARIZA KORUMASI: makale gönderdik ama Claude 0 analiz döndürdüyse
+        # SESSİZ ARIZA KORUMASI: makale gönderdik ama LLM 0 analiz döndürdüyse
         # (ör. geçersiz model, boş yanıt) bunu bir uyarı olarak yüzeye çıkar — beş tur
         # teşhise mal olan "sessizce 0" durumu bir daha görünmez kalmasın.
         if t["batches"] and applied["returned"] == 0:
             totals.warnings.append(
-                f"[{t['name']}] Claude 0 analiz döndürdü ({len(t['batches'])} batch "
-                "gönderildi) — model adı/yanıt sorunu olabilir (NEWSRADAR_MODEL?)."
+                f"[{t['name']}] LLM 0 analiz döndürdü ({len(t['batches'])} batch "
+                "gönderildi) — model/endpoint sorunu olabilir (NEWSRADAR_LLM_MODEL?)."
             )
         # Entity-başı sonuç: batch geldi mi, kaç analiz/eleme oldu. AMD gibi takılan
         # bir entity'nin batch_datas boşsa (Claude hatası) burada görünür.
@@ -482,7 +506,7 @@ async def analyze_all_async(
                 price=price_ctx, language=t["language"], analyst=analyst_ctx,
             )
             try:
-                adata = await _call(ENTITY_ANALYSIS_TOOL, user, 2000)
+                adata = await _call(ENTITY_ANALYSIS_TOOL, user, ENTITY_ASSESSMENT_MAX_TOKENS)
                 async with db_lock:
                     await asyncio.to_thread(
                         _write_assessment, t["id"], adata, len(payload), _avg_sentiment(payload)
@@ -544,19 +568,36 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient) -> AnalyzeTotals:
             name, entity_id, etype, query, len(payload), pre,
         )
 
-    batches = [payload[i : i + batch_size] for i in range(0, len(payload), batch_size)]
-    batch_datas: list[dict] = []
-    for b in batches:
+    ebs = _effective_batch_size(batch_size, lang)  # Türkçe → yarı batch
+    batches = [payload[i : i + ebs] for i in range(0, len(payload), ebs)]
+
+    def run_batch_sync(b):
+        """KESİLME/parse hatasında batch'i İKİYE bölüp yeniden dener (recursive)."""
         user = build_article_batch_prompt(name, query, etype, b, lang)
         try:
-            batch_datas.append(
-                client.call_tool(
-                    system=SYSTEM_PROMPT, user=user, tool=ARTICLE_ANALYSIS_TOOL,
-                    max_tokens=settings.max_output_tokens,
-                )
+            return client.call_tool(
+                system=SYSTEM_PROMPT, user=user, tool=ARTICLE_ANALYSIS_TOOL,
+                max_tokens=settings.max_output_tokens,
             )
         except ClaudeError as exc:
-            totals.warnings.append(f"[{name}] makale batch atlandı: {exc}")
+            if len(b) <= 1:
+                totals.warnings.append(f"[{name}] makale atlandı (tek makale, kesildi): {exc}")
+                return None
+            mid = len(b) // 2
+            logger.info("[analiz] %s batch kesildi → %d makale 2'ye bölünüp yeniden deneniyor",
+                        name, len(b))
+            merged: list[dict] = []
+            for half in (b[:mid], b[mid:]):
+                r = run_batch_sync(half)
+                if r:
+                    merged.extend(r.get("analyses", []))
+            return {"analyses": merged} if merged else None
+
+    batch_datas: list[dict] = []
+    for b in batches:
+        r = run_batch_sync(b)
+        if r:
+            batch_datas.append(r)
 
     applied = _apply_article_results(entity_id, batch_datas)
     totals.analyzed += applied["analyzed"]
@@ -573,8 +614,8 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient) -> AnalyzeTotals:
     # SESSİZ ARIZA KORUMASI (bkz. _process_entity): batch gönderildi ama 0 döndüyse uyar.
     if batches and applied["returned"] == 0:
         totals.warnings.append(
-            f"[{name}] Claude 0 analiz döndürdü ({len(batches)} batch gönderildi) — "
-            "model adı/yanıt sorunu olabilir (NEWSRADAR_MODEL?)."
+            f"[{name}] LLM 0 analiz döndürdü ({len(batches)} batch gönderildi) — "
+            "model/endpoint sorunu olabilir (NEWSRADAR_LLM_MODEL?)."
         )
 
     payload2 = _read_assessment_payload(entity_id)
@@ -585,7 +626,8 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient) -> AnalyzeTotals:
         )
         try:
             adata = client.call_tool(
-                system=SYSTEM_PROMPT, user=user, tool=ENTITY_ANALYSIS_TOOL, max_tokens=2000
+                system=SYSTEM_PROMPT, user=user, tool=ENTITY_ANALYSIS_TOOL,
+                max_tokens=ENTITY_ASSESSMENT_MAX_TOKENS,
             )
             _write_assessment(entity_id, adata, len(payload2), _avg_sentiment(payload2))
             totals.entity_assessments += 1
