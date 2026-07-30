@@ -12,18 +12,29 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.api.main:app --host 0.0.0.0 --port $PORT
     envVars:
-      # Sırlar — Render Dashboard'da elle girin (repoya gitmez).
-      - key: APP_PASSWORD
+      # --- Sırlar — Render Dashboard'da elle girin (repoya gitmez) ---
+      - key: APP_PASSWORD           # genel giriş şifresi
         sync: false
-      - key: ANTHROPIC_API_KEY
+      - key: NEWSRADAR_LLM_API_KEY  # OpenRouter anahtarı (analiz motoru)
         sync: false
-      - key: FINNHUB_API_KEY
+      - key: FINNHUB_API_KEY        # ticker haberleri + analist tavsiyesi
         sync: false
-      - key: NEWSAPI_KEY
+      - key: NEWSAPI_KEY            # keyword haberleri
+        sync: false
+      - key: FMP_API_KEY            # analist hedef fiyatı
+        sync: false
+      - key: ANTHROPIC_API_KEY      # Claude — GERİ DÖNÜŞ için (provider=anthropic)
         sync: false
       # Frontend static site'ın adresi (deploy sonrası doldurun).
       - key: FRONTEND_URL
         sync: false
+      # --- LLM motoru: OpenAI-uyumlu endpoint (OpenRouter). Sır değil, sabit. ---
+      - key: NEWSRADAR_LLM_PROVIDER
+        value: openrouter
+      - key: NEWSRADAR_LLM_BASE_URL
+        value: https://openrouter.ai/api/v1
+      - key: NEWSRADAR_LLM_MODEL
+        value: meta-llama/llama-3.3-70b-instruct
       # Kalıcı olmayan diskte DB boş başlamasın diye açılışta seed.
       - key: NEWSRADAR_SEED_ON_START
         value: "on"
