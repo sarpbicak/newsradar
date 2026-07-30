@@ -315,6 +315,8 @@ class User(Base):
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # "NewsRadar ne yapar?" açıklama kutusu kapatıldı mı (kullanıcı tercihi; kalıcı).
     guide_dismissed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # İlk giriş tutorial'ı tamamlandı/kapatıldı mı (bir daha gösterilmez; kalıcı).
+    tutorial_done: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Büyük/küçük harf duyarsız benzersizlik (SQLite functional unique index).
     __table_args__ = (

@@ -45,7 +45,7 @@ def _user_out(u: User) -> UserOut:
     return UserOut(
         id=u.id, username=u.username, is_admin=u.is_admin,
         created_at=u.created_at, last_login_at=u.last_login_at,
-        guide_dismissed=u.guide_dismissed,
+        guide_dismissed=u.guide_dismissed, tutorial_done=u.tutorial_done,
     )
 
 
@@ -129,4 +129,11 @@ def me(user: User = Depends(get_current_user)) -> UserOut:
 def dismiss_guide(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> UserOut:
     """"NewsRadar ne yapar?" açıklama kutusunu kalıcı olarak kapat (kullanıcı tercihi)."""
     user.guide_dismissed = True
+    return _user_out(user)
+
+
+@router.post("/me/tutorial-done", response_model=UserOut)
+def finish_tutorial(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> UserOut:
+    """İlk giriş tutorial'ını tamamlandı işaretle (bir daha gösterilmez)."""
+    user.tutorial_done = True
     return _user_out(user)

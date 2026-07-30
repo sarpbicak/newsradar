@@ -179,6 +179,29 @@ def main():
         c_list = client.get("/entities", headers=C).json()
         check(c_list == [], f"Yeni kullanıcı BOŞ liste (görülen: {len(c_list)} kart)")
 
+        print("\n== TEST 7: Tutorial flag (kalıcı) ==")
+        me = client.get("/users/me", headers=C).json()
+        check(me["tutorial_done"] is False, "Yeni kullanıcı tutorial_done=False")
+        r = client.post("/users/me/tutorial-done", headers=C)
+        check(r.status_code == 200 and r.json()["tutorial_done"] is True, "tutorial-done → True")
+        me2 = client.get("/users/me", headers=C).json()
+        check(me2["tutorial_done"] is True, "Tekrar girişte tutorial_done kalıcı True")
+
+        print("\n== TEST 8: Admin görünürlüğü ==")
+        with session_scope() as db:
+            a_uid = db.query(User).filter(User.username == "usera").first().id
+        # admin: kullanıcı detayında watchlist görünür
+        det = client.get(f"/admin/users/{a_uid}", headers=adm).json()
+        check(det["watchlist_size"] == 15, f"Admin, A'nın 15 şirketini görür (görülen: {det['watchlist_size']})")
+        check(any(e["name"] == "Apple" for e in det["watchlist"]), "A'nın watchlist'inde Apple var")
+        # stats: en çok takip edilen + toplam
+        stats = client.get("/admin/stats", headers=adm).json()
+        check(stats["total_entities"] >= 1, f"total_entities > 0 (görülen: {stats['total_entities']})")
+        check(len(stats["most_followed"]) >= 1, f"most_followed dolu (görülen: {len(stats['most_followed'])})")
+        # normal kullanıcı admin ucuna erişemez
+        r = client.get("/admin/stats", headers=C)
+        check(r.status_code == 403, f"Normal kullanıcı /admin/stats 403 (alınan: {r.status_code})")
+
     print(f"\n{'='*50}\nSONUÇ: {PASS} geçti, {FAIL} başarısız")
     return FAIL == 0
 

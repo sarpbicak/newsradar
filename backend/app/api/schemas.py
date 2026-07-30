@@ -65,6 +65,7 @@ class UserOut(BaseModel):
     created_at: datetime
     last_login_at: datetime | None = None
     guide_dismissed: bool = False   # "NewsRadar ne yapar?" kutusu kapatıldı mı
+    tutorial_done: bool = False     # ilk giriş tutorial'ı tamamlandı mı
 
 
 class UserTokenOut(BaseModel):
@@ -102,6 +103,8 @@ class AdminUserDetail(BaseModel):
     event_counts: dict[str, int]           # {event_type: adet}
     top_entities: list[dict]               # [{name, count}] — en çok view alan
     recent_events: list[AdminEventOut]     # son eylemler (zaman çizelgesi)
+    watchlist: list[dict]                  # [{name, type, query}] — kullanıcının takip ettikleri
+    watchlist_size: int                    # izleme listesi boyutu
 
 
 class AdminStatsOut(BaseModel):
@@ -111,6 +114,8 @@ class AdminStatsOut(BaseModel):
     active_today: int                      # bugün en az 1 eylem yapan kullanıcı
     refreshes_today: int
     top_entities: list[dict]               # [{name, count}] — en popüler (view)
+    most_followed: list[dict]              # [{name, type, followers}] — en çok watchlist'te
+    total_entities: int                    # havuzdaki benzersiz (takip edilen) entity sayısı
 
 
 # --------------------------- Yanıt modelleri --------------------------- #

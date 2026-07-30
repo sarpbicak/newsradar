@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..db.database import get_db
-from ..db.models import UsageEvent, User
+from ..db.models import Entity, UsageEvent, User, UserWatchlist
 from .routes_auth import require_admin
 from .schemas import (
     AdminEventOut,
@@ -101,10 +101,20 @@ def user_detail(user_id: int, db: Session = Depends(get_db)) -> AdminUserDetail:
         .limit(40)
     ).all()
 
+    # Kullanıcının izleme listesi (kim neyi takip ediyor).
+    wl_rows = db.execute(
+        select(Entity.name, Entity.type, Entity.query)
+        .join(UserWatchlist, UserWatchlist.entity_id == Entity.id)
+        .where(UserWatchlist.user_id == user_id)
+        .order_by(UserWatchlist.added_at)
+    ).all()
+    watchlist = [{"name": n, "type": t, "query": q} for n, t, q in wl_rows]
+
     return AdminUserDetail(
         user=UserOut(
             id=user.id, username=user.username, is_admin=user.is_admin,
             created_at=user.created_at, last_login_at=user.last_login_at,
+            guide_dismissed=user.guide_dismissed, tutorial_done=user.tutorial_done,
         ),
         event_counts=event_counts,
         top_entities=_top_entities(db, user_id),
@@ -112,6 +122,8 @@ def user_detail(user_id: int, db: Session = Depends(get_db)) -> AdminUserDetail:
             AdminEventOut(event_type=e.event_type, detail=e.detail, created_at=e.created_at)
             for e in recent
         ],
+        watchlist=watchlist,
+        watchlist_size=len(watchlist),
     )
 
 
@@ -128,9 +140,25 @@ def stats(db: Session = Depends(get_db)) -> AdminStatsOut:
         select(func.count()).select_from(UsageEvent)
         .where(UsageEvent.event_type == "refresh", UsageEvent.created_at >= today)
     ) or 0
+
+    # En çok takip edilen şirketler (kaç kullanıcının watchlist'inde) + toplam benzersiz.
+    followed = db.execute(
+        select(Entity.name, Entity.type, func.count(UserWatchlist.user_id).label("followers"))
+        .join(UserWatchlist, UserWatchlist.entity_id == Entity.id)
+        .group_by(Entity.id)
+        .order_by(func.count(UserWatchlist.user_id).desc())
+        .limit(10)
+    ).all()
+    most_followed = [{"name": n, "type": t, "followers": f} for n, t, f in followed]
+    total_entities = db.scalar(
+        select(func.count(func.distinct(UserWatchlist.entity_id)))
+    ) or 0
+
     return AdminStatsOut(
         total_users=total_users,
         active_today=active_today,
         refreshes_today=refreshes_today,
         top_entities=_top_entities(db, None, limit=8),
+        most_followed=most_followed,
+        total_entities=total_entities,
     )
