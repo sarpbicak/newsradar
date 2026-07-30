@@ -58,7 +58,7 @@ def status(db: Session = Depends(get_db)) -> ProviderStatusOut:
         quota = NewsApiQuotaOut(**newsapi_usage(db))
     return ProviderStatusOut(
         providers=provider_status(),
-        claude=settings.claude_available,
+        claude=settings.llm_available,  # "claude" alan adı geriye uyum; aktif LLM'i yansıtır
         scheduler_enabled=scheduler.is_enabled(),
         newsapi_quota=quota,
         is_running=st["is_running"],

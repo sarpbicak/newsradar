@@ -28,8 +28,6 @@ class Settings:
 
     def __init__(self) -> None:
         self.anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "").strip()
-        # NVIDIA (OpenAI-uyumlu) — barındırılan Llama; ücretsiz endpoint.
-        self.nvidia_api_key: str = os.getenv("NVIDIA_API_KEY", "").strip()
         self.finnhub_api_key: str = os.getenv("FINNHUB_API_KEY", "").strip()
         self.newsapi_key: str = os.getenv("NEWSAPI_KEY", "").strip()
         # FMP (Financial Modeling Prep) — GERÇEK analist hedef fiyatı (Finnhub'da premium).
@@ -52,18 +50,17 @@ class Settings:
         self.max_users: int = int(_env("NEWSRADAR_MAX_USERS", "10"))
 
         # NOT: Geçersiz bir model adı API'de sessiz boş/404 yanıta yol açabilir;
-        # yalnızca geçerli, güncel bir model kullanın.
-        self.model: str = _env("NEWSRADAR_MODEL", "claude-sonnet-4-6")
+        # yalnızca geçerli, güncel bir model kullanın. (Yalnızca provider=anthropic'te
+        # kullanılır; OpenAI-uyumlu endpoint'te model NEWSRADAR_LLM_MODEL'den gelir.)
+        self.anthropic_model: str = _env("NEWSRADAR_MODEL", "claude-sonnet-4-6")
         # LLM seçimi (GERİ DÖNÜLEBİLİR): anthropic → Claude; başka her değer → OpenAI-uyumlu
         # endpoint (OpenRouter/NVIDIA/…). Sorun çıkarsa NEWSRADAR_LLM_PROVIDER=anthropic.
         self.llm_provider: str = _env("NEWSRADAR_LLM_PROVIDER", "openrouter").lower()
         # OpenAI-uyumlu endpoint ayarları. Varsayılan: OpenRouter.
         self.llm_base_url: str = _env("NEWSRADAR_LLM_BASE_URL", "https://openrouter.ai/api/v1")
         self.llm_model: str = _env("NEWSRADAR_LLM_MODEL", "meta-llama/llama-3.3-70b-instruct")
-        # Genel anahtar; yoksa geriye uyum için NVIDIA_API_KEY'e düşer.
-        self.llm_api_key: str = (
-            os.getenv("NEWSRADAR_LLM_API_KEY", "").strip() or self.nvidia_api_key
-        )
+        # OpenAI-uyumlu endpoint anahtarı (OpenRouter/NVIDIA/… — hangisini kullanıyorsan).
+        self.llm_api_key: str = os.getenv("NEWSRADAR_LLM_API_KEY", "").strip()
         self.lookback_hours: int = int(_env("NEWSRADAR_LOOKBACK_HOURS", "48"))
         self.scheduler_enabled: bool = _env("NEWSRADAR_SCHEDULER", "on").lower() == "on"
         # Otomatik yenileme aralığı (saat). Saatlik çok agresif; varsayılan 6.
@@ -130,6 +127,13 @@ class Settings:
     @property
     def claude_available(self) -> bool:
         return bool(self.anthropic_api_key)
+
+    @property
+    def llm_available(self) -> bool:
+        """AKTİF analiz motorunun anahtarı var mı (sağlayıcıya göre)."""
+        if self.llm_provider == "anthropic":
+            return self.claude_available
+        return bool(self.llm_api_key)
 
 
 @lru_cache(maxsize=1)

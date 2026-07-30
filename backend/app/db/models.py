@@ -186,8 +186,6 @@ class Suggestion(Base):
     # ÖNERİLEN şirketin neden gündemde olduğu (şirket-özel, tek cümle). Eski
     # kayıtlarda NULL → kartta hiç gösterilmez.
     why_relevant: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # (Eski alan; makale-alaka gerekçesini tutuyordu — artık gösterilmez, yazılmaz.)
-    sample_rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
     first_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
     dismissed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

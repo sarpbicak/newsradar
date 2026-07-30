@@ -1,15 +1,16 @@
 /** @type {import('tailwindcss').Config} */
-// YUMUŞAK KOYU TEMA + MOR VURGU (Linear/Vercel tarzı). Saf siyah/beyaz YOK.
-//  - ink-*  = yüzeyler/kenarlıklar (koyu taban → bir tık açık kart → ince açık kenarlık)
-//  - slate-* = metin (küçük numara = açık/önemli, büyük numara = soluk)
+// SICAK KAĞIT TEMA + MOR VURGU. Saf siyah/beyaz YOK; zemin krem, metin sıcak siyah.
+//  - ink-*  = yüzeyler/kenarlıklar (900 = krem sayfa → 800 = beyaz kart → açık kenarlık)
+//  - slate-* = metin. DİKKAT: ölçek TERS ÇEVRİLİ. Tailwind'de normalde slate küçük
+//    numara = açık renktir; burada kağıt zemine göre küçük numara = KOYU/önemli metin,
+//    büyük numara = SOLUK metin. (900→100'e geçerken kod aynı kalsın diye ölçek
+//    yeniden eşlendi; yani text-slate-100 = en koyu, text-slate-700 = en soluk.)
 //  - accent = MOR (yalnızca vurgu). Sinyal renkleri (emerald/rose) MOR DEĞİL — sabit.
 export default {
   content: ["./index.html", "./src/**/*.{js,jsx}"],
   theme: {
     extend: {
       colors: {
-        // Yüzeyler: 900 = sayfa zemini (yumuşak koyu), 800 = kart (bir tık açık),
-        // 700 = yükseltilmiş/hover/divide, 600/500 = ince/güçlü açık kenarlık.
         // SICAK KAĞIT: 900 = kağıt zemini (krem), 800 = kart (beyaz), 700 = hover,
         // 600/500 = sıcak açık kenarlıklar.
         ink: {

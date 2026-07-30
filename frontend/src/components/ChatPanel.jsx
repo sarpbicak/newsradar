@@ -1,4 +1,4 @@
-// Entity detayı içindeki sohbet paneli — Claude ile streaming konuşma.
+// Entity detayı içindeki sohbet paneli — AI ile streaming konuşma.
 import React, { useRef, useState, useEffect } from "react";
 import { streamChat } from "../api.js";
 
@@ -54,7 +54,7 @@ export default function ChatPanel({ entityId, entityName }) {
   return (
     <div className="flex h-[520px] flex-col rounded-xl border border-ink-600 bg-ink-800">
       <div className="border-b border-ink-600 px-4 py-2 text-sm font-semibold text-slate-200">
-        💬 {entityName} — haberleri Claude ile konuş
+        💬 {entityName} — haberleri AI ile konuş
       </div>
 
       <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-4">

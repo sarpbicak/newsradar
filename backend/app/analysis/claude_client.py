@@ -40,7 +40,7 @@ class ClaudeClient:
             raise MissingAPIKeyError(
                 "ANTHROPIC_API_KEY tanımlı değil. .env dosyasına anahtarınızı ekleyin."
             )
-        self.model = model or settings.model
+        self.model = model or settings.anthropic_model
         self._client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
 
     def call_tool(
