@@ -104,7 +104,13 @@ class OpenAICompatProvider(LLMProvider):
         self._client = OpenAI(base_url=base_url, api_key=api_key)
         self.model = model or settings.llm_model
         self.base_url = base_url
-        self.last_usage: dict | None = None  # son çağrının token kullanımı (raporlama)
+        self.last_usage: dict | None = None  # son çağrının token kullanımı
+        # Toplam token/çağrı sayacı (maliyet/ölçüm; thread-güvenli).
+        import threading
+        self._usage_lock = threading.Lock()
+        self.total_prompt_tokens = 0
+        self.total_completion_tokens = 0
+        self.call_count = 0
 
     def _raise_for_openai(self, exc: Exception) -> None:
         """OpenAI istisnalarını anlaşılır ClaudeError'a çevirir (429 = rate limit)."""
@@ -144,14 +150,17 @@ class OpenAICompatProvider(LLMProvider):
             logger.error("LLM call_tool hatası: %s", exc)
             self._raise_for_openai(exc)
 
-        # Token kullanımını sakla (maliyet/raporlama).
+        # Token kullanımını sakla + biriktir (maliyet/ölçüm).
         u = getattr(resp, "usage", None)
         if u is not None:
-            self.last_usage = {
-                "prompt_tokens": getattr(u, "prompt_tokens", None),
-                "completion_tokens": getattr(u, "completion_tokens", None),
-                "total_tokens": getattr(u, "total_tokens", None),
-            }
+            pt = getattr(u, "prompt_tokens", 0) or 0
+            ct = getattr(u, "completion_tokens", 0) or 0
+            self.last_usage = {"prompt_tokens": pt, "completion_tokens": ct,
+                               "total_tokens": getattr(u, "total_tokens", pt + ct)}
+            with self._usage_lock:
+                self.total_prompt_tokens += pt
+                self.total_completion_tokens += ct
+                self.call_count += 1
 
         choice = resp.choices[0]
         # OpenRouter bazı sağlayıcılarda kesilmeyi finish_reason yerine

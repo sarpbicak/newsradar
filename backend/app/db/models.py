@@ -123,6 +123,10 @@ class Article(Base):
     # sürümün altındaysa reconcile ile yeniden değerlendirmeye açılır.
     prefilter_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
+    # Aynı haberin kaç kaynakta çıktığı (dedup ile birleşen kopya sayısı). 1 = tekil.
+    # Çok kaynakta çıkması ÖNEM sinyalidir (sentiment tekrarı değil — kopyalar elenir).
+    source_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+
     # Makale-başı analiz (Claude doldurur; analiz edilene kadar analyzed=False)
     analyzed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     analyzed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

@@ -31,6 +31,19 @@ function SentimentBadge({ value }) {
   );
 }
 
+// "N kaynak" rozeti — aynı haber birden çok kaynakta çıktıysa (önem sinyali).
+function SourceCount({ n }) {
+  if (!n || n <= 1) return null;
+  return (
+    <span
+      className="inline-flex items-center rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] font-semibold text-accent"
+      title={`Bu haber ${n} kaynakta çıktı — önem sinyali (kopyalar tek sayıldı)`}
+    >
+      {n} kaynak
+    </span>
+  );
+}
+
 function Title({ a }) {
   return (
     <a
@@ -100,6 +113,7 @@ export default function ArticleTable({ articles }) {
             <Title a={a} />
             <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
               <span>{a.source || "kaynak yok"}</span>
+              <SourceCount n={a.source_count} />
               {a.published_at && (
                 <>
                   <span className="text-slate-600">·</span>
@@ -146,7 +160,9 @@ export default function ArticleTable({ articles }) {
                     </div>
                   )}
                 </td>
-                <td className="px-4 py-3 text-slate-400">{a.source || "–"}</td>
+                <td className="px-4 py-3 text-slate-400">
+                  <span className="inline-flex items-center gap-1.5">{a.source || "–"}<SourceCount n={a.source_count} /></span>
+                </td>
                 <td className="px-4 py-3"><SentimentBadge value={a.sentiment} /></td>
                 <td className="px-4 py-3 text-slate-400">{eventLabel(a.event_type)}</td>
                 <td className="px-4 py-3">

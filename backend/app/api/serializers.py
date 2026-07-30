@@ -251,6 +251,7 @@ def article_out(a: Article) -> ArticleOut:
         url=a.url,
         title=a.title,
         source=a.source,
+        source_count=a.source_count,
         published_at=a.published_at,
         provider=a.provider,
         analyzed=a.analyzed,

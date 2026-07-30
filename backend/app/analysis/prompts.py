@@ -226,11 +226,22 @@ def build_entity_prompt(
         "",
         "ANALİZ EDİLMİŞ HABERLER:",
     ]
+    # Not: Aynı haberin farklı kaynaklardaki kopyaları TEK sayıldı; "N kaynak" = o
+    # haberin ÖNEMİ (kaç yayında çıktı), sentiment tekrarı değil.
+    multi = any((a.get("source_count") or 1) > 1 for a in analyzed)
+    if multi:
+        lines.append(
+            "NOT: Bazı haberler birden çok kaynakta çıktı ('N kaynak'). Bu, o haberin "
+            "ÖNEM/yaygınlık sinyalidir (aynı duyguyu N kez sayma; ama çok kaynaklı "
+            "haberlere daha fazla ağırlık verebilirsin)."
+        )
     for a in analyzed:
         flags = ", ".join(a.get("risk_flags") or []) or "-"
+        sc = a.get("source_count") or 1
+        src = f", {sc} kaynak" if sc > 1 else ""
         lines.append(
             f"• (duygu {a['sentiment']:+.2f}, {a['event_type']}, ufuk {a['impact_horizon']}, "
-            f"riskler: {flags}) {a['title']}"
+            f"riskler: {flags}{src}) {a['title']}"
         )
         if a.get("rationale"):
             lines.append(f"    gerekçe: {a['rationale']}")

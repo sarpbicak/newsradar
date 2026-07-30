@@ -47,6 +47,7 @@ def init_db() -> None:
     models.Base.metadata.create_all(bind=engine)
     # create_all mevcut tabloya kolon EKLEMEZ; eski DB'ler için elle ekle.
     _ensure_column("articles", "prefiltered", "BOOLEAN NOT NULL DEFAULT 0")
+    _ensure_column("articles", "source_count", "INTEGER NOT NULL DEFAULT 1")
     _ensure_column("articles", "prefilter_version", "INTEGER NOT NULL DEFAULT 0")
     _ensure_column("entity_analyses", "avg_sentiment", "FLOAT")
     _ensure_column("entity_analyses", "headline_verdict", "TEXT")

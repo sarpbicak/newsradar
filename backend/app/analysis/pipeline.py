@@ -201,6 +201,67 @@ def _match_terms(name: str, query: str) -> list[str]:
     return list(terms)
 
 
+_STOPWORDS = {
+    "the", "and", "for", "with", "from", "that", "this", "are", "was", "will",
+    "ve", "ile", "bir", "icin", "ama", "gibi", "olan", "daha", "ihracat",
+}
+
+
+def _title_tokens(title: str) -> frozenset[str]:
+    """Başlığı anlamlı kelime kümesine indirger (Türkçe-güvenli, stopword'süz)."""
+    return frozenset(
+        w for w in _normalize(title or "").split()
+        if len(w) >= 4 and w not in _STOPWORDS
+    )
+
+
+def _titles_similar(t1: frozenset, t2: frozenset, thresh: float = 0.6) -> bool:
+    """İki başlık kümesi aynı hikâye mi? Jaccard benzerliği eşiği (senkron kopyaları yakalar)."""
+    if not t1 or not t2:
+        return False
+    inter = len(t1 & t2)
+    union = len(t1 | t2)
+    return union > 0 and inter / union >= thresh
+
+
+def _dedup_by_title(articles: list[Article]) -> tuple[list[Article], int]:
+    """Aynı haberin farklı kaynaklardaki kopyalarını TEK veri noktasına indirger.
+
+    Başlık benzerliğiyle kümeler; her kümeden bir TEMSİLCİ (en uzun açıklamalı) LLM'e
+    gider, kalan kopyalar prefiltered=True işaretlenir (sentiment 3 kez sayılmaz).
+    Temsilcinin source_count'u = kümedeki kopya sayısı (ÖNEM sinyali korunur).
+    Döner: (temsilciler [yeniden→eskiye], elenen kopya sayısı).
+    """
+    clusters: list[dict] = []  # {tokens, members}
+    for a in articles:
+        toks = _title_tokens(a.title)
+        placed = False
+        for c in clusters:
+            if _titles_similar(toks, c["tokens"]):
+                c["members"].append(a)
+                placed = True
+                break
+        if not placed:
+            clusters.append({"tokens": toks, "members": [a]})
+
+    reps: list[Article] = []
+    duplicates = 0
+    for c in clusters:
+        members = c["members"]
+        # Temsilci: en uzun açıklama (LLM'e en çok bağlam). Eşitlikte ilk (en yeni).
+        rep = max(members, key=lambda a: len(a.description or ""))
+        rep.source_count = len(members)
+        reps.append(rep)
+        for a in members:
+            if a is not rep:
+                a.prefiltered = True
+                a.prefilter_version = PREFILTER_VERSION
+                duplicates += 1
+    # En yeni önce, tarihsizler sona (tavan uygulanınca güncel haberler öncelikli).
+    reps.sort(key=lambda a: a.published_at or datetime.min, reverse=True)
+    return reps, duplicates
+
+
 def _prefilter(session: Session, entity: Entity, max_articles: int) -> tuple[list[dict], int]:
     """Bekleyen makaleleri ön-filtreden geçirir; kabul edilenlerin payload'ını döner.
 
@@ -230,14 +291,15 @@ def _prefilter(session: Session, entity: Entity, max_articles: int) -> tuple[lis
     provider = get_provider_for(entity)
     entity_filtered = provider.entity_filtered if provider else False
 
-    # GEVŞEK: sağlayıcı zaten entity'ye göre filtreli → sadece tavan uygula, eleme yok.
+    # GEVŞEK: sağlayıcı zaten entity'ye göre filtreli → eleme yok, ama TEKRARLARI birleştir.
     if entity_filtered:
-        capped = pending[:max_articles]
+        reps, duplicates = _dedup_by_title(pending)  # kopyalar prefiltered işaretlenir
+        capped = reps[:max_articles]
         payload = [
             {"id": a.id, "title": a.title, "source": a.source, "description": a.description}
             for a in capped
         ]
-        return payload, 0
+        return payload, duplicates
 
     # SIKI (yalnızca entity-filtreli OLMAYAN kaynaklar için): Türkçe-güvenli başlık
     # eşleşmesi; başlık/açıklamada isim geçmeyenler elenir.
@@ -253,7 +315,10 @@ def _prefilter(session: Session, entity: Entity, max_articles: int) -> tuple[lis
             a.prefilter_version = PREFILTER_VERSION
             prefiltered += 1
 
-    capped = kept[:max_articles]
+    # Kalanların da tekrarlarını birleştir (aynı hikâye çok kaynakta).
+    reps, duplicates = _dedup_by_title(kept)
+    prefiltered += duplicates
+    capped = reps[:max_articles]
     payload = [
         {"id": a.id, "title": a.title, "source": a.source, "description": a.description}
         for a in capped
@@ -330,6 +395,7 @@ def _read_assessment_payload(entity_id: int) -> list[dict]:
                 "impact_horizon": a.impact_horizon or "short",
                 "risk_flags": a.risk_flags or [],
                 "rationale": a.rationale or "",
+                "source_count": a.source_count or 1,
             }
             for a in articles
         ]

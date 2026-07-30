@@ -72,7 +72,7 @@ class Settings:
         # 4096 max_tokens'a sığmaz, yanıt kesilir. Güvenli varsayılan 10.
         self.batch_size: int = int(_env("NEWSRADAR_BATCH_SIZE", "10"))
         self.max_articles_per_entity: int = int(
-            _env("NEWSRADAR_MAX_ARTICLES_PER_ENTITY", "25")
+            _env("NEWSRADAR_MAX_ARTICLES_PER_ENTITY", "60")
         )
         self.analysis_concurrency: int = int(_env("NEWSRADAR_ANALYSIS_CONCURRENCY", "5"))
         # Makale-batch Claude çağrısı için üretim (output) token tavanı. Batch büyük

@@ -203,6 +203,7 @@ class ArticleOut(BaseModel):
     url: str
     title: str
     source: str
+    source_count: int = 1   # aynı haber kaç kaynakta çıktı (dedup); >1 = önem sinyali
     published_at: datetime | None
     provider: str
     analyzed: bool
