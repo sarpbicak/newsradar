@@ -1,7 +1,7 @@
 // Entity detay: ÜSTTE sabit özet (ad · hüküm · sinyal · Yön/Vade/Kanıt · fiyat/hedef),
 // ALTTA sekmeler (Özet / Grafikler / Haberler / Analistler). Her şey aynı ekranda değil.
 import React, { useEffect, useState } from "react";
-import { ChevronLeft, FileText, TrendingUp, Newspaper, BarChart3, Sparkles } from "lucide-react";
+import { ChevronLeft, FileText, TrendingUp, Newspaper, BarChart3, Sparkles, Lock } from "lucide-react";
 import { api } from "../api.js";
 import {
   StanceBadge, RiskScore, RiskDelta, TrendArrow, PriceDisplay, stanceLabel,
@@ -210,10 +210,27 @@ export default function EntityDetail({ entityId, onBack }) {
   );
 }
 
-// Özet sekmesi: Claude yorumu (üstte) + risk + özet + ana etkenler + doğrulama + invalidation.
+// Özet sekmesi: (özel şirket notu) + AI yorumu (üstte) + risk + özet + ana etkenler + doğrulama + invalidation.
 function SummaryTab({ a, entity }) {
+  const isPrivate = entity.type !== "ticker";
   return (
     <div className="space-y-4">
+      {/* Özel şirket açıklaması — kartla aynı; neden fiyat/analist verisi olmadığını söyler */}
+      {isPrivate && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-ink-600 bg-ink-800 p-4">
+          <Lock className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+          <div>
+            <div className="text-sm font-semibold text-slate-200">
+              Özel şirket — borsada işlem görmüyor
+            </div>
+            <p className="mt-0.5 text-[13px] leading-relaxed text-slate-400">
+              {entity.name} halka açık olmadığı için fiyat ve analist hedefi yok.
+              Aşağıdaki değerlendirme yalnızca haber akışına dayanıyor.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* "AI ne düşünüyor?" — bütünsel yorum (varsa) */}
       {a.ai_take && (
         <div className="rounded-xl border border-accent/30 bg-accent/10 p-5">

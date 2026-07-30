@@ -5,7 +5,7 @@
 // 4) Meta (küçük soluk: vade · N haber · yön değişti)
 // Tüm kartlar aynı yükseklik (h-full + flex; fiyat+meta alta yapışır).
 import React from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Lock } from "lucide-react";
 import { SignalPill, overallSignal, AnimatedNumber, horizonLabel } from "./ui.jsx";
 
 // Kompakt analist barı — al/tut/sat segmentleri + baskın görüş + analist sayısı.
@@ -41,8 +41,34 @@ function AnalystMiniBar({ a }) {
   );
 }
 
+// Özel (borsada işlem görmeyen) şirket bilgi kutusu — fiyat bloğunun yerini alır.
+const PRIVATE_SHELL = "rounded-lg border border-ink-600 bg-ink-900/40 px-3 py-2.5";
+function PrivateCompanyBox() {
+  return (
+    <div className={PRIVATE_SHELL}>
+      <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-300">
+        <Lock className="h-3.5 w-3.5 text-slate-500" />
+        Özel şirket — borsada işlem görmüyor
+      </div>
+      <div className="mt-1 text-[11px] leading-snug text-slate-500">
+        Halka açık olmadığı için fiyat ve analist hedefi yok. Değerlendirme
+        yalnızca haber akışına dayanıyor.
+      </div>
+    </div>
+  );
+}
+
+// Özel şirket kartında analist barının yerini alır: en önemli tek etken.
+function TopDriverLine({ text }) {
+  return (
+    <div className="flex items-baseline gap-1.5 text-[11px]">
+      <span className="shrink-0 font-medium text-slate-500">Öne çıkan:</span>
+      <span className="min-w-0 flex-1 truncate text-slate-400">{text}</span>
+    </div>
+  );
+}
+
 function PriceBox({ card }) {
-  const isTicker = card.type === "ticker";
   const price = card.price;
   const target = card.analyst?.target_mean;
   const upside = card.analyst?.upside_percent;
@@ -50,13 +76,11 @@ function PriceBox({ card }) {
   // Ortak kutu kabuğu — tüm kartlarda aynı yükseklik.
   const shell = "rounded-lg border border-ink-600 bg-ink-900/40 px-3 py-2.5";
 
-  // Keyword ya da fiyatsız: aynı kutu, ortalanmış açıklama.
-  if (!isTicker || price == null) {
+  // Ticker ama fiyat yok: aynı kutu, ortalanmış açıklama.
+  if (price == null) {
     return (
       <div className={`${shell} text-center`}>
-        <div className="text-sm text-slate-400">
-          {isTicker ? "Fiyat verisi yok" : "Borsada işlem görmüyor"}
-        </div>
+        <div className="text-sm text-slate-400">Fiyat verisi yok</div>
         <div className="mt-0.5 text-[10px] text-slate-500">sadece haber analizi</div>
       </div>
     );
@@ -157,11 +181,21 @@ export default function EntityCard({ card, onOpen, big = false }) {
             {a.headline_verdict || a.summary}
           </p>
 
-          {/* Satır 3 + analist + meta alta yapışır (tüm kartlar hizalı) */}
+          {/* Satır 3 + analist/etken + meta alta yapışır (tüm kartlar hizalı) */}
           <div className="mt-auto space-y-2.5">
-            <PriceBox card={card} />
-            {/* Analist barı — yalnızca ticker + tavsiye verisi olan */}
-            {card.type === "ticker" && card.analyst?.total > 0 && <AnalystMiniBar a={card.analyst} />}
+            {card.type === "ticker" ? (
+              <>
+                <PriceBox card={card} />
+                {/* Analist barı — yalnızca tavsiye verisi olan ticker'da */}
+                {card.analyst?.total > 0 && <AnalystMiniBar a={card.analyst} />}
+              </>
+            ) : (
+              <>
+                {/* Özel şirket: fiyat/analist yerine bilgi kutusu + en önemli etken */}
+                <PrivateCompanyBox />
+                {a.top_drivers?.[0] && <TopDriverLine text={a.top_drivers[0]} />}
+              </>
+            )}
             <div className="text-xs text-slate-500">
               {horizonLabel(card.horizon)} vade
               <span className="text-slate-600"> · </span>
