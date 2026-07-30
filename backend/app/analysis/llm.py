@@ -1,10 +1,14 @@
-"""LLM sağlayıcı soyutlaması — GERİ DÖNÜLEBİLİR.
+"""LLM sağlayıcı soyutlaması — GERİ DÖNÜLEBİLİR + OpenAI-uyumlu HERHANGİ bir endpoint.
 
-Analiz motoru env ile seçilir: NEWSRADAR_LLM_PROVIDER = nvidia (varsayılan) | anthropic.
+Analiz motoru env ile seçilir: NEWSRADAR_LLM_PROVIDER = anthropic → Claude; başka her
+değer (openrouter/nvidia/…) → OpenAICompatProvider. OpenAI-uyumlu sağlayıcı üç env'den
+okur: NEWSRADAR_LLM_BASE_URL, NEWSRADAR_LLM_API_KEY, NEWSRADAR_LLM_MODEL. Böylece
+OpenRouter, NVIDIA, Together, yerel vLLM… hepsi tek kodla çalışır.
+
 Claude kodu (claude_client.ClaudeClient) SİLİNMEZ; AnthropicProvider onu sarar. Bir
 sorun çıkarsa NEWSRADAR_LLM_PROVIDER=anthropic ile tek değişkenle geri dönülür.
 
-Her iki sağlayıcı da aynı sözleşmeyi sunar:
+Sözleşme:
   call_tool(system, user, tool, max_tokens) -> dict   (zorunlu tool-use → JSON)
   stream_chat(system, messages, max_tokens) -> Iterator[str]
 
@@ -17,14 +21,12 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Iterator
-from typing import Any
 
 from ..config import get_settings
 from .claude_client import ClaudeClient, ClaudeError, MissingAPIKeyError
 
 logger = logging.getLogger("newsradar.llm")
 
-_NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
 _TEMPERATURE = 0.3  # yapılandırılmış çıktı için düşük (tutarlılık)
 
 
@@ -68,32 +70,45 @@ def to_openai_tool(anthropic_tool: dict) -> dict:
     }
 
 
-# --------------------------- NVIDIA (yeni) --------------------------- #
-class NvidiaProvider(LLMProvider):
-    """NVIDIA'da barındırılan Llama (OpenAI-uyumlu API). Ücretsiz endpoint."""
+# ----------------- OpenAI-uyumlu genel sağlayıcı (OpenRouter/NVIDIA/…) ----------------- #
+class OpenAICompatProvider(LLMProvider):
+    """OpenAI-uyumlu HERHANGİ bir endpoint (OpenRouter, NVIDIA, Together, vLLM…).
 
-    def __init__(self, model: str | None = None) -> None:
+    base_url / api_key / model doğrudan verilir ya da env'den (config) okunur.
+    """
+
+    def __init__(
+        self,
+        base_url: str | None = None,
+        api_key: str | None = None,
+        model: str | None = None,
+    ) -> None:
         settings = get_settings()
-        if not settings.nvidia_api_key:
+        base_url = base_url or settings.llm_base_url
+        api_key = api_key or settings.llm_api_key
+        if not api_key:
             raise MissingAPIKeyError(
-                "NVIDIA_API_KEY tanımlı değil. .env dosyasına anahtarınızı ekleyin."
+                "NEWSRADAR_LLM_API_KEY tanımlı değil (OpenAI-uyumlu endpoint için gerekli). "
+                ".env dosyasına ekleyin."
             )
         from openai import OpenAI  # tembel import — anthropic yolunda gerekmez
 
-        self._client = OpenAI(base_url=_NVIDIA_BASE_URL, api_key=settings.nvidia_api_key)
+        self._client = OpenAI(base_url=base_url, api_key=api_key)
         self.model = model or settings.llm_model
+        self.base_url = base_url
+        self.last_usage: dict | None = None  # son çağrının token kullanımı (raporlama)
 
     def _raise_for_openai(self, exc: Exception) -> None:
         """OpenAI istisnalarını anlaşılır ClaudeError'a çevirir (429 = rate limit)."""
         import openai
 
         if isinstance(exc, openai.RateLimitError):
-            raise ClaudeError("NVIDIA rate limit (429) — kısa süre bekleyin.") from exc
+            raise ClaudeError("LLM rate limit (429) — kısa süre bekleyin.") from exc
         if isinstance(exc, openai.APIStatusError):
-            raise ClaudeError(f"NVIDIA API hatası ({exc.status_code}): {exc.message}") from exc
+            raise ClaudeError(f"LLM API hatası ({exc.status_code}): {exc.message}") from exc
         if isinstance(exc, openai.APIConnectionError):
-            raise ClaudeError(f"NVIDIA bağlantı hatası: {exc}") from exc
-        raise ClaudeError(f"NVIDIA beklenmeyen hata: {exc}") from exc
+            raise ClaudeError(f"LLM bağlantı hatası: {exc}") from exc
+        raise ClaudeError(f"LLM beklenmeyen hata: {exc}") from exc
 
     def call_tool(self, *, system: str, user: str, tool: dict, max_tokens: int = 4096) -> dict:
         """Zorunlu tool-use ile yapılandırılmış JSON döndürür.
@@ -118,15 +133,24 @@ class NvidiaProvider(LLMProvider):
                 tool_choice={"type": "function", "function": {"name": name}},
             )
         except openai.OpenAIError as exc:
-            logger.error("NVIDIA call_tool hatası: %s", exc)
+            logger.error("LLM call_tool hatası: %s", exc)
             self._raise_for_openai(exc)
+
+        # Token kullanımını sakla (maliyet/raporlama).
+        u = getattr(resp, "usage", None)
+        if u is not None:
+            self.last_usage = {
+                "prompt_tokens": getattr(u, "prompt_tokens", None),
+                "completion_tokens": getattr(u, "completion_tokens", None),
+                "total_tokens": getattr(u, "total_tokens", None),
+            }
 
         choice = resp.choices[0]
 
         # KRİTİK: yanıt max_tokens'ta kesildiyse tool argümanları yarım/bozuk JSON olur →
         # sessizce boş sayılırdı. Hata fırlat (asla yutma).
         if choice.finish_reason == "length":
-            msg = (f"NVIDIA yanıtı max_tokens'ta kesildi (model={self.model}, "
+            msg = (f"LLM yanıtı max_tokens'ta kesildi (model={self.model}, "
                    f"max_tokens={max_tokens}). Batch'i küçültün (NEWSRADAR_BATCH_SIZE) "
                    "ya da NEWSRADAR_MAX_OUTPUT_TOKENS'ı artırın.")
             logger.error(msg)
@@ -134,7 +158,7 @@ class NvidiaProvider(LLMProvider):
 
         tool_calls = getattr(choice.message, "tool_calls", None)
         if not tool_calls:
-            msg = (f"NVIDIA beklenen tool_call'ı döndürmedi (model={self.model}, "
+            msg = (f"LLM beklenen tool_call'ı döndürmedi (model={self.model}, "
                    f"finish_reason={choice.finish_reason}). Model/yanıt sorunu olabilir.")
             logger.error(msg)
             raise ClaudeError(msg)
@@ -143,11 +167,11 @@ class NvidiaProvider(LLMProvider):
         try:
             data = json.loads(raw_args)
         except (json.JSONDecodeError, TypeError) as exc:
-            msg = f"NVIDIA tool argümanları JSON parse edilemedi: {exc}"
+            msg = f"LLM tool argümanları JSON parse edilemedi: {exc}"
             logger.error("%s | ham: %s", msg, str(raw_args)[:200])
             raise ClaudeError(msg) from exc
         if not isinstance(data, dict):
-            raise ClaudeError("NVIDIA tool argümanları beklenen nesne (dict) değil.")
+            raise ClaudeError("LLM tool argümanları beklenen nesne (dict) değil.")
         return data
 
     def stream_chat(self, *, system: str, messages: list[dict], max_tokens: int = 4096) -> Iterator[str]:
@@ -169,13 +193,18 @@ class NvidiaProvider(LLMProvider):
             self._raise_for_openai(exc)
 
 
+# Geriye uyum adı (eski kod/testler NvidiaProvider'ı çağırabilir).
+NvidiaProvider = OpenAICompatProvider
+
+
 # ------------------------------- Fabrika ------------------------------- #
 def get_llm_provider(model: str | None = None) -> LLMProvider:
-    """Env'e göre sağlayıcı döner. Varsayılan: nvidia. Geri dönüş: anthropic."""
+    """Env'e göre sağlayıcı döner. anthropic → Claude; başka her değer → OpenAI-uyumlu
+    endpoint (NEWSRADAR_LLM_BASE_URL/API_KEY/MODEL). Varsayılan: OpenAI-uyumlu."""
     provider = get_settings().llm_provider
     if provider == "anthropic":
         return AnthropicProvider(model)
-    return NvidiaProvider(model)  # varsayılan
+    return OpenAICompatProvider(model=model)  # varsayılan (openrouter/nvidia/…)
 
 
 def provider_name() -> str:
