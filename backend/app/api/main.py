@@ -67,6 +67,18 @@ async def lifespan(_app: FastAPI):
         from ..seed import seed
 
         seed()
+    # BİR KEZLİK migration: pre-watchlist ORTAK listeyi admin'e devret (idempotent).
+    # seed'den SONRA çalışır ki seed'lenen entity'ler de admin'e taşınabilsin.
+    try:
+        from ..db.database import session_scope
+        from ..watchlist import backfill_watchlist_to_admin
+
+        with session_scope() as _s:
+            moved = backfill_watchlist_to_admin(_s)
+        if moved:
+            _log.info("Watchlist migration: %d entity admin'in listesine devredildi.", moved)
+    except Exception:  # noqa: BLE001 — migration hatası açılışı çökertmesin
+        _log.exception("Watchlist backfill migration başarısız (atlandı).")
     scheduler.start()
     yield
     scheduler.shutdown()

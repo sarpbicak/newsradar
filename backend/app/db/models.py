@@ -94,6 +94,31 @@ class Entity(Base):
     __table_args__ = (UniqueConstraint("type", "query", name="uq_entity_type_query"),)
 
 
+class UserWatchlist(Base):
+    """Kişisel izleme listesi (kullanıcı ↔ entity, many-to-many).
+
+    MİMARİ: entity'ler ORTAK havuzda (bir kez analiz edilir); "kim neyi takip
+    ediyor" bu tabloda kişiseldir. Bir kullanıcının listesi = buradaki kendi
+    satırları. Bir entity en az bir satırda geçiyorsa aktiftir (analiz edilir);
+    hiçbirinde geçmiyorsa pasif olur (silinmez — havuzda kalır, veri hazır durur).
+    """
+
+    __tablename__ = "user_watchlist"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    entity_id: Mapped[int] = mapped_column(
+        ForeignKey("entities.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    added_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "entity_id", name="uq_user_watchlist"),
+    )
+
+
 class Article(Base):
     """Bir haber makalesi + (varsa) makale-başı Claude analizi."""
 
@@ -191,6 +216,29 @@ class Suggestion(Base):
     dismissed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     __table_args__ = (UniqueConstraint("norm_key", name="uq_suggestion_norm"),)
+
+
+class SuggestionDismissal(Base):
+    """Bir kullanıcının bir öneriyi kapatması (KİŞİSEL — başkasını etkilemez).
+
+    Öneri tablosu ortak (co-mention havuzu) ama "kapatma" kişiseldir: A kullanıcısı
+    bir öneriyi kapatınca yalnızca A'da gizlenir; B hâlâ görebilir (izolasyon).
+    """
+
+    __tablename__ = "suggestion_dismissals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    suggestion_id: Mapped[int] = mapped_column(
+        ForeignKey("suggestions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    dismissed_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "suggestion_id", name="uq_suggestion_dismissal"),
+    )
 
 
 class PriceSnapshot(Base):
