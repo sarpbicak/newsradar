@@ -48,6 +48,11 @@ class Settings:
         # Kayıt sınırı: en fazla bu kadar hesap açılabilir (genel şifreyi bilen biri
         # sınırsız hesap açmasın). 0 = sınırsız.
         self.max_users: int = int(_env("NEWSRADAR_MAX_USERS", "10"))
+        # Kişi başı kotalar (admin muaf). 0 = sınırsız.
+        # max_entities_per_user: normal kullanıcının izleme listesi üst sınırı.
+        # max_refresh_per_day: normal kullanıcının 24 saatte elle yenileme hakkı.
+        self.max_entities_per_user: int = int(_env("NEWSRADAR_MAX_ENTITIES_PER_USER", "15"))
+        self.max_refresh_per_day: int = int(_env("NEWSRADAR_MAX_REFRESH_PER_DAY", "5"))
 
         # NOT: Geçersiz bir model adı API'de sessiz boş/404 yanıta yol açabilir;
         # yalnızca geçerli, güncel bir model kullanın. (Yalnızca provider=anthropic'te

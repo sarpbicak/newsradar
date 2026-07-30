@@ -12,8 +12,11 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from sqlalchemy import exists
+
 from ..db.database import get_db
-from ..db.models import Entity, Suggestion, User
+from ..db.models import Entity, Suggestion, SuggestionDismissal, User
+from ..watchlist import add_to_watchlist, can_add_entity, in_watchlist, user_entity_ids
 from .routes_auth import get_current_user
 from .schemas import EntityCardOut, SuggestionOut
 from .serializers import entity_card
@@ -57,15 +60,6 @@ def resolve_add_target(sug: Suggestion) -> tuple[str, str, str]:
     return "keyword", sug.name.strip(), (sug.source_language or "en")
 
 
-def _watchlist_terms(db: Session) -> set[str]:
-    """İzleme listesindeki tüm isim ve query'lerin lowercase kümesi (eşleşme için)."""
-    terms: set[str] = set()
-    for name, query in db.execute(select(Entity.name, Entity.query)).all():
-        terms.add(name.strip().lower())
-        terms.add(query.strip().lower())
-    return terms
-
-
 def _in_watchlist(sug: Suggestion, terms: set[str]) -> bool:
     if sug.name.strip().lower() in terms:
         return True
@@ -92,10 +86,32 @@ def _suggestion_out(db: Session, sug: Suggestion, name_by_id: dict[int, str]) ->
 
 
 @router.get("", response_model=list[SuggestionOut])
-def list_suggestions(db: Session = Depends(get_db)) -> list[SuggestionOut]:
-    """Filtrelenmiş öneriler: dismissed değil, ≥3 anılma, izleme listesinde yok."""
-    terms = _watchlist_terms(db)
-    name_by_id = {e.id: e.name for e in db.scalars(select(Entity)).all()}
+def list_suggestions(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> list[SuggestionOut]:
+    """KİŞİSEL öneriler: yalnızca KULLANICININ listesindeki entity'lerin haberlerinden
+    çıkan co-mention'lar; kullanıcının zaten takip ettikleri + kişisel kapatılanlar hariç.
+
+    İZOLASYON: öneri ancak kaynak entity'lerinden (source_entity_ids) en az biri
+    kullanıcının listesindeyse gösterilir; kaynak adları da kullanıcının entity'leriyle
+    sınırlıdır (başka kullanıcının neyi takip ettiği sızmaz).
+    """
+    my_ids = user_entity_ids(db, user.id)
+    if not my_ids:
+        return []
+    # Kullanıcının entity'lerinin isim+query'leri (zaten takip edilenleri elemek için)
+    # ve kaynak adı gösterimi için yalnızca kendi entity'leri.
+    my_terms: set[str] = set()
+    name_by_id: dict[int, str] = {}
+    for e in db.scalars(select(Entity).where(Entity.id.in_(my_ids))).all():
+        my_terms.add(e.name.strip().lower())
+        my_terms.add(e.query.strip().lower())
+        name_by_id[e.id] = e.name
+
+    dismissed = set(db.scalars(
+        select(SuggestionDismissal.suggestion_id).where(SuggestionDismissal.user_id == user.id)
+    ).all())
 
     rows = db.scalars(
         select(Suggestion)
@@ -105,7 +121,12 @@ def list_suggestions(db: Session = Depends(get_db)) -> list[SuggestionOut]:
 
     out: list[SuggestionOut] = []
     for s in rows:
-        if _in_watchlist(s, terms):
+        if s.id in dismissed:
+            continue
+        # Kaynak, kullanıcının takip ettiği en az bir entity'yi içermeli (kişisel alaka).
+        if not (set(s.source_entity_ids or []) & my_ids):
+            continue
+        if _in_watchlist(s, my_terms):
             continue
         out.append(_suggestion_out(db, s, name_by_id))
         if len(out) >= MAX_RESULTS:
@@ -119,11 +140,27 @@ def dismiss_suggestion(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> None:
+    """Öneriyi YALNIZCA bu kullanıcı için kapatır (KİŞİSEL — başkasını etkilemez)."""
     sug = db.get(Suggestion, suggestion_id)
     if sug is None:
         raise HTTPException(status_code=404, detail="Öneri bulunamadı.")
-    sug.dismissed = True
+    already = db.scalar(select(exists().where(
+        SuggestionDismissal.user_id == user.id,
+        SuggestionDismissal.suggestion_id == suggestion_id,
+    )))
+    if not already:
+        db.add(SuggestionDismissal(user_id=user.id, suggestion_id=suggestion_id))
     record_event(db, user.id, "dismiss_suggestion", {"name": sug.name})
+
+
+def _dismiss_for_user(db: Session, user_id: int, suggestion_id: int) -> None:
+    """Öneriyi bu kullanıcı için kapat (idempotent; global DEĞİL)."""
+    already = db.scalar(select(exists().where(
+        SuggestionDismissal.user_id == user_id,
+        SuggestionDismissal.suggestion_id == suggestion_id,
+    )))
+    if not already:
+        db.add(SuggestionDismissal(user_id=user_id, suggestion_id=suggestion_id))
 
 
 @router.post("/{suggestion_id}/add", response_model=EntityCardOut, status_code=201)
@@ -132,25 +169,36 @@ def add_suggestion(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> EntityCardOut:
-    """Öneriyi izleme listesine entity olarak ekler ve öneriyi dismiss eder.
+    """Öneriyi KULLANICININ listesine ekler (havuz-farkında) ve öneriyi KİŞİSEL kapatır.
 
-    Tip seçimi: ticker VAR ve is_public=True ise ticker; aksi halde keyword.
+    Tip seçimi: ticker VAR ve is_public=True + ABD ise ticker; aksi halde keyword.
+    Entity havuzda varsa yalnızca listeye eklenir (yeni analiz yok).
     """
     sug = db.get(Suggestion, suggestion_id)
     if sug is None:
         raise HTTPException(status_code=404, detail="Öneri bulunamadı.")
 
+    ok, limit = can_add_entity(db, user)
+    if not ok:
+        raise HTTPException(
+            status_code=403,
+            detail=f"En fazla {limit} şirket takip edebilirsiniz. Yeni eklemek için birini çıkarın.",
+        )
+
     # ABD borsası + halka açık + İngilizce kaynak ise ticker; aksi halde keyword
     # + kaynak dili (Türk/Avrupa şirketleri Finnhub'da çalışmaz → keyword).
     etype, query, language = resolve_add_target(sug)
 
-    sug.dismissed = True  # her durumda öneriyi kaldır
+    _dismiss_for_user(db, user.id, suggestion_id)  # yalnızca bu kullanıcı için kaldır
 
-    # Zaten varsa mevcut entity'yi döndür (çakışmayı tolere et).
+    # Havuzda varsa: yalnızca kullanıcının listesine ekle (yeni entity/analiz yok).
     existing = db.scalar(
         select(Entity).where(Entity.type == etype, Entity.query == query)
     )
     if existing is not None:
+        if not in_watchlist(db, user.id, existing.id):
+            add_to_watchlist(db, user.id, existing.id)
+        record_event(db, user.id, "add_suggestion", {"entity_id": existing.id, "name": existing.name})
         return entity_card(db, existing)
 
     entity = Entity(name=sug.name.strip(), type=etype, query=query, language=language)
@@ -159,15 +207,17 @@ def add_suggestion(
         db.flush()
     except IntegrityError:
         db.rollback()
-        # Yarış durumunda: dismiss'i tekrar uygula ve mevcut olanı döndür.
-        again = db.get(Suggestion, suggestion_id)
-        if again:
-            again.dismissed = True
         existing = db.scalar(
             select(Entity).where(Entity.type == etype, Entity.query == query)
         )
-        if existing is not None:
-            return entity_card(db, existing)
-        raise HTTPException(status_code=409, detail="Entity eklenemedi.")
+        if existing is None:
+            raise HTTPException(status_code=409, detail="Entity eklenemedi.")
+        _dismiss_for_user(db, user.id, suggestion_id)
+        if not in_watchlist(db, user.id, existing.id):
+            add_to_watchlist(db, user.id, existing.id)
+        record_event(db, user.id, "add_suggestion", {"entity_id": existing.id, "name": existing.name})
+        return entity_card(db, existing)
+
+    add_to_watchlist(db, user.id, entity.id)
     record_event(db, user.id, "add_suggestion", {"entity_id": entity.id, "name": entity.name})
     return entity_card(db, entity)

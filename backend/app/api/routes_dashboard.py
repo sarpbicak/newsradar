@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..db.database import get_db
 from ..db.models import Article, Entity, User
+from ..watchlist import in_watchlist
 from .routes_auth import get_current_user
 from .schemas import ArticleStatusOut, DashboardOut
 from .serializers import article_out, entity_card, price_history, risk_history
@@ -24,7 +25,9 @@ def entity_dashboard(
     user: User = Depends(get_current_user),
 ) -> DashboardOut:
     entity = db.get(Entity, entity_id)
-    if entity is None:
+    # İZOLASYON: kullanıcının kendi listesinde OLMAYAN entity'nin detayına erişemez.
+    # Var olmayan gibi 404 (varlığını bile sızdırma — başkasının takip ettiği ortaya çıkmasın).
+    if entity is None or not in_watchlist(db, user.id, entity_id):
         raise HTTPException(status_code=404, detail="Entity bulunamadı.")
     record_event(db, user.id, "view_entity", {"entity_id": entity.id, "name": entity.name})
 
