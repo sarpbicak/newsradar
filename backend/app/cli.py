@@ -74,15 +74,17 @@ def cmd_fetch(args: argparse.Namespace) -> None:
 
 
 def cmd_analyze(args: argparse.Namespace) -> None:
-    from .analysis.claude_client import ClaudeClient, MissingAPIKeyError
+    from .analysis.claude_client import MissingAPIKeyError
+    from .analysis.llm import get_llm_provider, provider_name
     from .analysis.pipeline import analyze_entity_sync
 
     init_db()
     try:
-        client = ClaudeClient()
+        client = get_llm_provider()
     except MissingAPIKeyError as exc:
         print(exc)
         sys.exit(1)
+    print(f"(LLM sağlayıcı: {provider_name()} · model: {client.model})")
 
     with session_scope() as session:
         # diagnose ile AYNI geniş eşleşmeyi kullan — hangi entity'ye çözüldüğü

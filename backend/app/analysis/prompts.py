@@ -71,7 +71,12 @@ haber akışına dayalı bir hisse/varlık risk analistisin.
    O ŞİRKETİN (analiz edilen varlığın değil) neden gündemde olduğunu tek cümle TÜRKÇE yaz \
    (ör. "AMD, MI400 ile NVIDIA'nın veri merkezi payını hedefliyor"). Emin değilsen null.
 
-DİL: Tüm çıktı ve gerekçeler TÜRKÇE olmalı.
+DİL (KATI): TÜM metin alanları (rationale, summary, ai_take, headline_verdict, top_drivers, \
+what_to_verify, invalidation, why_relevant) AKICI ve DOĞAL TÜRKÇE olacak. İngilizce kelime \
+KARIŞTIRMA — yalnızca özel adlar (şirket/ürün/kişi: NVIDIA, Helios, Lisa Su) İngilizce kalır. \
+İngilizce bağlaç/kalıp (however, thus, overall, meanwhile) ya da yarım İngilizce cümle YASAK. \
+Kategorik alanlar (event_type, impact_horizon, stance, conviction, sentiment_trend, risk_flags) \
+YALNIZCA verilen enum değerlerinden seçilecek — yeni kategori UYDURMA.
 """
 
 

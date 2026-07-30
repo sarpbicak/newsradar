@@ -115,7 +115,7 @@ class AdminStatsOut(BaseModel):
 # --------------------------- Yanıt modelleri --------------------------- #
 class AnalysisOut(BaseModel):
     headline_verdict: str | None = None
-    claude_take: str | None = None
+    ai_take: str | None = None
     risk_score: int
     sentiment_trend: str
     top_drivers: list[str]

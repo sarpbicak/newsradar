@@ -303,9 +303,9 @@ class EntityAnalysis(Base):
     # Finans bilmeyen için tek cümlelik düz Türkçe hüküm (kartın başında). Eski
     # kayıtlarda None → kart özete/yöne düşer.
     headline_verdict: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # "Claude ne düşünüyor?" — 3-5 cümlelik bütünsel yorum (detay sayfası). Eski
-    # kayıtlarda None → bölüm gösterilmez.
-    claude_take: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # "AI ne düşünüyor?" — 3-5 cümlelik bütünsel yorum (detay sayfası). Sağlayıcıdan
+    # bağımsız ad (ai_take). Eski kayıtlarda None → bölüm gösterilmez.
+    ai_take: Mapped[str | None] = mapped_column(Text, nullable=True)
     risk_score: Mapped[int] = mapped_column(Integer, nullable=False)           # 0..100
     sentiment_trend: Mapped[str] = mapped_column(String(20), nullable=False)
     top_drivers: Mapped[list] = mapped_column(JSON, nullable=False)            # list[str], TR

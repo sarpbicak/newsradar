@@ -13,7 +13,8 @@ import threading
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 
-from .analysis.claude_client import ClaudeClient, MissingAPIKeyError
+from .analysis.claude_client import MissingAPIKeyError
+from .analysis.llm import get_llm_provider
 from .analysis.pipeline import analyze_all_async
 from .analyst import refresh_analyst
 from .db.database import session_scope
@@ -135,8 +136,9 @@ def run_refresh(lookback_hours: int | None = None, manual: bool = False) -> Refr
             prune_quota(session)  # eski api_call kayıtlarını temizle
 
         # 2) Analiz (ön-filtre + paralel). Anahtar yoksa çekme yine geçerli kalır.
+        #    Sağlayıcı env'den seçilir (nvidia/anthropic) — geri dönülebilir.
         try:
-            client = ClaudeClient()
+            client = get_llm_provider()
         except MissingAPIKeyError as exc:
             summary.warnings.append(str(exc))
             return summary

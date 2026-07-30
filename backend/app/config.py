@@ -28,6 +28,8 @@ class Settings:
 
     def __init__(self) -> None:
         self.anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "").strip()
+        # NVIDIA (OpenAI-uyumlu) — barındırılan Llama; ücretsiz endpoint.
+        self.nvidia_api_key: str = os.getenv("NVIDIA_API_KEY", "").strip()
         self.finnhub_api_key: str = os.getenv("FINNHUB_API_KEY", "").strip()
         self.newsapi_key: str = os.getenv("NEWSAPI_KEY", "").strip()
         # FMP (Financial Modeling Prep) — GERÇEK analist hedef fiyatı (Finnhub'da premium).
@@ -44,6 +46,11 @@ class Settings:
         # NOT: Geçersiz bir model adı API'de sessiz boş/404 yanıta yol açabilir;
         # yalnızca geçerli, güncel bir model kullanın.
         self.model: str = _env("NEWSRADAR_MODEL", "claude-sonnet-4-6")
+        # LLM sağlayıcı seçimi (GERİ DÖNÜLEBİLİR): nvidia (varsayılan) | anthropic.
+        # Sorun çıkarsa NEWSRADAR_LLM_PROVIDER=anthropic ile Claude'a geri dönülür.
+        self.llm_provider: str = _env("NEWSRADAR_LLM_PROVIDER", "nvidia").lower()
+        # Sağlayıcıdan bağımsız model adı (yalnızca nvidia yolunda kullanılır).
+        self.llm_model: str = _env("NEWSRADAR_LLM_MODEL", "meta/llama-3.3-70b-instruct")
         self.lookback_hours: int = int(_env("NEWSRADAR_LOOKBACK_HOURS", "48"))
         self.scheduler_enabled: bool = _env("NEWSRADAR_SCHEDULER", "on").lower() == "on"
         # Otomatik yenileme aralığı (saat). Saatlik çok agresif; varsayılan 6.

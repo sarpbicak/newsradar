@@ -214,13 +214,13 @@ export default function EntityDetail({ entityId, onBack }) {
 function SummaryTab({ a, entity }) {
   return (
     <div className="space-y-4">
-      {/* "Claude ne düşünüyor?" — bütünsel yorum (varsa) */}
-      {a.claude_take && (
+      {/* "AI ne düşünüyor?" — bütünsel yorum (varsa) */}
+      {a.ai_take && (
         <div className="rounded-xl border border-accent/30 bg-accent/10 p-5">
           <div className="mb-2 flex items-center gap-2 font-display text-sm font-semibold text-accent">
-            <Sparkles className="h-4 w-4" /> Claude ne düşünüyor?
+            <Sparkles className="h-4 w-4" /> AI ne düşünüyor?
           </div>
-          <p className="text-[15px] leading-relaxed text-slate-100">{a.claude_take}</p>
+          <p className="text-[15px] leading-relaxed text-slate-100">{a.ai_take}</p>
           <p className="mt-3 text-[11px] text-slate-500">
             Bu bir yorum, yatırım tavsiyesi değil — kararlar sana ait.
           </p>

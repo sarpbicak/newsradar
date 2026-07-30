@@ -15,7 +15,8 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..analysis.claude_client import ClaudeClient, ClaudeError, MissingAPIKeyError
+from ..analysis.claude_client import ClaudeError, MissingAPIKeyError
+from ..analysis.llm import get_llm_provider
 from ..analysis.prompts import SYSTEM_PROMPT, utc_context_line
 from ..db.database import get_db
 from ..db.models import Article, Entity, EntityAnalysis, User
@@ -96,7 +97,7 @@ def chat(
 
     def event_stream():
         try:
-            client = ClaudeClient()
+            client = get_llm_provider()
         except MissingAPIKeyError as exc:
             yield _sse("error", {"message": str(exc)})
             return

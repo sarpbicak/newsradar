@@ -153,10 +153,10 @@ ENTITY_ANALYSIS_TOOL = {
                     "'Güçlü olumlu haberler ve analistler de yüksek hedefte — tablo tutarlı.'"
                 ),
             },
-            "claude_take": {
+            "ai_take": {
                 "type": "string",
                 "description": (
-                    "'Claude ne düşünüyor?' — 3-5 cümlelik, KONUŞMA DİLİNDE, bütünsel bir "
+                    "'AI ne düşünüyor?' — 3-5 cümlelik, KONUŞMA DİLİNDE, bütünsel bir "
                     "yorum. Haber akışı + fiyat hareketi + analist konsensüsü + kanıt gücünü "
                     "SENTEZLE; bir arkadaşın anlatır gibi düz Türkçe (jargon YOK). ŞUNLARI YAP: "
                     "(a) net bir duruş al ('Bence asıl mesele şu…'); (b) zaman ufku ayır "
@@ -194,7 +194,7 @@ ENTITY_ANALYSIS_TOOL = {
             },
         },
         "required": [
-            "headline_verdict", "claude_take", "risk_score", "sentiment_trend", "top_drivers",
+            "headline_verdict", "ai_take", "risk_score", "sentiment_trend", "top_drivers",
             "summary", "stance", "conviction", "what_to_verify", "invalidation",
         ],
         "additionalProperties": False,
@@ -266,10 +266,10 @@ def sanitize_entity_analysis(item: dict) -> dict:
     # Hüküm cümlesi: en fazla 14 kelimeye kırp (kartta 3 satırı aşmasın).
     verdict = " ".join(str(item.get("headline_verdict", "")).strip().split()[:14])
     # Claude yorumu: 3-5 cümle; en fazla ~120 kelimeye kırp (aşırı uzamasın).
-    take = " ".join(str(item.get("claude_take", "")).strip().split()[:120])
+    take = " ".join(str(item.get("ai_take", "")).strip().split()[:120])
     return {
         "headline_verdict": verdict,
-        "claude_take": take,
+        "ai_take": take,
         "risk_score": int(clamp(float(item.get("risk_score", 50)), 0, 100)),
         "sentiment_trend": trend if trend in SENTIMENT_TRENDS else "stable",
         "top_drivers": drivers[:3],
