@@ -201,8 +201,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen">
-      {/* Soluk, yavaş hareket eden arka plan aurora (CSS; okunabilirliği bozmaz) */}
-      <div className="aurora-bg" aria-hidden="true" />
       <header className="sticky top-0 z-10 border-b border-ink-600 bg-ink-900/70 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2">

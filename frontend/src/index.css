@@ -36,7 +36,9 @@ body {
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
   background-size: 100% 100%, 140px 140px;
   background-repeat: no-repeat, repeat;
-  background-attachment: fixed, fixed;
+  /* PERF: 'fixed' arka plan her kaydırmada tüm ekranı yeniden boyar (özellikle
+     mobilde belirgin jank). 'scroll' ile sayfayla birlikte kayar, repaint yok. */
+  background-attachment: scroll, scroll;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -50,35 +52,10 @@ body {
   font-family: "Space Grotesk", Inter, system-ui, sans-serif;
 }
 
-/* --- Arka plan aurora: çok soluk, yavaş hareket eden pastel degrade "blob"lar ---
-   Açık temada göze batmaz; içeriğin arkasında (z:-1), okunabilirliği bozmaz.
-   CSS-tabanlı (canvas yok → pil dostu). Mobilde hafifler; reduced-motion'da durur. */
-.aurora-bg {
-  position: fixed;
-  inset: -25%;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(38% 38% at 18% 24%, rgba(109, 74, 255, 0.05), transparent 70%),
-    radial-gradient(32% 32% at 82% 16%, rgba(109, 74, 255, 0.04), transparent 70%),
-    radial-gradient(42% 42% at 74% 84%, rgba(90, 63, 224, 0.035), transparent 70%);
-  filter: blur(56px);
-  will-change: transform;
-  animation: aurora-drift 34s ease-in-out infinite alternate;
-}
-@keyframes aurora-drift {
-  0% { transform: translate3d(0, 0, 0) scale(1); }
-  50% { transform: translate3d(2.5%, -2%, 0) scale(1.06); }
-  100% { transform: translate3d(-2%, 2%, 0) scale(1.03); }
-}
-/* Mobil: daha yavaş + daha soluk (performans/pil). */
-@media (max-width: 640px) {
-  .aurora-bg {
-    animation-duration: 50s;
-    filter: blur(32px);
-    opacity: 0.6;
-  }
-}
+/* NOT: Arka plan "aurora" katmanı (sürekli çalışan blur+transform animasyonu)
+   performans için tamamen kaldırıldı — ekranda daima repaint üreten tek öğeydi.
+   Kalan animasyonlar olay-kapsamlı: .stagger (bir kez), .scan-host (yalnızca
+   yenileme sırasında), .skeleton (yalnızca yükleme), .tab-fade (bir kez). */
 
 /* İnce açık kaydırma çubuğu */
 ::-webkit-scrollbar {
