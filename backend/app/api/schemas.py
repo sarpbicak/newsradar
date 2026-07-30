@@ -327,3 +327,7 @@ class ProviderStatusOut(BaseModel):
     progress_total: int = 0
     last_completed_at: datetime | None = None
     last_summary: RefreshSummaryOut | None = None
+    # Kişisel elle yenileme kotası (rolling 24s). refresh_limit=0 → sınırsız.
+    refresh_limit: int = 0
+    refresh_used: int = 0
+    refresh_is_admin: bool = False

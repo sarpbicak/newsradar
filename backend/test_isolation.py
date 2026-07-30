@@ -150,6 +150,30 @@ def main():
         check(r.status_code == 403, f"16. şirket reddedildi 403 (alınan: {r.status_code})")
         check("15" in r.json().get("detail", ""), f"Mesajda limit belirtiliyor: {r.json().get('detail')}")
 
+        print("\n== TEST 5: Yenileme kotası (5/gün) ==")
+        from datetime import datetime, timezone
+        from app.db.models import UsageEvent, User
+        # Normal kullanıcı userd: 5 yenileme olayı ekle → 6. istek 429
+        D = auth_headers(client, "userd")
+        with session_scope() as db:
+            uid = db.query(User).filter(User.username == "userd").first().id
+            for _ in range(5):
+                db.add(UsageEvent(user_id=uid, event_type="refresh",
+                                  created_at=datetime.now(timezone.utc).replace(tzinfo=None)))
+        r = client.post("/refresh", headers=D)
+        check(r.status_code == 429, f"6. yenileme reddedildi 429 (alınan: {r.status_code})")
+        check("5/5" in r.json().get("detail", ""), f"Mesaj limiti belirtir: {r.json().get('detail')}")
+        # Admin (theadmin): kota YOK — 10 olay olsa bile geçer
+        adm = auth_headers(client, "theadmin")
+        with session_scope() as db:
+            aid = db.query(User).filter(User.username == "theadmin").first().id
+            check(db.get(User, aid).is_admin is True, "theadmin gerçekten admin")
+            for _ in range(10):
+                db.add(UsageEvent(user_id=aid, event_type="refresh",
+                                  created_at=datetime.now(timezone.utc).replace(tzinfo=None)))
+        r = client.post("/refresh", headers=adm)
+        check(r.status_code == 200, f"Admin yenileme kotasız geçer (alınan: {r.status_code})")
+
         print("\n== TEST 6: Yeni kullanıcı boş başlar ==")
         C = auth_headers(client, "userc")
         c_list = client.get("/entities", headers=C).json()
