@@ -73,6 +73,38 @@ export default function AdminPanel() {
         />
       </div>
 
+      {/* En çok TAKİP EDİLEN şirketler (kaç kullanıcının listesinde) + toplam benzersiz */}
+      <div className="rounded-xl border border-ink-600 bg-ink-800 p-4">
+        <div className="mb-2 flex items-center justify-between">
+          <div className="text-[11px] uppercase tracking-wide text-slate-500">
+            En çok takip edilen şirketler
+          </div>
+          <div className="text-[11px] text-slate-500">
+            Havuzda <span className="font-semibold text-slate-300">{stats.total_entities}</span> benzersiz şirket
+          </div>
+        </div>
+        {stats.most_followed.length === 0 ? (
+          <span className="text-sm text-slate-500">Henüz kimse şirket takip etmiyor.</span>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {stats.most_followed.map((e) => (
+              <span
+                key={`${e.type}:${e.name}`}
+                className="inline-flex items-center gap-1.5 rounded-md border border-ink-500 bg-ink-700 px-2 py-1 text-xs text-slate-300"
+              >
+                <span className="font-mono text-[10px] text-slate-500">
+                  {e.type === "ticker" ? "$" : "#"}
+                </span>
+                {e.name}
+                <span className="rounded bg-accent/15 px-1.5 font-semibold text-accent">
+                  {e.followers} kişi
+                </span>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* En çok görüntülenen şirketler */}
       {stats.top_entities.length > 0 && (
         <div className="rounded-xl border border-ink-600 bg-ink-800 p-4">
@@ -210,6 +242,29 @@ function UserDetail({ userId, onClose }) {
                 </div>
               </div>
             )}
+            {/* İzleme listesi — kullanıcının TAKİP ETTİĞİ şirketler (B6) */}
+            <div>
+              <div className="mb-2 text-[11px] uppercase tracking-wide text-slate-500">
+                İzleme listesi ({data.watchlist_size})
+              </div>
+              {data.watchlist_size === 0 ? (
+                <span className="text-sm text-slate-500">Takip ettiği şirket yok.</span>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {data.watchlist.map((e) => (
+                    <span
+                      key={`${e.type}:${e.query}`}
+                      className="inline-flex items-center gap-1 rounded-md border border-ink-500 bg-ink-800 px-2 py-1 text-xs text-slate-300"
+                    >
+                      {e.name}
+                      <span className="font-mono text-[10px] text-slate-500">
+                        {e.type === "ticker" ? "$" : "#"}{e.query}
+                      </span>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
             <div className="text-xs text-slate-500">
               Kayıt: {fmtDate(data.user.created_at)} · Son giriş:{" "}
               {data.user.last_login_at ? fmtDate(data.user.last_login_at) : "—"}

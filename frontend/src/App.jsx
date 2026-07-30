@@ -7,6 +7,7 @@ import EntityDetail from "./components/EntityDetail.jsx";
 import Login from "./components/Login.jsx";
 import AdminPanel from "./components/AdminPanel.jsx";
 import GuideBox from "./components/GuideBox.jsx";
+import Tutorial from "./components/Tutorial.jsx";
 import { Skeleton } from "./components/ui.jsx";
 import { RefreshCw, Menu, X, LogOut, ShieldCheck, LayoutDashboard, Radar, HelpCircle } from "lucide-react";
 
@@ -17,6 +18,8 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);   // mobil header menüsü
   const [showGuide, setShowGuide] = useState(false); // "NewsRadar ne yapar?" kutusu
   const guideAutoRef = useRef(false);                // oturumda bir kez otomatik aç
+  const [showTutorial, setShowTutorial] = useState(false); // ilk giriş tutorial'ı
+  const tutorialAutoRef = useRef(false);
   const authed = !!user;
   const [cards, setCards] = useState([]);
   const [status, setStatus] = useState(null);
@@ -30,15 +33,29 @@ export default function App() {
   // Tarama sürüyor mu: sunucu durumu VEYA iyimser 'başlatılıyor' bayrağı.
   const running = !!status?.is_running;
   const isRefreshing = starting || running;
+  // Kişisel yenileme kotası etiketi (admin/limitsiz → gösterme). Örn "(3/5)".
+  const refreshQuotaLabel =
+    status && !status.refresh_is_admin && status.refresh_limit > 0
+      ? `(${Math.max(0, status.refresh_limit - status.refresh_used)}/${status.refresh_limit})`
+      : "";
 
   // Herhangi bir istek 401 dönerse (kişisel token geçersiz) kişisel girişe dön.
   useEffect(() => {
     setUnauthorizedHandler(() => setUser(null));
   }, []);
 
-  // "NewsRadar ne yapar?" kutusu: daha önce kapatılmadıysa oturumda BİR kez otomatik aç.
+  // Yeni kullanıcı: ilk girişte tutorial'ı otomatik aç (oturumda bir kez).
   useEffect(() => {
-    if (user && !user.guide_dismissed && !guideAutoRef.current) {
+    if (user && !user.tutorial_done && !tutorialAutoRef.current) {
+      tutorialAutoRef.current = true;
+      setShowTutorial(true);
+    }
+  }, [user]);
+
+  // "NewsRadar ne yapar?" kutusu: tutorial'ı bitirmiş ve kutuyu kapatmamış kullanıcıya
+  // oturumda BİR kez otomatik aç (yeni kullanıcıda tutorial öncelikli — üst üste binmesin).
+  useEffect(() => {
+    if (user && user.tutorial_done && !user.guide_dismissed && !guideAutoRef.current) {
       guideAutoRef.current = true;
       setShowGuide(true);
     }
@@ -52,6 +69,17 @@ export default function App() {
       setUser(u);
     } catch {
       /* kapatma tercihi sunucuya yazılamadıysa yoksay — UI zaten kapandı */
+    }
+  }, []);
+
+  // Tutorial'ı kapat/bitir: kalıcı işaretle (bir daha gösterilmez).
+  const closeTutorial = useCallback(async () => {
+    setShowTutorial(false);
+    try {
+      const u = await api.finishTutorial();
+      setUser(u);
+    } catch {
+      /* yazılamadıysa yoksay — UI zaten kapandı */
     }
   }, []);
 
@@ -179,7 +207,13 @@ export default function App() {
       setStatus(s);
     } catch (e) {
       setStarting(false);
-      setNotice({ type: "warn", text: `Yenileme başlatılamadı: ${e.message}`, details: [] });
+      // Kota mesajı zaten kendini açıklıyor → olduğu gibi göster; değilse önekle.
+      const isQuota = /limit/i.test(e.message);
+      setNotice({
+        type: "warn",
+        text: isQuota ? e.message : `Yenileme başlatılamadı: ${e.message}`,
+        details: [],
+      });
     }
   }
 
@@ -245,6 +279,8 @@ export default function App() {
                   ? running
                     ? `Yenileniyor… (${status.progress_done}/${status.progress_total})`
                     : "Başlatılıyor…"
+                  : refreshQuotaLabel
+                  ? `Yenile ${refreshQuotaLabel}`
                   : "Yenile"}
               </span>
             </button>
@@ -450,6 +486,8 @@ export default function App() {
         </>
         )}
       </main>
+
+      {showTutorial && <Tutorial onClose={closeTutorial} />}
 
       <footer className="mx-auto max-w-7xl px-6 pb-10 pt-6 text-center text-xs leading-relaxed text-slate-500">
         Haber akışı bazlı sinyal — değerleme veya fiyat tahmini değil. Analist hedefleri

@@ -1,8 +1,67 @@
 // Genel görünüm: Katman 1 (bugün önemli — büyük kartlar) + Katman 2 (liste — satırlar).
 import React, { useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 import EntityCard, { EntityRow } from "./EntityCard.jsx";
 import WatchlistManager from "./WatchlistManager.jsx";
 import SuggestionsSection from "./SuggestionsSection.jsx";
+
+// Boş liste için "tıkla-ekle" popüler başlangıç önerileri.
+const STARTERS = [
+  { name: "Tesla", type: "ticker", query: "TSLA" },
+  { name: "Apple", type: "ticker", query: "AAPL" },
+  { name: "NVIDIA", type: "ticker", query: "NVDA" },
+  { name: "Microsoft", type: "ticker", query: "MSFT" },
+  { name: "Amazon", type: "ticker", query: "AMZN" },
+  { name: "OpenAI", type: "keyword", query: "OpenAI" },
+];
+
+// Boş durum: yeni kullanıcı için açıklama + popüler şirketlerle hızlı başlangıç.
+function EmptyState({ onCreate }) {
+  const [adding, setAdding] = useState(null);
+  const [err, setErr] = useState(null);
+  async function add(s) {
+    setAdding(s.query);
+    setErr(null);
+    try {
+      await onCreate({ ...s, language: "en" });
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setAdding(null);
+    }
+  }
+  return (
+    <div className="rounded-2xl border border-ink-600 bg-ink-800 p-8 text-center">
+      <h2 className="font-display text-xl font-bold text-slate-100">
+        Henüz takip ettiğin şirket yok
+      </h2>
+      <p className="mx-auto mt-2 max-w-md text-[15px] leading-relaxed text-slate-400">
+        İzleme listene şirket ekleyerek başla. Aşağıdakilerden biriyle hemen
+        deneyebilir ya da aşağıdaki formdan istediğini ekleyebilirsin.
+      </p>
+      <div className="mt-5 flex flex-wrap justify-center gap-2">
+        {STARTERS.map((s) => (
+          <button
+            key={s.query}
+            onClick={() => add(s)}
+            disabled={adding === s.query}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-ink-500 bg-ink-700 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-accent/60 hover:bg-accent/10 disabled:opacity-60"
+          >
+            <Plus className="h-3.5 w-3.5 text-accent" />
+            {s.name}
+            <span className="font-mono text-[11px] text-slate-500">
+              {s.type === "ticker" ? "$" : "#"}{s.query}
+            </span>
+          </button>
+        ))}
+      </div>
+      {err && <p className="mt-3 text-xs text-rose-400">{err}</p>}
+      <p className="mt-4 text-xs text-slate-500">
+        Eklediğin şirketler bir sonraki yenilemede analiz edilir.
+      </p>
+    </div>
+  );
+}
 
 // Katman 2 sıralaması (Katman 1 zaten backend'de öncelik skoruyla seçilir).
 const SORTS = {
@@ -42,9 +101,7 @@ export default function Overview({
   return (
     <div className="space-y-6">
       {cards.length === 0 ? (
-        <div className="rounded-xl border border-ink-600 bg-ink-800 p-8 text-center text-slate-400">
-          İzleme listesi boş. Aşağıdan bir varlık ekleyin.
-        </div>
+        <EmptyState onCreate={onCreate} />
       ) : (
         <>
           {/* ── KATMAN 1 — "Bugün önemli" ─────────────────────────────── */}
