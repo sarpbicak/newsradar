@@ -176,12 +176,19 @@ def fetch_for_entity(
 
 
 def fetch_all(
-    session: Session, lookback_hours: int | None = None, manual: bool = False
+    session: Session,
+    lookback_hours: int | None = None,
+    manual: bool = False,
+    entity_ids: set[int] | None = None,
 ) -> list[IngestResult]:
-    """Aktif tüm entity'ler için haberleri çeker (manual: elle Yenile'de akıllı davran)."""
-    entities = session.scalars(
-        select(Entity).where(Entity.active.is_(True))
-    ).all()
+    """Aktif entity'ler için haberleri çeker (manual: elle Yenile'de akıllı davran).
+
+    entity_ids verilirse yalnızca o entity'ler (kişisel elle yenileme); None → tüm aktif.
+    """
+    q = select(Entity).where(Entity.active.is_(True))
+    if entity_ids is not None:
+        q = q.where(Entity.id.in_(entity_ids))
+    entities = session.scalars(q).all()
     return [fetch_for_entity(session, e, lookback_hours, manual) for e in entities]
 
 

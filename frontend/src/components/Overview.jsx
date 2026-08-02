@@ -97,11 +97,34 @@ export default function Overview({
     () => cards.filter((c) => c.tier !== 1).sort(SORTS[sort].fn),
     [cards, sort]
   );
+  // Az şirket modu (backend hepsini tier=1 yaptı): kademe yok, hepsi büyük kart,
+  // nötr başlık — "Bugün önemli değişiklik" iddiası olmadan sayfa dolu görünür.
+  const fewMode = tier1.length > 0 && tier2.length === 0;
+
+  const bigGrid = (
+    <div
+      className={`stagger grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 ${
+        scanning ? "scan-host rounded-xl" : ""
+      }`}
+    >
+      {tier1.map((c) => (
+        <EntityCard key={c.id} card={c} onOpen={onOpen} big />
+      ))}
+    </div>
+  );
 
   return (
     <div className="space-y-6">
       {cards.length === 0 ? (
         <EmptyState onCreate={onCreate} />
+      ) : fewMode ? (
+        /* ── AZ ŞİRKET — hepsi büyük kart, nötr başlık ─────────────── */
+        <section className="space-y-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Takip ettiklerin
+          </h2>
+          {bigGrid}
+        </section>
       ) : (
         <>
           {/* ── KATMAN 1 — "Bugün önemli" ─────────────────────────────── */}
@@ -110,15 +133,7 @@ export default function Overview({
               Bugün önemli
             </h2>
             {tier1.length > 0 ? (
-              <div
-                className={`stagger grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 ${
-                  scanning ? "scan-host rounded-xl" : ""
-                }`}
-              >
-                {tier1.map((c) => (
-                  <EntityCard key={c.id} card={c} onOpen={onOpen} big />
-                ))}
-              </div>
+              bigGrid
             ) : (
               <div className="rounded-xl border border-dashed border-ink-600 bg-ink-800/50 px-4 py-6 text-center text-sm text-slate-400">
                 Bugün önemli bir değişiklik yok — tüm varlıklar aşağıdaki listede.

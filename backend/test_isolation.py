@@ -153,8 +153,10 @@ def main():
         print("\n== TEST 5: Yenileme kotası (5/gün) ==")
         from datetime import datetime, timezone
         from app.db.models import UsageEvent, User
-        # Normal kullanıcı userd: 5 yenileme olayı ekle → 6. istek 429
+        from app.api.routes_refresh import _refresh_quota
+        # Normal kullanıcı userd: 1 şirket + 5 yenileme olayı → 6. istek 429
         D = auth_headers(client, "userd")
+        client.post("/entities", json={"name": "Apple", "type": "ticker", "query": "AAPL"}, headers=D)
         with session_scope() as db:
             uid = db.query(User).filter(User.username == "userd").first().id
             for _ in range(5):
@@ -163,16 +165,17 @@ def main():
         r = client.post("/refresh", headers=D)
         check(r.status_code == 429, f"6. yenileme reddedildi 429 (alınan: {r.status_code})")
         check("5/5" in r.json().get("detail", ""), f"Mesaj limiti belirtir: {r.json().get('detail')}")
-        # Admin (theadmin): kota YOK — 10 olay olsa bile geçer
+        # Admin (theadmin): kota YOK — 10 olay olsa bile _refresh_quota ok döner (unit).
         adm = auth_headers(client, "theadmin")
         with session_scope() as db:
-            aid = db.query(User).filter(User.username == "theadmin").first().id
-            check(db.get(User, aid).is_admin is True, "theadmin gerçekten admin")
+            adm_u = db.query(User).filter(User.username == "theadmin").first()
+            check(adm_u.is_admin is True, "theadmin gerçekten admin")
             for _ in range(10):
-                db.add(UsageEvent(user_id=aid, event_type="refresh",
+                db.add(UsageEvent(user_id=adm_u.id, event_type="refresh",
                                   created_at=datetime.now(timezone.utc).replace(tzinfo=None)))
-        r = client.post("/refresh", headers=adm)
-        check(r.status_code == 200, f"Admin yenileme kotasız geçer (alınan: {r.status_code})")
+            db.flush()
+            ok, _lim, _used = _refresh_quota(db, adm_u)
+            check(ok is True, "Admin 10 olaydan sonra bile kota muaf (_refresh_quota ok=True)")
 
         print("\n== TEST 6: Yeni kullanıcı boş başlar ==")
         C = auth_headers(client, "userc")
@@ -201,6 +204,53 @@ def main():
         # normal kullanıcı admin ucuna erişemez
         r = client.get("/admin/stats", headers=C)
         check(r.status_code == 403, f"Normal kullanıcı /admin/stats 403 (alınan: {r.status_code})")
+
+        print("\n== TEST 9: Az şirket → hepsi büyük kart (tier=1) ==")
+        F = auth_headers(client, "userf")
+        for nm, ty, q in [("Tesla", "ticker", "TSLA"), ("Apple", "ticker", "AAPL"),
+                          ("NVIDIA", "ticker", "NVDA")]:
+            client.post("/entities", json={"name": nm, "type": ty, "query": q}, headers=F)
+        lst = client.get("/entities", headers=F).json()
+        check(len(lst) == 3 and all(c["tier"] == 1 for c in lst),
+              f"3 şirket → hepsi tier=1 (tier'ler: {[c['tier'] for c in lst]})")
+        client.post("/entities", json={"name": "Kf1", "type": "keyword", "query": "Kf1"}, headers=F)
+        lst = client.get("/entities", headers=F).json()
+        check(len(lst) == 4 and all(c["tier"] == 1 for c in lst),
+              f"4 şirket → hâlâ hepsi tier=1 (eşik sınırı)")
+        client.post("/entities", json={"name": "Kf2", "type": "keyword", "query": "Kf2"}, headers=F)
+        lst = client.get("/entities", headers=F).json()
+        n_big = sum(1 for c in lst if c["tier"] == 1)
+        check(len(lst) == 5 and n_big < 5 and n_big <= 3,
+              f"5 şirket → kademe devrede (büyük kart: {n_big}/5, ≤3 beklenir)")
+
+        print("\n== TEST 10: Yenileme ilerlemesi KİŞİSEL ==")
+        from app import refresh as R
+        with session_scope() as db:
+            fid = db.query(User).filter(User.username == "userf").first().id
+            uid_a = db.query(User).filter(User.username == "usera").first().id
+        # userf'in taraması çalışıyormuş gibi durum kur (3 entity)
+        R._set_running(True, total=3, user_id=fid)
+        R._set_progress(1, 3)
+        st_f = client.get("/status", headers=F).json()
+        check(st_f["is_running"] is True and st_f["progress_total"] == 3,
+              f"userf kendi taramasını görür (1/3): running={st_f['is_running']} total={st_f['progress_total']}")
+        st_a = client.get("/status", headers=A).json()
+        check(st_a["is_running"] is False and st_a["progress_total"] == 0,
+              f"A, userf'in taramasını GÖRMEZ (running={st_a['is_running']} total={st_a['progress_total']})")
+        # tamamlanınca son özet yalnızca sahibine
+        summ = R.RefreshSummary(analyzed=2, warnings=["[Kf1] test uyarı"])
+        R._record_completion(summ)
+        st_f2 = client.get("/status", headers=F).json()
+        st_a2 = client.get("/status", headers=A).json()
+        check(st_f2["last_summary"] is not None, "userf son özeti görür")
+        check(st_a2["last_summary"] is None, "A, userf'in son özetini/uyarısını GÖRMEZ (sızıntı yok)")
+
+        print("\n== TEST 11: Boş liste → yenileme başlamaz ==")
+        G = auth_headers(client, "userg")
+        r = client.post("/refresh", headers=G)
+        check(r.status_code == 200 and r.json()["started"] is False,
+              f"Boş listede yenileme başlamaz (started={r.json().get('started')})")
+        check("boş" in r.json().get("message", "").lower(), f"Mesaj: {r.json().get('message')}")
 
     print(f"\n{'='*50}\nSONUÇ: {PASS} geçti, {FAIL} başarısız")
     return FAIL == 0

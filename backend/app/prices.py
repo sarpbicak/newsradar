@@ -25,8 +25,12 @@ MAX_PRICE_HISTORY = 100   # entity başına saklanacak en fazla fiyat snapshot'�
 WEEK_WINDOW_DAYS = 7      # "son ~hafta değişimi" için pencere
 
 
-def refresh_prices() -> list[str]:
-    """Tüm aktif ticker entity'ler için güncel fiyatı çeker ve snapshot yazar."""
+def refresh_prices(entity_ids: set[int] | None = None) -> list[str]:
+    """Aktif ticker'lar için güncel fiyatı çeker ve snapshot yazar.
+
+    entity_ids verilirse yalnızca o entity'ler işlenir (kişisel elle yenileme);
+    None ise tüm aktif ticker'lar (scheduler).
+    """
     provider = get_price_provider()
     warnings: list[str] = []
     if not provider.is_available():
@@ -34,9 +38,10 @@ def refresh_prices() -> list[str]:
 
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     with session_scope() as session:
-        tickers = session.scalars(
-            select(Entity).where(Entity.active.is_(True), Entity.type == "ticker")
-        ).all()
+        q = select(Entity).where(Entity.active.is_(True), Entity.type == "ticker")
+        if entity_ids is not None:
+            q = q.where(Entity.id.in_(entity_ids))
+        tickers = session.scalars(q).all()
         for e in tickers:
             try:
                 res = provider.quote(e)

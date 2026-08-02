@@ -448,10 +448,13 @@ def _write_assessment(entity_id: int, data: dict, considered: int, avg_sentiment
 async def analyze_all_async(
     client: ClaudeClient,
     progress_cb=None,
+    entity_ids: set[int] | None = None,
 ) -> AnalyzeTotals:
-    """Aktif tüm entity'ler için ön-filtre + paralel analiz + değerlendirme.
+    """Aktif entity'ler için ön-filtre + paralel analiz + değerlendirme.
 
-    progress_cb(done, total): her entity tamamlandığında çağrılır (ilerleme için).
+    entity_ids verilirse yalnızca o entity'ler işlenir (kişisel elle yenileme);
+    None ise tüm aktif entity'ler (scheduler). progress_cb(done, total): her entity
+    tamamlandığında çağrılır (ilerleme kişisel elle yenilemede kullanıcının listesine göre).
     """
     settings = get_settings()
     batch_size = max(1, settings.batch_size)
@@ -463,9 +466,10 @@ async def analyze_all_async(
     # --- Aşama 1: ön-filtre + batch listesi (DB, tek thread) ---
     entity_tasks: list[dict] = []
     with session_scope() as session:
-        entities = session.scalars(
-            select(Entity).where(Entity.active.is_(True))
-        ).all()
+        q = select(Entity).where(Entity.active.is_(True))
+        if entity_ids is not None:
+            q = q.where(Entity.id.in_(entity_ids))
+        entities = session.scalars(q).all()
         for e in entities:
             # Tek entity'nin ön-filtresi beklenmedik hata atsa BİLE diğerleri işlensin.
             # (Bu döngü _process_entity_safe DIŞINDA; sarılmazsa tek entity tüm

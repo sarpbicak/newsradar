@@ -40,6 +40,9 @@ class RefreshSummary:
 
 
 # --------------------------- Süreç durumu --------------------------- #
+# İlerleme KİŞİSEL: elle yenilemeyi hangi kullanıcı başlattıysa (user_id) durum ona
+# aittir; /status yalnızca o kullanıcıya is_running/ilerleme/özet gösterir (başka
+# kullanıcı, başkasının taramasının sayısını/uyarılarını görmesin — izolasyon).
 @dataclass
 class _State:
     is_running: bool = False
@@ -47,6 +50,8 @@ class _State:
     progress_total: int = 0
     last_completed_at: datetime | None = None
     last_summary: RefreshSummary | None = None
+    user_id: int | None = None        # şu an çalışan taramayı başlatan kullanıcı
+    last_user_id: int | None = None   # son tamamlanan taramayı başlatan kullanıcı
 
 
 _state = _State()
@@ -62,6 +67,8 @@ def get_state() -> dict:
             "progress_total": _state.progress_total,
             "last_completed_at": _state.last_completed_at,
             "last_summary": asdict(_state.last_summary) if _state.last_summary else None,
+            "user_id": _state.user_id,
+            "last_user_id": _state.last_user_id,
         }
 
 
@@ -70,12 +77,13 @@ def is_running() -> bool:
         return _state.is_running
 
 
-def _set_running(running: bool, total: int = 0) -> None:
+def _set_running(running: bool, total: int = 0, user_id: int | None = None) -> None:
     with _state_lock:
         _state.is_running = running
         if running:
             _state.progress_done = 0
             _state.progress_total = total
+            _state.user_id = user_id
 
 
 def _set_progress(done: int, total: int) -> None:
@@ -88,14 +96,22 @@ def _record_completion(summary: RefreshSummary) -> None:
     with _state_lock:
         _state.last_completed_at = datetime.now(timezone.utc)
         _state.last_summary = summary
+        _state.last_user_id = _state.user_id
+        _state.user_id = None
 
 
 # --------------------------- Çekirdek akış --------------------------- #
-def run_refresh(lookback_hours: int | None = None, manual: bool = False) -> RefreshSummary:
-    """Tüm izleme listesi için çeker ve (anahtar varsa) analiz eder (senkron çekirdek).
+def run_refresh(
+    lookback_hours: int | None = None,
+    manual: bool = False,
+    entity_ids: set[int] | None = None,
+    user_id: int | None = None,
+) -> RefreshSummary:
+    """İzleme listesi için çeker ve (anahtar varsa) analiz eder (senkron çekirdek).
 
-    Aynı anda yalnızca tek bir refresh çalışır; biri sürerken ikincisi beklemeden
-    'refresh already running' uyarısıyla döner.
+    entity_ids verilirse YALNIZCA o entity'ler işlenir (kişisel elle yenileme —
+    kullanıcının kendi listesi); None ise tüm aktif havuz (scheduler). user_id, /status'un
+    ilerlemeyi kişiselleştirmesi için taşınır. Aynı anda tek refresh çalışır.
     """
     summary = RefreshSummary()
 
@@ -104,34 +120,35 @@ def run_refresh(lookback_hours: int | None = None, manual: bool = False) -> Refr
         summary.warnings.append("refresh already running")
         return summary
 
-    # İlerleme toplamı için aktif entity sayısını baştan al (UI 0/Y gösterebilsin).
+    # İlerleme toplamı için (scoped) aktif entity sayısını baştan al (UI 0/Y gösterebilsin).
     try:
         with session_scope() as session:
             from sqlalchemy import func, select
 
             from .db.models import Entity
 
-            total = session.scalar(
-                select(func.count()).select_from(Entity).where(Entity.active.is_(True))
-            ) or 0
+            q = select(func.count()).select_from(Entity).where(Entity.active.is_(True))
+            if entity_ids is not None:
+                q = q.where(Entity.id.in_(entity_ids))
+            total = session.scalar(q) or 0
     except Exception:  # noqa: BLE001
         total = 0
 
-    _set_running(True, total=total)
+    _set_running(True, total=total, user_id=user_id)
     try:
         # 0) Fiyat + analist snapshot'ları (ticker entity'ler; ucuz, hata-toleranslı).
         try:
-            summary.warnings.extend(refresh_prices())
+            summary.warnings.extend(refresh_prices(entity_ids))
         except Exception as exc:  # noqa: BLE001 — fiyat hatası yenilemeyi çökertmesin
             logger.warning("Fiyat çekme başarısız (atlandı): %s", exc)
         try:
-            summary.warnings.extend(refresh_analyst())
+            summary.warnings.extend(refresh_analyst(entity_ids))
         except Exception as exc:  # noqa: BLE001 — analist hatası yenilemeyi çökertmesin
             logger.warning("Analist çekme başarısız (atlandı): %s", exc)
 
         # 1) Çekme (Claude gerektirmez). manual: elle Yenile'de kota-akıllı davran.
         with session_scope() as session:
-            for r in fetch_all(session, lookback_hours, manual):
+            for r in fetch_all(session, lookback_hours, manual, entity_ids):
                 summary.fetched_new += r.new_count
                 summary.warnings.extend(f"[{r.entity_name}] {w}" for w in r.warnings)
                 summary.infos.extend(f"[{r.entity_name}] {i}" for i in r.infos)
@@ -145,7 +162,9 @@ def run_refresh(lookback_hours: int | None = None, manual: bool = False) -> Refr
             summary.warnings.append(str(exc))
             return summary
 
-        totals = asyncio.run(analyze_all_async(client, progress_cb=_set_progress))
+        totals = asyncio.run(
+            analyze_all_async(client, progress_cb=_set_progress, entity_ids=entity_ids)
+        )
         summary.prefiltered = totals.prefiltered
         summary.analyzed = totals.analyzed
         summary.discarded = totals.discarded
@@ -164,15 +183,22 @@ def run_refresh(lookback_hours: int | None = None, manual: bool = False) -> Refr
         _refresh_lock.release()
 
 
-def start_background_refresh(lookback_hours: int | None = None, manual: bool = True) -> bool:
+def start_background_refresh(
+    lookback_hours: int | None = None,
+    manual: bool = True,
+    entity_ids: set[int] | None = None,
+    user_id: int | None = None,
+) -> bool:
     """Yenilemeyi arka plan thread'inde başlatır (elle Yenile → manual=True).
 
+    entity_ids: kişisel elle yenilemede kullanıcının kendi entity id'leri (None → tüm havuz).
     Zaten çalışıyorsa False döner.
     """
     if is_running():
         return False
     thread = threading.Thread(
-        target=run_refresh, args=(lookback_hours, manual), name="refresh", daemon=True
+        target=run_refresh, args=(lookback_hours, manual, entity_ids, user_id),
+        name="refresh", daemon=True,
     )
     thread.start()
     return True

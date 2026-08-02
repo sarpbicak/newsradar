@@ -34,6 +34,8 @@ router = APIRouter(prefix="/entities", tags=["entities"])
 # Kademeli düzen (Katman 1): skoru ≥ bu eşik olan kartlar aday; en yüksek 3'ü "bugün önemli".
 TIER1_MIN_SCORE = 2
 TIER1_MAX_CARDS = 3
+# Az şirket varken kademe uygulama: hepsini büyük kart yap (sayfa boş görünmesin).
+FEW_ENTITIES_THRESHOLD = 4
 
 
 @router.get("", response_model=list[EntityCardOut])
@@ -49,8 +51,14 @@ def list_entities(
         select(Entity).where(Entity.id.in_(ids)).order_by(Entity.created_at)
     ).all()
     cards = [entity_card(db, e) for e in entities]
-    # Katman 1 seçimi kullanıcının kendi kartları üzerinden: skoru ≥ eşik olan en
-    # yüksek 3 aday tier=1 alır. Eşitlikte en son güncellenen öne geçer.
+    # AZ ŞİRKET (≤ eşik): kademe uygulama — hepsi büyük kart (tier=1). 1 şirket varken
+    # "Bugün önemli" boş kalıp sayfa boş görünmesin. Liste büyüdükçe kademeye geçilir.
+    if len(cards) <= FEW_ENTITIES_THRESHOLD:
+        for c in cards:
+            c.tier = 1
+        return cards
+    # FAZLA ŞİRKET: Katman 1 seçimi — skoru ≥ eşik olan en yüksek 3 aday tier=1 alır.
+    # Eşitlikte en son güncellenen öne geçer. Kalanlar tier=2 (sıkışık liste).
     candidates = [c for c in cards if c.priority_score >= TIER1_MIN_SCORE]
     candidates.sort(
         key=lambda c: (c.priority_score, c.last_updated or datetime.min),

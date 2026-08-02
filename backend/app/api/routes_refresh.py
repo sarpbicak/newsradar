@@ -14,7 +14,8 @@ from ..db.database import get_db
 from ..db.models import UsageEvent, User
 from ..providers import provider_status
 from ..quota import newsapi_usage
-from ..refresh import get_state, start_background_refresh
+from ..refresh import get_state, is_running, start_background_refresh
+from ..watchlist import user_entity_ids
 from .routes_auth import get_current_user
 from .schemas import NewsApiQuotaOut, ProviderStatusOut, RefreshAck
 from .usage import record_event
@@ -59,6 +60,17 @@ def refresh(
     if scheduler_enabled is not None:
         scheduler.set_enabled(scheduler_enabled)
 
+    # KİŞİSEL elle yenileme: yalnızca kullanıcının KENDİ listesindeki entity'leri işle
+    # (ortak havuzun tamamını değil — ilerleme "1/1" doğru olsun, kota adil olsun).
+    # Havuzun geri kalanını scheduler zaten 6 saatte bir tazeliyor.
+    my_ids = user_entity_ids(db, user.id)
+    if not my_ids:
+        return RefreshAck(
+            started=False,
+            is_running=is_running(),
+            message="İzleme listeniz boş — önce bir şirket ekleyin.",
+        )
+
     # Kişi başı günlük elle yenileme kotası (admin muaf). Zaten çalışan bir
     # yenileme kota harcamaz (started=False → event yok); yalnızca YENİ başlatma sayılır.
     ok, limit, used = _refresh_quota(db, user)
@@ -69,7 +81,7 @@ def refresh(
                     "Otomatik güncelleme arka planda 6 saatte bir çalışıyor."),
         )
 
-    started = start_background_refresh(hours)
+    started = start_background_refresh(hours, entity_ids=my_ids, user_id=user.id)
     if started:
         record_event(db, user.id, "refresh", None)
     return RefreshAck(
@@ -91,16 +103,22 @@ def status(
     if settings.newsapi_available:
         quota = NewsApiQuotaOut(**newsapi_usage(db))
     _ok, r_limit, r_used = _refresh_quota(db, user)
+
+    # KİŞİSEL durum: is_running/ilerleme/son özet YALNIZCA bu kullanıcının başlattığı
+    # taramaya aittir. Başka kullanıcının (ya da scheduler'ın user_id=None) taraması
+    # bu kullanıcıya "çalışıyor" ya da yabancı uyarılar olarak sızmaz (izolasyon).
+    mine_running = st["is_running"] and st["user_id"] == user.id
+    mine_last = st["last_user_id"] == user.id
     return ProviderStatusOut(
         providers=provider_status(),
         claude=settings.llm_available,  # "claude" alan adı geriye uyum; aktif LLM'i yansıtır
         scheduler_enabled=scheduler.is_enabled(),
         newsapi_quota=quota,
-        is_running=st["is_running"],
-        progress_done=st["progress_done"],
-        progress_total=st["progress_total"],
-        last_completed_at=st["last_completed_at"],
-        last_summary=st["last_summary"],
+        is_running=mine_running,
+        progress_done=st["progress_done"] if mine_running else 0,
+        progress_total=st["progress_total"] if mine_running else 0,
+        last_completed_at=st["last_completed_at"] if mine_last else None,
+        last_summary=st["last_summary"] if mine_last else None,
         refresh_limit=r_limit,
         refresh_used=r_used,
         refresh_is_admin=user.is_admin,

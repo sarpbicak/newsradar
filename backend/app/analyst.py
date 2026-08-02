@@ -30,10 +30,11 @@ def _latest_price(session: Session, entity_id: int) -> float | None:
     return snap.price if snap else None
 
 
-def refresh_analyst() -> list[str]:
+def refresh_analyst(entity_ids: set[int] | None = None) -> list[str]:
     """Aktif ticker'lar için analist TAVSİYESİ (Finnhub) + HEDEF FİYAT (FMP) çekip
     tek snapshot'ta birleştirir. İki kaynak da hata-toleranslı; biri yoksa diğeri yazılır.
 
+    entity_ids verilirse yalnızca o entity'ler (kişisel elle yenileme); None → tüm aktif.
     accuracy: hedef fiyat YALNIZCA FMP'den gelen gerçek analist verisidir; kaynak
     erişilemezse hedef None kalır (asla tahminle doldurulmaz)."""
     rec_provider = get_analyst_provider()   # Finnhub al/tut/sat
@@ -45,9 +46,10 @@ def refresh_analyst() -> list[str]:
         return warnings  # ikisi de yoksa sessizce atla
 
     with session_scope() as session:
-        tickers = session.scalars(
-            select(Entity).where(Entity.active.is_(True), Entity.type == "ticker")
-        ).all()
+        q = select(Entity).where(Entity.active.is_(True), Entity.type == "ticker")
+        if entity_ids is not None:
+            q = q.where(Entity.id.in_(entity_ids))
+        tickers = session.scalars(q).all()
         for e in tickers:
             sb = b = h = s = ss = 0
             period = None
