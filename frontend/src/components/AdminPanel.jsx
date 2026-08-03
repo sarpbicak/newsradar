@@ -32,27 +32,45 @@ function StatCard({ label, value, hint }) {
   );
 }
 
-export default function AdminPanel() {
+export default function AdminPanel({ currentUserId }) {
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null); // seçili kullanıcı id
+  const [deleting, setDeleting] = useState(null); // silinmekte olan kullanıcı id
+
+  async function reload() {
+    const [s, u] = await Promise.all([api.adminStats(), api.adminUsers()]);
+    setStats(s);
+    setUsers(u);
+  }
 
   useEffect(() => {
     let alive = true;
-    Promise.all([api.adminStats(), api.adminUsers()])
-      .then(([s, u]) => {
-        if (!alive) return;
-        setStats(s);
-        setUsers(u);
-      })
+    reload()
       .catch((e) => alive && setError(e.message))
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
     };
   }, []);
+
+  async function handleDelete(u, e) {
+    e.stopPropagation(); // satır tıklamasıyla detay açılmasın
+    if (!window.confirm(`${u.username} kullanıcısını ve tüm verilerini silmek istediğinize emin misiniz?`))
+      return;
+    setDeleting(u.id);
+    try {
+      await api.adminDeleteUser(u.id);
+      if (selected === u.id) setSelected(null);
+      await reload();
+    } catch (err) {
+      window.alert(`Silinemedi: ${err.message}`);
+    } finally {
+      setDeleting(null);
+    }
+  }
 
   if (loading) return <div className="p-8 text-slate-500">Kullanım verileri yükleniyor…</div>;
   if (error) return <div className="p-8 text-rose-400">Hata: {error}</div>;
@@ -153,6 +171,7 @@ export default function AdminPanel() {
               <th className="px-4 py-2.5 text-right">Yenileme</th>
               <th className="px-4 py-2.5 text-right">Toplam eylem</th>
               <th className="px-4 py-2.5">Son aktiflik</th>
+              <th className="px-4 py-2.5 text-right">İşlem</th>
             </tr>
           </thead>
           <tbody>
@@ -177,6 +196,20 @@ export default function AdminPanel() {
                 <td className="px-4 py-2.5 text-right tabular-nums text-slate-300">{u.total_events}</td>
                 <td className="px-4 py-2.5 text-slate-500">
                   {u.last_active_at ? timeAgo(u.last_active_at) : "hiç"}
+                </td>
+                <td className="px-4 py-2.5 text-right">
+                  {u.id === currentUserId ? (
+                    <span className="text-[11px] text-slate-600">siz</span>
+                  ) : (
+                    <button
+                      onClick={(e) => handleDelete(u, e)}
+                      disabled={deleting === u.id}
+                      title="Kullanıcıyı ve tüm verilerini sil"
+                      className="rounded-md border border-rose-500/30 px-2 py-1 text-[11px] font-medium text-rose-400 transition hover:bg-rose-500/10 disabled:opacity-50"
+                    >
+                      {deleting === u.id ? "Siliniyor…" : "Sil"}
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

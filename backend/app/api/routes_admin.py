@@ -8,11 +8,18 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from ..db.database import get_db
-from ..db.models import Entity, UsageEvent, User, UserWatchlist
+from ..db.models import (
+    Entity,
+    SuggestionDismissal,
+    UsageEvent,
+    User,
+    UserWatchlist,
+)
+from ..watchlist import recompute_active
 from .routes_auth import require_admin
 from .schemas import (
     AdminEventOut,
@@ -21,6 +28,7 @@ from .schemas import (
     AdminUserRow,
     UserOut,
 )
+from .usage import record_event
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
@@ -127,6 +135,49 @@ def user_detail(user_id: int, db: Session = Depends(get_db)) -> AdminUserDetail:
         watchlist=watchlist,
         watchlist_size=len(watchlist),
     )
+
+
+@router.delete("/users/{user_id}", status_code=204)
+def delete_user(
+    user_id: int,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> None:
+    """Kullanıcıyı ve ona bağlı TÜM verileri siler (yalnızca admin).
+
+    - Admin KENDİ hesabını silemez (403) — son admin kilitlenmesini önler.
+    - Silinen veriler: watchlist satırları, usage_events, suggestion_dismissals, user.
+    - Entity'ler: watchlist satırı silinince başka kullanıcıda yoksa PASİF olur
+      (recompute_active), havuzda kalır (silinmez).
+    - Silme, admin'in usage_events'ine 'delete_user' olarak kaydedilir (kim kimi sildi).
+    SQLite FK cascade'e güvenmeyip bağlı satırları AÇIKÇA sileriz (foreign_keys pragma
+    açık olmayabilir).
+    """
+    if user_id == admin.id:
+        raise HTTPException(status_code=403, detail="Kendi hesabınızı silemezsiniz.")
+    target = db.get(User, user_id)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
+    username = target.username
+
+    # Silmeden ÖNCE etkilenen entity'leri topla (sonra active'i yeniden hesapla).
+    entity_ids = list(db.scalars(
+        select(UserWatchlist.entity_id).where(UserWatchlist.user_id == user_id)
+    ).all())
+
+    # Bağlı verileri açıkça sil (cascade'e güvenme).
+    db.execute(delete(UserWatchlist).where(UserWatchlist.user_id == user_id))
+    db.execute(delete(SuggestionDismissal).where(SuggestionDismissal.user_id == user_id))
+    db.execute(delete(UsageEvent).where(UsageEvent.user_id == user_id))
+    db.delete(target)
+    db.flush()
+
+    # Kullanıcının entity'leri: kimsede kalmadıysa pasifleştir (havuz mantığı).
+    for eid in entity_ids:
+        recompute_active(db, eid)
+
+    # Kim kimi sildi — admin'in kaydına yaz (silinen kullanıcının olayları gitti).
+    record_event(db, admin.id, "delete_user", {"deleted_id": user_id, "username": username})
 
 
 @router.get("/stats", response_model=AdminStatsOut)

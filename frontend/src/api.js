@@ -125,6 +125,7 @@ export const api = {
   // Admin (yalnızca is_admin kullanıcı; değilse backend 403 döner)
   adminUsers: () => req("/admin/users"),
   adminUserDetail: (id) => req(`/admin/users/${id}`),
+  adminDeleteUser: (id) => req(`/admin/users/${id}`, { method: "DELETE" }),
   adminStats: () => req("/admin/stats"),
   status: () => req("/status"),
   listEntities: () => req("/entities"),

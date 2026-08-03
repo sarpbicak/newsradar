@@ -137,6 +137,60 @@ def main():
             n_rf = db.query(UsageEvent).filter(UsageEvent.event_type == "register_failed").count()
         check(n_rf >= 1, f"En az 1 register_failed olayı ({n_rf})")
 
+        print("\n== Admin kullanıcı silme (DELETE /admin/users/{id}) ==")
+        # Rate-limit testi IP'yi kilitledi → silme testinden önce limiter'ı sıfırla.
+        from app.security import login_limiter as _ll
+        _ll._fails.clear(); _ll._locked_until.clear()
+        adm = {"Authorization": f"Bearer {adm_tok}"}  # rootadmin header'ı
+        from app.db.models import Entity, UserWatchlist, SuggestionDismissal
+        # Limiti geçici kaldır ki test kullanıcıları açılabilsin (cached settings'i mutasyonla).
+        import app.config as _cfg
+        _cfg.get_settings().max_users = 0  # sınırsız (test için)
+        # İki test kullanıcısı + ortak entity (havuz mantığı testi)
+        with session_scope() as db:
+            e = Entity(name="ShareCo", type="ticker", query="SHR", active=True)
+            db.add(e); db.flush(); shr_id = e.id
+        def uhdr(username):
+            return {"Authorization": f"Bearer {reg(client, username).json()['token']}"}
+        d1 = uhdr("delme1")
+        d2 = uhdr("delme2")
+        # ikisi de ShareCo ekler + delme1 kendine özel bir entity ekler
+        client.post("/entities", json={"name": "ShareCo", "type": "ticker", "query": "SHR"}, headers=d1)
+        client.post("/entities", json={"name": "ShareCo", "type": "ticker", "query": "SHR"}, headers=d2)
+        client.post("/entities", json={"name": "OnlyMine", "type": "keyword", "query": "OnlyMine"}, headers=d1)
+        with session_scope() as db:
+            u1 = db.query(User).filter(User.username == "delme1").first()
+            u1_id = u1.id
+            only = db.query(Entity).filter(Entity.query == "OnlyMine").first()
+            only_id = only.id
+            wl_before = db.query(UserWatchlist).filter(UserWatchlist.user_id == u1_id).count()
+        check(wl_before == 2, f"delme1'in 2 watchlist satırı ({wl_before})")
+        # Admin, kendini silemez → 403
+        with session_scope() as db:
+            adm_id = db.query(User).filter(User.username == "rootadmin").first().id
+        rself = client.delete(f"/admin/users/{adm_id}", headers=adm)
+        check(rself.status_code == 403, f"Admin kendini silemez 403 ({rself.status_code})")
+        # delme1'i sil
+        rdel = client.delete(f"/admin/users/{u1_id}", headers=adm)
+        check(rdel.status_code == 204, f"delme1 silindi 204 ({rdel.status_code})")
+        with session_scope() as db:
+            gone = db.get(User, u1_id)
+            check(gone is None, "delme1 DB'den gitti")
+            wl_after = db.query(UserWatchlist).filter(UserWatchlist.user_id == u1_id).count()
+            check(wl_after == 0, f"delme1 watchlist satırları temizlendi ({wl_after})")
+            sd = db.query(SuggestionDismissal).filter(SuggestionDismissal.user_id == u1_id).count()
+            check(sd == 0, f"delme1 suggestion_dismissals temizlendi ({sd})")
+            ue = db.query(UsageEvent).filter(UsageEvent.user_id == u1_id).count()
+            check(ue == 0, f"delme1 usage_events temizlendi ({ue})")
+            # Havuz mantığı: ShareCo delme2'de var → AKTİF; OnlyMine kimsede yok → PASİF
+            shr = db.get(Entity, shr_id)
+            check(shr is not None and shr.active is True, "ShareCo delme2'de var → AKTİF (silinmedi)")
+            om = db.get(Entity, only_id)
+            check(om is not None and om.active is False, "OnlyMine kimsede yok → PASİF (silinmedi)")
+            # Silme kaydı admin'e yazıldı
+            dl = db.query(UsageEvent).filter(UsageEvent.event_type == "delete_user").count()
+            check(dl >= 1, f"delete_user olayı kaydedildi ({dl})")
+
     print(f"\n{'='*52}\nSONUÇ: {PASS} geçti, {FAIL} başarısız")
     return FAIL == 0
 
