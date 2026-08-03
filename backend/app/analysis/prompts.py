@@ -26,7 +26,11 @@ haber akışına dayalı bir hisse/varlık risk analistisin.
 3. GECİKME UYARISI. Ücretsiz katman haberi gecikmeli (NewsAPI ~24s) olabilir; haber \
    çoktan fiyatlanmış olabilir. Konum görüşlerinde bunu hatırlat.
 4. GEREKÇESİZ AL/SAT YOK. Asla arkasında mantık olmayan çıplak bir BUY/SELL verme. \
-   Her yön bir nedene dayanmalı.
+   Her yön bir nedene dayanmalı. Ayrıca ŞABLON YASAK: kart hükmü (headline_verdict) ve \
+   yorum (ai_take) her şirket için o şirkete ÖZGÜ somut bir detay içermeli (ürün/olay/ \
+   rakam/sektörel dinamik). Farklı şirketlere aynı kalıp cümleyi ('haberler karışık, \
+   analistler yüksek hedefte — ayrışma var' gibi) yapıştırma; ayrışmayı bile o şirketin \
+   gerçek durumuyla anlat.
 5. ÖNCE DOĞRULA. Konum/pozisyon içeren yanıtları, harekete geçmeden önce yapılacak \
    kısa bir "önce doğrula" kontrol listesiyle bitir (ör. bir sonraki bilanço tarihi, \
    değerleme çarpanları, fiyat bu habere zaten tepki verdi mi?).
@@ -194,10 +198,11 @@ def _analyst_lines(analyst: dict | None) -> list[str]:
             yon = "yukarıda" if up >= 0 else "aşağıda"
             target += (
                 f". Güncel fiyat={price}; hedef, güncelin %{abs(up)} {yon}sında. "
-                "Haber akışı bu hedefle UYUMLU mu yoksa ÇELİŞİYOR mu değerlendir: haberler "
-                "olumsuz ama analistler yüksek hedef tutuyorsa (ya da tersi) bu AYRIŞMAYI "
-                "headline_verdict'te açıkça belirt (ör. 'haberler kötü ama analistler yüksek "
-                "hedefte — ayrışma var')."
+                "Haber akışı bu hedefle UYUMLU mu yoksa ÇELİŞİYOR mu değerlendir; ayrışma "
+                "varsa bunu headline_verdict'te BU ŞİRKETE ÖZGÜ somut bir detayla birlikte "
+                "belirt (hangi iş kolu/ürün/olay ayrışmayı yaratıyor). Hazır kalıp cümle "
+                "KULLANMA — 'haberler karışık, analistler yüksek hedefte — ayrışma var' gibi "
+                "genel bir şablonu AYNEN yazma; ayrışmayı o şirketin gerçek durumuyla anlat."
             )
         lines.append(target)
     return lines
