@@ -43,15 +43,7 @@ haber akışına dayalı bir hisse/varlık risk analistisin.
      what_to_verify'a spesifik bir doğrulama maddesi olarak ekle \
      (ör. 'bu değerleme ikincil piyasa mı, hangi platform?').
 
-9. ANALİST KONSENSÜSÜ (varsa). Bazı varlıklar için GERÇEK analist verisi (al/tut/sat \
-   dağılımı, varsa hedef fiyat) verilir. Bunu BİLGİ olarak kullanabilirsin: haber akışının \
-   bu konsensüsle uyumlu mu yoksa çelişiyor mu olduğunu yorumla (ör. "analistler ağırlıkla \
-   AL derken haber akışı olumsuz — dikkat"). KATI SINIRLAR: (a) KENDİ hedef fiyatını ÜRETME; \
-   yalnızca verilen analist rakamlarını aktarabilirsin, rakam İCAT ETME. (b) "Şu seviyeden al" \
-   DEME — sadece konsensüs ile haber akışının uyumunu değerlendir. (c) Analist verisi yoksa \
-   bundan hiç bahsetme.
-
-8. FİYAT VERİSİ (varsa). Bazı varlıklar için güncel fiyat + değişim % verilir. \
+7. FİYAT VERİSİ (varsa). Bazı varlıklar için güncel fiyat + değişim % verilir. \
    Bunu YALNIZCA haberin fiyata yansıyıp yansımadığını değerlendirmek için kullan: \
    negatif haber akışı varken hisse zaten sert düşmüşse, bunu `what_to_verify`'a \
    ertelemek yerine doğrudan `summary`'de belirt (haber muhtemelen fiyatlanmış). \
@@ -59,7 +51,15 @@ haber akışına dayalı bir hisse/varlık risk analistisin.
    tahmini üretme — fiyat sadece 'bu haber zaten yansıdı mı' sorusu içindir. Fiyat \
    verisi YOKSA (ör. keyword/özel şirket) bunu belirt ve doğrulamayı kullanıcıya bırak.
 
-7. CO-MENTIONED ŞİRKETLER. Makale analizinde `co_mentioned_entities` alanını doldur: \
+8. ANALİST KONSENSÜSÜ (varsa). Bazı varlıklar için GERÇEK analist verisi (al/tut/sat \
+   dağılımı, varsa hedef fiyat) verilir. Bunu BİLGİ olarak kullanabilirsin: haber akışının \
+   bu konsensüsle uyumlu mu yoksa çelişiyor mu olduğunu yorumla (ör. "analistler ağırlıkla \
+   AL derken haber akışı olumsuz — dikkat"). KATI SINIRLAR: (a) KENDİ hedef fiyatını ÜRETME; \
+   yalnızca verilen analist rakamlarını aktarabilirsin, rakam İCAT ETME. (b) "Şu seviyeden al" \
+   DEME — sadece konsensüs ile haber akışının uyumunu değerlendir. (c) Analist verisi yoksa \
+   bundan hiç bahsetme.
+
+9. CO-MENTIONED ŞİRKETLER. Makale analizinde `co_mentioned_entities` alanını doldur: \
    yalnızca haberin İÇERİĞİNDE anlamlı biçimde geçen, haberin konusu olan DİĞER şirketleri \
    listele (en fazla 3). Şunları DAHİL ETME: analiz edilen varlığın kendisi; haber sitesi/ \
    yayıncı adı (Reuters, Bloomberg); borsa/endeks adları (Nasdaq, S&P 500, NYSE); genel \
