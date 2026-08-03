@@ -156,8 +156,10 @@ def stats(db: Session = Depends(get_db)) -> AdminStatsOut:
         select(func.count(func.distinct(UserWatchlist.entity_id)))
     ) or 0
 
+    from ..config import get_settings
     return AdminStatsOut(
         total_users=total_users,
+        max_users=get_settings().max_users,
         active_today=active_today,
         refreshes_today=refreshes_today,
         top_entities=_top_entities(db, None, limit=8),

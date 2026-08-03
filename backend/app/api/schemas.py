@@ -111,6 +111,7 @@ class AdminStatsOut(BaseModel):
     """Genel istatistikler."""
 
     total_users: int
+    max_users: int                         # kayıt sınırı (0 = sınırsız); panelde N/limit göster
     active_today: int                      # bugün en az 1 eylem yapan kullanıcı
     refreshes_today: int
     top_entities: list[dict]               # [{name, count}] — en popüler (view)

@@ -63,7 +63,24 @@ export default function AdminPanel() {
 
       {/* Genel istatistik */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Toplam kullanıcı" value={stats.total_users} />
+        {(() => {
+          const over = stats.max_users > 0 && stats.total_users > stats.max_users;
+          const label = stats.max_users > 0
+            ? `${stats.total_users}/${stats.max_users}`
+            : `${stats.total_users}`;
+          return (
+            <div className={`rounded-xl border bg-ink-800 p-4 shadow-card ${
+              over ? "border-rose-500/50" : "border-ink-600"}`}>
+              <div className="text-[11px] uppercase tracking-wide text-slate-500">Kullanıcı (kayıt/limit)</div>
+              <div className={`mt-1 font-display text-2xl font-bold ${over ? "text-rose-400" : "text-slate-100"}`}>
+                {label}
+              </div>
+              <div className={`mt-0.5 text-xs ${over ? "text-rose-400" : "text-slate-500"}`}>
+                {over ? "⚠ limit aşıldı!" : stats.max_users > 0 ? "kayıt sınırı" : "sınırsız"}
+              </div>
+            </div>
+          );
+        })()}
         <StatCard label="Bugün aktif" value={stats.active_today} hint="en az 1 eylem" />
         <StatCard label="Bugünkü yenileme" value={stats.refreshes_today} />
         <StatCard
