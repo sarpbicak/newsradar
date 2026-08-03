@@ -23,7 +23,7 @@ import logging
 from collections.abc import Iterator
 
 from ..config import get_settings
-from .claude_client import ClaudeClient, ClaudeError, MissingAPIKeyError
+from .claude_client import ClaudeClient, ClaudeError, MissingAPIKeyError, TruncationError
 
 logger = logging.getLogger("newsradar.llm")
 
@@ -178,7 +178,7 @@ class OpenAICompatProvider(LLMProvider):
         # KRİTİK: yanıt kesildiyse tool argümanları yarım/bozuk JSON olur → hata (asla yutma).
         if truncated:
             logger.error(trunc_msg)
-            raise ClaudeError(trunc_msg)
+            raise TruncationError(trunc_msg)
 
         tool_calls = getattr(choice.message, "tool_calls", None)
         if not tool_calls:
@@ -195,7 +195,7 @@ class OpenAICompatProvider(LLMProvider):
             # otomatik yeniden-dene (batch bölme) tetiklensin.
             logger.error("LLM JSON parse hatası (muhtemelen kesildi): %s | ham son 80: %s",
                          exc, str(raw_args)[-80:])
-            raise ClaudeError(trunc_msg) from exc
+            raise TruncationError(trunc_msg) from exc
         if not isinstance(data, dict):
             raise ClaudeError("LLM tool argümanları beklenen nesne (dict) değil.")
         return data

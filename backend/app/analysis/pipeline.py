@@ -32,7 +32,7 @@ from ..db.models import PREFILTER_VERSION, Article, Entity, EntityAnalysis, Sugg
 from ..analyst import analyst_context_for
 from ..prices import price_context_for
 from ..providers import get_provider_for
-from .claude_client import ClaudeClient, ClaudeError
+from .claude_client import ClaudeClient, ClaudeError, TruncationError
 from .prompts import (
     SYSTEM_PROMPT,
     build_article_batch_prompt,
@@ -60,6 +60,11 @@ AGGREGATE_LOOKBACK = 20  # entity değerlendirmesinde kaç son makale bağlam ol
 # Entity değerlendirme çıktısı (headline_verdict + ai_take + summary + drivers + ...);
 # Türkçe uzun metinler için 2000 azdı → 4096 (kesilmeyi önle).
 ENTITY_ASSESSMENT_MAX_TOKENS = 4096
+# Kesilmede batch bölme derinliği güvenlik sınırı. Doğal taban durumu tek makale
+# (len<=1) olduğu için 10'luk batch normalde 4 bölmede tek makaleye iner; bu sınır
+# yalnızca patolojik özyinelemeye karşı emniyet supabı (en kötü ihtimalle tek makale
+# kaybı hedefi korunur — bkz. _run_batch/run_batch_sync).
+_MAX_SPLIT_DEPTH = 6
 MAX_ANALYSIS_HISTORY = 100  # entity başına saklanacak en fazla değerlendirme kaydı
 SUGGESTION_TTL_DAYS = 30    # bu süreden eski + az anılan öneriler temizlenir
 
@@ -516,25 +521,40 @@ async def analyze_all_async(
                 max_tokens=max_tokens,
             )
 
-    async def _run_batch(t: dict, b: list[dict]):
-        """Bir batch'i analiz eder. KESİLME/parse hatasında batch'i İKİYE bölüp yeniden
-        dener (tek uzun yanıt yüzünden entity tümden boş kalmasın)."""
+    async def _run_batch(t: dict, b: list[dict], depth: int = 0):
+        """Bir batch'i analiz eder. YALNIZCA KESİLME'de (TruncationError) batch'i ikiye
+        bölüp yeniden dener; en kötü ihtimalle tek problemli makale kaybedilir. Kesilme
+        DIŞI hatalar (rate limit/bağlantı/API) bölünmez — uyar + devam."""
         user = build_article_batch_prompt(t["name"], t["query"], t["type"], b, t["language"])
         try:
             return await _call(ARTICLE_ANALYSIS_TOOL, user, settings.max_output_tokens)
-        except ClaudeError as exc:
+        except TruncationError as exc:
             if len(b) <= 1:
-                totals.warnings.append(f"[{t['name']}] makale atlandı (tek makale, kesildi): {exc}")
+                aid = b[0].get("id", "?") if b else "?"
+                totals.warnings.append(
+                    f"[{t['name']}] makale #{aid} analiz edilemedi: yanıt kesildi, "
+                    "makale çok uzun olabilir")
+                return None
+            if depth >= _MAX_SPLIT_DEPTH:
+                totals.warnings.append(
+                    f"[{t['name']}] {len(b)} makale atlandı: bölme sınırına ulaşıldı, "
+                    "yanıt hâlâ kesiliyor")
                 return None
             mid = len(b) // 2
-            logger.info("[analiz] %s batch kesildi → %d makale 2'ye bölünüp yeniden deneniyor",
-                        t["name"], len(b))
-            halves = await asyncio.gather(_run_batch(t, b[:mid]), _run_batch(t, b[mid:]))
+            logger.info("[analiz] %s batch kesildi (%d makale) → %d+%d olarak yeniden deneniyor",
+                        t["name"], len(b), mid, len(b) - mid)
+            halves = await asyncio.gather(
+                _run_batch(t, b[:mid], depth + 1), _run_batch(t, b[mid:], depth + 1)
+            )
             merged: list[dict] = []
             for h in halves:
                 if h:
                     merged.extend(h.get("analyses", []))
             return {"analyses": merged} if merged else None
+        except ClaudeError as exc:
+            # Kesilme DIŞI hata → bölme YOK (tekrar denemek aynı hatayı verir + token yakar).
+            totals.warnings.append(f"[{t['name']}] batch analiz hatası (bölünmedi): {exc}")
+            return None
 
     async def _process_entity(t: dict):
         nonlocal done
@@ -645,27 +665,39 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient) -> AnalyzeTotals:
     ebs = _effective_batch_size(batch_size, lang)  # Türkçe → yarı batch
     batches = [payload[i : i + ebs] for i in range(0, len(payload), ebs)]
 
-    def run_batch_sync(b):
-        """KESİLME/parse hatasında batch'i İKİYE bölüp yeniden dener (recursive)."""
+    def run_batch_sync(b, depth: int = 0):
+        """YALNIZCA KESİLME'de (TruncationError) batch'i ikiye bölüp yeniden dener
+        (recursive; en kötü tek makale kaybı). Kesilme dışı hatalar bölünmez."""
         user = build_article_batch_prompt(name, query, etype, b, lang)
         try:
             return client.call_tool(
                 system=SYSTEM_PROMPT, user=user, tool=ARTICLE_ANALYSIS_TOOL,
                 max_tokens=settings.max_output_tokens,
             )
-        except ClaudeError as exc:
+        except TruncationError as exc:
             if len(b) <= 1:
-                totals.warnings.append(f"[{name}] makale atlandı (tek makale, kesildi): {exc}")
+                aid = b[0].get("id", "?") if b else "?"
+                totals.warnings.append(
+                    f"[{name}] makale #{aid} analiz edilemedi: yanıt kesildi, "
+                    "makale çok uzun olabilir")
+                return None
+            if depth >= _MAX_SPLIT_DEPTH:
+                totals.warnings.append(
+                    f"[{name}] {len(b)} makale atlandı: bölme sınırına ulaşıldı, "
+                    "yanıt hâlâ kesiliyor")
                 return None
             mid = len(b) // 2
-            logger.info("[analiz] %s batch kesildi → %d makale 2'ye bölünüp yeniden deneniyor",
-                        name, len(b))
+            logger.info("[analiz] %s batch kesildi (%d makale) → %d+%d olarak yeniden deneniyor",
+                        name, len(b), mid, len(b) - mid)
             merged: list[dict] = []
             for half in (b[:mid], b[mid:]):
-                r = run_batch_sync(half)
+                r = run_batch_sync(half, depth + 1)
                 if r:
                     merged.extend(r.get("analyses", []))
             return {"analyses": merged} if merged else None
+        except ClaudeError as exc:
+            totals.warnings.append(f"[{name}] batch analiz hatası (bölünmedi): {exc}")
+            return None
 
     batch_datas: list[dict] = []
     for b in batches:

@@ -33,6 +33,13 @@ class MissingAPIKeyError(ClaudeError):
     """ANTHROPIC_API_KEY tanımlı değil."""
 
 
+class TruncationError(ClaudeError):
+    """Yanıt max_tokens'ta kesildi (yarım/bozuk JSON). Batch bölünüp yeniden denenebilir.
+
+    ClaudeError'ın ALT tipi: pipeline yalnızca BUNU bölerek yeniden dener; diğer
+    ClaudeError'lar (rate limit, bağlantı, API) bölünmez (uyar + devam)."""
+
+
 class ClaudeClient:
     def __init__(self, model: str | None = None) -> None:
         settings = get_settings()
@@ -88,7 +95,7 @@ class ClaudeClient:
                    f"max_tokens={max_tokens}). Batch'i küçültün (NEWSRADAR_BATCH_SIZE) "
                    "ya da NEWSRADAR_MAX_OUTPUT_TOKENS'ı artırın.")
             logger.error(msg)
-            raise ClaudeError(msg)
+            raise TruncationError(msg)
 
         for block in resp.content:
             if block.type == "tool_use" and block.name == tool["name"]:
