@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import time
+from datetime import datetime, timezone
 
 import bcrypt
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -58,6 +59,11 @@ def make_user_token(user: User) -> str:
     return f"{user.id}.{iat}.{sig}"
 
 
+# last_active_at yazma throttle'ı (sn). Görüntü "az önce/dk" hassasiyetinde olduğu
+# için 30 sn içindeki tekrar yazmalar atlanır — status polling her yazmayı tetiklemez.
+_ACTIVE_THROTTLE_S = 30
+
+
 def _bearer(authorization: str | None) -> str:
     if authorization and authorization.lower().startswith("bearer "):
         return authorization[7:].strip()
@@ -93,6 +99,14 @@ def get_current_user(
     expected = _sign(uid, iat, user.password_hash, settings.app_secret)
     if not hmac.compare_digest(sig, expected):
         raise invalid
+
+    # Son aktiflik: HER kimlik-doğrulanmış istekte tazele (dashboard, status polling
+    # dahil). Yazma amplifikasyonunu önlemek için hafif throttle — son güncellemeden
+    # bu kadar saniye geçmediyse yazma (görüntü zaten dakika/"az önce" hassasiyetinde).
+    now_dt = datetime.now(timezone.utc).replace(tzinfo=None)
+    la = user.last_active_at
+    if la is None or (now_dt - la).total_seconds() >= _ACTIVE_THROTTLE_S:
+        user.last_active_at = now_dt  # get_db istek sonunda commit eder
     return user
 
 

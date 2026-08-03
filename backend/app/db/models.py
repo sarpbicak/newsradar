@@ -313,6 +313,9 @@ class User(Base):
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Son aktiflik: HER kimlik-doğrulanmış istekte (get_current_user) tazelenir —
+    # login gibi belirli eylemler değil, sadece siteyi gezmek de sayılır (throttle'lı).
+    last_active_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # "NewsRadar ne yapar?" açıklama kutusu kapatıldı mı (kullanıcı tercihi; kalıcı).
     guide_dismissed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # İlk giriş tutorial'ı tamamlandı/kapatıldı mı (bir daha gösterilmez; kalıcı).

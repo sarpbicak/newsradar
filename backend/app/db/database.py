@@ -60,6 +60,7 @@ def init_db() -> None:
     _ensure_column("analyst_snapshots", "target_consensus", "FLOAT")
     _ensure_column("users", "guide_dismissed", "BOOLEAN NOT NULL DEFAULT 0")
     _ensure_column("users", "tutorial_done", "BOOLEAN NOT NULL DEFAULT 0")
+    _ensure_column("users", "last_active_at", "DATETIME")
 
 
 def _ensure_column(table: str, column: str, ddl_type: str) -> None:

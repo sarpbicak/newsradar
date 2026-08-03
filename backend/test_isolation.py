@@ -252,6 +252,26 @@ def main():
               f"Boş listede yenileme başlamaz (started={r.json().get('started')})")
         check("boş" in r.json().get("message", "").lower(), f"Mesaj: {r.json().get('message')}")
 
+        print("\n== TEST 12: last_active_at her authed istekte tazelenir ==")
+        from datetime import datetime, timezone
+        H = auth_headers(client, "userh")
+        with session_scope() as db:
+            hid = db.query(User).filter(User.username == "userh").first().id
+            before = db.get(User, hid).last_active_at
+        check(before is None, "Kayıt sonrası last_active_at boş (henüz veri isteği yok)")
+        # Herhangi bir authed veri isteği (get_current_user'dan geçer) → tazelensin.
+        client.get("/entities", headers=H)
+        with session_scope() as db:
+            after = db.get(User, hid).last_active_at
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        check(after is not None, "GET /entities sonrası last_active_at DOLU (siteyi gezmek sayılıyor)")
+        check(after is not None and (now - after).total_seconds() < 10,
+              f"last_active_at gerçek zamanlı (fark: {None if after is None else round((now-after).total_seconds(),1)}s)")
+        # Admin panelinde de görünür (Test 5'teki admin header'ını yeniden kullan)
+        rows = client.get("/admin/users", headers=adm).json()
+        hrow = next((r for r in rows if r["username"] == "userh"), None)
+        check(hrow and hrow["last_active_at"] is not None, "Admin, userh'in son aktifliğini görür")
+
     print(f"\n{'='*50}\nSONUÇ: {PASS} geçti, {FAIL} başarısız")
     return FAIL == 0
 

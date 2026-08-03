@@ -65,7 +65,9 @@ def list_users(db: Session = Depends(get_db)) -> list[AdminUserRow]:
     users = db.scalars(select(User).order_by(User.created_at)).all()
     rows: list[AdminUserRow] = []
     for u in users:
-        last_active = db.scalar(
+        # Son aktiflik: artık her istekte tazelenen kolon birincil kaynak; kolon henüz
+        # dolmamışsa (migration öncesi eski kayıt) event geçmişinin en yenisine düş.
+        last_active = u.last_active_at or db.scalar(
             select(func.max(UsageEvent.created_at)).where(UsageEvent.user_id == u.id)
         )
         rows.append(AdminUserRow(
