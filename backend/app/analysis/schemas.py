@@ -156,22 +156,15 @@ ENTITY_ANALYSIS_TOOL = {
                     "Kartın en üstünde büyük gösterilecek. "
                     "ŞU ÜÇ ŞEYİ İÇERMELİ: (a) haber akışının yönü (olumlu/olumsuz/kararsız), "
                     "(b) ne kadar güvenilir olduğu (çok/az habere dayanıyor, tutarlı mı), "
-                    "(c) VARSA analist beklentisi ile haberlerin AYRIŞMASI ya da fiyatın zaten "
+                    "(c) VARSA analist beklentisi ile haberlerin ayrışması ya da fiyatın zaten "
                     "tepki verdiği. JARGON KESİNLİKLE YASAK: 'volatilite', 'momentum', "
                     "'konsolidasyon', 'değerleme', 'katalizör' gibi kelimeler KULLANMA; "
                     "günlük Türkçe kullan. "
-                    "ÇEŞİTLİLİK: bu şirketin haberinden SOMUT bir çapa kullan (ürün, iş "
-                    "kolu, olay, sayı ya da tarih) ki hüküm başka şirkete de uyan boş bir "
-                    "kalıp OLMASIN. Cümleye 'Haberler…' ya da '[Şirket] için olumlu haberler "
-                    "var' gibi GENEL bir açılışla BAŞLAMA; doğrudan o şirketin somut "
-                    "gelişmesiyle başla. Ayrışmayı da her seferinde aynı sözlerle "
-                    "('analistler yüksek hedefte — ayrışma var') bitirme; ayrışmanın "
-                    "SEBEBİNİ somutla. 'Güçlü olumlu haberler, tablo tutarlı' gibi genel "
-                    "cümleyi tek başına yazma — neyin olumlu olduğunu somutla. İyi örnekler "
-                    "(kalıp değil, KANCA olarak oku): "
-                    "'Yeni çip siparişleri güçlü ama makro baskı hisseyi düşürdü — analistler yine de yukarı bakıyor.', "
-                    "'Bulut büyümesi yavaşladı, az sayıda haber var — kanıt zayıf, acele etme.', "
-                    "'Bilanço beklentiyi aştı ve analistler hedefi yükseltti — tablo tutarlı.'"
+                    "BU şirkete ÖZGÜ en az bir SOMUT detay içermeli (ürün/olay adı, rakam, "
+                    "sektörel dinamik). Sadece 'haberler karışık/olumlu/olumsuz' ile başlayan "
+                    "genel cümle YETERSİZ — doğrudan o şirketin elindeki haberlerden çıkan somut "
+                    "gelişmeyle başla. Şablon kalıpları aynen tekrarlama; başka şirkete "
+                    "kopyalanabilen hüküm YANLIŞTIR."
                 ),
             },
             "ai_take": {
@@ -179,28 +172,42 @@ ENTITY_ANALYSIS_TOOL = {
                 "description": (
                     "'AI ne düşünüyor?' — 3-5 cümlelik, KONUŞMA DİLİNDE, bütünsel bir "
                     "yorum. Haber akışı + fiyat hareketi + analist konsensüsü + kanıt gücünü "
-                    "SENTEZLE; bir arkadaşın anlatır gibi düz Türkçe (jargon YOK). ŞUNLARI YAP: "
-                    "(a) net bir duruş al ('Bence asıl mesele şu…'); (b) zaman ufku ayır "
-                    "('kısa vadede …, ama 1-2 yıllık bakıyorsan …'); (c) çelişkileri açıkça söyle "
-                    "('haberler kötü ama analistler yüksek hedefte — bu ayrışma önemli'); "
-                    "(d) somut ne izlenmeli belirt ('asıl belirleyici şu tarihteki bilanço'); "
-                    "(e) BU şirkete özgü en az bir gerçek ayrıntıya (ürün adı, iş kolu, olay, "
-                    "sayı, tarih) yaslan — başka şirkete de uyan genel bir yorum YAZMA. "
+                    "SENTEZLE; bir arkadaşın anlatır gibi düz Türkçe (jargon YOK). "
+                    "BU şirketin KENDİ durumunu anlat: elindeki haberlerden çıkan somut "
+                    "detayları kullan (ürün adı, olay, rakam, kişi). Her şirkete uyacak genel "
+                    "bir yorum YAZMA — yorumun başka bir şirkete olduğu gibi kopyalanabiliyorsa "
+                    "YANLIŞTIR, o şirkete özgü olmalı. ŞUNLARI YAP: (a) net bir duruş al; "
+                    "(b) kısa vade ile uzun vadeyi ayır; (c) varsa çelişkileri (haber↔analist "
+                    "ayrışması) o şirketin somut durumuyla açıkla; (d) somut ne izlenmeli belirt "
+                    "(bu şirketin haberlerinden doğan spesifik olay/tarih/rakam). "
                     "ŞUNLARI YAPMA: kendi hedef fiyatını UYDURMA (yalnızca verilen FMP analist "
-                    "hedefini aktarabilirsin; 'bence $X olur' ASLA); 'kesin yükselir/düşer' gibi "
-                    "kesinlik satma, belirsizliği dürüstçe söyle; değerleme yapamadığını, sadece "
-                    "haber akışı + fiyat + analist verisine baktığını gerektiğinde belirt "
-                    "(her cümlede tekrarlama). Örnek ton: 'Tablo ikiye bölünmüş: ürün tarafı "
-                    "güçlü ve analistler yukarı potansiyel görüyor, ama hisse sektörel makro "
-                    "baskıyla düştü. Kısa vadede bu baskı sürebilir; uzun vadede hikâye bozulmuş "
-                    "değil. Asıl belirleyici yaklaşan bilanço. Aceleye gerek yok ama izlemeye değer.'"
+                    "hedefini aktarabilirsin; kendi fiyat hedefin ASLA); 'kesin yükselir/düşer' "
+                    "gibi kesinlik satma, belirsizliği dürüstçe söyle; değerleme yapamadığını, "
+                    "sadece haber akışı + fiyat + analist verisine baktığını gerektiğinde belirt "
+                    "(her cümlede tekrarlama)."
                 ),
             },
-            "risk_score": {"type": "integer", "description": "0 (düşük) .. 100 (yüksek risk)"},
+            "risk_score": {
+                "type": "integer",
+                "description": (
+                    "0 (düşük risk) .. 100 (yüksek risk). ÖNCE haber akışının net yönünü "
+                    "belirle, SONRA o yönün bandından seç — 60 gibi bir sayıya VARSAYILAN "
+                    "olarak DÜŞME: güçlü olumlu → 15-30; hafif olumlu → 30-42; gerçekten "
+                    "karışık/belirsiz → 45-58; olumsuz → 60-74; ciddi olumsuz (skandal, dava, "
+                    "güvenlik ihlali, büyük kayıp) → 75-90. Olumlu haber akışı olan bir şirkete "
+                    "60 VERME (o düşük olmalı); ciddi olumsuz habere de 60 verme (o yüksek "
+                    "olmalı). Yuvarlak çıpalardan (50, 60) kaç; kanıtın gücü ve haberlerin "
+                    "sertliğine göre gerçek değeri seç. Skorlar şirketler arası açıkça farklılaşmalı."
+                ),
+            },
             "sentiment_trend": {"type": "string", "enum": list(SENTIMENT_TRENDS)},
             "top_drivers": {
                 "type": "array",
-                "description": "Tam 3 kısa etken, TÜRKÇE.",
+                "description": (
+                    "Tam 3 kısa etken, TÜRKÇE. Genel ifade DEĞİL — BU şirketin haberlerinden "
+                    "doğan somut etken (ürün/olay/rakam/kişi adı geçsin). Başka şirkete de "
+                    "uyacak genel maddeler yazma."
+                ),
                 "items": {"type": "string"},
             },
             "summary": {"type": "string", "description": "2-3 cümle özet, TÜRKÇE."},
