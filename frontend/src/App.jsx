@@ -394,7 +394,8 @@ export default function App() {
             {running ? (
               <span>
                 Tarama sürüyor… <strong>{status.progress_done}/{status.progress_total}</strong> şirket işlendi.
-                Bittiğinde pano otomatik güncellenecek — sayfayı kapatabilirsiniz.
+                İlk yenileme birikmiş haberler nedeniyle uzun sürebilir; bittiğinde pano
+                otomatik güncellenecek — sayfayı kapatabilirsiniz.
               </span>
             ) : (
               <span>Yenileme başlatılıyor…</span>

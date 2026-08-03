@@ -81,8 +81,11 @@ class Settings:
         # (co_mentioned_entities + why_relevant) makale başına ~300 token → 25 makale
         # 4096 max_tokens'a sığmaz, yanıt kesilir. Güvenli varsayılan 10.
         self.batch_size: int = int(_env("NEWSRADAR_BATCH_SIZE", "10"))
+        # Entity başına analiz edilecek makale tavanı. Geniş kanıt tabanı için yüksek
+        # varsayılan; 0 = SINIRSIZ (birikmiş tüm bekleyen makaleler analiz edilir).
+        # DİKKAT: yalnızca analyzed=False makaleler işlenir → tekrar analiz olmaz.
         self.max_articles_per_entity: int = int(
-            _env("NEWSRADAR_MAX_ARTICLES_PER_ENTITY", "60")
+            _env("NEWSRADAR_MAX_ARTICLES_PER_ENTITY", "200")
         )
         self.analysis_concurrency: int = int(_env("NEWSRADAR_ANALYSIS_CONCURRENCY", "5"))
         # Makale-batch Claude çağrısı için üretim (output) token tavanı. Batch büyük

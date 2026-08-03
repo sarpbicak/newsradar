@@ -65,6 +65,9 @@ ENTITY_ASSESSMENT_MAX_TOKENS = 4096
 # yalnızca patolojik özyinelemeye karşı emniyet supabı (en kötü ihtimalle tek makale
 # kaybı hedefi korunur — bkz. _run_batch/run_batch_sync).
 _MAX_SPLIT_DEPTH = 6
+# Tavan sınırsızken (0) entity-DEĞERLENDİRME okuması tek prompt'u şişirmesin diye
+# okunacak analiz edilmiş makale üst sınırı (makale-başı analiz yine sınırsız).
+ASSESSMENT_READ_CAP = 200
 MAX_ANALYSIS_HISTORY = 100  # entity başına saklanacak en fazla değerlendirme kaydı
 SUGGESTION_TTL_DAYS = 30    # bu süreden eski + az anılan öneriler temizlenir
 
@@ -299,7 +302,7 @@ def _prefilter(session: Session, entity: Entity, max_articles: int) -> tuple[lis
     # GEVŞEK: sağlayıcı zaten entity'ye göre filtreli → eleme yok, ama TEKRARLARI birleştir.
     if entity_filtered:
         reps, duplicates = _dedup_by_title(pending)  # kopyalar prefiltered işaretlenir
-        capped = reps[:max_articles]
+        capped = reps if max_articles <= 0 else reps[:max_articles]
         payload = [
             {"id": a.id, "title": a.title, "source": a.source, "description": a.description}
             for a in capped
@@ -323,7 +326,7 @@ def _prefilter(session: Session, entity: Entity, max_articles: int) -> tuple[lis
     # Kalanların da tekrarlarını birleştir (aynı hikâye çok kaynakta).
     reps, duplicates = _dedup_by_title(kept)
     prefiltered += duplicates
-    capped = reps[:max_articles]
+    capped = reps if max_articles <= 0 else reps[:max_articles]
     payload = [
         {"id": a.id, "title": a.title, "source": a.source, "description": a.description}
         for a in capped
@@ -387,8 +390,11 @@ def _read_assessment_payload(entity_id: int) -> list[dict]:
     """Entity değerlendirmesi için son analiz edilmiş makalelerden bağlam payload'ı.
 
     Lookback TAVANLA (max_articles_per_entity) tutarlı: 20'ye kilitlenmez; 40 makale
-    analiz edildiyse değerlendirme (ve karttaki 'N haber') 40'a kadar yansır."""
-    lookback = max(AGGREGATE_LOOKBACK, get_settings().max_articles_per_entity)
+    analiz edildiyse değerlendirme (ve karttaki 'N haber') 40'a kadar yansır.
+    Tavan SINIRSIZ (0) ise değerlendirme okuması tek prompt'u şişirmesin diye makul
+    bir tavanla (ASSESSMENT_READ_CAP) sınırlanır."""
+    cap = get_settings().max_articles_per_entity
+    lookback = ASSESSMENT_READ_CAP if cap <= 0 else max(AGGREGATE_LOOKBACK, cap)
     with session_scope() as session:
         articles = session.scalars(
             select(Article)
@@ -463,7 +469,7 @@ async def analyze_all_async(
     """
     settings = get_settings()
     batch_size = max(1, settings.batch_size)
-    max_articles = max(1, settings.max_articles_per_entity)
+    max_articles = settings.max_articles_per_entity  # 0 = sınırsız (_prefilter yorumlar)
     concurrency = max(1, settings.analysis_concurrency)
 
     totals = AnalyzeTotals()
@@ -644,7 +650,7 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient) -> AnalyzeTotals:
     """CLI/test için tek entity'yi senkron analiz eder (ön-filtre + batch + değerlendirme)."""
     settings = get_settings()
     batch_size = max(1, settings.batch_size)
-    max_articles = max(1, settings.max_articles_per_entity)
+    max_articles = settings.max_articles_per_entity  # 0 = sınırsız (_prefilter yorumlar)
     totals = AnalyzeTotals()
 
     with session_scope() as session:
