@@ -30,19 +30,21 @@ def mask_url_secrets(text: str) -> str:
 
 
 def get_client_ip(request) -> str:
-    """İstemci IP'si — Render/proxy arkasında X-Forwarded-For'un SON (en sağ) adresi.
+    """İstemci IP'si — Render/proxy arkasında X-Forwarded-For'un İLK (en sol) adresi.
 
-    GÜVENLİK: XFF'in İLK adresi İSTEMCİ tarafından spoof edilebilir (saldırgan
-    'X-Forwarded-For: rastgele' göndererek her istekte yeni IP taklit edip hız
-    sınırını atlatır). Render gibi TEK güvenilir proxy arkasında gerçek istemci IP'si
-    XFF'in EN SAĞINDADIR (proxy ekler; istemci bunu kontrol edemez). Bu yüzden son
-    adresi alırız → spoof'a dayanıklı. (Birden çok proxy eklenirse bu konum ayarlanmalı.)
+    RENDER: gerçek istemci IP'si XFF'in İLK adresidir (Render access log'unda da bunu
+    gösterir). SON (en sağ) adresi almak Render'ın DEĞİŞEN iç proxy IP'sini verir → her
+    istek 'yeni IP' sayılır ve hız sayacı hiç birikmez (canlıda yaşanan boşluk buydu).
+
+    NOT (spoofing): teoride istemci kendi X-Forwarded-For'unu yollayıp ilk adresi
+    değiştirebilir; ancak Render kenarı XFF'i kendi belirlediği istemci IP'siyle kurar.
+    Çok katmanlı/güvenilmez proxy senaryosunda güvenilir-proxy derinliği ayarlanmalı.
     """
     xff = request.headers.get("x-forwarded-for")
     if xff:
         parts = [p.strip() for p in xff.split(",") if p.strip()]
         if parts:
-            return parts[-1]
+            return parts[0]
     return request.client.host if request.client else "unknown"
 
 
@@ -75,15 +77,17 @@ class LoginRateLimiter:
             fails = [t for t in self._fails.get(ip, []) if now - t < self.window_s]
             fails.append(now)
             self._fails[ip] = fails
-            if len(fails) >= self.max_fails:
+            n = len(fails)
+            if n >= self.max_fails:
                 self._locked_until[ip] = now + self.lock_s
-                n = len(fails)
                 self._fails[ip] = []  # sıfırla; kilit süresi işliyor
-                # Loglardan görülebilsin (sessiz kalmasın).
                 logger.warning(
-                    "[rate-limit] IP %s kilitlendi (%d başarısız deneme, %d dk)",
-                    ip, n, self.lock_s // 60,
+                    "[rate-limit] IP=%s KİLİTLENDİ (%d/%d başarısız, %d dk)",
+                    ip, n, self.max_fails, self.lock_s // 60,
                 )
+            else:
+                # HER başarısız denemede sayacı logla (canlıda birikimi görebilmek için).
+                logger.warning("[rate-limit] IP=%s sayaç=%d/%d", ip, n, self.max_fails)
 
     def record_success(self, ip: str) -> None:
         with self._lock:

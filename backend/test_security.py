@@ -151,12 +151,12 @@ def main():
         got429 = any(s == 429 for _, s in mixed)
         check(got429, f"KARIŞIK uçlarda 5. başarısızda kilit (429) — kodlar: {mixed}")
 
-        print("\n== XFF spoof: son (en sağ) adres alınır (spoof'a dayanıklı) ==")
+        print("\n== XFF: İLK (en sol) adres = Render istemci IP'si ==")
         from app.security import get_client_ip
         class _Req:
             def __init__(self, xff): self.headers = {"x-forwarded-for": xff}; self.client = None
-        ip = get_client_ip(_Req("1.2.3.4, 9.9.9.9"))
-        check(ip == "9.9.9.9", f"XFF'in SON adresi alınır (spoof-dayanıklı): {ip}")
+        ip = get_client_ip(_Req("31.206.162.84, 10.0.0.5, 10.0.0.9"))
+        check(ip == "31.206.162.84", f"XFF'in İLK adresi (Render istemci IP'si) alınır: {ip}")
 
         print("\n== login_failed kullanıcı adıyla kaydediliyor ==")
         _ll2._fails.clear(); _ll2._locked_until.clear()

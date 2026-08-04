@@ -6,6 +6,7 @@ geçilmeli. me KİŞİSEL token ister (get_current_user). Şifreler bcrypt ile h
 
 from __future__ import annotations
 
+import logging
 import re
 import threading
 from datetime import datetime, timezone
@@ -30,6 +31,7 @@ from .schemas import RegisterIn, UserLoginIn, UserOut, UserTokenOut
 from .usage import record_event
 
 router = APIRouter(prefix="/users", tags=["users"])
+logger = logging.getLogger("newsradar.security")
 
 MIN_PASSWORD_LEN = 8
 # Kullanıcı adı: alfanumerik + alt çizgi, 3–30 karakter (boşluk/kontrol karakteri yok).
@@ -149,6 +151,10 @@ def login(payload: UserLoginIn, request: Request, db: Session = Depends(get_db))
     attempted = payload.username.strip()
     user = _find_by_username_ci(db, attempted)
     if user is None or not verify_password(payload.password, user.password_hash):
+        # TANI: hesaplanan IP ile ham XFF'i logla — canlıda IP'nin tutarlı mı yoksa her
+        # istekte farklı mı geldiği (XFF/proxy sorunu) buradan görülür.
+        logger.warning("[rate-limit] /users/login başarısız — ip=%s xff=%r",
+                       ip, request.headers.get("x-forwarded-for"))
         login_limiter.record_failure(ip)
         # Başarısız denemeyi admin panelinde göster (KULLANICI ADI dahil → kimin/neyin
         # takıldığı görünsün). AYRI session: aşağıdaki 401 request session'ını rollback
