@@ -126,6 +126,7 @@ export const api = {
   adminUsers: () => req("/admin/users"),
   adminUserDetail: (id) => req(`/admin/users/${id}`),
   adminDeleteUser: (id) => req(`/admin/users/${id}`, { method: "DELETE" }),
+  adminResetPassword: (id) => req(`/admin/users/${id}/reset-password`, { method: "POST" }),
   adminStats: () => req("/admin/stats"),
   status: () => req("/status"),
   listEntities: () => req("/entities"),

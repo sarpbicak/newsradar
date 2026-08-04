@@ -50,19 +50,22 @@ def _check_locked(request: Request) -> None:
 
 
 def _record_register_failed(reason: str, attempted: str, request: Request) -> None:
-    """Başarısız kayıt denemesini admin'in görebilmesi için usage_events'e yaz.
+    """Başarısız kayıt denemesini kaydeder + ORTAK hız sayacına ekler.
 
-    Kayıt anonimdir (kullanıcı yok) → olayı ADMIN'e iliştir (admin başarısız denemeleri
-    panelde görsün). Admin yoksa (ilk kayıt) sessizce atla. AYRI session (istek session'ı
-    hata yolunda rollback edilir → olay kaybolmasın)."""
+    (1) usage_events'e yaz (admin panelde görsün). Kayıt anonimdir → olayı ADMIN'e
+    iliştir; admin yoksa (ilk kayıt) atla. AYRI session (istek session'ı hata yolunda
+    rollback edilir → olay kaybolmasın).
+    (2) login_limiter.record_failure: /auth/login + /users/login ile AYNI IP sayacına
+    eklenir → saldırgan denemeleri uçlara dağıtarak sınırı atlayamaz (uç-bağımsız)."""
+    ip = get_client_ip(request)
+    login_limiter.record_failure(ip)
     with session_scope() as s2:
         admin = s2.scalar(
             select(User).where(User.is_admin.is_(True)).order_by(User.created_at).limit(1)
         )
         if admin is not None:
             record_event(s2, admin.id, "register_failed",
-                         {"reason": reason, "username": attempted[:50],
-                          "ip": get_client_ip(request)})
+                         {"reason": reason, "username": attempted[:50], "ip": ip})
 
 
 def _user_out(u: User) -> UserOut:
@@ -143,14 +146,24 @@ def login(payload: UserLoginIn, request: Request, db: Session = Depends(get_db))
     Hız-sınırlı (kaba kuvvet). Hata mesajı kullanıcı adı/şifre ayrımı yapmaz (enum'a karşı)."""
     ip = get_client_ip(request)
     _check_locked(request)
-    user = _find_by_username_ci(db, payload.username.strip())
+    attempted = payload.username.strip()
+    user = _find_by_username_ci(db, attempted)
     if user is None or not verify_password(payload.password, user.password_hash):
         login_limiter.record_failure(ip)
-        # Var olan bir kullanıcıya yönelik başarısız denemeyi admin panelinde göster.
-        # AYRI session: aşağıdaki 401 request session'ını rollback eder → event kaybolmasın.
-        if user is not None:
-            with session_scope() as s2:
-                record_event(s2, user.id, "login_failed", {"ip": ip})
+        # Başarısız denemeyi admin panelinde göster (KULLANICI ADI dahil → kimin/neyin
+        # takıldığı görünsün). AYRI session: aşağıdaki 401 request session'ını rollback
+        # eder → event kaybolmasın.
+        with session_scope() as s2:
+            if user is not None:
+                record_event(s2, user.id, "login_failed", {"ip": ip, "username": user.username})
+            else:
+                # Bilinmeyen kullanıcı adı (muhtemel sondaj) → admin'e iliştir, görünür olsun.
+                admin = s2.scalar(
+                    select(User).where(User.is_admin.is_(True)).order_by(User.created_at).limit(1)
+                )
+                if admin is not None:
+                    record_event(s2, admin.id, "login_failed",
+                                 {"ip": ip, "username": attempted[:50], "unknown": True})
         raise HTTPException(status_code=401, detail="Kullanıcı adı veya şifre hatalı.")
     login_limiter.record_success(ip)
     user.last_login_at = datetime.now(timezone.utc).replace(tzinfo=None)

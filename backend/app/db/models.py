@@ -295,7 +295,7 @@ class AnalystSnapshot(Base):
 USAGE_EVENT_TYPES = (
     "login", "login_failed", "register_failed", "refresh", "view_entity",
     "add_entity", "remove_entity", "chat", "add_suggestion", "dismiss_suggestion",
-    "delete_user",
+    "delete_user", "password_reset",
 )
 
 

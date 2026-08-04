@@ -5,6 +5,7 @@ Veri ORTAK; bu uçlar yalnızca 'kim ne yaptı' özetini gösterir (usage_events
 
 from __future__ import annotations
 
+import secrets
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -20,12 +21,13 @@ from ..db.models import (
     UserWatchlist,
 )
 from ..watchlist import recompute_active
-from .routes_auth import require_admin
+from .routes_auth import hash_password, require_admin
 from .schemas import (
     AdminEventOut,
     AdminStatsOut,
     AdminUserDetail,
     AdminUserRow,
+    PasswordResetOut,
     UserOut,
 )
 from .usage import record_event
@@ -178,6 +180,28 @@ def delete_user(
 
     # Kim kimi sildi — admin'in kaydına yaz (silinen kullanıcının olayları gitti).
     record_event(db, admin.id, "delete_user", {"deleted_id": user_id, "username": username})
+
+
+@router.post("/users/{user_id}/reset-password", response_model=PasswordResetOut)
+def reset_password(
+    user_id: int,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> PasswordResetOut:
+    """Kullanıcının şifresini GEÇİCİ bir şifreyle sıfırlar (yalnızca admin).
+
+    Geçici şifre üretilir, hash'lenip saklanır ve düz metni YALNIZCA bu yanıtta döner
+    (admin kullanıcıya iletir). Şifre değiştiği için kullanıcının mevcut token'ları
+    geçersizleşir (token imzası pwhash'e bağlı) → yeniden giriş gerekir. LOGLANMAZ.
+    """
+    target = db.get(User, user_id)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
+    temp = secrets.token_urlsafe(9)  # ~12 karakter, min 8 şartını karşılar
+    target.password_hash = hash_password(temp)
+    record_event(db, admin.id, "password_reset",
+                 {"target_id": user_id, "username": target.username})
+    return PasswordResetOut(username=target.username, temp_password=temp)
 
 
 @router.get("/stats", response_model=AdminStatsOut)

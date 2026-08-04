@@ -7,6 +7,8 @@ import { timeAgo } from "./ui.jsx";
 
 const EVENT_LABELS = {
   login: "giriş",
+  login_failed: "başarısız giriş",
+  register_failed: "başarısız kayıt",
   refresh: "yenileme",
   view_entity: "görüntüleme",
   add_entity: "şirket ekleme",
@@ -14,6 +16,8 @@ const EVENT_LABELS = {
   chat: "sohbet",
   add_suggestion: "öneri ekleme",
   dismiss_suggestion: "öneri gizleme",
+  delete_user: "kullanıcı silme",
+  password_reset: "şifre sıfırlama",
 };
 function eventLabel(t) {
   return EVENT_LABELS[t] || t;
@@ -69,6 +73,25 @@ export default function AdminPanel({ currentUserId }) {
       window.alert(`Silinemedi: ${err.message}`);
     } finally {
       setDeleting(null);
+    }
+  }
+
+  const [resetting, setResetting] = useState(null);
+  async function handleReset(u, e) {
+    e.stopPropagation();
+    if (!window.confirm(`${u.username} kullanıcısının şifresi sıfırlansın mı? Geçici bir şifre üretilecek.`))
+      return;
+    setResetting(u.id);
+    try {
+      const r = await api.adminResetPassword(u.id);
+      window.prompt(
+        `${r.username} için geçici şifre (kopyalayın, kullanıcıya iletin — bir daha gösterilmez):`,
+        r.temp_password
+      );
+    } catch (err) {
+      window.alert(`Sıfırlanamadı: ${err.message}`);
+    } finally {
+      setResetting(null);
     }
   }
 
@@ -198,18 +221,28 @@ export default function AdminPanel({ currentUserId }) {
                   {u.last_active_at ? timeAgo(u.last_active_at) : "hiç"}
                 </td>
                 <td className="px-4 py-2.5 text-right">
-                  {u.id === currentUserId ? (
-                    <span className="text-[11px] text-slate-600">siz</span>
-                  ) : (
+                  <div className="flex items-center justify-end gap-1.5">
                     <button
-                      onClick={(e) => handleDelete(u, e)}
-                      disabled={deleting === u.id}
-                      title="Kullanıcıyı ve tüm verilerini sil"
-                      className="rounded-md border border-rose-500/30 px-2 py-1 text-[11px] font-medium text-rose-400 transition hover:bg-rose-500/10 disabled:opacity-50"
+                      onClick={(e) => handleReset(u, e)}
+                      disabled={resetting === u.id}
+                      title="Şifre sıfırla (geçici şifre üret)"
+                      className="rounded-md border border-ink-500 px-2 py-1 text-[11px] font-medium text-slate-400 transition hover:bg-ink-700 hover:text-slate-200 disabled:opacity-50"
                     >
-                      {deleting === u.id ? "Siliniyor…" : "Sil"}
+                      {resetting === u.id ? "…" : "Şifre"}
                     </button>
-                  )}
+                    {u.id === currentUserId ? (
+                      <span className="text-[11px] text-slate-600">siz</span>
+                    ) : (
+                      <button
+                        onClick={(e) => handleDelete(u, e)}
+                        disabled={deleting === u.id}
+                        title="Kullanıcıyı ve tüm verilerini sil"
+                        className="rounded-md border border-rose-500/30 px-2 py-1 text-[11px] font-medium text-rose-400 transition hover:bg-rose-500/10 disabled:opacity-50"
+                      >
+                        {deleting === u.id ? "Siliniyor…" : "Sil"}
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -337,8 +370,11 @@ function UserDetail({ userId, onClose }) {
                   </span>
                   <span className="text-slate-300">
                     {eventLabel(ev.event_type)}
-                    {ev.detail?.name && (
-                      <span className="text-slate-500"> · {ev.detail.name}</span>
+                    {(ev.detail?.name || ev.detail?.username) && (
+                      <span className="text-slate-500"> · {ev.detail.name || ev.detail.username}</span>
+                    )}
+                    {ev.detail?.ip && (
+                      <span className="text-slate-600"> ({ev.detail.ip})</span>
                     )}
                   </span>
                 </div>

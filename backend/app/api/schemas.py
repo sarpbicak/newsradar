@@ -96,6 +96,13 @@ class AdminEventOut(BaseModel):
     created_at: datetime
 
 
+class PasswordResetOut(BaseModel):
+    """Admin şifre sıfırlama sonucu — geçici şifre YALNIZCA burada döner (bir kez)."""
+
+    username: str
+    temp_password: str
+
+
 class AdminUserDetail(BaseModel):
     """Tek kullanıcının detaylı kullanımı."""
 

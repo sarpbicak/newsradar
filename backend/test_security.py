@@ -137,6 +137,59 @@ def main():
             n_rf = db.query(UsageEvent).filter(UsageEvent.event_type == "register_failed").count()
         check(n_rf >= 1, f"En az 1 register_failed olayı ({n_rf})")
 
+        adm = {"Authorization": f"Bearer {adm_tok}"}  # rootadmin header'ı (aşağıdaki testler için)
+        print("\n== Rate limit KARIŞIK uçlarda ortak sayaç (uç-bağımsız) ==")
+        from app.security import login_limiter as _ll2
+        _ll2._fails.clear(); _ll2._locked_until.clear()
+        gtm = gtok(client)
+        mixed = []
+        for _ in range(4):  # /auth/login yanlış
+            mixed.append(("auth", client.post("/auth/login", json={"password": "YANLIS"}).status_code))
+        for _ in range(3):  # /users/login yanlış (aynı IP)
+            mixed.append(("users", client.post("/users/login", json={"username": "rootadmin", "password": "YANLIS"},
+                          headers={"Authorization": f"Bearer {gtm}"}).status_code))
+        got429 = any(s == 429 for _, s in mixed)
+        check(got429, f"KARIŞIK uçlarda 5. başarısızda kilit (429) — kodlar: {mixed}")
+
+        print("\n== XFF spoof: son (en sağ) adres alınır (spoof'a dayanıklı) ==")
+        from app.security import get_client_ip
+        class _Req:
+            def __init__(self, xff): self.headers = {"x-forwarded-for": xff}; self.client = None
+        ip = get_client_ip(_Req("1.2.3.4, 9.9.9.9"))
+        check(ip == "9.9.9.9", f"XFF'in SON adresi alınır (spoof-dayanıklı): {ip}")
+
+        print("\n== login_failed kullanıcı adıyla kaydediliyor ==")
+        _ll2._fails.clear(); _ll2._locked_until.clear()
+        gtm2 = gtok(client)
+        client.post("/users/login", json={"username": "rootadmin", "password": "YANLIS2"},
+                    headers={"Authorization": f"Bearer {gtm2}"})
+        with session_scope() as db:
+            lf = db.query(UsageEvent).filter(UsageEvent.event_type == "login_failed").all()
+            has_uname = any((e.detail or {}).get("username") == "rootadmin" for e in lf)
+        check(has_uname, f"login_failed detayında kullanıcı adı var ({len(lf)} olay)")
+
+        print("\n== Admin şifre sıfırlama ==")
+        _ll2._fails.clear(); _ll2._locked_until.clear()
+        # sıfırlanacak kullanıcı: mevcut bir non-admin (delme2 hâlâ var)
+        with session_scope() as db:
+            tgt = db.query(User).filter(User.is_admin.is_(False)).first()
+            tgt_id, tgt_name, old_hash = tgt.id, tgt.username, tgt.password_hash
+        rr = client.post(f"/admin/users/{tgt_id}/reset-password", headers=adm)
+        check(rr.status_code == 200, f"Şifre sıfırlama 200 ({rr.status_code})")
+        body = rr.json()
+        temp = body.get("temp_password", "")
+        check(len(temp) >= 8 and body.get("username") == tgt_name, f"Geçici şifre döndü ({len(temp)} kar.)")
+        with session_scope() as db:
+            new_hash = db.get(User, tgt_id).password_hash
+        check(new_hash != old_hash, "Şifre hash'i değişti (yeni geçici şifre saklandı)")
+        # yeni geçici şifreyle giriş çalışıyor mu
+        rlog = client.post("/users/login", json={"username": tgt_name, "password": temp},
+                           headers={"Authorization": f"Bearer {gtok(client)}"})
+        check(rlog.status_code == 200, f"Geçici şifreyle giriş 200 ({rlog.status_code})")
+        with session_scope() as db:
+            pr = db.query(UsageEvent).filter(UsageEvent.event_type == "password_reset").count()
+        check(pr >= 1, f"password_reset olayı kaydedildi ({pr})")
+
         print("\n== Admin kullanıcı silme (DELETE /admin/users/{id}) ==")
         # Rate-limit testi IP'yi kilitledi → silme testinden önce limiter'ı sıfırla.
         from app.security import login_limiter as _ll
