@@ -187,10 +187,15 @@ def _priority(analysis, delta, change_percent, analyst) -> tuple[int, str | None
     reasons: list[tuple[str, int]] = []
     if delta is not None:
         if delta.stance_changed:
-            reasons.append(("yön değişti", 3))
-        if abs(delta.risk_delta) >= 8:
+            prev = delta.previous_stance
+            curr = analysis.stance if analysis is not None else None
+            if prev in ("bullish", "bearish") and curr in ("bullish", "bearish") and prev != curr:
+                reasons.append(("yön değişti", 3))   # tam tersine dönüş — önemli
+            else:
+                reasons.append(("yön netleşti", 1))  # nötr↔yönlü — hafif sinyal
+        if abs(delta.risk_delta) >= 5:
             reasons.append(("risk sıçraması", 2))
-    if change_percent is not None and abs(change_percent) >= 3:
+    if change_percent is not None and abs(change_percent) >= 2:
         reasons.append(("sert hareket", 2))
     if analysis is not None and analyst is not None:
         buyish = analyst.strong_buy + analyst.buy
