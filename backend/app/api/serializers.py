@@ -149,11 +149,11 @@ def _horizon_and_evidence(
     horizons = [h for h, _ in rows if h]
     horizon = Counter(horizons).most_common(1)[0][0] if horizons else None
 
-    # Karttaki "N haber": analiz edilmiş makale sayısı, TAVANLA sınırlı (cap ile tutarlı,
-    # eski 20-kilidi yerine). Kayıtlı articles_considered'a bağlı kalmaz → anında yansır.
-    from ..config import get_settings
-    _cap = get_settings().max_articles_per_entity
-    count = len(rows) if _cap <= 0 else min(len(rows), _cap)
+    # Karttaki "N haber": GERÇEK analiz edilmiş makale sayısı — sabit bir tavana
+    # (ör. env'deki 40) kilitlenmez. Analiz-per-yenileme tavanı (max_articles_per_entity)
+    # yalnızca tek yenilemede KAÇ YENİ makale işleneceğini sınırlar; birikmiş toplam
+    # analiz edilmiş sayı kartta olduğu gibi gösterilir.
+    count = len(rows)
     sentiments = [s for _, s in rows if s is not None]
 
     # Kanıt puanı: kanaat + haber sayısı + duygu tutarlılığı.
@@ -177,7 +177,12 @@ def _horizon_and_evidence(
 def _priority(analysis, delta, change_percent, analyst) -> tuple[int, str | None]:
     """Kademeli düzen için öncelik skoru + baskın neden (Katman 1 seçimi).
 
-    yön değişti +3 · |risk farkı|≥8 +2 · |günlük %|≥3 +2 · haber↔analist ayrışması +1.
+    Tam tersine dönüş (bullish↔bearish) +3 · nötr↔yönlü gürültü +1 · |risk farkı|≥5 +2
+    · |günlük %|≥2 +2 · haber↔analist ayrışması +1.
+
+    NOT: eskiden HER stance_changed +3 alıyordu; ama LLM nötr↔yönlü arasında
+    kararsızlık yaptığında (nötr-gürültü) bu sahte aciliyet üretiyordu (çoğu entity
+    skor≥2 → seçim ayrımsız). Artık yalnızca GERÇEK tersine dönüş ağır puan alır.
     """
     reasons: list[tuple[str, int]] = []
     if delta is not None:

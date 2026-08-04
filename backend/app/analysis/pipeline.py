@@ -56,7 +56,9 @@ def _effective_batch_size(batch_size: int, language: str | None) -> int:
     return batch_size
 
 
-AGGREGATE_LOOKBACK = 20  # entity değerlendirmesinde kaç son makale bağlam olarak verilir
+AGGREGATE_LOOKBACK = 200  # entity değerlendirmesinde kaç son makale bağlam olarak verilir
+# (tavanla uyumlu: değerlendirme son 40'a değil, birikmiş son ~200 analiz edilmiş
+#  makaleye bakar; _read_assessment_payload lookback = max(AGGREGATE_LOOKBACK, cap)).
 # Entity değerlendirme çıktısı (headline_verdict + ai_take + summary + drivers + ...);
 # Türkçe uzun metinler için 2000 azdı → 4096 (kesilmeyi önle).
 ENTITY_ASSESSMENT_MAX_TOKENS = 4096
