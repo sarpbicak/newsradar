@@ -200,6 +200,21 @@ class LoginRate(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
 
+class LlmUsage(Base):
+    """LLM token kullanımı (maliyet takibi + günlük bütçe tavanı). Her yenileme sonunda
+    o taramanın toplam token deltası bir satır olarak yazılır; günlük toplam buradan sayılır.
+    """
+
+    __tablename__ = "llm_usage"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False, index=True)
+    prompt_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    completion_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    total_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    calls: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+
 class Suggestion(Base):
     """Öneri: analiz edilen haberlerde geçen ama izleme listesinde OLMAYAN şirketler.
 
@@ -337,6 +352,12 @@ class User(Base):
     guide_dismissed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # İlk giriş tutorial'ı tamamlandı/kapatıldı mı (bir daha gösterilmez; kalıcı).
     tutorial_done: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # ANONİM CİHAZ OTURUMU: şifresiz kullanım. Anon kullanıcı da normal bir satır;
+    # username sentetiktir ("anon:<hash>", insan kaydedemez — regex ':' içermez).
+    # Hesaba yükseltince is_anonymous=False + gerçek username/şifre yazılır.
+    is_anonymous: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # device_id cookie'sinin sha256'sı (düz device_id ASLA saklanmaz). Cihazdan kullanıcı bulunur.
+    device_id_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
 
     # Büyük/küçük harf duyarsız benzersizlik (SQLite functional unique index).
     __table_args__ = (

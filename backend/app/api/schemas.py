@@ -124,6 +124,13 @@ class AdminStatsOut(BaseModel):
     top_entities: list[dict]               # [{name, count}] — en popüler (view)
     most_followed: list[dict]              # [{name, type, followers}] — en çok watchlist'te
     total_entities: int                    # havuzdaki benzersiz (takip edilen) entity sayısı
+    # Maliyet takibi (LLM token → tahmini USD) + günlük bütçe durumu.
+    tokens_today: int = 0
+    tokens_month: int = 0
+    cost_today_usd: float = 0.0
+    cost_month_usd: float = 0.0
+    daily_token_budget: int = 0            # 0 = sınırsız
+    budget_exceeded: bool = False
 
 
 # --------------------------- Yanıt modelleri --------------------------- #
@@ -344,3 +351,10 @@ class ProviderStatusOut(BaseModel):
     refresh_limit: int = 0
     refresh_used: int = 0
     refresh_is_admin: bool = False
+    # Sistem-geneli günlük token bütçesi (maliyet güvencesi).
+    budget_exceeded: bool = False          # dolduysa yeni analiz durur
+    tokens_today: int = 0
+    daily_token_budget: int = 0            # 0 = sınırsız
+    # Kişisel entity kotası (kademeli; kartta "N/limit" göstermek için).
+    entity_limit: int = 0
+    entity_used: int = 0

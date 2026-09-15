@@ -43,11 +43,14 @@ def watchlist_count(db: Session, user_id: int) -> int:
 
 
 def can_add_entity(db: Session, user) -> tuple[bool, int]:
-    """Kullanıcı yeni entity ekleyebilir mi? Admin limitsiz. (uygun_mu, limit) döner."""
+    """Kullanıcı yeni entity ekleyebilir mi? KADEMELİ limit (anon<kayıtlı<admin).
+
+    (uygun_mu, limit) döner; limit=0 → sınırsız (admin).
+    """
     from .config import get_settings
 
-    limit = get_settings().max_entities_per_user
-    if getattr(user, "is_admin", False) or limit <= 0:
+    limit = get_settings().entity_limit_for(user)
+    if limit <= 0:  # 0 = sınırsız (admin)
         return True, limit
     return watchlist_count(db, user.id) < limit, limit
 

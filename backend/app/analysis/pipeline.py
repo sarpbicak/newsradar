@@ -474,6 +474,21 @@ async def analyze_all_async(
     max_articles = settings.max_articles_per_entity  # 0 = sınırsız (_prefilter yorumlar)
     concurrency = max(1, settings.analysis_concurrency)
 
+    # SİSTEM BÜTÇE TAVANI (canlı): bugün kullanılan token + bu taramanın canlı deltası
+    # tavana ulaşırsa YENİ entity analizine başlama (büyük scheduler taramasını da durdurur).
+    from ..budget import daily_tokens_used
+    _budget = settings.daily_token_budget
+    _today_start = daily_tokens_used() if _budget > 0 else 0
+    _base_p = getattr(client, "total_prompt_tokens", 0) or 0
+    _base_c = getattr(client, "total_completion_tokens", 0) or 0
+
+    def _over_budget() -> bool:
+        if _budget <= 0:
+            return False
+        live = ((getattr(client, "total_prompt_tokens", 0) or 0) - _base_p) + \
+               ((getattr(client, "total_completion_tokens", 0) or 0) - _base_c)
+        return (_today_start + live) >= _budget
+
     totals = AnalyzeTotals()
 
     # --- Aşama 1: ön-filtre + batch listesi (DB, tek thread) ---
@@ -564,8 +579,22 @@ async def analyze_all_async(
             totals.warnings.append(f"[{t['name']}] batch analiz hatası (bölünmedi): {exc}")
             return None
 
+    _budget_stopped = {"flag": False}
+
     async def _process_entity(t: dict):
         nonlocal done
+        # SİSTEM BÜTÇE: tavana ulaşıldıysa bu entity'nin LLM çağrılarını YAPMA (atla).
+        if _over_budget():
+            if not _budget_stopped["flag"]:
+                _budget_stopped["flag"] = True
+                totals.warnings.append(
+                    "Günlük analiz kapasitesi doldu — kalan entity'ler bu turda atlandı."
+                )
+                logger.warning("[budget] Tavan tarama sırasında doldu — kalan entity'ler atlanıyor.")
+            done += 1
+            if progress_cb:
+                progress_cb(done, len(entity_tasks))
+            return
         # 1) Makale batch'leri — hepsi paralel (global semaphore ile sınırlı).
         #    Batch'ler hem entity içinde hem entity'ler arası eşzamanlı çalışır;
         #    aynı anda en fazla `concurrency` çağrı olur.

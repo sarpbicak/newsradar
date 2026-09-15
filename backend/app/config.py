@@ -45,14 +45,26 @@ class Settings:
         self.app_secret: str = os.getenv("APP_SECRET", "").strip() or self.app_password
         # Token geçerlilik süresi (gün). Süresi geçmiş token 401 döner.
         self.token_ttl_days: int = int(_env("NEWSRADAR_TOKEN_TTL_DAYS", "30"))
-        # Kayıt sınırı: en fazla bu kadar hesap açılabilir (genel şifreyi bilen biri
-        # sınırsız hesap açmasın). 0 = sınırsız.
-        self.max_users: int = int(_env("NEWSRADAR_MAX_USERS", "10"))
-        # Kişi başı kotalar (admin muaf). 0 = sınırsız.
-        # max_entities_per_user: normal kullanıcının izleme listesi üst sınırı.
-        # max_refresh_per_day: normal kullanıcının 24 saatte elle yenileme hakkı.
-        self.max_entities_per_user: int = int(_env("NEWSRADAR_MAX_ENTITIES_PER_USER", "15"))
-        self.max_refresh_per_day: int = int(_env("NEWSRADAR_MAX_REFRESH_PER_DAY", "5"))
+        # Kayıt sınırı: en fazla bu kadar hesap (anonim dahil). 0 = sınırsız.
+        # Herkese açık: yüksek ama sonlu (kötüye kullanım + maliyet tavanı).
+        self.max_users: int = int(_env("NEWSRADAR_MAX_USERS", "500"))
+        # KADEMELİ kişi-başı kotalar (admin muaf; 0 = sınırsız).
+        # Anonim (cihaz oturumu) < kayıtlı (hesap oluşturmuş) < admin.
+        self.max_entities_anon: int = int(_env("NEWSRADAR_MAX_ENTITIES_ANON", "3"))
+        self.max_entities_registered: int = int(_env("NEWSRADAR_MAX_ENTITIES_REGISTERED", "10"))
+        self.max_refresh_anon: int = int(_env("NEWSRADAR_MAX_REFRESH_ANON", "1"))
+        self.max_refresh_registered: int = int(_env("NEWSRADAR_MAX_REFRESH_REGISTERED", "3"))
+        # SİSTEM GENELİ maliyet güvencesi (asıl koruma):
+        # daily_token_budget: 24 saatte toplam LLM token tavanı (0 = sınırsız). Dolunca
+        #   yeni analiz durur, scheduler da uyar. token_unit_cost: 1M token başına USD
+        #   (kaba maliyet gösterimi için). daily_entity_add_cap: sistem geneli günlük yeni
+        #   entity ekleme sınırı (biri 500 şirket ekleyip kotayı yakmasın; 0 = sınırsız).
+        self.daily_token_budget: int = int(_env("NEWSRADAR_DAILY_TOKEN_BUDGET", "3000000"))
+        self.token_unit_cost_usd: float = float(_env("NEWSRADAR_TOKEN_UNIT_COST_USD", "0.4"))
+        self.daily_entity_add_cap: int = int(_env("NEWSRADAR_DAILY_ENTITY_ADD_CAP", "300"))
+        # Anonim oturum oluşturma: IP başına saatlik sınır (cookie silip sonsuz "yeni
+        # kullanıcı" üretilmesin).
+        self.anon_sessions_per_ip_hour: int = int(_env("NEWSRADAR_ANON_SESSIONS_PER_IP_HOUR", "10"))
 
         # NOT: Geçersiz bir model adı API'de sessiz boş/404 yanıta yol açabilir;
         # yalnızca geçerli, güncel bir model kullanın. (Yalnızca provider=anthropic'te
@@ -142,6 +154,23 @@ class Settings:
         if self.llm_provider == "anthropic":
             return self.claude_available
         return bool(self.llm_api_key)
+
+    # --- Kademeli kota yardımcıları (0 = sınırsız) ---
+    def entity_limit_for(self, user) -> int:
+        """Kullanıcının izleme listesi üst sınırı (admin=sınırsız, anon<kayıtlı)."""
+        if getattr(user, "is_admin", False):
+            return 0
+        if getattr(user, "is_anonymous", False):
+            return self.max_entities_anon
+        return self.max_entities_registered
+
+    def refresh_limit_for(self, user) -> int:
+        """Kullanıcının 24 saatlik elle yenileme hakkı (admin=sınırsız)."""
+        if getattr(user, "is_admin", False):
+            return 0
+        if getattr(user, "is_anonymous", False):
+            return self.max_refresh_anon
+        return self.max_refresh_registered
 
 
 @lru_cache(maxsize=1)

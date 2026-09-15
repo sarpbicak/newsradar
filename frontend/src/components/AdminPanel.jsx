@@ -131,6 +131,28 @@ export default function AdminPanel({ currentUserId }) {
         />
       </div>
 
+      {/* MALİYET + günlük token bütçesi (herkese açık site maliyet güvencesi) */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {(() => {
+          const over = stats.budget_exceeded;
+          const label = stats.daily_token_budget > 0
+            ? `${(stats.tokens_today / 1000).toFixed(0)}K/${(stats.daily_token_budget / 1000).toFixed(0)}K`
+            : `${(stats.tokens_today / 1000).toFixed(0)}K`;
+          return (
+            <div className={`rounded-xl border bg-ink-800 p-4 shadow-card ${over ? "border-rose-500/50" : "border-ink-600"}`}>
+              <div className="text-[11px] uppercase tracking-wide text-slate-500">Bugün token (bütçe)</div>
+              <div className={`mt-1 font-display text-2xl font-bold ${over ? "text-rose-400" : "text-slate-100"}`}>{label}</div>
+              <div className={`mt-0.5 text-xs ${over ? "text-rose-400" : "text-slate-500"}`}>
+                {over ? "⚠ günlük kapasite doldu" : stats.daily_token_budget > 0 ? "günlük tavan" : "sınırsız"}
+              </div>
+            </div>
+          );
+        })()}
+        <StatCard label="Bugünkü maliyet" value={`$${stats.cost_today_usd.toFixed(2)}`} hint="tahmini (token × birim)" />
+        <StatCard label="30 günlük maliyet" value={`$${stats.cost_month_usd.toFixed(2)}`} hint={`${(stats.tokens_month / 1000).toFixed(0)}K token`} />
+        <StatCard label="Toplam şirket" value={stats.total_entities} hint="havuzda benzersiz" />
+      </div>
+
       {/* En çok TAKİP EDİLEN şirketler (kaç kullanıcının listesinde) + toplam benzersiz */}
       <div className="rounded-xl border border-ink-600 bg-ink-800 p-4">
         <div className="mb-2 flex items-center justify-between">

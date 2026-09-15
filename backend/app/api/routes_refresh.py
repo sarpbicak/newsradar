@@ -28,8 +28,8 @@ def _refresh_quota(db: Session, user: User) -> tuple[bool, int, int]:
 
     (uygun_mu, limit, kullanılan) döner. limit=0 → sınırsız.
     """
-    limit = get_settings().max_refresh_per_day
-    if user.is_admin or limit <= 0:
+    limit = get_settings().refresh_limit_for(user)
+    if limit <= 0:  # 0 = sınırsız (admin)
         return True, limit, 0
     since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=24)
     used = db.scalar(
@@ -109,6 +109,9 @@ def status(
     # bu kullanıcıya "çalışıyor" ya da yabancı uyarılar olarak sızmaz (izolasyon).
     mine_running = st["is_running"] and st["user_id"] == user.id
     mine_last = st["last_user_id"] == user.id
+
+    from .. import budget
+    from ..watchlist import watchlist_count
     return ProviderStatusOut(
         providers=provider_status(),
         claude=settings.llm_available,  # "claude" alan adı geriye uyum; aktif LLM'i yansıtır
@@ -122,4 +125,9 @@ def status(
         refresh_limit=r_limit,
         refresh_used=r_used,
         refresh_is_admin=user.is_admin,
+        budget_exceeded=budget.is_budget_exceeded(),
+        tokens_today=budget.daily_tokens_used(),
+        daily_token_budget=settings.daily_token_budget,
+        entity_limit=settings.entity_limit_for(user),
+        entity_used=watchlist_count(db, user.id),
     )

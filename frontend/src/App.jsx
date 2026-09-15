@@ -403,6 +403,13 @@ export default function App() {
           </div>
         )}
 
+        {status?.budget_exceeded && (
+          <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+            Günlük analiz kapasitesi doldu — yeni analiz bugünlük durduruldu, yarın tekrar
+            deneyin. Mevcut değerlendirmeler görüntülenmeye devam eder.
+          </div>
+        )}
+
         {status?.newsapi_quota?.warn && (
           <div
             className={`mb-4 rounded-lg border px-4 py-3 text-sm ${

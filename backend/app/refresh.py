@@ -162,6 +162,20 @@ def run_refresh(
             summary.warnings.append(str(exc))
             return summary
 
+        # SİSTEM BÜTÇE TAVANI: günlük token dolduysa YENİ analiz yapma (maliyet güvencesi).
+        from .budget import is_budget_exceeded, record_llm_usage
+        if is_budget_exceeded():
+            summary.warnings.append(
+                "Günlük analiz kapasitesi doldu — yeni analiz durduruldu, yarın tekrar deneyin."
+            )
+            logger.warning("[budget] Günlük token tavanı dolu — analiz atlandı.")
+            return summary
+
+        # Bu taramanın token deltasını ölçmek için başlangıç anlık değeri.
+        base_p = getattr(client, "total_prompt_tokens", 0) or 0
+        base_c = getattr(client, "total_completion_tokens", 0) or 0
+        base_calls = getattr(client, "call_count", 0) or 0
+
         totals = asyncio.run(
             analyze_all_async(client, progress_cb=_set_progress, entity_ids=entity_ids)
         )
@@ -170,6 +184,11 @@ def run_refresh(
         summary.discarded = totals.discarded
         summary.entity_assessments = totals.entity_assessments
         summary.warnings.extend(totals.warnings)
+
+        # Kullanımı kaydet (maliyet takibi + günlük bütçe sayacı).
+        dp = (getattr(client, "total_prompt_tokens", 0) or 0) - base_p
+        dc = (getattr(client, "total_completion_tokens", 0) or 0) - base_c
+        record_llm_usage(dp, dc, (getattr(client, "call_count", 0) or 0) - base_calls)
 
         logger.info(
             "Yenileme tamam: yeni=%d ön-filtre=%d analiz=%d elenen=%d değerlendirme=%d",

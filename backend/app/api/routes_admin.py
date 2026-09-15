@@ -232,6 +232,11 @@ def stats(db: Session = Depends(get_db)) -> AdminStatsOut:
     ) or 0
 
     from ..config import get_settings
+    from datetime import timedelta
+
+    from .. import budget as _budget
+    tok_today = _budget.daily_tokens_used()
+    tok_month = _budget.tokens_since(_start_of_today() - timedelta(days=30))
     return AdminStatsOut(
         total_users=total_users,
         max_users=get_settings().max_users,
@@ -240,4 +245,10 @@ def stats(db: Session = Depends(get_db)) -> AdminStatsOut:
         top_entities=_top_entities(db, None, limit=8),
         most_followed=most_followed,
         total_entities=total_entities,
+        tokens_today=tok_today,
+        tokens_month=tok_month,
+        cost_today_usd=_budget.estimated_cost_usd(tok_today),
+        cost_month_usd=_budget.estimated_cost_usd(tok_month),
+        daily_token_budget=get_settings().daily_token_budget,
+        budget_exceeded=_budget.is_budget_exceeded(),
     )

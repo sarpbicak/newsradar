@@ -7,13 +7,14 @@ değiştirir (havuzdaki entity silinmez, başka kullanıcıları etkilemez).
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from ..config import get_settings
 from ..db.database import get_db
 from ..db.models import Entity, User
 from ..watchlist import (
@@ -36,6 +37,21 @@ TIER1_MIN_SCORE = 2
 TIER1_MAX_CARDS = 3
 # Az şirket varken kademe uygulama: hepsini büyük kart yap (sayfa boş görünmesin).
 FEW_ENTITIES_THRESHOLD = 4
+
+
+def _daily_new_entity_ok(db: Session, user: User) -> bool:
+    """Sistem geneli GÜNLÜK yeni-entity ekleme sınırı (biri havuza 500 şirket ekleyip
+    kotayı yakmasın). Admin muaf. Yalnızca YENİ entity oluşturmayı sınırlar; mevcut
+    havuz entity'sini listeye eklemek serbest (yeni maliyet yok)."""
+    cap = get_settings().daily_entity_add_cap
+    if cap <= 0 or getattr(user, "is_admin", False):
+        return True
+    since = datetime.now(timezone.utc).replace(tzinfo=None).replace(
+        hour=0, minute=0, second=0, microsecond=0)
+    n = db.scalar(
+        select(func.count()).select_from(Entity).where(Entity.created_at >= since)
+    ) or 0
+    return n < cap
 
 
 @router.get("", response_model=list[EntityCardOut])
@@ -98,6 +114,13 @@ def create_entity(
         record_event(db, user.id, "add_entity",
                      {"entity_id": existing.id, "name": existing.name, "pool_hit": True})
         return entity_card(db, existing)
+
+    # YENİ entity (havuzda yok) → sistem-geneli günlük ekleme sınırını uygula.
+    if not _daily_new_entity_ok(db, user):
+        raise HTTPException(
+            status_code=429,
+            detail="Bugünkü yeni şirket ekleme kapasitesi doldu — yarın tekrar deneyin.",
+        )
 
     entity = Entity(
         name=payload.name, type=payload.type, query=payload.query, language=payload.language
