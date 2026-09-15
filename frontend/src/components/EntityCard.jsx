@@ -68,6 +68,43 @@ function TopDriverLine({ text }) {
   );
 }
 
+// MOBİL tek satır fiyat: "$338.19 −%0.2 → hedef $338" (detay için karta dokun).
+function CompactPriceLine({ card }) {
+  const price = card.price;
+  const chg = card.change_percent;
+  const target = card.analyst?.target_mean;
+  if (price == null) {
+    return <div className="text-[13px] text-slate-500">Fiyat verisi yok · sadece haber analizi</div>;
+  }
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-1.5 font-mono text-[13px] tabular-nums text-slate-300">
+      <span className="font-semibold text-slate-100">${price.toFixed(2)}</span>
+      {chg != null && (
+        <span className={chg >= 0 ? "text-emerald-400" : "text-rose-400"}>
+          {chg >= 0 ? "+" : "−"}%{Math.abs(chg).toFixed(1)}
+        </span>
+      )}
+      {target != null && (
+        <span className="text-slate-500">
+          → hedef <span className="font-semibold text-slate-300">${target.toFixed(0)}</span>
+        </span>
+      )}
+    </div>
+  );
+}
+
+// MOBİL özel şirket tek satırı — fiyat kutusunun yerine kısa not.
+function CompactPrivateLine({ drivers }) {
+  return (
+    <div className="text-[13px] text-slate-500">
+      Özel şirket — sadece haber analizi
+      {drivers?.[0] && (
+        <span className="mt-0.5 block truncate text-slate-400">Öne çıkan: {drivers[0]}</span>
+      )}
+    </div>
+  );
+}
+
 function PriceBox({ card }) {
   const price = card.price;
   const target = card.analyst?.target_mean;
@@ -142,8 +179,8 @@ export default function EntityCard({ card, onOpen, big = false }) {
           open();
         }
       }}
-      className={`group relative flex h-full cursor-pointer flex-col gap-4 overflow-hidden rounded-xl border bg-ink-800 text-left shadow-card transition duration-200 hover:-translate-y-0.5 hover:shadow-card-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
-        big ? "border-ink-500 p-6 pl-7" : "border-ink-600 p-5 pl-6 hover:border-accent/60"
+      className={`group relative flex h-full cursor-pointer flex-col gap-3 overflow-hidden rounded-xl border bg-ink-800 text-left shadow-card transition duration-200 hover:-translate-y-0.5 hover:shadow-card-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 md:gap-4 ${
+        big ? "border-ink-500 p-4 pl-5 md:p-6 md:pl-7" : "border-ink-600 p-4 pl-5 hover:border-accent/60 md:p-5 md:pl-6"
       }`}
     >
       {/* Sol kenar durum şeridi (pill rengiyle aynı; Katman 1'de daha kalın) */}
@@ -159,9 +196,9 @@ export default function EntityCard({ card, onOpen, big = false }) {
               analiz yok
             </span>
           )}
-          {/* Katman 1 nedeni — neden "bugün önemli" olduğunu tek kelimeyle söyler */}
+          {/* Katman 1 nedeni — neden "bugün önemli" (mobilde gizli: sadeleştirme) */}
           {big && card.priority_reason && (
-            <span className="inline-flex items-center rounded-full bg-accent/15 px-2.5 py-1 text-[11px] font-semibold text-accent">
+            <span className="hidden items-center rounded-full bg-accent/15 px-2.5 py-1 text-[11px] font-semibold text-accent md:inline-flex">
               {card.priority_reason}
             </span>
           )}
@@ -176,31 +213,42 @@ export default function EntityCard({ card, onOpen, big = false }) {
 
       {a ? (
         <>
-          {/* Satır 2 — Hüküm cümlesi (SERİF, editöryel; TAM, kesme yok) */}
-          <p className={`font-serif font-semibold leading-snug text-slate-100 ${big ? "text-[23px]" : "text-[19px]"}`}>
+          {/* Satır 2 — Hüküm cümlesi (SERİF, editöryel; TAM, kesme yok; mobilde
+              biraz küçük punto ama okunaklı satır aralığı) */}
+          <p className={`font-serif font-semibold leading-snug text-slate-100 ${big ? "text-[19px] md:text-[23px]" : "text-[17px] md:text-[19px]"}`}>
             {a.headline_verdict || a.summary}
           </p>
 
-          {/* Satır 3 + analist/etken + meta alta yapışır (tüm kartlar hizalı) */}
-          <div className="mt-auto space-y-2.5">
-            {card.type === "ticker" ? (
-              <>
-                <PriceBox card={card} />
-                {/* Analist barı — yalnızca tavsiye verisi olan ticker'da */}
-                {card.analyst?.total > 0 && <AnalystMiniBar a={card.analyst} />}
-              </>
-            ) : (
-              <>
-                {/* Özel şirket: fiyat/analist yerine bilgi kutusu + en önemli etken */}
-                <PrivateCompanyBox />
-                {a.top_drivers?.[0] && <TopDriverLine text={a.top_drivers[0]} />}
-              </>
-            )}
-            <div className="text-xs text-slate-500">
-              {horizonLabel(card.horizon)} vade
-              <span className="text-slate-600"> · </span>
-              {card.evidence_count} haber
-              {changed && <span className="text-amber-400"> · yön değişti</span>}
+          {/* Alta yapışan blok — MOBİLDE tek satır (sadeleştirme), MASAÜSTÜNDE tam. */}
+          <div className="mt-auto">
+            {/* MOBİL: yalnızca tek satır fiyat / özel-şirket notu */}
+            <div className="md:hidden">
+              {card.type === "ticker" ? (
+                <CompactPriceLine card={card} />
+              ) : (
+                <CompactPrivateLine drivers={a.top_drivers} />
+              )}
+            </div>
+
+            {/* MASAÜSTÜ: fiyat kutusu + analist barı + meta satırı */}
+            <div className="hidden space-y-2.5 md:block">
+              {card.type === "ticker" ? (
+                <>
+                  <PriceBox card={card} />
+                  {card.analyst?.total > 0 && <AnalystMiniBar a={card.analyst} />}
+                </>
+              ) : (
+                <>
+                  <PrivateCompanyBox />
+                  {a.top_drivers?.[0] && <TopDriverLine text={a.top_drivers[0]} />}
+                </>
+              )}
+              <div className="text-xs text-slate-500">
+                {horizonLabel(card.horizon)} vade
+                <span className="text-slate-600"> · </span>
+                {card.evidence_count} haber
+                {changed && <span className="text-amber-400"> · yön değişti</span>}
+              </div>
             </div>
           </div>
         </>
@@ -221,9 +269,9 @@ export function EntityRow({ card, onOpen }) {
   return (
     <button
       onClick={() => onOpen(card.id)}
-      className="group flex w-full items-center gap-3 overflow-hidden rounded-lg border border-ink-600 bg-ink-800 py-2 pl-0 pr-3 text-left transition hover:border-accent/50 hover:-translate-y-px hover:shadow-card"
+      className="group flex min-h-[44px] w-full items-center gap-3 overflow-hidden rounded-lg border border-ink-600 bg-ink-800 py-2 pl-0 pr-3 text-left transition hover:border-accent/50 hover:-translate-y-px hover:shadow-card"
     >
-      <span className="h-9 w-1.5 shrink-0 self-stretch rounded-r" style={{ background: stripColor }} />
+      <span className="w-1.5 shrink-0 self-stretch rounded-r" style={{ background: stripColor }} />
       <span className="w-28 shrink-0 truncate font-display text-sm font-semibold text-slate-100 sm:w-32">
         {card.name}
       </span>

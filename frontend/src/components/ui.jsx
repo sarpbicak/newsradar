@@ -5,6 +5,24 @@ const REDUCED_MOTION =
   typeof window !== "undefined" &&
   window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
+// Mobil kırılma noktası (<768px). matchMedia ile — kaydırmada değil, yalnızca
+// gerçek genişlik değişince yeniden hesaplanır (ucuz). Tailwind `md:` ile hizalı.
+export function useIsMobile(breakpoint = 768) {
+  const query = `(max-width: ${breakpoint - 1}px)`;
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && !!window.matchMedia?.(query).matches
+  );
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia(query);
+    const onChange = (e) => setIsMobile(e.matches);
+    setIsMobile(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [query]);
+  return isMobile;
+}
+
 // Sayısal değerleri animasyonlu sayaçla gösterir (reduced-motion'da anında).
 export function AnimatedNumber({ value, decimals = 0, prefix = "", suffix = "" }) {
   const [display, setDisplay] = useState(value ?? 0);

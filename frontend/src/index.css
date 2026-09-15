@@ -137,6 +137,23 @@ body {
   color: #6d4aff;
 }
 
+/* ── Mobil (<768px) — okunabilirlik + davranış ───────────────────── */
+@media (max-width: 767px) {
+  /* Tarayıcının kendi "aşağı çek → yenile"si bizim göstergemizle çakışmasın */
+  html,
+  body {
+    overscroll-behavior-y: contain;
+  }
+  /* İmza (sağ-alt sabit) mobilde alttaki SABİT sekme çubuğuyla çakışmasın */
+  .signature {
+    display: none;
+  }
+  /* Uzun gövde/hüküm metinleri mobilde biraz ferah okunsun */
+  .font-serif {
+    line-height: 1.35;
+  }
+}
+
 /* prefers-reduced-motion — ZORUNLU: kapalıysa tüm animasyonlar dursun */
 @media (prefers-reduced-motion: reduce) {
   *,

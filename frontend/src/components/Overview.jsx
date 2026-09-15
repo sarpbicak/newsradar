@@ -1,6 +1,7 @@
 // Genel görünüm: Katman 1 (bugün önemli — büyük kartlar) + Katman 2 (liste — satırlar).
 import React, { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
+import { useIsMobile } from "./ui.jsx";
 import EntityCard, { EntityRow } from "./EntityCard.jsx";
 import WatchlistManager from "./WatchlistManager.jsx";
 import SuggestionsSection from "./SuggestionsSection.jsx";
@@ -83,6 +84,7 @@ export default function Overview({
   scanning = false,
 }) {
   const [sort, setSort] = useState("risk");
+  const isMobile = useIsMobile();
 
   // Katman 1: backend tier=1 verdiği kartlar, öncelik skoruna göre sıralı (en yüksek → sol).
   const tier1 = useMemo(
@@ -101,13 +103,20 @@ export default function Overview({
   // nötr başlık — "Bugün önemli değişiklik" iddiası olmadan sayfa dolu görünür.
   const fewMode = tier1.length > 0 && tier2.length === 0;
 
+  // MOBİL: en fazla 2 büyük kart göster; geri kalan tier1 kartları listeye (satır) düşer.
+  // Böylece 3 şirket için 3 ekran kaydırmak gerekmez. MASAÜSTÜ: hepsi büyük kart.
+  const bigCards = isMobile ? tier1.slice(0, 2) : tier1;
+  const tier1Overflow = isMobile ? tier1.slice(2) : [];
+  // Listede: taşan tier1 kartları (öncelikli, en üstte) + sıralı tier2.
+  const listRows = [...tier1Overflow, ...tier2];
+
   const bigGrid = (
     <div
-      className={`stagger grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 ${
+      className={`stagger grid grid-cols-1 gap-4 md:gap-5 md:grid-cols-2 lg:grid-cols-3 ${
         scanning ? "scan-host rounded-xl" : ""
       }`}
     >
-      {tier1.map((c) => (
+      {bigCards.map((c) => (
         <EntityCard key={c.id} card={c} onOpen={onOpen} big />
       ))}
     </div>
@@ -118,12 +127,20 @@ export default function Overview({
       {cards.length === 0 ? (
         <EmptyState onCreate={onCreate} />
       ) : fewMode ? (
-        /* ── AZ ŞİRKET — hepsi büyük kart, nötr başlık ─────────────── */
+        /* ── AZ ŞİRKET — büyük kart(lar), nötr başlık ─────────────── */
         <section className="space-y-3">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
             Takip ettiklerin
           </h2>
           {bigGrid}
+          {/* MOBİL: 2'den fazla varsa kalanı sıkışık liste olarak göster */}
+          {tier1Overflow.length > 0 && (
+            <div className="stagger space-y-1.5 pt-1">
+              {tier1Overflow.map((c) => (
+                <EntityRow key={c.id} card={c} onOpen={onOpen} />
+              ))}
+            </div>
+          )}
         </section>
       ) : (
         <>
@@ -141,12 +158,12 @@ export default function Overview({
             )}
           </section>
 
-          {/* ── KATMAN 2 — Tüm liste (sıkışık satırlar) ───────────────── */}
-          {tier2.length > 0 && (
+          {/* ── KATMAN 2 — Tüm liste (sıkışık satırlar) + mobilde taşan tier1 ── */}
+          {listRows.length > 0 && (
             <section className="space-y-2.5">
               <div className="flex items-center justify-between">
                 <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Liste ({tier2.length})
+                  Liste ({listRows.length})
                 </h2>
                 <div className="flex items-center gap-1 text-[11px]">
                   <span className="mr-1 text-slate-500">Sırala:</span>
@@ -154,7 +171,7 @@ export default function Overview({
                     <button
                       key={key}
                       onClick={() => setSort(key)}
-                      className={`rounded px-2 py-0.5 transition ${
+                      className={`min-h-[32px] rounded px-2 py-1 transition ${
                         sort === key
                           ? "bg-accent/15 font-medium text-slate-100"
                           : "text-slate-500 hover:text-slate-300"
@@ -166,7 +183,7 @@ export default function Overview({
                 </div>
               </div>
               <div className="stagger space-y-1.5">
-                {tier2.map((c) => (
+                {listRows.map((c) => (
                   <EntityRow key={c.id} card={c} onOpen={onOpen} />
                 ))}
               </div>

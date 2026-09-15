@@ -28,6 +28,7 @@ export default function EntityDetail({ entityId, onBack }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState("summary");
+  const [showAllCharts, setShowAllCharts] = useState(false); // mobil: risk+duygu gizli başlar
 
   useEffect(() => {
     let alive = true;
@@ -61,10 +62,12 @@ export default function EntityDetail({ entityId, onBack }) {
   const activeTab = tabs.some((t) => t.key === tab) ? tab : "summary";
 
   return (
-    <div className="space-y-5">
+    /* pb-24 (mobil): alttaki SABİT sekme çubuğu içeriği örtmesin. Masaüstünde çubuk
+       yukarıda olduğu için ekstra boşluk yok. */
+    <div className="space-y-5 pb-24 md:pb-0">
       <button
         onClick={onBack}
-        className="inline-flex min-h-[40px] items-center gap-1 rounded-lg pr-3 text-sm text-slate-500 transition hover:text-slate-200"
+        className="inline-flex min-h-[44px] items-center gap-1 rounded-lg pr-3 text-sm text-slate-500 transition hover:text-slate-200"
       >
         <ChevronLeft className="h-4 w-4" /> genel görünüm
       </button>
@@ -161,8 +164,10 @@ export default function EntityDetail({ entityId, onBack }) {
         </div>
       ) : (
         <>
-          {/* ---- SEKME ÇUBUĞU ---- */}
-          <div className="flex gap-1 overflow-x-auto rounded-xl border border-ink-600 bg-ink-800 p-1">
+          {/* ---- SEKME ÇUBUĞU ----
+              MOBİL: ekranın ALTINDA sabit (başparmakla tek elle erişim).
+              MASAÜSTÜ: içeriğin üstünde normal akışta. */}
+          <div className="fixed inset-x-0 bottom-0 z-30 flex gap-1 border-t border-ink-500 bg-ink-800/95 p-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.06)] backdrop-blur-md md:static md:rounded-xl md:border md:border-ink-600 md:pb-1 md:shadow-none md:backdrop-blur-none">
             {tabs.map((t) => {
               const Icon = t.icon;
               const on = activeTab === t.key;
@@ -170,11 +175,11 @@ export default function EntityDetail({ entityId, onBack }) {
                 <button
                   key={t.key}
                   onClick={() => setTab(t.key)}
-                  className={`inline-flex min-h-[40px] flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-sm font-medium transition ${
+                  className={`inline-flex min-h-[52px] flex-1 flex-col items-center justify-center gap-0.5 whitespace-nowrap rounded-lg px-2 text-[11px] font-medium transition md:min-h-[40px] md:flex-row md:gap-1.5 md:text-sm ${
                     on ? "bg-accent/20 text-accent" : "text-slate-400 hover:bg-ink-700 hover:text-slate-200"
                   }`}
                 >
-                  <Icon className="h-4 w-4" /> {t.label}
+                  <Icon className="h-5 w-5 md:h-4 md:w-4" /> {t.label}
                 </button>
               );
             })}
@@ -184,17 +189,46 @@ export default function EntityDetail({ entityId, onBack }) {
           <div key={activeTab} className="tab-fade">
             {activeTab === "summary" && <SummaryTab a={a} entity={entity} />}
             {activeTab === "charts" && (
-              <div className="grid gap-4 lg:grid-cols-2">
-                <div className="space-y-4">
-                  <RiskHistoryChart history={risk_history} />
-                  <PriceHistoryChart
-                    history={price_history}
-                    updatedAt={entity.price_updated_at}
-                    isTicker={isTicker}
-                  />
+              <>
+                {/* MASAÜSTÜ: tüm grafikler, 2 sütun (değişmedi) */}
+                <div className="hidden gap-4 md:grid lg:grid-cols-2">
+                  <div className="space-y-4">
+                    <RiskHistoryChart history={risk_history} />
+                    <PriceHistoryChart
+                      history={price_history}
+                      updatedAt={entity.price_updated_at}
+                      isTicker={isTicker}
+                    />
+                  </div>
+                  <SentimentChart articles={articles} />
                 </div>
-                <SentimentChart articles={articles} />
-              </div>
+
+                {/* MOBİL: yalnızca birincil grafik; diğerleri istenince açılır (dar
+                    ekranda üç grafik okunmuyor). */}
+                <div className="space-y-4 md:hidden">
+                  {isTicker ? (
+                    <PriceHistoryChart
+                      history={price_history}
+                      updatedAt={entity.price_updated_at}
+                      isTicker={isTicker}
+                    />
+                  ) : (
+                    <RiskHistoryChart history={risk_history} />
+                  )}
+                  {showAllCharts && (
+                    <>
+                      {isTicker && <RiskHistoryChart history={risk_history} />}
+                      <SentimentChart articles={articles} />
+                    </>
+                  )}
+                  <button
+                    onClick={() => setShowAllCharts((v) => !v)}
+                    className="min-h-[44px] w-full rounded-lg border border-ink-500 bg-ink-800 text-sm font-medium text-slate-300 transition hover:bg-ink-700"
+                  >
+                    {showAllCharts ? "Grafikleri gizle" : "Grafikleri göster (risk, duygu)"}
+                  </button>
+                </div>
+              </>
             )}
             {activeTab === "news" && <ArticleTable articles={articles} />}
             {activeTab === "analysts" && isTicker && (

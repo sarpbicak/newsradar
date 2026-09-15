@@ -125,14 +125,14 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
     <div className={embedded ? "" : "rounded-xl border border-ink-600 bg-ink-800 p-4"}>
       {!embedded && <h3 className="mb-3 text-sm font-semibold text-slate-200">İzleme Listesi</h3>}
 
-      <form onSubmit={submit} className="mb-3 flex flex-wrap items-end gap-2">
+      <form onSubmit={submit} className="mb-3 flex flex-col gap-2 md:flex-row md:flex-wrap md:items-end">
         {/* Tip */}
         <div className="flex flex-col">
           <label className="mb-1 text-[10px] uppercase text-slate-500">Tip</label>
           <select
             value={type}
             onChange={(e) => changeType(e.target.value)}
-            className="rounded-md border border-ink-500 bg-ink-900 px-2 py-1 text-sm outline-none focus:border-accent"
+            className="min-h-[44px] w-full rounded-md border border-ink-500 bg-ink-900 px-2 py-2 text-sm outline-none focus:border-accent md:w-auto"
           >
             <option value="ticker">ticker (ABD hissesi)</option>
             <option value="keyword">keyword (şirket/konu)</option>
@@ -140,7 +140,7 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
         </div>
 
         {/* Ad — ticker'da arama kutusu, keyword'de arama terimi */}
-        <div className="relative flex flex-col">
+        <div className="relative flex flex-col md:flex-1">
           <label className="mb-1 text-[10px] uppercase text-slate-500">
             {type === "ticker" ? "Ad (ara)" : "Ad / arama terimi"}
           </label>
@@ -149,12 +149,12 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
             onChange={(e) => setName(e.target.value)}
             placeholder={type === "ticker" ? "Tesla" : "Aselsan"}
             autoComplete="off"
-            className="w-48 rounded-md border border-ink-500 bg-ink-900 px-2 py-1 text-sm outline-none focus:border-accent"
+            className="min-h-[44px] w-full rounded-md border border-ink-500 bg-ink-900 px-2 py-2 text-sm outline-none focus:border-accent md:w-48 md:flex-none"
           />
 
           {/* Sembol arama açılır listesi (yalnızca ticker) */}
           {showDropdown && (searching || results.length > 0 || searched) && (
-            <div className="absolute top-full z-20 mt-1 w-72 overflow-hidden rounded-md border border-ink-500 bg-ink-900 shadow-xl">
+            <div className="absolute top-full z-20 mt-1 w-full overflow-hidden rounded-md border border-ink-500 bg-ink-900 shadow-xl md:w-72">
               {searching && (
                 <div className="px-3 py-2 text-xs text-slate-500">Aranıyor…</div>
               )}
@@ -164,7 +164,7 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
                     key={r.symbol}
                     type="button"
                     onClick={() => pickSymbol(r)}
-                    className="block w-full px-3 py-1.5 text-left text-xs hover:bg-ink-700"
+                    className="block min-h-[44px] w-full px-3 py-2 text-left text-xs hover:bg-ink-700"
                   >
                     <div
                       className={`flex items-center justify-between gap-2 ${
@@ -203,7 +203,7 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
               onChange={(e) => setQuery(e.target.value.toUpperCase().replace(/\s+/g, ""))}
               placeholder="TSLA"
               autoComplete="off"
-              className="w-28 rounded-md border border-ink-500 bg-ink-900 px-2 py-1 font-mono text-sm outline-none focus:border-accent"
+              className="min-h-[44px] w-full rounded-md border border-ink-500 bg-ink-900 px-2 py-2 font-mono text-sm outline-none focus:border-accent md:w-28"
             />
           </div>
         )}
@@ -215,7 +215,7 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
-              className="rounded-md border border-ink-500 bg-ink-900 px-2 py-1 text-sm outline-none focus:border-accent"
+              className="min-h-[44px] w-full rounded-md border border-ink-500 bg-ink-900 px-2 py-2 text-sm outline-none focus:border-accent md:w-auto"
             >
               {LANGUAGES.map((l) => (
                 <option key={l.code} value={l.code}>
@@ -229,13 +229,13 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
         <button
           disabled={!canSubmit}
           title={missing.length ? `Eksik: ${missing.join(", ")}` : ""}
-          className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+          className="min-h-[44px] w-full rounded-md bg-accent px-3 py-2 text-sm font-medium text-white disabled:opacity-50 md:w-auto"
         >
           {busy ? "Ekleniyor…" : "Ekle"}
         </button>
 
         {missing.length > 0 && (
-          <span className="text-[11px] text-slate-500">Eksik: {missing.join(", ")}</span>
+          <span className="text-[11px] text-slate-500 md:self-center">Eksik: {missing.join(", ")}</span>
         )}
       </form>
       {err && <p className="mb-2 text-xs text-rose-400">{err}</p>}

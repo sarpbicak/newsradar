@@ -8,8 +8,11 @@ import AccountModal from "./components/AccountModal.jsx";
 import PrivacyModal from "./components/PrivacyModal.jsx";
 import AdminPanel from "./components/AdminPanel.jsx";
 import Tutorial from "./components/Tutorial.jsx";
-import { Skeleton } from "./components/ui.jsx";
-import { RefreshCw, Menu, X, LogOut, ShieldCheck, LayoutDashboard, Radar, HelpCircle, UserPlus } from "lucide-react";
+import { Skeleton, useIsMobile } from "./components/ui.jsx";
+import { RefreshCw, Menu, X, LogOut, ShieldCheck, LayoutDashboard, Radar, HelpCircle, UserPlus, ArrowDown } from "lucide-react";
+
+// Mobil aşağı-çekip-yenile eşiği (px). Bu mesafeyi geçince bırakınca yenilenir.
+const PULL_THRESHOLD = 70;
 
 export default function App() {
   const [user, setUser] = useState(null);            // kişisel kullanıcı (anon ya da kayıtlı)
@@ -20,6 +23,9 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);   // mobil header menüsü
   const [showTutorial, setShowTutorial] = useState(false); // ilk giriş tutorial'ı
   const tutorialAutoRef = useRef(false);
+  const isMobile = useIsMobile();
+  const [pull, setPull] = useState(0);          // mobil aşağı-çek mesafesi (px)
+  const pullStart = useRef(null);
   const authed = !!user;
   const [cards, setCards] = useState([]);
   const [status, setStatus] = useState(null);
@@ -224,6 +230,44 @@ export default function App() {
     }
   }
 
+  // ── Mobil aşağı-çekip-yenile (pull-to-refresh) ──
+  // Yalnızca mobilde, pano en üstteyken (scrollY=0) ve tarama yokken.
+  const refreshExhausted =
+    status && !status.refresh_is_admin && status.refresh_limit > 0 &&
+    status.refresh_used >= status.refresh_limit;
+  const canPull = isMobile && view === "dashboard" && selected == null && !isRefreshing;
+
+  function onTouchStart(e) {
+    if (!canPull || window.scrollY > 0) {
+      pullStart.current = null;
+      return;
+    }
+    pullStart.current = e.touches[0].clientY;
+  }
+  function onTouchMove(e) {
+    if (pullStart.current == null) return;
+    const dy = e.touches[0].clientY - pullStart.current;
+    // Sönümle (0.5×) ve tavanla; yalnızca en üstteyken aşağı çekişte.
+    setPull(dy > 0 && window.scrollY === 0 ? Math.min(dy * 0.5, 90) : 0);
+  }
+  function onTouchEnd() {
+    if (pullStart.current == null) return;
+    const triggered = pull >= PULL_THRESHOLD;
+    pullStart.current = null;
+    setPull(0);
+    if (!triggered) return;
+    // Kota dolmuşsa boşuna istek atma — net mesaj göster (spec 2f).
+    if (refreshExhausted) {
+      setNotice({
+        type: "warn",
+        text: `Günlük yenileme hakkın doldu ${refreshQuotaLabel}. Yarın tekrar deneyebilirsin.`,
+        details: [],
+      });
+      return;
+    }
+    handleRefresh();
+  }
+
   async function handleCreate(payload) {
     await api.createEntity(payload);
     await loadCards();
@@ -261,7 +305,24 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div
+      className="min-h-screen"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
+      {/* Mobil pull-to-refresh göstergesi (yalnızca çekerken görünür) */}
+      {pull > 0 && (
+        <div
+          className="pointer-events-none fixed inset-x-0 top-0 z-40 flex justify-center pt-2 md:hidden"
+          style={{ transform: `translateY(${pull}px)`, opacity: Math.min(pull / PULL_THRESHOLD, 1) }}
+        >
+          <div className="flex items-center gap-2 rounded-full border border-ink-500 bg-ink-800 px-3 py-1.5 text-xs text-slate-400 shadow-card">
+            <ArrowDown className={`h-4 w-4 transition-transform ${pull >= PULL_THRESHOLD ? "rotate-180 text-accent" : ""}`} />
+            {pull >= PULL_THRESHOLD ? "Bırak → yenile" : "Yenilemek için çek"}
+          </div>
+        </div>
+      )}
       <header className="sticky top-0 z-10 border-b border-ink-600 bg-ink-900/70 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2">
@@ -269,7 +330,7 @@ export default function App() {
               <Radar className="h-5 w-5 text-accent" />
               NewsRadar
             </span>
-            <span className="hidden font-mono text-[11px] uppercase tracking-wide text-slate-500 sm:inline">
+            <span className="hidden font-mono text-[11px] uppercase tracking-wide text-slate-500 md:inline">
               haber akışı · risk paneli
             </span>
           </div>
@@ -278,10 +339,10 @@ export default function App() {
             <button
               onClick={handleRefresh}
               disabled={isRefreshing}
-              className="inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:brightness-105 disabled:opacity-70 sm:px-4"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:brightness-105 disabled:opacity-70 md:px-4"
             >
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-              <span className="hidden sm:inline">
+              <span className="hidden md:inline">
                 {isRefreshing
                   ? running
                     ? `Yenileniyor… (${status.progress_done}/${status.progress_total})`
@@ -292,12 +353,12 @@ export default function App() {
               </span>
             </button>
 
-            {/* Nasıl çalışır — ilk giriş tutorial'ını tekrar açar */}
+            {/* Nasıl çalışır — masaüstünde görünür; mobilde "…" menüsüne toplanır */}
             <button
               onClick={() => setShowTutorial(true)}
               title="Nasıl çalışır?"
               aria-label="Nasıl çalışır?"
-              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-2.5 text-sm text-slate-500 transition hover:bg-ink-700 hover:text-slate-200"
+              className="hidden min-h-[44px] items-center gap-1.5 rounded-lg px-2.5 text-sm text-slate-500 transition hover:bg-ink-700 hover:text-slate-200 md:inline-flex"
             >
               <HelpCircle className="h-5 w-5" />
               <span className="hidden md:inline">Nasıl çalışır?</span>
@@ -305,7 +366,7 @@ export default function App() {
 
             {/* MASAÜSTÜ: admin + kullanıcı + çıkış inline (NewsAPI kotası header'da
                 gösterilmez — teknik iç detay; kota admin panelinde görünür) */}
-            <div className="hidden items-center gap-2 sm:flex">
+            <div className="hidden items-center gap-2 md:flex">
               {user?.is_admin && (
                 <button
                   onClick={() => setView((v) => (v === "admin" ? "dashboard" : "admin"))}
@@ -354,11 +415,11 @@ export default function App() {
             </div>
 
             {/* MOBİL: hamburger menü */}
-            <div className="relative sm:hidden">
+            <div className="relative md:hidden">
               <button
                 onClick={() => setMenuOpen((o) => !o)}
                 aria-label="menü"
-                className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border border-ink-500 text-slate-500 transition hover:bg-ink-700 hover:text-slate-200"
+                className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-ink-500 text-slate-500 transition hover:bg-ink-700 hover:text-slate-200"
               >
                 {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </button>
@@ -374,6 +435,13 @@ export default function App() {
                         <span className="rounded bg-accent/15 px-1.5 text-[10px] font-semibold text-accent">admin</span>
                       )}
                     </div>
+                    {/* Nasıl çalışır — tutorial'ı tekrar aç */}
+                    <button
+                      onClick={() => { setShowTutorial(true); setMenuOpen(false); }}
+                      className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-slate-300 hover:bg-ink-700"
+                    >
+                      <HelpCircle className="h-4 w-4" /> Nasıl çalışır?
+                    </button>
                     {user?.is_anonymous && (
                       <>
                         <button

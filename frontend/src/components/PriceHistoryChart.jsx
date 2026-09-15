@@ -54,7 +54,8 @@ export default function PriceHistoryChart({ history, updatedAt, isTicker }) {
             tick={{ fill: "#8A867E", fontSize: 9 }}
             axisLine={false}
             tickLine={false}
-            minTickGap={24}
+            minTickGap={40}
+            interval="preserveStartEnd"
           />
           <YAxis
             domain={["auto", "auto"]}

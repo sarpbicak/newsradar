@@ -73,7 +73,8 @@ export default function RiskHistoryChart({ history }) {
             tick={{ fill: "#8A867E", fontSize: 9 }}
             axisLine={false}
             tickLine={false}
-            minTickGap={24}
+            minTickGap={40}
+            interval="preserveStartEnd"
           />
           <YAxis
             domain={[0, 100]}
