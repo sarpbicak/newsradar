@@ -75,6 +75,8 @@ class Settings:
         # Anonim oturum oluşturma: IP başına saatlik sınır (cookie silip sonsuz "yeni
         # kullanıcı" üretilmesin).
         self.anon_sessions_per_ip_hour: int = int(_env("NEWSRADAR_ANON_SESSIONS_PER_IP_HOUR", "10"))
+        # Geri bildirim: IP başına saatlik sınır (spam koruması; 0 = sınırsız).
+        self.feedback_per_ip_hour: int = int(_env("NEWSRADAR_FEEDBACK_PER_IP_HOUR", "5"))
 
         # NOT: Geçersiz bir model adı API'de sessiz boş/404 yanıta yol açabilir;
         # yalnızca geçerli, güncel bir model kullanın. (Yalnızca provider=anthropic'te

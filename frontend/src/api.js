@@ -127,8 +127,13 @@ export function logoutAll() {
 export const api = {
   me: () => req("/users/me"),
   finishTutorial: () => req("/users/me/tutorial-done", { method: "POST" }),
+  // Geri bildirim (herkese açık — anon da gönderebilir)
+  sendFeedback: (message, contact) =>
+    req("/feedback", { method: "POST", body: JSON.stringify({ message, contact }) }),
   // Admin (yalnızca is_admin kullanıcı; değilse backend 403 döner)
   adminUsers: () => req("/admin/users"),
+  adminFeedback: () => req("/admin/feedback"),
+  adminMarkFeedbackRead: (id) => req(`/admin/feedback/${id}/read`, { method: "POST" }),
   adminUserDetail: (id) => req(`/admin/users/${id}`),
   adminDeleteUser: (id) => req(`/admin/users/${id}`, { method: "DELETE" }),
   adminResetPassword: (id) => req(`/admin/users/${id}/reset-password`, { method: "POST" }),

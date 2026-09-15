@@ -22,6 +22,7 @@ from . import (
     routes_chat,
     routes_dashboard,
     routes_entities,
+    routes_feedback,
     routes_refresh,
     routes_session,
     routes_suggestions,
@@ -124,6 +125,9 @@ app.include_router(routes_auth.router)
 
 # Anonim cihaz oturumu (şifresiz) — açılışta /session/bootstrap.
 app.include_router(routes_session.router)
+
+# Geri bildirim (şifresiz; anon da yazabilir). Admin okuma uçları routes_admin'de.
+app.include_router(routes_feedback.router)
 
 # Kişisel hesaplar: register/login/upgrade (HERKESE AÇIK), /users/me kişisel token ister.
 app.include_router(routes_users.router)

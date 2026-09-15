@@ -9,12 +9,13 @@ import secrets
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from ..db.database import get_db
 from ..db.models import (
     Entity,
+    Feedback,
     SuggestionDismissal,
     UsageEvent,
     User,
@@ -22,8 +23,10 @@ from ..db.models import (
 )
 from ..watchlist import recompute_active
 from .routes_auth import hash_password, require_admin
+from .routes_feedback import device_from_user_agent
 from .schemas import (
     AdminEventOut,
+    AdminFeedbackOut,
     AdminStatsOut,
     AdminUserDetail,
     AdminUserRow,
@@ -171,6 +174,8 @@ def delete_user(
     db.execute(delete(UserWatchlist).where(UserWatchlist.user_id == user_id))
     db.execute(delete(SuggestionDismissal).where(SuggestionDismissal.user_id == user_id))
     db.execute(delete(UsageEvent).where(UsageEvent.user_id == user_id))
+    # Geri bildirim SİLİNMEZ (kıymetli) — yalnızca kimlik düşer (anonimleşir).
+    db.execute(update(Feedback).where(Feedback.user_id == user_id).values(user_id=None))
     db.delete(target)
     db.flush()
 
@@ -237,6 +242,9 @@ def stats(db: Session = Depends(get_db)) -> AdminStatsOut:
     from .. import budget as _budget
     tok_today = _budget.daily_tokens_used()
     tok_month = _budget.tokens_since(_start_of_today() - timedelta(days=30))
+    unread_feedback = db.scalar(
+        select(func.count()).select_from(Feedback).where(Feedback.is_read.is_(False))
+    ) or 0
     return AdminStatsOut(
         total_users=total_users,
         max_users=get_settings().max_users,
@@ -251,4 +259,43 @@ def stats(db: Session = Depends(get_db)) -> AdminStatsOut:
         cost_month_usd=_budget.estimated_cost_usd(tok_month),
         daily_token_budget=get_settings().daily_token_budget,
         budget_exceeded=_budget.is_budget_exceeded(),
+        unread_feedback=unread_feedback,
     )
+
+
+@router.get("/feedback", response_model=list[AdminFeedbackOut])
+def list_feedback(db: Session = Depends(get_db)) -> list[AdminFeedbackOut]:
+    """Tüm geri bildirimler — OKUNMAMIŞLAR önce, sonra en yeni üstte.
+
+    Gönderen kullanıcı adı/anon durumu User join'iyle çözülür (silinmiş/anon → None).
+    """
+    rows = db.execute(
+        select(Feedback, User.username, User.is_anonymous)
+        .outerjoin(User, User.id == Feedback.user_id)
+        .order_by(Feedback.is_read.asc(), Feedback.created_at.desc())
+    ).all()
+    out: list[AdminFeedbackOut] = []
+    for fb, username, is_anon in rows:
+        # Anon kullanıcı adı sentetik ("anon:...") — panelde gösterme, "anonim" say.
+        anon = bool(is_anon) or (username or "").startswith("anon:")
+        out.append(AdminFeedbackOut(
+            id=fb.id,
+            message=fb.message,
+            contact=fb.contact,
+            username=None if (anon or username is None) else username,
+            is_anonymous=anon or username is None,
+            device=device_from_user_agent(fb.user_agent),
+            user_agent=fb.user_agent,
+            is_read=fb.is_read,
+            created_at=fb.created_at,
+        ))
+    return out
+
+
+@router.post("/feedback/{feedback_id}/read", status_code=204)
+def mark_feedback_read(feedback_id: int, db: Session = Depends(get_db)) -> None:
+    """Bir geri bildirimi okundu işaretle (idempotent)."""
+    fb = db.get(Feedback, feedback_id)
+    if fb is None:
+        raise HTTPException(status_code=404, detail="Geri bildirim bulunamadı.")
+    fb.is_read = True

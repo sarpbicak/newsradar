@@ -18,6 +18,7 @@ const EVENT_LABELS = {
   dismiss_suggestion: "öneri gizleme",
   delete_user: "kullanıcı silme",
   password_reset: "şifre sıfırlama",
+  feedback_sent: "geri bildirim",
 };
 function eventLabel(t) {
   return EVENT_LABELS[t] || t;
@@ -39,15 +40,33 @@ function StatCard({ label, value, hint }) {
 export default function AdminPanel({ currentUserId }) {
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
+  const [feedback, setFeedback] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null); // seçili kullanıcı id
   const [deleting, setDeleting] = useState(null); // silinmekte olan kullanıcı id
 
   async function reload() {
-    const [s, u] = await Promise.all([api.adminStats(), api.adminUsers()]);
+    const [s, u, f] = await Promise.all([
+      api.adminStats(),
+      api.adminUsers(),
+      api.adminFeedback(),
+    ]);
     setStats(s);
     setUsers(u);
+    setFeedback(f);
+  }
+
+  async function markRead(id) {
+    // İyimser: yereldeki satırı okundu yap + rozeti düşür; sonra sunucuya yaz.
+    setFeedback((prev) => prev.map((f) => (f.id === id ? { ...f, is_read: true } : f)));
+    setStats((prev) => (prev ? { ...prev, unread_feedback: Math.max(0, prev.unread_feedback - 1) } : prev));
+    try {
+      await api.adminMarkFeedbackRead(id);
+    } catch (err) {
+      window.alert(`İşaretlenemedi: ${err.message}`);
+      reload().catch(() => {});
+    }
   }
 
   useEffect(() => {
@@ -124,11 +143,18 @@ export default function AdminPanel({ currentUserId }) {
         })()}
         <StatCard label="Bugün aktif" value={stats.active_today} hint="en az 1 eylem" />
         <StatCard label="Bugünkü yenileme" value={stats.refreshes_today} />
-        <StatCard
-          label="En popüler"
-          value={stats.top_entities[0]?.name || "—"}
-          hint={stats.top_entities[0] ? `${stats.top_entities[0].count} görüntüleme` : ""}
-        />
+        {/* Okunmamış geri bildirim — >0 ise mor vurguyla dikkat çeker */}
+        <div className={`rounded-xl border bg-ink-800 p-4 shadow-card ${
+          stats.unread_feedback > 0 ? "border-accent/50" : "border-ink-600"}`}>
+          <div className="text-[11px] uppercase tracking-wide text-slate-500">Okunmamış geri bildirim</div>
+          <div className={`mt-1 font-display text-2xl font-bold ${
+            stats.unread_feedback > 0 ? "text-accent" : "text-slate-100"}`}>
+            {stats.unread_feedback}
+          </div>
+          <div className="mt-0.5 text-xs text-slate-500">
+            {stats.unread_feedback > 0 ? "okunmayı bekliyor" : "hepsi okundu"}
+          </div>
+        </div>
       </div>
 
       {/* MALİYET + günlük token bütçesi (herkese açık site maliyet güvencesi) */}
@@ -152,6 +178,9 @@ export default function AdminPanel({ currentUserId }) {
         <StatCard label="30 günlük maliyet" value={`$${stats.cost_month_usd.toFixed(2)}`} hint={`${(stats.tokens_month / 1000).toFixed(0)}K token`} />
         <StatCard label="Toplam şirket" value={stats.total_entities} hint="havuzda benzersiz" />
       </div>
+
+      {/* Geri bildirim gelen kutusu — okunmamışlar önce, vurgulu */}
+      <FeedbackInbox items={feedback} onMarkRead={markRead} />
 
       {/* En çok TAKİP EDİLEN şirketler (kaç kullanıcının listesinde) + toplam benzersiz */}
       <div className="rounded-xl border border-ink-600 bg-ink-800 p-4">
@@ -273,6 +302,77 @@ export default function AdminPanel({ currentUserId }) {
       </div>
 
       {selected != null && <UserDetail userId={selected} onClose={() => setSelected(null)} />}
+    </div>
+  );
+}
+
+// Geri bildirim gelen kutusu — okunmamışlar önce (backend sıralar), vurgulu.
+function FeedbackInbox({ items, onMarkRead }) {
+  const unread = items.filter((f) => !f.is_read).length;
+  return (
+    <div className="rounded-xl border border-ink-600 bg-ink-800 p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <span className="text-[11px] uppercase tracking-wide text-slate-500">Geri bildirimler</span>
+        {unread > 0 && (
+          <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-semibold text-accent">
+            {unread} okunmamış
+          </span>
+        )}
+        <span className="ml-auto text-[11px] text-slate-500">{items.length} toplam</span>
+      </div>
+
+      {items.length === 0 ? (
+        <span className="text-sm text-slate-500">Henüz geri bildirim yok.</span>
+      ) : (
+        <div className="space-y-2.5">
+          {items.map((f) => (
+            <div
+              key={f.id}
+              className={`rounded-lg border p-3 transition ${
+                f.is_read
+                  ? "border-ink-600 bg-ink-800"
+                  : "border-accent/40 bg-accent/5"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <p
+                  className={`min-w-0 flex-1 whitespace-pre-wrap break-words text-sm leading-relaxed ${
+                    f.is_read ? "text-slate-400" : "font-medium text-slate-100"
+                  }`}
+                >
+                  {f.message}
+                </p>
+                {!f.is_read ? (
+                  <button
+                    onClick={() => onMarkRead(f.id)}
+                    className="shrink-0 rounded-md border border-ink-500 px-2 py-1 text-[11px] font-medium text-slate-400 transition hover:bg-ink-700 hover:text-slate-200"
+                  >
+                    Okundu
+                  </button>
+                ) : (
+                  <span className="shrink-0 text-[10px] uppercase tracking-wide text-slate-600">okundu</span>
+                )}
+              </div>
+
+              <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
+                <span className="font-medium text-slate-400">
+                  {f.username || "anonim"}
+                </span>
+                {f.contact && (
+                  <>
+                    <span className="text-slate-600">·</span>
+                    <span className="text-accent">{f.contact}</span>
+                  </>
+                )}
+                <span className="text-slate-600">·</span>
+                <span>{f.device}</span>
+                <span className="text-slate-600">·</span>
+                <span title={fmtDate(f.created_at)}>{timeAgo(f.created_at)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

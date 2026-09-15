@@ -8,6 +8,7 @@ import AccountModal from "./components/AccountModal.jsx";
 import PrivacyModal from "./components/PrivacyModal.jsx";
 import AdminPanel from "./components/AdminPanel.jsx";
 import Tutorial from "./components/Tutorial.jsx";
+import FeedbackWidget from "./components/FeedbackWidget.jsx";
 import { Skeleton, useIsMobile } from "./components/ui.jsx";
 import { RefreshCw, Menu, X, LogOut, ShieldCheck, LayoutDashboard, Radar, HelpCircle, UserPlus, ArrowDown } from "lucide-react";
 
@@ -628,15 +629,9 @@ export default function App() {
         </button>
       </footer>
 
-      <a
-        className="signature"
-        href="https://github.com/sarpbicak"
-        target="_blank"
-        rel="noreferrer"
-      >
-        built by Sarp Bıçak
-      </a>
-
+      {/* Sağ altta sabit geri bildirim butonu (kurucu imzası panel içinde).
+          Mobilde detay sayfasının alt sekme çubuğuyla çakışmasın diye yükseltilir. */}
+      <FeedbackWidget raised={isMobile && view === "dashboard" && selected != null} />
     </div>
   );
 }

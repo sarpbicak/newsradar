@@ -45,6 +45,27 @@ class ChatRequest(BaseModel):
     messages: list[dict] = Field(max_length=50)  # aşırı uzun konuşma reddedilsin
 
 
+class FeedbackIn(BaseModel):
+    """Geri bildirim gönderimi (herkese açık). message zorunlu, contact opsiyonel."""
+
+    message: str = Field(min_length=1, max_length=2000)
+    contact: str | None = Field(default=None, max_length=200)
+
+    @field_validator("message")
+    @classmethod
+    def _non_empty_message(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("boş olamaz")
+        return v
+
+    @field_validator("contact")
+    @classmethod
+    def _clean_contact(cls, v: str | None) -> str | None:
+        v = (v or "").strip()
+        return v or None
+
+
 # --------------------------- Kullanıcı hesapları --------------------------- #
 class RegisterIn(BaseModel):
     username: str = Field(max_length=100)   # detay doğrulama route'ta (regex 3–30)
@@ -115,6 +136,26 @@ class AdminUserDetail(BaseModel):
     watchlist_size: int                    # izleme listesi boyutu
 
 
+class FeedbackAck(BaseModel):
+    """Geri bildirim gönderim onayı."""
+
+    ok: bool = True
+
+
+class AdminFeedbackOut(BaseModel):
+    """Admin gelen kutusu satırı — mesaj + gönderen + cihaz + okundu."""
+
+    id: int
+    message: str
+    contact: str | None = None
+    username: str | None = None       # gönderen kullanıcı adı; anonim/silinmişse None
+    is_anonymous: bool = False        # gönderen anon cihaz oturumu muydu
+    device: str = "bilinmiyor"        # "mobil" | "masaüstü" | "bilinmiyor" (user_agent'tan)
+    user_agent: str | None = None
+    is_read: bool = False
+    created_at: datetime
+
+
 class AdminStatsOut(BaseModel):
     """Genel istatistikler."""
 
@@ -132,6 +173,7 @@ class AdminStatsOut(BaseModel):
     cost_month_usd: float = 0.0
     daily_token_budget: int = 0            # 0 = sınırsız
     budget_exceeded: bool = False
+    unread_feedback: int = 0               # okunmamış geri bildirim sayısı
 
 
 # --------------------------- Yanıt modelleri --------------------------- #

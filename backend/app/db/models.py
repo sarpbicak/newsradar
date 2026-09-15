@@ -215,6 +215,29 @@ class LlmUsage(Base):
     calls: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
 
+class Feedback(Base):
+    """Kullanıcı geri bildirimi (herkese açık — anon da yazabilir). Yalnızca admin okur.
+
+    user_id nullable: anonim (token'sız) gönderim ya da gönderen kullanıcı silinince NULL
+    olur (geri bildirim korunur, kimlik düşer). IP SAKLANMAZ (spam sınırı ephemeral,
+    GDPR); yalnızca user_agent tutulur (mobil/masaüstü ayrımı için).
+    """
+
+    __tablename__ = "feedback"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    contact: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=utcnow, nullable=False, index=True
+    )
+
+
 class Suggestion(Base):
     """Öneri: analiz edilen haberlerde geçen ama izleme listesinde OLMAYAN şirketler.
 
@@ -326,7 +349,7 @@ class AnalystSnapshot(Base):
 USAGE_EVENT_TYPES = (
     "login", "login_failed", "register_failed", "refresh", "view_entity",
     "add_entity", "remove_entity", "chat", "add_suggestion", "dismiss_suggestion",
-    "delete_user", "password_reset",
+    "delete_user", "password_reset", "feedback_sent",
 )
 
 

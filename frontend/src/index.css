@@ -120,33 +120,12 @@ body {
   100% { background-position: 0 50%; }
 }
 
-/* İmza — sağ altta sabit, ince, düşük kontrast */
-.signature {
-  position: fixed;
-  right: 12px;
-  bottom: 10px;
-  z-index: 40;
-  font-size: 11px;
-  letter-spacing: 0.02em;
-  color: #a8a49b;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
-  text-decoration: none;
-  transition: color 0.2s ease;
-}
-.signature:hover {
-  color: #6d4aff;
-}
-
 /* ── Mobil (<768px) — okunabilirlik + davranış ───────────────────── */
 @media (max-width: 767px) {
   /* Tarayıcının kendi "aşağı çek → yenile"si bizim göstergemizle çakışmasın */
   html,
   body {
     overscroll-behavior-y: contain;
-  }
-  /* İmza (sağ-alt sabit) mobilde alttaki SABİT sekme çubuğuyla çakışmasın */
-  .signature {
-    display: none;
   }
   /* Uzun gövde/hüküm metinleri mobilde biraz ferah okunsun */
   .font-serif {
