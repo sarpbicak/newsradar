@@ -18,6 +18,7 @@ from ..db.database import get_db
 from ..db.models import Entity, Suggestion, SuggestionDismissal, User
 from ..watchlist import add_to_watchlist, can_add_entity, in_watchlist, user_entity_ids
 from .routes_auth import get_current_user
+from .routes_entities import _add_lock
 from .schemas import EntityCardOut, SuggestionOut
 from .serializers import entity_card
 from .usage import record_event
@@ -178,46 +179,52 @@ def add_suggestion(
     if sug is None:
         raise HTTPException(status_code=404, detail="Öneri bulunamadı.")
 
-    ok, limit = can_add_entity(db, user)
-    if not ok:
-        raise HTTPException(
-            status_code=403,
-            detail=f"En fazla {limit} şirket takip edebilirsiniz. Yeni eklemek için birini çıkarın.",
-        )
+    # Kota yarışına karşı: create_entity ile AYNI kilit + commit-kilit-içinde deseni
+    # (öneriyle ekleme de kişi-başı entity limitini eşzamanlı isteklerle aşamasın).
+    with _add_lock:
+        ok, limit = can_add_entity(db, user)
+        if not ok:
+            raise HTTPException(
+                status_code=403,
+                detail=f"En fazla {limit} şirket takip edebilirsiniz. Yeni eklemek için birini çıkarın.",
+            )
 
-    # ABD borsası + halka açık + İngilizce kaynak ise ticker; aksi halde keyword
-    # + kaynak dili (Türk/Avrupa şirketleri Finnhub'da çalışmaz → keyword).
-    etype, query, language = resolve_add_target(sug)
+        # ABD borsası + halka açık + İngilizce kaynak ise ticker; aksi halde keyword
+        # + kaynak dili (Türk/Avrupa şirketleri Finnhub'da çalışmaz → keyword).
+        etype, query, language = resolve_add_target(sug)
 
-    _dismiss_for_user(db, user.id, suggestion_id)  # yalnızca bu kullanıcı için kaldır
+        _dismiss_for_user(db, user.id, suggestion_id)  # yalnızca bu kullanıcı için kaldır
 
-    # Havuzda varsa: yalnızca kullanıcının listesine ekle (yeni entity/analiz yok).
-    existing = db.scalar(
-        select(Entity).where(Entity.type == etype, Entity.query == query)
-    )
-    if existing is not None:
-        if not in_watchlist(db, user.id, existing.id):
-            add_to_watchlist(db, user.id, existing.id)
-        record_event(db, user.id, "add_suggestion", {"entity_id": existing.id, "name": existing.name})
-        return entity_card(db, existing)
-
-    entity = Entity(name=sug.name.strip(), type=etype, query=query, language=language)
-    db.add(entity)
-    try:
-        db.flush()
-    except IntegrityError:
-        db.rollback()
+        # Havuzda varsa: yalnızca kullanıcının listesine ekle (yeni entity/analiz yok).
         existing = db.scalar(
             select(Entity).where(Entity.type == etype, Entity.query == query)
         )
-        if existing is None:
-            raise HTTPException(status_code=409, detail="Entity eklenemedi.")
-        _dismiss_for_user(db, user.id, suggestion_id)
-        if not in_watchlist(db, user.id, existing.id):
-            add_to_watchlist(db, user.id, existing.id)
-        record_event(db, user.id, "add_suggestion", {"entity_id": existing.id, "name": existing.name})
-        return entity_card(db, existing)
+        if existing is not None:
+            if not in_watchlist(db, user.id, existing.id):
+                add_to_watchlist(db, user.id, existing.id)
+            record_event(db, user.id, "add_suggestion", {"entity_id": existing.id, "name": existing.name})
+            db.commit()
+            return entity_card(db, existing)
 
-    add_to_watchlist(db, user.id, entity.id)
-    record_event(db, user.id, "add_suggestion", {"entity_id": entity.id, "name": entity.name})
-    return entity_card(db, entity)
+        entity = Entity(name=sug.name.strip(), type=etype, query=query, language=language)
+        db.add(entity)
+        try:
+            db.flush()
+        except IntegrityError:
+            db.rollback()
+            existing = db.scalar(
+                select(Entity).where(Entity.type == etype, Entity.query == query)
+            )
+            if existing is None:
+                raise HTTPException(status_code=409, detail="Entity eklenemedi.")
+            _dismiss_for_user(db, user.id, suggestion_id)
+            if not in_watchlist(db, user.id, existing.id):
+                add_to_watchlist(db, user.id, existing.id)
+            record_event(db, user.id, "add_suggestion", {"entity_id": existing.id, "name": existing.name})
+            db.commit()
+            return entity_card(db, existing)
+
+        add_to_watchlist(db, user.id, entity.id)
+        record_event(db, user.id, "add_suggestion", {"entity_id": entity.id, "name": entity.name})
+        db.commit()
+        return entity_card(db, entity)

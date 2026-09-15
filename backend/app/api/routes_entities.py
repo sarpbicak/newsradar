@@ -7,6 +7,7 @@ değiştirir (havuzdaki entity silinmez, başka kullanıcıları etkilemez).
 
 from __future__ import annotations
 
+import threading
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -30,6 +31,13 @@ from .serializers import entity_card
 from .usage import record_event
 
 router = APIRouter(prefix="/entities", tags=["entities"])
+
+# YARIŞ KORUMASI (register'daki _register_lock ile aynı gerekçe): kota sayımı +
+# watchlist insert + commit ATOMİK değildi → eşzamanlı N ekleme kişi-başı entity
+# limitini aşabiliyordu (test edildi: anon limit=3 iken 10 eşzamanlı istek → 10 satır).
+# Kritik bölüm kilit altında ve commit KİLİT İÇİNDE yapılır ki sonraki thread taze
+# (commit'lenmiş) sayıyı görsün. uvicorn tek-process çok-thread → threading.Lock yeter.
+_add_lock = threading.Lock()
 
 
 # Kademeli düzen (Katman 1): skoru ≥ bu eşik olan kartlar aday; en yüksek 3'ü "bugün önemli".
@@ -97,53 +105,59 @@ def create_entity(
       yeni analiz YAPMA, mevcut analizi anında göster (bedava, hızlı).
     - YOKSA → yeni entity oluştur + listeye ekle; sıradaki yenilemede analiz edilir.
     """
-    ok, limit = can_add_entity(db, user)
-    if not ok:
-        raise HTTPException(
-            status_code=403,
-            detail=f"En fazla {limit} şirket takip edebilirsiniz. Yeni eklemek için birini çıkarın.",
-        )
+    # KRİTİK BÖLÜM (yarış-güvenli): kota kontrolü + watchlist ekleme + commit tek kilit
+    # altında; commit KİLİT İÇİNDE ki bir sonraki eşzamanlı ekleme taze sayıyı görsün.
+    with _add_lock:
+        ok, limit = can_add_entity(db, user)
+        if not ok:
+            raise HTTPException(
+                status_code=403,
+                detail=f"En fazla {limit} şirket takip edebilirsiniz. Yeni eklemek için birini çıkarın.",
+            )
 
-    existing = db.scalar(
-        select(Entity).where(Entity.type == payload.type, Entity.query == payload.query)
-    )
-    if existing is not None:
-        if in_watchlist(db, user.id, existing.id):
-            raise HTTPException(status_code=409, detail="Bu şirket zaten izleme listenizde.")
-        add_to_watchlist(db, user.id, existing.id)
-        record_event(db, user.id, "add_entity",
-                     {"entity_id": existing.id, "name": existing.name, "pool_hit": True})
-        return entity_card(db, existing)
-
-    # YENİ entity (havuzda yok) → sistem-geneli günlük ekleme sınırını uygula.
-    if not _daily_new_entity_ok(db, user):
-        raise HTTPException(
-            status_code=429,
-            detail="Bugünkü yeni şirket ekleme kapasitesi doldu — yarın tekrar deneyin.",
-        )
-
-    entity = Entity(
-        name=payload.name, type=payload.type, query=payload.query, language=payload.language
-    )
-    db.add(entity)
-    try:
-        db.flush()
-    except IntegrityError:
-        # Yarış: başka istek aynı entity'yi oluşturdu → mevcut olana ekle.
-        db.rollback()
         existing = db.scalar(
             select(Entity).where(Entity.type == payload.type, Entity.query == payload.query)
         )
-        if existing is None:
-            raise HTTPException(status_code=409, detail="Şirket eklenemedi.")
-        if not in_watchlist(db, user.id, existing.id):
+        if existing is not None:
+            if in_watchlist(db, user.id, existing.id):
+                raise HTTPException(status_code=409, detail="Bu şirket zaten izleme listenizde.")
             add_to_watchlist(db, user.id, existing.id)
-        record_event(db, user.id, "add_entity", {"entity_id": existing.id, "name": existing.name})
-        return entity_card(db, existing)
+            record_event(db, user.id, "add_entity",
+                         {"entity_id": existing.id, "name": existing.name, "pool_hit": True})
+            db.commit()
+            return entity_card(db, existing)
 
-    add_to_watchlist(db, user.id, entity.id)
-    record_event(db, user.id, "add_entity", {"entity_id": entity.id, "name": entity.name})
-    return entity_card(db, entity)
+        # YENİ entity (havuzda yok) → sistem-geneli günlük ekleme sınırını uygula.
+        if not _daily_new_entity_ok(db, user):
+            raise HTTPException(
+                status_code=429,
+                detail="Bugünkü yeni şirket ekleme kapasitesi doldu — yarın tekrar deneyin.",
+            )
+
+        entity = Entity(
+            name=payload.name, type=payload.type, query=payload.query, language=payload.language
+        )
+        db.add(entity)
+        try:
+            db.flush()
+        except IntegrityError:
+            # Yarış: başka istek aynı entity'yi oluşturdu → mevcut olana ekle.
+            db.rollback()
+            existing = db.scalar(
+                select(Entity).where(Entity.type == payload.type, Entity.query == payload.query)
+            )
+            if existing is None:
+                raise HTTPException(status_code=409, detail="Şirket eklenemedi.")
+            if not in_watchlist(db, user.id, existing.id):
+                add_to_watchlist(db, user.id, existing.id)
+            record_event(db, user.id, "add_entity", {"entity_id": existing.id, "name": existing.name})
+            db.commit()
+            return entity_card(db, existing)
+
+        add_to_watchlist(db, user.id, entity.id)
+        record_event(db, user.id, "add_entity", {"entity_id": entity.id, "name": entity.name})
+        db.commit()
+        return entity_card(db, entity)
 
 
 @router.delete("/{entity_id}", status_code=204)
