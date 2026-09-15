@@ -1,0 +1,72 @@
+"""Anonim cihaz oturumu ucu: POST /session/bootstrap.
+
+Herkese açık (şifre GEREKTİRMEZ). Frontend açılışta çağırır:
+- device_id cookie'si varsa → o kullanıcıya taze token döner (return-visitor: aynı
+  cihazda liste korunur; anon ya da hesaba yükseltilmiş fark etmez).
+- yoksa → yeni ANON kullanıcı açar, HttpOnly cookie yazar, token döner.
+IP yalnızca oturum-oluşturma hız sınırı için (ephemeral); KİMLİK olarak kullanılmaz.
+"""
+
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from ..config import get_settings
+from ..db.database import get_db
+from ..db.models import User
+from ..security import get_client_ip
+from ..session import (
+    anon_create_limiter,
+    create_anonymous_user,
+    find_user_by_device,
+    new_device_id,
+)
+from .routes_auth import make_user_token
+from .routes_users import _user_out
+from .schemas import UserTokenOut
+
+router = APIRouter(prefix="/session", tags=["session"])
+
+
+def _set_device_cookie(response: Response, device_id: str) -> None:
+    s = get_settings()
+    response.set_cookie(
+        key=s.session_cookie_name,
+        value=device_id,
+        max_age=s.session_cookie_days * 86400,
+        httponly=True,               # JS okuyamaz (XSS'e karşı)
+        secure=s.cookie_secure,      # yalnızca HTTPS
+        samesite=s.cookie_samesite,  # cross-origin (Render subdomain) için "none"
+        path="/",
+    )
+
+
+@router.post("/bootstrap", response_model=UserTokenOut)
+def bootstrap(request: Request, response: Response, db: Session = Depends(get_db)) -> UserTokenOut:
+    """Cihaz oturumu al/oluştur (şifresiz). Token + kullanıcı döner, cookie'yi tazeler."""
+    settings = get_settings()
+    device_id = request.cookies.get(settings.session_cookie_name)
+
+    user = find_user_by_device(db, device_id) if device_id else None
+    if user is None:
+        # Yeni anon oturum — kötüye kullanım/maliyet koruması.
+        ip = get_client_ip(request)
+        if not anon_create_limiter.allow(ip):
+            raise HTTPException(
+                status_code=429,
+                detail="Çok fazla yeni oturum açıldı — biraz sonra tekrar deneyin.",
+            )
+        if settings.max_users > 0:
+            n = db.scalar(select(func.count()).select_from(User)) or 0
+            if n >= settings.max_users:
+                raise HTTPException(
+                    status_code=503,
+                    detail="Site şu an kapasitede — lütfen daha sonra tekrar deneyin.",
+                )
+        device_id = new_device_id()
+        user = create_anonymous_user(db, device_id)
+
+    _set_device_cookie(response, device_id)  # süreyi her ziyarette tazele
+    return UserTokenOut(token=make_user_token(user), user=_user_out(user))

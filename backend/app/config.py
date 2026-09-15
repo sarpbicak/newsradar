@@ -45,6 +45,13 @@ class Settings:
         self.app_secret: str = os.getenv("APP_SECRET", "").strip() or self.app_password
         # Token geçerlilik süresi (gün). Süresi geçmiş token 401 döner.
         self.token_ttl_days: int = int(_env("NEWSRADAR_TOKEN_TTL_DAYS", "30"))
+        # ANONİM CİHAZ OTURUMU cookie'si (HttpOnly). Frontend+backend Render'da farklı
+        # subdomain (cross-origin) → cookie'nin fetch'te gitmesi için SameSite=None+Secure
+        # gerekir (aynı-origin'de "lax" yeter). Yerelde (http) Secure kapatılabilir.
+        self.session_cookie_name: str = _env("NEWSRADAR_SESSION_COOKIE", "nr_device")
+        self.cookie_samesite: str = _env("NEWSRADAR_COOKIE_SAMESITE", "none").lower()
+        self.cookie_secure: bool = _env("NEWSRADAR_COOKIE_SECURE", "on").lower() == "on"
+        self.session_cookie_days: int = int(_env("NEWSRADAR_SESSION_COOKIE_DAYS", "365"))
         # Kayıt sınırı: en fazla bu kadar hesap (anonim dahil). 0 = sınırsız.
         # Herkese açık: yüksek ama sonlu (kötüye kullanım + maliyet tavanı).
         self.max_users: int = int(_env("NEWSRADAR_MAX_USERS", "500"))

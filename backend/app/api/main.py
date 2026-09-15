@@ -23,6 +23,7 @@ from . import (
     routes_dashboard,
     routes_entities,
     routes_refresh,
+    routes_session,
     routes_suggestions,
     routes_symbols,
     routes_users,
@@ -97,23 +98,29 @@ async def _security_headers(request: Request, call_next):
     return resp
 
 
-# CORS: yerel Vite + FRONTEND_URL (deploy'da Render frontend domain'i).
-# İzinli origin'ler ortam değişkeninden okunur (bkz. config.cors_origins).
-# allow_credentials=False (kimlik Authorization header ile taşınır, cookie yok) →
-# '*' origin bile kimlik hırsızlığına yol açmaz; yine de config '*'e izin vermez (bkz. cors_origins).
+# CORS: yerel Vite + FRONTEND_URL. Anonim cihaz cookie'si (HttpOnly) cross-origin
+# gönderileceği için allow_credentials=True + KESİN origin listesi (credentials ile '*'
+# tarayıcıda geçersiz). Deploy'da FRONTEND_URL'i tam frontend origin'ine ayarlayın.
+_origins = get_settings().cors_origins
+if "*" in _origins:
+    # '*' + credentials geçersiz → yalnızca yerel dev origin'lerine düş (cookie çalışsın).
+    _origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=get_settings().cors_origins,
-    allow_credentials=False,
+    allow_origins=_origins,
+    allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
-# Katman 1 — genel şifre ucu (/auth/login) korumasız; genel token buradan alınır.
+# Genel şifre ucu (/auth/login) — geriye uyum için duruyor ama artık ZORUNLU DEĞİL
+# (site herkese açık; anon cihaz oturumu + kayıt/giriş genel şifre gerektirmez).
 app.include_router(routes_auth.router)
 
-# Katman 2 — kişisel hesaplar. register/login GENEL şifre kapısının arkasında
-# (kendi route bağımlılıklarında), /users/me kişisel token ister.
+# Anonim cihaz oturumu (şifresiz) — açılışta /session/bootstrap.
+app.include_router(routes_session.router)
+
+# Kişisel hesaplar: register/login/upgrade (HERKESE AÇIK), /users/me kişisel token ister.
 app.include_router(routes_users.router)
 
 # Tüm veri uçları artık KİŞİSEL token ister (get_current_user). Kişisel token ancak

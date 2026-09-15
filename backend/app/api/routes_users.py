@@ -73,6 +73,7 @@ def _record_register_failed(reason: str, attempted: str, request: Request) -> No
 def _user_out(u: User) -> UserOut:
     return UserOut(
         id=u.id, username=u.username, is_admin=u.is_admin,
+        is_anonymous=u.is_anonymous,
         created_at=u.created_at, last_login_at=u.last_login_at,
         guide_dismissed=u.guide_dismissed, tutorial_done=u.tutorial_done,
     )
@@ -82,10 +83,10 @@ def _find_by_username_ci(db: Session, username: str) -> User | None:
     return db.scalar(select(User).where(func.lower(User.username) == username.lower()))
 
 
-@router.post("/register", response_model=UserTokenOut, status_code=201,
-             dependencies=[Depends(require_auth)])
+@router.post("/register", response_model=UserTokenOut, status_code=201)
 def register(payload: RegisterIn, request: Request, db: Session = Depends(get_db)) -> UserTokenOut:
-    """Yeni kişisel hesap. İlk kullanıcı (ya da ADMIN_USERNAME) admin olur. Hız/sayı sınırlı."""
+    """Yeni kişisel hesap (HERKESE AÇIK — genel şifre kapısı kaldırıldı; max_users + anon
+    hız sınırı korur). İlk kullanıcı (ya da ADMIN_USERNAME) admin olur."""
     _check_locked(request)
     settings = get_settings()
     username = payload.username.strip()
@@ -141,7 +142,7 @@ def register(payload: RegisterIn, request: Request, db: Session = Depends(get_db
     return UserTokenOut(token=token, user=out)
 
 
-@router.post("/login", response_model=UserTokenOut, dependencies=[Depends(require_auth)])
+@router.post("/login", response_model=UserTokenOut)
 def login(payload: UserLoginIn, request: Request, db: Session = Depends(get_db)) -> UserTokenOut:
     """Kişisel giriş. Kullanıcı adı büyük/küçük harf duyarsız; şifre bcrypt ile doğrulanır.
 
@@ -181,6 +182,32 @@ def login(payload: UserLoginIn, request: Request, db: Session = Depends(get_db))
 def me(user: User = Depends(get_current_user)) -> UserOut:
     """Mevcut kişisel kullanıcı bilgisi (is_admin dahil)."""
     return _user_out(user)
+
+
+@router.post("/upgrade", response_model=UserTokenOut)
+def upgrade(payload: RegisterIn, user: User = Depends(get_current_user),
+            db: Session = Depends(get_db)) -> UserTokenOut:
+    """Anonim oturumu KALICI hesaba çevir (liste/geçmiş korunur — aynı satır).
+
+    Yalnızca anonim kullanıcı için. Kullanıcı adı + şifre belirlenir; device_id_hash
+    korunur (aynı cihazda hatırlanmaya devam). Şifre değiştiği için TAZE token döner."""
+    if not user.is_anonymous:
+        raise HTTPException(status_code=409, detail="Bu hesap zaten kalıcı.")
+    username = payload.username.strip()
+    if not _USERNAME_RE.match(username):
+        raise HTTPException(status_code=422,
+                            detail="Kullanıcı adı 3–30 karakter; yalnızca harf, rakam, alt çizgi.")
+    if len(payload.password) < MIN_PASSWORD_LEN:
+        raise HTTPException(status_code=422, detail=f"Şifre en az {MIN_PASSWORD_LEN} karakter olmalı.")
+    if _find_by_username_ci(db, username) is not None:
+        raise HTTPException(status_code=409, detail="Bu kullanıcı adı zaten alınmış.")
+    user.username = username
+    user.password_hash = hash_password(payload.password)
+    user.is_anonymous = False
+    user.last_login_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    record_event(db, user.id, "login", {"via": "upgrade"})
+    db.flush()
+    return UserTokenOut(token=make_user_token(user), user=_user_out(user))
 
 
 @router.post("/me/guide-dismiss", response_model=UserOut)

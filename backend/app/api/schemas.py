@@ -62,6 +62,7 @@ class UserOut(BaseModel):
     id: int
     username: str
     is_admin: bool
+    is_anonymous: bool = False   # anon cihaz oturumu mu (frontend "Misafir" gösterir)
     created_at: datetime
     last_login_at: datetime | None = None
     guide_dismissed: bool = False   # "NewsRadar ne yapar?" kutusu kapatıldı mı

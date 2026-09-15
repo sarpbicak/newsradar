@@ -59,44 +59,50 @@ async function req(path, options = {}) {
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: authHeaders(options.headers),
+    credentials: "include", // anon cihaz cookie'si gönderilsin (cross-origin)
   });
   if (res.status === 401) {
-    setUserToken(null); // kişisel oturum düştü → kişisel girişe dön (genel katman durur)
+    setUserToken(null); // kişisel oturum düştü → App yeni anon oturum başlatır
     onUnauthorized?.();
-    throw new Error("Oturum geçersiz. Lütfen tekrar giriş yapın.");
+    throw new Error("Oturum geçersiz. Lütfen tekrar deneyin.");
   }
   if (!res.ok) throw new Error(await parseError(res));
   if (res.status === 204) return null;
   return res.json();
 }
 
-// Katman 1: genel şifre → genel token sakla.
-export async function generalLogin(password) {
-  const res = await fetch(`${API_BASE}/auth/login`, {
+// ANONİM cihaz oturumu: şifresiz. Cookie ile aynı cihazda kalıcı; token'ı saklar.
+export async function bootstrapSession() {
+  const res = await fetch(`${API_BASE}/session/bootstrap`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ password }),
+    credentials: "include", // HttpOnly device cookie yaz/oku
   });
-  if (!res.ok) throw new Error(await parseError(res, "Giriş başarısız."));
-  const { token } = await res.json();
-  setGeneralToken(token);
-  return token;
+  if (!res.ok) throw new Error(await parseError(res, "Oturum başlatılamadı."));
+  const data = await res.json();
+  setUserToken(data.token);
+  return data.user;
+}
+
+// Anonim oturumu KALICI hesaba çevir (liste korunur).
+export async function upgradeAccount(username, password) {
+  const data = await req("/users/upgrade", {
+    method: "POST",
+    body: JSON.stringify({ username, password }),
+  });
+  setUserToken(data.token);
+  return data.user;
 }
 
 // Katman 2: kayıt/giriş — GENEL token ile korunur; kişisel token + user döner.
 async function userAuth(path, body) {
+  // Herkese açık: genel şifre kapısı YOK. Kayıt/giriş doğrudan.
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(generalToken ? { Authorization: `Bearer ${generalToken}` } : {}),
-    },
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify(body),
   });
-  if (res.status === 401 && generalToken) {
-    // Genel token geçersiz → Katman 1'e dön.
-    setGeneralToken(null);
-  }
   if (!res.ok) throw new Error(await parseError(res, "İşlem başarısız."));
   const data = await res.json();
   setUserToken(data.token);

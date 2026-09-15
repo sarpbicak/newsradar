@@ -1,19 +1,22 @@
 // NewsRadar kök bileşeni: durum yükleme, genel görünüm/detay yönlendirme,
 // global yenileme, sağlayıcı uyarıları, footer.
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { api, getUserToken, logout, setUnauthorizedHandler } from "./api.js";
+import { api, bootstrapSession, getUserToken, logout, setUnauthorizedHandler } from "./api.js";
 import Overview from "./components/Overview.jsx";
 import EntityDetail from "./components/EntityDetail.jsx";
-import Login from "./components/Login.jsx";
+import AccountModal from "./components/AccountModal.jsx";
+import PrivacyModal from "./components/PrivacyModal.jsx";
 import AdminPanel from "./components/AdminPanel.jsx";
 import GuideBox from "./components/GuideBox.jsx";
 import Tutorial from "./components/Tutorial.jsx";
 import { Skeleton } from "./components/ui.jsx";
-import { RefreshCw, Menu, X, LogOut, ShieldCheck, LayoutDashboard, Radar, HelpCircle } from "lucide-react";
+import { RefreshCw, Menu, X, LogOut, ShieldCheck, LayoutDashboard, Radar, HelpCircle, UserPlus } from "lucide-react";
 
 export default function App() {
-  const [user, setUser] = useState(null);            // kişisel kullanıcı (null = çıkış)
-  const [checkingSession, setCheckingSession] = useState(!!getUserToken());
+  const [user, setUser] = useState(null);            // kişisel kullanıcı (anon ya da kayıtlı)
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [account, setAccount] = useState(null);      // "upgrade" | "login" | null (modal)
+  const [showPrivacy, setShowPrivacy] = useState(false);
   const [view, setView] = useState("dashboard");     // "dashboard" | "admin"
   const [menuOpen, setMenuOpen] = useState(false);   // mobil header menüsü
   const [showGuide, setShowGuide] = useState(false); // "NewsRadar ne yapar?" kutusu
@@ -39,9 +42,16 @@ export default function App() {
       ? `(${Math.max(0, status.refresh_limit - status.refresh_used)}/${status.refresh_limit})`
       : "";
 
-  // Herhangi bir istek 401 dönerse (kişisel token geçersiz) kişisel girişe dön.
+  // Herhangi bir istek 401 dönerse (token süresi doldu) YENİ anon oturum başlat
+  // (cihaz cookie'si varsa aynı kullanıcıya döner; yoksa yeni misafir).
   useEffect(() => {
-    setUnauthorizedHandler(() => setUser(null));
+    setUnauthorizedHandler(async () => {
+      try {
+        setUser(await bootstrapSession());
+      } catch {
+        setUser(null);
+      }
+    });
   }, []);
 
   // Yeni kullanıcı: ilk girişte tutorial'ı otomatik aç (oturumda bir kez).
@@ -83,15 +93,31 @@ export default function App() {
     }
   }, []);
 
-  // Açılışta kişisel token varsa doğrula (kim olduğumuzu öğren). Geçersizse çıkış.
+  // Açılış: token varsa doğrula; yoksa/geçersizse ANONİM cihaz oturumu başlat.
+  // Site herkese açık — kullanıcı şifre girmeden misafir olarak kullanır.
   useEffect(() => {
-    if (!getUserToken()) return;
     let alive = true;
-    api
-      .me()
-      .then((u) => alive && setUser(u))
-      .catch(() => {})
-      .finally(() => alive && setCheckingSession(false));
+    (async () => {
+      let u = null;
+      if (getUserToken()) {
+        try {
+          u = await api.me();
+        } catch {
+          /* token geçersiz → anon oturum */
+        }
+      }
+      if (!u) {
+        try {
+          u = await bootstrapSession();
+        } catch (e) {
+          if (alive) setLoadError(`Oturum başlatılamadı: ${e.message}`);
+        }
+      }
+      if (alive) {
+        setUser(u);
+        setCheckingSession(false);
+      }
+    })();
     return () => {
       alive = false;
     };
@@ -175,27 +201,29 @@ export default function App() {
     };
   }, [authed, isRefreshing]);
 
-  function handleLogout() {
-    logout(); // kişisel çıkış (genel katman korunur — sadece kişisel girişe döner)
-    setUser(null);
+  async function handleLogout() {
+    // Kayıtlı hesaptan çık → MİSAFİR (anon) oturuma dön (cihaz cookie'si varsa o misafir).
+    logout();
     setView("dashboard");
     setSelected(null);
     setCards([]);
     setStatus(null);
     setSuggestions([]);
+    try {
+      setUser(await bootstrapSession());
+    } catch {
+      setUser(null);
+    }
   }
 
-  // Oturum doğrulanıyorsa (token var, me() bekleniyor) boş bekle — flaş önlemek için.
-  if (!authed && checkingSession) return <div className="min-h-screen" />;
-  // Giriş yapılmadıysa panoyu hiç yükleme — iki aşamalı giriş ekranı.
+  // Oturum hazırlanıyor (token doğrulama / anon bootstrap) — flaş önlemek için boş bekle.
+  if (checkingSession) return <div className="min-h-screen" />;
+  // Bootstrap tümden başarısız olduysa (nadir) küçük bir hata göster.
   if (!authed)
     return (
-      <Login
-        onAuthed={(u) => {
-          setUser(u);
-          setCheckingSession(false);
-        }}
-      />
+      <div className="flex min-h-screen items-center justify-center p-6 text-center text-sm text-slate-400">
+        {loadError || "Oturum başlatılamadı. Sayfayı yenileyin."}
+      </div>
     );
 
   async function handleRefresh() {
@@ -312,19 +340,38 @@ export default function App() {
                   {view === "admin" ? "Pano" : "Admin"}
                 </button>
               )}
-              <span className="inline-flex items-center gap-1.5 rounded-lg bg-ink-700 px-2.5 py-1.5 text-sm text-slate-300">
-                <span className="font-medium">{user?.username}</span>
-                {user?.is_admin && (
-                  <span className="rounded bg-accent/15 px-1.5 text-[10px] font-semibold text-accent">admin</span>
-                )}
-              </span>
-              <button
-                onClick={handleLogout}
-                title="Çıkış"
-                className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border border-ink-500 text-slate-400 transition hover:bg-ink-700 hover:text-slate-200"
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
+              {user?.is_anonymous ? (
+                <>
+                  <button
+                    onClick={() => setAccount("upgrade")}
+                    className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg bg-accent px-3 text-sm font-medium text-white transition hover:brightness-105"
+                  >
+                    <UserPlus className="h-4 w-4" /> Hesap oluştur
+                  </button>
+                  <button
+                    onClick={() => setAccount("login")}
+                    className="inline-flex min-h-[40px] items-center rounded-lg border border-ink-500 px-3 text-sm text-slate-300 transition hover:bg-ink-700"
+                  >
+                    Giriş yap
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-ink-700 px-2.5 py-1.5 text-sm text-slate-300">
+                    <span className="font-medium">{user?.username}</span>
+                    {user?.is_admin && (
+                      <span className="rounded bg-accent/15 px-1.5 text-[10px] font-semibold text-accent">admin</span>
+                    )}
+                  </span>
+                  <button
+                    onClick={handleLogout}
+                    title="Çıkış (misafire dön)"
+                    className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border border-ink-500 text-slate-400 transition hover:bg-ink-700 hover:text-slate-200"
+                  >
+                    <LogOut className="h-4 w-4" />
+                  </button>
+                </>
+              )}
             </div>
 
             {/* MOBİL: hamburger menü */}
@@ -341,11 +388,29 @@ export default function App() {
                   <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
                   <div className="absolute right-0 top-full z-20 mt-2 w-60 rounded-xl border border-ink-500 bg-ink-800 p-2 shadow-card-hover">
                     <div className="flex items-center justify-between gap-2 border-b border-ink-600 px-3 py-2">
-                      <span className="font-medium text-slate-200">{user?.username}</span>
+                      <span className="font-medium text-slate-200">
+                        {user?.is_anonymous ? "Misafir" : user?.username}
+                      </span>
                       {user?.is_admin && (
                         <span className="rounded bg-accent/15 px-1.5 text-[10px] font-semibold text-accent">admin</span>
                       )}
                     </div>
+                    {user?.is_anonymous && (
+                      <>
+                        <button
+                          onClick={() => { setAccount("upgrade"); setMenuOpen(false); }}
+                          className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-slate-300 hover:bg-ink-700"
+                        >
+                          <UserPlus className="h-4 w-4" /> Hesap oluştur
+                        </button>
+                        <button
+                          onClick={() => { setAccount("login"); setMenuOpen(false); }}
+                          className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-slate-300 hover:bg-ink-700"
+                        >
+                          Giriş yap
+                        </button>
+                      </>
+                    )}
                     {user?.is_admin && (
                       <button
                         onClick={() => {
@@ -358,15 +423,17 @@ export default function App() {
                         {view === "admin" ? "Panoya dön" : "Admin paneli"}
                       </button>
                     )}
-                    <button
-                      onClick={() => {
-                        handleLogout();
-                        setMenuOpen(false);
-                      }}
-                      className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-slate-300 hover:bg-ink-700"
-                    >
-                      <LogOut className="h-4 w-4" /> Çıkış
-                    </button>
+                    {!user?.is_anonymous && (
+                      <button
+                        onClick={() => {
+                          handleLogout();
+                          setMenuOpen(false);
+                        }}
+                        className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-slate-300 hover:bg-ink-700"
+                      >
+                        <LogOut className="h-4 w-4" /> Çıkış (misafire dön)
+                      </button>
+                    )}
                   </div>
                 </>
               )}
@@ -496,10 +563,24 @@ export default function App() {
       </main>
 
       {showTutorial && <Tutorial onClose={closeTutorial} />}
+      {account && (
+        <AccountModal
+          mode={account}
+          onClose={() => setAccount(null)}
+          onDone={(u) => {
+            setUser(u);
+            setAccount(null);
+          }}
+        />
+      )}
+      {showPrivacy && <PrivacyModal onClose={() => setShowPrivacy(false)} />}
 
       <footer className="mx-auto max-w-7xl px-6 pb-10 pt-6 text-center text-xs leading-relaxed text-slate-500">
         Haber akışı bazlı sinyal — değerleme veya fiyat tahmini değil. Analist hedefleri
         Finnhub konsensüs verisidir. Kararlar size aittir.
+        <button onClick={() => setShowPrivacy(true)} className="ml-1 underline hover:text-slate-300">
+          Gizlilik
+        </button>
       </footer>
 
       <a
