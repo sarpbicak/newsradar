@@ -7,7 +7,6 @@ import EntityDetail from "./components/EntityDetail.jsx";
 import AccountModal from "./components/AccountModal.jsx";
 import PrivacyModal from "./components/PrivacyModal.jsx";
 import AdminPanel from "./components/AdminPanel.jsx";
-import GuideBox from "./components/GuideBox.jsx";
 import Tutorial from "./components/Tutorial.jsx";
 import { Skeleton } from "./components/ui.jsx";
 import { RefreshCw, Menu, X, LogOut, ShieldCheck, LayoutDashboard, Radar, HelpCircle, UserPlus } from "lucide-react";
@@ -19,8 +18,6 @@ export default function App() {
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [view, setView] = useState("dashboard");     // "dashboard" | "admin"
   const [menuOpen, setMenuOpen] = useState(false);   // mobil header menüsü
-  const [showGuide, setShowGuide] = useState(false); // "NewsRadar ne yapar?" kutusu
-  const guideAutoRef = useRef(false);                // oturumda bir kez otomatik aç
   const [showTutorial, setShowTutorial] = useState(false); // ilk giriş tutorial'ı
   const tutorialAutoRef = useRef(false);
   const authed = !!user;
@@ -55,6 +52,7 @@ export default function App() {
   }, []);
 
   // Yeni kullanıcı: ilk girişte tutorial'ı otomatik aç (oturumda bir kez).
+  // "Nasıl çalışır?" ile de istendiğinde tekrar açılır (aşağıdaki header butonu).
   useEffect(() => {
     if (user && !user.tutorial_done && !tutorialAutoRef.current) {
       tutorialAutoRef.current = true;
@@ -62,27 +60,8 @@ export default function App() {
     }
   }, [user]);
 
-  // "NewsRadar ne yapar?" kutusu: tutorial'ı bitirmiş ve kutuyu kapatmamış kullanıcıya
-  // oturumda BİR kez otomatik aç (yeni kullanıcıda tutorial öncelikli — üst üste binmesin).
-  useEffect(() => {
-    if (user && user.tutorial_done && !user.guide_dismissed && !guideAutoRef.current) {
-      guideAutoRef.current = true;
-      setShowGuide(true);
-    }
-  }, [user]);
-
-  // Kutuyu kapat: tercihi backend'de kalıcı yap (bir daha otomatik açılmasın).
-  const closeGuide = useCallback(async () => {
-    setShowGuide(false);
-    try {
-      const u = await api.dismissGuide();
-      setUser(u);
-    } catch {
-      /* kapatma tercihi sunucuya yazılamadıysa yoksay — UI zaten kapandı */
-    }
-  }, []);
-
-  // Tutorial'ı kapat/bitir: kalıcı işaretle (bir daha gösterilmez).
+  // Tutorial'ı kapat/bitir: kalıcı işaretle (bir daha OTOMATİK gösterilmez; "Nasıl
+  // çalışır?" ile elle yine açılabilir).
   const closeTutorial = useCallback(async () => {
     setShowTutorial(false);
     try {
@@ -313,9 +292,9 @@ export default function App() {
               </span>
             </button>
 
-            {/* Nasıl çalışır — açıklama kutusunu tekrar açar */}
+            {/* Nasıl çalışır — ilk giriş tutorial'ını tekrar açar */}
             <button
-              onClick={() => setShowGuide(true)}
+              onClick={() => setShowTutorial(true)}
               title="Nasıl çalışır?"
               aria-label="Nasıl çalışır?"
               className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-2.5 text-sm text-slate-500 transition hover:bg-ink-700 hover:text-slate-200"
@@ -447,8 +426,6 @@ export default function App() {
           <AdminPanel currentUserId={user?.id} />
         ) : (
         <>
-        {showGuide && <GuideBox onClose={closeGuide} />}
-
         {loadError && (
           <div className="mb-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
             API'ye bağlanılamadı: {loadError}. Backend çalışıyor mu? (uvicorn app.api.main:app)
