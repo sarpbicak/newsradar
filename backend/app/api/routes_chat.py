@@ -9,6 +9,7 @@ ile tartışabilir. Yanıt token-token SSE olarak akar.
 from __future__ import annotations
 
 import json
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -96,17 +97,25 @@ def chat(
     system = f"{SYSTEM_PROMPT}\n\nBAĞLAM (bu varlığın haber akışı):\n{context}"
 
     def event_stream():
+        # GÜVENLİK: kullanıcıya GENEL mesaj (model adı/config/iç ayrıntı sızdırma);
+        # gerçek hatayı sunucuda logla.
+        _log = logging.getLogger("newsradar.chat")
         try:
             client = get_llm_provider()
         except MissingAPIKeyError as exc:
-            yield _sse("error", {"message": str(exc)})
+            _log.warning("chat: sağlayıcı yok: %s", exc)
+            yield _sse("error", {"message": "Sohbet şu an kullanılamıyor."})
             return
         try:
             for text in client.stream_chat(system=system, messages=messages, max_tokens=4096):
                 yield _sse("delta", {"text": text})
             yield _sse("done", {})
         except ClaudeError as exc:
-            yield _sse("error", {"message": str(exc)})
+            _log.warning("chat: LLM hatası: %s", exc)
+            yield _sse("error", {"message": "Sohbet yanıtı alınamadı, lütfen tekrar deneyin."})
+        except Exception as exc:  # noqa: BLE001 — beklenmedik hata sızdırma, logla
+            _log.exception("chat: beklenmedik hata")
+            yield _sse("error", {"message": "Beklenmedik bir hata oluştu."})
 
     return StreamingResponse(
         event_stream(),

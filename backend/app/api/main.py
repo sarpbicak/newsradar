@@ -95,6 +95,11 @@ async def _security_headers(request: Request, call_next):
     resp.headers.setdefault("X-Content-Type-Options", "nosniff")
     resp.headers.setdefault("Referrer-Policy", "no-referrer")
     resp.headers.setdefault("X-Frame-Options", "DENY")
+    # HSTS: HTTPS'i zorla (Render TLS sonlandırır). Cross-origin API için değerli.
+    resp.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    # CSP: bu servis yalnızca JSON döndürür (HTML/JS sunmaz) → çok kısıtlı politika yeter.
+    # (Frontend HTML'inin CSP'si static host tarafında ayarlanmalı.)
+    resp.headers.setdefault("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
     return resp
 
 
