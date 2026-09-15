@@ -184,6 +184,22 @@ class ApiCall(Base):
     called_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False, index=True)
 
 
+class LoginRate(Base):
+    """IP başına giriş hız-sınırı durumu (KALICI — süreç yeniden başlasa da korunur).
+
+    In-memory sayaç Render free tier'da soğuk-başlangıçta sıfırlanıyordu → kilit
+    kayboluyordu. DB'de tutulur: attempts = pencere içindeki başarısız zaman damgaları
+    (JSON), locked_until = kilidin bittiği epoch saniyesi.
+    """
+
+    __tablename__ = "login_rate"
+
+    ip: Mapped[str] = mapped_column(String(64), primary_key=True)
+    attempts: Mapped[str] = mapped_column(Text, default="[]", nullable=False)  # JSON list[float]
+    locked_until: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
 class Suggestion(Base):
     """Öneri: analiz edilen haberlerde geçen ama izleme listesinde OLMAYAN şirketler.
 

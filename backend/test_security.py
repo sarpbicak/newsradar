@@ -140,7 +140,7 @@ def main():
         adm = {"Authorization": f"Bearer {adm_tok}"}  # rootadmin header'ı (aşağıdaki testler için)
         print("\n== Rate limit KARIŞIK uçlarda ortak sayaç (uç-bağımsız) ==")
         from app.security import login_limiter as _ll2
-        _ll2._fails.clear(); _ll2._locked_until.clear()
+        _ll2.reset_all()
         gtm = gtok(client)
         mixed = []
         for _ in range(4):  # /auth/login yanlış
@@ -151,6 +151,21 @@ def main():
         got429 = any(s == 429 for _, s in mixed)
         check(got429, f"KARIŞIK uçlarda 5. başarısızda kilit (429) — kodlar: {mixed}")
 
+        print("\n== Rate limit KALICI: yeniden başlatmadan sonra kilit korunur ==")
+        from app.security import LoginRateLimiter
+        _ll2.reset_all()
+        for _ in range(5):
+            _ll2.record_failure("9.8.7.6")
+        # 'Yeniden başlatma' simülasyonu: bellek durumu olmayan YEPYENİ limiter örneği,
+        # kilidi yalnızca DB'den okuyabilir.
+        fresh_limiter = LoginRateLimiter()
+        rem = fresh_limiter.locked_seconds("9.8.7.6")
+        check(rem > 0, f"Restart sonrası (yeni örnek) kilit DB'den okunuyor: {rem}s kaldı")
+        with session_scope() as db:
+            from app.db.models import LoginRate
+            has_row = db.get(LoginRate, "9.8.7.6") is not None
+        check(has_row, "login_rate satırı DB'de KALICI")
+
         print("\n== XFF: İLK (en sol) adres = Render istemci IP'si ==")
         from app.security import get_client_ip
         class _Req:
@@ -159,7 +174,7 @@ def main():
         check(ip == "31.206.162.84", f"XFF'in İLK adresi (Render istemci IP'si) alınır: {ip}")
 
         print("\n== login_failed kullanıcı adıyla kaydediliyor ==")
-        _ll2._fails.clear(); _ll2._locked_until.clear()
+        _ll2.reset_all()
         gtm2 = gtok(client)
         client.post("/users/login", json={"username": "rootadmin", "password": "YANLIS2"},
                     headers={"Authorization": f"Bearer {gtm2}"})
@@ -169,7 +184,7 @@ def main():
         check(has_uname, f"login_failed detayında kullanıcı adı var ({len(lf)} olay)")
 
         print("\n== Admin şifre sıfırlama ==")
-        _ll2._fails.clear(); _ll2._locked_until.clear()
+        _ll2.reset_all()
         # sıfırlanacak kullanıcı: mevcut bir non-admin (delme2 hâlâ var)
         with session_scope() as db:
             tgt = db.query(User).filter(User.is_admin.is_(False)).first()
@@ -193,7 +208,7 @@ def main():
         print("\n== Admin kullanıcı silme (DELETE /admin/users/{id}) ==")
         # Rate-limit testi IP'yi kilitledi → silme testinden önce limiter'ı sıfırla.
         from app.security import login_limiter as _ll
-        _ll._fails.clear(); _ll._locked_until.clear()
+        _ll.reset_all()
         adm = {"Authorization": f"Bearer {adm_tok}"}  # rootadmin header'ı
         from app.db.models import Entity, UserWatchlist, SuggestionDismissal
         # Limiti geçici kaldır ki test kullanıcıları açılabilsin (cached settings'i mutasyonla).

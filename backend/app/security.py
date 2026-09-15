@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import logging
 import re
-import threading
 import time
 
 logger = logging.getLogger("newsradar.security")
@@ -51,48 +50,75 @@ def get_client_ip(request) -> str:
 class LoginRateLimiter:
     """IP başına başarısız giriş sınırı: `max_fails` / `window_s` aşılırsa `lock_s` kilit.
 
-    Bellek-içi (tek instance; Render free tier tek süreç). Süreç yeniden başlarsa sıfırlanır
-    — kaba kuvvete karşı yeterli; kalıcı kilit gerekmiyor. Thread-güvenli.
+    KALICI (DB-tabanlı, login_rate tablosu): süreç yeniden başlasa da (Render free tier
+    soğuk-başlangıç/redeploy) sayaç ve kilit korunur. Her metod kendi kısa transaction'ını
+    açar (istek session'ından bağımsız → 401 rollback'i sayacı silmez). SQLite yazmayı
+    serialize eder; küçük yarışlar en fazla ±1 sayar, kilit yine tetiklenir.
     """
 
     def __init__(self, max_fails: int = 5, window_s: int = 60, lock_s: int = 900) -> None:
         self.max_fails = max_fails
         self.window_s = window_s
         self.lock_s = lock_s
-        self._lock = threading.Lock()
-        self._fails: dict[str, list[float]] = {}
-        self._locked_until: dict[str, float] = {}
 
     def locked_seconds(self, ip: str) -> int:
         """IP kilitliyse kalan saniye, değilse 0."""
-        with self._lock:
-            until = self._locked_until.get(ip, 0)
-            remaining = until - time.time()
+        from .db.database import session_scope
+        from .db.models import LoginRate
+        with session_scope() as s:
+            row = s.get(LoginRate, ip)
+            if row is None:
+                return 0
+            remaining = row.locked_until - time.time()
             return int(remaining) if remaining > 0 else 0
 
     def record_failure(self, ip: str) -> None:
-        """Başarısız denemeyi kaydet; eşik aşılırsa IP'yi kilitle."""
+        """Başarısız denemeyi kaydet (KALICI); eşik aşılırsa IP'yi kilitle."""
+        import json
+        from datetime import datetime, timezone
+        from .db.database import session_scope
+        from .db.models import LoginRate
         now = time.time()
-        with self._lock:
-            fails = [t for t in self._fails.get(ip, []) if now - t < self.window_s]
-            fails.append(now)
-            self._fails[ip] = fails
-            n = len(fails)
+        with session_scope() as s:
+            row = s.get(LoginRate, ip)
+            if row is None:
+                row = LoginRate(ip=ip, attempts="[]", locked_until=0.0)
+                s.add(row)
+            try:
+                prev = [t for t in json.loads(row.attempts or "[]") if now - t < self.window_s]
+            except (ValueError, TypeError):
+                prev = []
+            prev.append(now)
+            n = len(prev)
+            row.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
             if n >= self.max_fails:
-                self._locked_until[ip] = now + self.lock_s
-                self._fails[ip] = []  # sıfırla; kilit süresi işliyor
+                row.locked_until = now + self.lock_s
+                row.attempts = "[]"  # sıfırla; kilit süresi işliyor
                 logger.warning(
                     "[rate-limit] IP=%s KİLİTLENDİ (%d/%d başarısız, %d dk)",
                     ip, n, self.max_fails, self.lock_s // 60,
                 )
             else:
+                row.attempts = json.dumps(prev)
                 # HER başarısız denemede sayacı logla (canlıda birikimi görebilmek için).
                 logger.warning("[rate-limit] IP=%s sayaç=%d/%d", ip, n, self.max_fails)
 
     def record_success(self, ip: str) -> None:
-        with self._lock:
-            self._fails.pop(ip, None)
-            self._locked_until.pop(ip, None)
+        """Başarılı giriş → o IP'nin sayaç/kilidini temizle."""
+        from .db.database import session_scope
+        from .db.models import LoginRate
+        with session_scope() as s:
+            row = s.get(LoginRate, ip)
+            if row is not None:
+                s.delete(row)
+
+    def reset_all(self) -> None:
+        """TEST/ADMIN: tüm hız-sınırı durumunu temizle."""
+        from sqlalchemy import delete as _delete
+        from .db.database import session_scope
+        from .db.models import LoginRate
+        with session_scope() as s:
+            s.execute(_delete(LoginRate))
 
 
 # Giriş uçları (genel şifre + kişisel giriş + kayıt) için ortak sınırlayıcı.
