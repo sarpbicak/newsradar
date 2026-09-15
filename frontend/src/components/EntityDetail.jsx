@@ -5,13 +5,11 @@ import { ChevronLeft, FileText, TrendingUp, Newspaper, BarChart3, Sparkles, Lock
 import { api } from "../api.js";
 import {
   StanceBadge, RiskScore, RiskDelta, TrendArrow, PriceDisplay, stanceLabel,
-  stanceColor, horizonLabel, evidenceLabel, evidenceColor, SignalBand,
+  stanceColor, horizonLabel, evidenceLabel, evidenceColor, SignalBand, useIsMobile,
 } from "./ui.jsx";
 import ArticleTable from "./ArticleTable.jsx";
 import ChatPanel from "./ChatPanel.jsx";
-import SentimentChart from "./SentimentChart.jsx";
-import RiskHistoryChart from "./RiskHistoryChart.jsx";
-import PriceHistoryChart from "./PriceHistoryChart.jsx";
+import TimeSeriesCharts from "./TimeSeriesCharts.jsx";
 import AnalystConsensus from "./AnalystConsensus.jsx";
 
 function MiniStat({ label, value, color }) {
@@ -28,7 +26,7 @@ export default function EntityDetail({ entityId, onBack }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState("summary");
-  const [showAllCharts, setShowAllCharts] = useState(false); // mobil: risk+duygu gizli başlar
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     let alive = true;
@@ -189,46 +187,13 @@ export default function EntityDetail({ entityId, onBack }) {
           <div key={activeTab} className="tab-fade">
             {activeTab === "summary" && <SummaryTab a={a} entity={entity} />}
             {activeTab === "charts" && (
-              <>
-                {/* MASAÜSTÜ: tüm grafikler, 2 sütun (değişmedi) */}
-                <div className="hidden gap-4 md:grid lg:grid-cols-2">
-                  <div className="space-y-4">
-                    <RiskHistoryChart history={risk_history} />
-                    <PriceHistoryChart
-                      history={price_history}
-                      updatedAt={entity.price_updated_at}
-                      isTicker={isTicker}
-                    />
-                  </div>
-                  <SentimentChart articles={articles} />
-                </div>
-
-                {/* MOBİL: yalnızca birincil grafik; diğerleri istenince açılır (dar
-                    ekranda üç grafik okunmuyor). */}
-                <div className="space-y-4 md:hidden">
-                  {isTicker ? (
-                    <PriceHistoryChart
-                      history={price_history}
-                      updatedAt={entity.price_updated_at}
-                      isTicker={isTicker}
-                    />
-                  ) : (
-                    <RiskHistoryChart history={risk_history} />
-                  )}
-                  {showAllCharts && (
-                    <>
-                      {isTicker && <RiskHistoryChart history={risk_history} />}
-                      <SentimentChart articles={articles} />
-                    </>
-                  )}
-                  <button
-                    onClick={() => setShowAllCharts((v) => !v)}
-                    className="min-h-[44px] w-full rounded-lg border border-ink-500 bg-ink-800 text-sm font-medium text-slate-300 transition hover:bg-ink-700"
-                  >
-                    {showAllCharts ? "Grafikleri gizle" : "Grafikleri göster (risk, duygu)"}
-                  </button>
-                </div>
-              </>
+              <TimeSeriesCharts
+                riskHistory={risk_history}
+                priceHistory={price_history}
+                articles={articles}
+                isTicker={isTicker}
+                isMobile={isMobile}
+              />
             )}
             {activeTab === "news" && <ArticleTable articles={articles} />}
             {activeTab === "analysts" && isTicker && (
