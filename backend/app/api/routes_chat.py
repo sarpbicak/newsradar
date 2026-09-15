@@ -21,6 +21,7 @@ from ..analysis.llm import get_llm_provider
 from ..analysis.prompts import SYSTEM_PROMPT, utc_context_line
 from ..db.database import get_db
 from ..db.models import Article, Entity, EntityAnalysis, User
+from ..watchlist import in_watchlist
 from .routes_auth import get_current_user
 from .schemas import ChatRequest
 from .usage import record_event
@@ -79,7 +80,10 @@ def chat(
     user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     entity = db.get(Entity, payload.entity_id)
-    if entity is None:
+    # İZOLASYON (IDOR): kullanıcı yalnızca KENDİ listesindeki entity hakkında sohbet
+    # edebilir. Aksi halde başkasının takip ettiği varlığın haber/analiz bağlamı
+    # sohbete sızardı. dashboard ucuyla aynı davranış: yoksa/erişilemezse 404.
+    if entity is None or not in_watchlist(db, user.id, entity.id):
         raise HTTPException(status_code=404, detail="Entity bulunamadı.")
     record_event(db, user.id, "chat", {"entity_id": entity.id, "name": entity.name})
 
