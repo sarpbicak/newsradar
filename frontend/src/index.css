@@ -120,6 +120,19 @@ body {
   100% { background-position: 0 50%; }
 }
 
+/* iOS SAFARI ODAK-ZOOM'U: font-size < 16px olan input/textarea/select'e
+   odaklanınca sayfayı otomatik yakınlaştırır (düzen bozulur). Çözüm: dokunmatik
+   cihazlarda (coarse pointer) VE dar ekranda tüm form kontrolleri en az 16px.
+   Masaüstü (fine pointer, geniş ekran) bu kuralın DIŞINDA — mevcut kompakt
+   tasarım korunur. !important → Tailwind text-sm/text-xs'i bu kapsamda ezer. */
+@media (pointer: coarse), (max-width: 767px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
 /* ── Mobil (<768px) — okunabilirlik + davranış ───────────────────── */
 @media (max-width: 767px) {
   /* Tarayıcının kendi "aşağı çek → yenile"si bizim göstergemizle çakışmasın */

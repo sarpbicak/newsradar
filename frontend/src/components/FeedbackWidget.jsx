@@ -3,6 +3,13 @@
 import React, { useState } from "react";
 import { MessageSquare, X, Send } from "lucide-react";
 import { api } from "../api.js";
+import { useVisualViewport } from "./ui.jsx";
+
+// Odaklanınca alanı görünür alanın ortasına kaydır (klavye açılınca kaybolmasın).
+function scrollFocusIntoView(e) {
+  const el = e.target;
+  setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 100);
+}
 
 // Marka ikonları (lucide bu sürümde brand glyph'lerini içermiyor) — küçük inline SVG.
 function LinkedInIcon() {
@@ -69,6 +76,7 @@ export default function FeedbackWidget({ raised = false }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [sent, setSent] = useState(false);
+  const vp = useVisualViewport(); // iOS klavyesi açılınca panel klavyenin üstünde kalsın
 
   function close() {
     setOpen(false);
@@ -117,11 +125,12 @@ export default function FeedbackWidget({ raised = false }) {
 
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-4 backdrop-blur-sm sm:items-center"
+          className="fixed inset-x-0 z-50 flex items-end justify-center bg-black/30 p-4 backdrop-blur-sm sm:items-center"
+          style={{ top: vp.offsetTop, height: vp.height }}
           onClick={close}
         >
           <div
-            className="relative w-full max-w-md rounded-2xl border border-ink-600 bg-ink-800 p-6 shadow-card-hover"
+            className="relative flex max-h-full w-full max-w-md flex-col overflow-y-auto overscroll-contain rounded-2xl border border-ink-600 bg-ink-800 p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-card-hover"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -152,22 +161,25 @@ export default function FeedbackWidget({ raised = false }) {
                 </p>
 
                 <form onSubmit={submit} className="mt-4 space-y-3">
+                  {/* text-base (16px) → iOS odak-zoom'unu engeller (font <16 zoom yapar) */}
                   <textarea
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
+                    onFocus={scrollFocusIntoView}
                     rows={4}
                     maxLength={2000}
                     autoFocus
                     placeholder="Ne düşünüyorsun?"
-                    className="w-full resize-y rounded-lg border border-ink-500 bg-ink-900 px-3 py-2 text-sm leading-relaxed text-slate-200 outline-none transition focus:border-accent"
+                    className="w-full resize-y rounded-lg border border-ink-500 bg-ink-900 px-3 py-2 text-base leading-relaxed text-slate-200 outline-none transition focus:border-accent"
                   />
                   <div>
                     <input
                       value={contact}
                       onChange={(e) => setContact(e.target.value)}
+                      onFocus={scrollFocusIntoView}
                       maxLength={200}
                       placeholder="E-posta / kullanıcı adı (zorunlu değil)"
-                      className="min-h-[44px] w-full rounded-lg border border-ink-500 bg-ink-900 px-3 py-2 text-sm text-slate-200 outline-none transition focus:border-accent"
+                      className="min-h-[44px] w-full rounded-lg border border-ink-500 bg-ink-900 px-3 py-2 text-base text-slate-200 outline-none transition focus:border-accent"
                     />
                     <p className="mt-1 text-[11px] text-slate-500">
                       Cevap istersen iletişim bırak — zorunlu değil.

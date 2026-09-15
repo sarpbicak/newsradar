@@ -23,6 +23,29 @@ export function useIsMobile(breakpoint = 768) {
   return isMobile;
 }
 
+// Görünür viewport (visualViewport API) — iOS'ta klavye açılınca küçülen GERÇEK
+// görünür alanı verir. Modal'ı klavyenin ÜSTÜNDE tutmak için kullanılır: klavye
+// açılınca height küçülür, offsetTop kayar → "Gönder" butonu klavye arkasında kalmaz.
+export function useVisualViewport() {
+  const [vp, setVp] = useState(() => ({
+    height: typeof window !== "undefined" ? window.innerHeight : 0,
+    offsetTop: 0,
+  }));
+  useEffect(() => {
+    const vv = typeof window !== "undefined" ? window.visualViewport : null;
+    if (!vv) return;
+    const onChange = () => setVp({ height: vv.height, offsetTop: vv.offsetTop });
+    onChange();
+    vv.addEventListener("resize", onChange);
+    vv.addEventListener("scroll", onChange);
+    return () => {
+      vv.removeEventListener("resize", onChange);
+      vv.removeEventListener("scroll", onChange);
+    };
+  }, []);
+  return vp;
+}
+
 // Sayısal değerleri animasyonlu sayaçla gösterir (reduced-motion'da anında).
 export function AnimatedNumber({ value, decimals = 0, prefix = "", suffix = "" }) {
   const [display, setDisplay] = useState(value ?? 0);

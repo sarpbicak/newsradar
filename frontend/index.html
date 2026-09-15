@@ -2,7 +2,10 @@
 <html lang="tr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover: env(safe-area-inset-*) çalışsın (çentikli iPhone).
+         maximum-scale/user-scalable KULLANILMAZ — erişilebilirliği bozar, modern iOS
+         zaten yok sayar. iOS odak-zoom'u <16px input'tan gelir; CSS'te 16px ile çözülür. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>NewsRadar — Haber Akışı Bazlı Risk Analizi</title>
   </head>
   <body>
