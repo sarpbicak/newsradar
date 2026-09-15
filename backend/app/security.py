@@ -121,5 +121,20 @@ class LoginRateLimiter:
             s.execute(_delete(LoginRate))
 
 
-# Giriş uçları (genel şifre + kişisel giriş + kayıt) için ortak sınırlayıcı.
+# Giriş uçları (genel şifre + kişisel giriş + kayıt) için ortak IP sınırlayıcı.
 login_limiter = LoginRateLimiter()
+
+# HESAP-BAZLI sınırlayıcı (XFF spoofing'e karşı savunma): saldırgan her istekte farklı
+# sahte X-Forwarded-For göndererek IP sayacını atlayabilir (get_client_ip XFF'e güvenir,
+# Render arkasında bunu tam doğrulayamayız). Bu yüzden /users/login'de HEDEF KULLANICI
+# ADINA göre de sayaç tutulur ("user:<ad>" anahtarı) → tek hesaba dönük kaba kuvvet, IP
+# ne olursa olsun kilitlenir. Eşik IP'den yüksek (kazara kendini kilitleme riskini azaltır),
+# pencere uzun (yavaş/dağıtık denemeleri de yakalar). login_rate tablosunu paylaşır;
+# anahtarlar IP'lerle çakışmaz. (Kabul edilen ödünleşme: bir saldırgan bir hesabı geçici
+# kilitleyerek DoS yapabilir — hesap ele geçirmeye karşı bu tercih edilir.)
+account_limiter = LoginRateLimiter(max_fails=10, window_s=900, lock_s=900)
+
+
+def account_key(username: str) -> str:
+    """Hesap-bazlı hız sayacı anahtarı (IP anahtarlarıyla çakışmayan ad-alanı)."""
+    return f"user:{username.strip().lower()}"

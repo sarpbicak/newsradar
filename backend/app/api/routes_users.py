@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from ..config import get_settings
 from ..db.database import get_db, session_scope
 from ..db.models import User
-from ..security import get_client_ip, login_limiter
+from ..security import account_key, account_limiter, get_client_ip, login_limiter
 from .routes_auth import (
     get_current_user,
     hash_password,
@@ -148,8 +148,12 @@ def login(payload: UserLoginIn, request: Request, db: Session = Depends(get_db))
 
     Hız-sınırlı (kaba kuvvet). Hata mesajı kullanıcı adı/şifre ayrımı yapmaz (enum'a karşı)."""
     ip = get_client_ip(request)
-    _check_locked(request)
     attempted = payload.username.strip()
+    akey = account_key(attempted)
+    # IP kilidi VEYA hesap kilidi (hesap kilidi XFF spoofing'i etkisiz kılar).
+    locked = login_limiter.locked_seconds(ip) or account_limiter.locked_seconds(akey)
+    if locked:
+        raise HTTPException(status_code=429, detail=f"Çok fazla deneme. {locked // 60 + 1} dk sonra tekrar deneyin.")
     user = _find_by_username_ci(db, attempted)
     if user is None or not verify_password(payload.password, user.password_hash):
         # TANI: hesaplanan IP ile ham XFF'i logla — canlıda IP'nin tutarlı mı yoksa her
@@ -157,6 +161,7 @@ def login(payload: UserLoginIn, request: Request, db: Session = Depends(get_db))
         logger.warning("[rate-limit] /users/login başarısız — ip=%s xff=%r",
                        ip, request.headers.get("x-forwarded-for"))
         login_limiter.record_failure(ip)
+        account_limiter.record_failure(akey)  # hesap-bazlı (XFF spoof'a karşı)
         # Başarısız denemeyi admin panelinde göster (KULLANICI ADI dahil → kimin/neyin
         # takıldığı görünsün). AYRI session: aşağıdaki 401 request session'ını rollback
         # eder → event kaybolmasın.
@@ -173,6 +178,7 @@ def login(payload: UserLoginIn, request: Request, db: Session = Depends(get_db))
                                  {"ip": ip, "username": attempted[:50], "unknown": True})
         raise HTTPException(status_code=401, detail="Kullanıcı adı veya şifre hatalı.")
     login_limiter.record_success(ip)
+    account_limiter.record_success(akey)  # başarılı giriş → hesap kilidini temizle
     user.last_login_at = datetime.now(timezone.utc).replace(tzinfo=None)
     record_event(db, user.id, "login", None)
     return UserTokenOut(token=make_user_token(user), user=_user_out(user))

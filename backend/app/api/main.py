@@ -101,6 +101,9 @@ async def _security_headers(request: Request, call_next):
     # CSP: bu servis yalnızca JSON döndürür (HTML/JS sunmaz) → çok kısıtlı politika yeter.
     # (Frontend HTML'inin CSP'si static host tarafında ayarlanmalı.)
     resp.headers.setdefault("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+    # Sürüm sızıntısını önle: uvicorn 'Server: uvicorn' ekler → jenerik yap (parmak izi
+    # + bilinen-sürüm açığı hedeflemesini zorlaştır). X-Powered-By zaten set edilmiyor.
+    resp.headers["Server"] = "NewsRadar"
     return resp
 
 

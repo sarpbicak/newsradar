@@ -10,7 +10,7 @@ services:
     rootDir: backend
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.api.main:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn app.api.main:app --host 0.0.0.0 --port $PORT --no-server-header
     envVars:
       # --- Sırlar — Render Dashboard'da elle girin (repoya gitmez) ---
       - key: APP_PASSWORD           # genel giriş şifresi
