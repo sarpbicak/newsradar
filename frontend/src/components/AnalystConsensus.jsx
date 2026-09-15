@@ -64,7 +64,7 @@ function TargetRangeBar({ low, high, mean, price }) {
         {/* düşük–yüksek analist aralığı */}
         <div
           className="absolute top-0 h-2 rounded-full"
-          style={{ left: pos(low), width: `${((high - low) / span) * 100}%`, background: "rgba(124,92,255,0.35)" }}
+          style={{ left: pos(low), width: `${((high - low) / span) * 100}%`, background: "rgba(30,58,95,0.30)" }}
         />
         {/* güncel fiyat işareti (dikey çizgi) */}
         {price != null && (

@@ -29,16 +29,16 @@ body {
   margin: 0;
   color: #1a1a18;
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  /* Sıcak kağıt zemini + üstte neredeyse görünmez mor glow + hafif gazete grain'i */
+  /* Sıcak kağıt zemini + hafif gazete grain'i. (Mor glow KALDIRILDI — kağıt zeminde
+     görünmüyordu ve boşuna repaint üretiyordu; editöryel his için düz kağıt yeter.) */
   background-color: #f7f5f1;
   background-image:
-    radial-gradient(120% 55% at 50% -10%, rgba(109, 74, 255, 0.05), rgba(109, 74, 255, 0) 60%),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
-  background-size: 100% 100%, 140px 140px;
-  background-repeat: no-repeat, repeat;
-  /* PERF: 'fixed' arka plan her kaydırmada tüm ekranı yeniden boyar (özellikle
-     mobilde belirgin jank). 'scroll' ile sayfayla birlikte kayar, repaint yok. */
-  background-attachment: scroll, scroll;
+  background-size: 140px 140px;
+  background-repeat: repeat;
+  /* PERF: 'fixed' arka plan her kaydırmada tüm ekranı yeniden boyar (mobilde jank).
+     'scroll' ile sayfayla birlikte kayar, repaint yok. */
+  background-attachment: scroll;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -103,7 +103,7 @@ body {
   position: absolute;
   inset: 0 auto 0 0;
   width: 40%;
-  background: linear-gradient(90deg, transparent, rgba(109, 74, 255, 0.10), transparent);
+  background: linear-gradient(90deg, transparent, rgba(30, 58, 95, 0.08), transparent);
   animation: scan 1.4s ease-in-out infinite;
   pointer-events: none;
 }

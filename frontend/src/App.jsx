@@ -187,6 +187,14 @@ export default function App() {
     };
   }, [authed, isRefreshing]);
 
+  // Logo → ana sayfa (pano). Detay/admin'den döner; zaten anasayfadaysa en üste kaydırır.
+  function goHome() {
+    setMenuOpen(false);
+    setView("dashboard");
+    setSelected(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function handleLogout() {
     // Kayıtlı hesaptan çık → MİSAFİR (anon) oturuma dön (cihaz cookie'si varsa o misafir).
     logout();
@@ -327,10 +335,16 @@ export default function App() {
       <header className="sticky top-0 z-10 border-b border-ink-600 bg-ink-900/70 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 font-display text-lg font-bold tracking-tight text-slate-100">
+            {/* Logo → her zaman ana sayfa (pano). Detay/admin/alt sayfadan döner;
+                zaten anasayfadaysa en üste kaydırır. */}
+            <button
+              onClick={goHome}
+              aria-label="Ana sayfaya dön"
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg font-display text-lg font-bold tracking-tight text-slate-100 transition hover:opacity-70"
+            >
               <Radar className="h-5 w-5 text-accent" />
               NewsRadar
-            </span>
+            </button>
             <span className="hidden font-mono text-[11px] uppercase tracking-wide text-slate-500 md:inline">
               haber akışı · risk paneli
             </span>
@@ -401,7 +415,7 @@ export default function App() {
                   <span className="inline-flex items-center gap-1.5 rounded-lg bg-ink-700 px-2.5 py-1.5 text-sm text-slate-300">
                     <span className="font-medium">{user?.username}</span>
                     {user?.is_admin && (
-                      <span className="rounded bg-accent/15 px-1.5 text-[10px] font-semibold text-accent">admin</span>
+                      <span className="rounded bg-ink-700 px-1.5 text-[10px] font-semibold text-slate-500">admin</span>
                     )}
                   </span>
                   <button
@@ -433,7 +447,7 @@ export default function App() {
                         {user?.is_anonymous ? "Misafir" : user?.username}
                       </span>
                       {user?.is_admin && (
-                        <span className="rounded bg-accent/15 px-1.5 text-[10px] font-semibold text-accent">admin</span>
+                        <span className="rounded bg-ink-700 px-1.5 text-[10px] font-semibold text-slate-500">admin</span>
                       )}
                     </div>
                     {/* Nasıl çalışır — tutorial'ı tekrar aç */}

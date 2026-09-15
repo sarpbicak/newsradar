@@ -1,5 +1,5 @@
 // Sağ altta sabit "Geri bildirim" butonu + panel. Herkese açık (anon da gönderebilir).
-// Panel altında kurucu imzası + sosyal hesaplar. Sıcak kağıt teması, mor vurgu, sans.
+// Panel altında kurucu imzası + sosyal hesaplar. Sıcak kağıt teması, lacivert vurgu, sans.
 import React, { useState } from "react";
 import { MessageSquare, X, Send } from "lucide-react";
 import { api } from "../api.js";

@@ -143,7 +143,7 @@ export default function AdminPanel({ currentUserId }) {
         })()}
         <StatCard label="Bugün aktif" value={stats.active_today} hint="en az 1 eylem" />
         <StatCard label="Bugünkü yenileme" value={stats.refreshes_today} />
-        {/* Okunmamış geri bildirim — >0 ise mor vurguyla dikkat çeker */}
+        {/* Okunmamış geri bildirim — >0 ise lacivert vurguyla dikkat çeker */}
         <div className={`rounded-xl border bg-ink-800 p-4 shadow-card ${
           stats.unread_feedback > 0 ? "border-accent/50" : "border-ink-600"}`}>
           <div className="text-[11px] uppercase tracking-wide text-slate-500">Okunmamış geri bildirim</div>
@@ -205,7 +205,7 @@ export default function AdminPanel({ currentUserId }) {
                   {e.type === "ticker" ? "$" : "#"}
                 </span>
                 {e.name}
-                <span className="rounded bg-accent/15 px-1.5 font-semibold text-accent">
+                <span className="rounded bg-ink-700 px-1.5 font-semibold text-slate-500">
                   {e.followers} kişi
                 </span>
               </span>
@@ -258,7 +258,7 @@ export default function AdminPanel({ currentUserId }) {
                 <td className="px-4 py-2.5">
                   <span className="font-medium text-slate-200">{u.username}</span>
                   {u.is_admin && (
-                    <span className="ml-1.5 rounded bg-accent/15 px-1.5 text-[10px] font-semibold text-accent">
+                    <span className="ml-1.5 rounded bg-ink-700 px-1.5 text-[10px] font-semibold text-slate-500">
                       admin
                     </span>
                   )}
@@ -399,7 +399,7 @@ function UserDetail({ userId, onClose }) {
         <h3 className="font-display text-lg font-semibold text-slate-100">
           {data ? data.user.username : "Yükleniyor…"}
           {data?.user.is_admin && (
-            <span className="ml-2 rounded bg-accent/15 px-1.5 text-[10px] font-semibold text-accent">
+            <span className="ml-2 rounded bg-ink-700 px-1.5 text-[10px] font-semibold text-slate-500">
               admin
             </span>
           )}

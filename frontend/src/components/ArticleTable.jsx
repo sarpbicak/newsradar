@@ -36,7 +36,7 @@ function SourceCount({ n }) {
   if (!n || n <= 1) return null;
   return (
     <span
-      className="inline-flex items-center rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] font-semibold text-accent"
+      className="inline-flex items-center rounded-full bg-ink-700 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500"
       title={`Bu haber ${n} kaynakta çıktı — önem sinyali (kopyalar tek sayıldı)`}
     >
       {n} kaynak

@@ -234,12 +234,12 @@ export function SignalBand({ stance, evidence, showLabel = true, minimal = false
           </span>
         </div>
       )}
-      {/* Yumuşak spektrum (olumsuz→nötr(mor)→olumlu) + konum işaretçisi. Koyu zemin. */}
+      {/* Yumuşak spektrum (olumsuz→nötr(gri)→olumlu) + konum işaretçisi. Koyu zemin. */}
       <div
         className="relative h-2 rounded-full"
         style={{
           background:
-            "linear-gradient(90deg, rgba(198,40,40,0.55) 0%, rgba(198,40,40,0.22) 28%, rgba(109,74,255,0.24) 50%, rgba(15,138,76,0.22) 72%, rgba(15,138,76,0.55) 100%)",
+            "linear-gradient(90deg, rgba(198,40,40,0.55) 0%, rgba(198,40,40,0.22) 28%, rgba(122,119,112,0.20) 50%, rgba(15,138,76,0.22) 72%, rgba(15,138,76,0.55) 100%)",
         }}
         aria-label={`Genel sinyal: ${sig.label}`}
       >

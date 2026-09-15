@@ -1,11 +1,12 @@
 /** @type {import('tailwindcss').Config} */
-// SICAK KAĞIT TEMA + MOR VURGU. Saf siyah/beyaz YOK; zemin krem, metin sıcak siyah.
+// SICAK KAĞIT TEMA + LACİVERT VURGU. Saf siyah/beyaz YOK; zemin krem, metin sıcak siyah.
 //  - ink-*  = yüzeyler/kenarlıklar (900 = krem sayfa → 800 = beyaz kart → açık kenarlık)
 //  - slate-* = metin. DİKKAT: ölçek TERS ÇEVRİLİ. Tailwind'de normalde slate küçük
 //    numara = açık renktir; burada kağıt zemine göre küçük numara = KOYU/önemli metin,
 //    büyük numara = SOLUK metin. (900→100'e geçerken kod aynı kalsın diye ölçek
 //    yeniden eşlendi; yani text-slate-100 = en koyu, text-slate-700 = en soluk.)
-//  - accent = MOR (yalnızca vurgu). Sinyal renkleri (emerald/rose) MOR DEĞİL — sabit.
+//  - accent = KOYU MÜREKKEP LACİVERT (yalnızca vurgu; editöryel/finans hissi, sıcak
+//    kağıtla uyumlu). Sinyal renkleri (emerald/rose) sabit — vurgu rengiyle karışmaz.
 export default {
   content: ["./index.html", "./src/**/*.{js,jsx}"],
   theme: {
@@ -20,7 +21,8 @@ export default {
           600: "#E7E3DA", // ince kenarlık (~rgba(0,0,0,0.08) sıcak)
           500: "#D8D3C7", // güçlü kenarlık/input
         },
-        accent: "#6D4AFF", // MOR vurgu (kağıt zemininde çalışan ton)
+        accent: "#1E3A5F",          // koyu mürekkep lacivert (birincil vurgu)
+        "accent-hover": "#2C5282",  // hover/aktif için biraz açığı
         // Metin (kağıt zeminde): küçük numara = koyu/önemli, büyük = soluk.
         slate: {
           100: "#1A1A18", // birincil metin (sıcak siyah — tam siyah değil)
@@ -31,7 +33,7 @@ export default {
           600: "#A8A49B", // daha soluk
           700: "#C4C0B6", // en soluk
         },
-        // Yön/durum tonları — kağıt zeminde okunaklı, DOYGUN. (Mor DEĞİL.)
+        // Yön/durum tonları — kağıt zeminde okunaklı, DOYGUN. (Lacivert vurguyla karışmaz.)
         emerald: { 200: "#0F8A4C", 300: "#0F8A4C", 400: "#0F8A4C", 500: "#0B7A42", 600: "#0B7A42" },
         rose: { 200: "#C62828", 300: "#C62828", 400: "#C62828", 500: "#A81E1E", 600: "#A81E1E" },
         amber: { 200: "#B45309", 300: "#B45309", 400: "#C77700", 500: "#B45309", 600: "#B45309" },
@@ -47,7 +49,7 @@ export default {
       boxShadow: {
         // Kağıt tema: çok yumuşak, dağınık, hafif gölge (üstte duran kart hissi).
         card: "0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.04)",
-        "card-hover": "0 2px 6px rgba(0,0,0,0.06), 0 14px 32px rgba(109,74,255,0.10)",
+        "card-hover": "0 2px 6px rgba(0,0,0,0.06), 0 14px 32px rgba(30,58,95,0.10)",
       },
       keyframes: {
         "card-in": {
@@ -59,7 +61,7 @@ export default {
           "100%": { transform: "translateX(300%)" },
         },
         flash: {
-          "0%": { background: "rgba(124,92,255,0.22)" },
+          "0%": { background: "rgba(30,58,95,0.14)" },
           "100%": { background: "transparent" },
         },
       },
