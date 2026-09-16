@@ -59,9 +59,10 @@ def _effective_batch_size(batch_size: int, language: str | None) -> int:
 AGGREGATE_LOOKBACK = 200  # entity değerlendirmesinde kaç son makale bağlam olarak verilir
 # (tavanla uyumlu: değerlendirme son 40'a değil, birikmiş son ~200 analiz edilmiş
 #  makaleye bakar; _read_assessment_payload lookback = max(AGGREGATE_LOOKBACK, cap)).
-# Entity değerlendirme çıktısı (headline_verdict + ai_take + summary + drivers + ...);
-# Türkçe uzun metinler için 2000 azdı → 4096 (kesilmeyi önle).
-ENTITY_ASSESSMENT_MAX_TOKENS = 4096
+# NOT: Entity değerlendirme çağrısı ARTIK settings.max_output_tokens kullanır
+# (eskiden sabit 4096'ya bağlıydı → NEWSRADAR_MAX_OUTPUT_TOKENS okunmuyordu ve uzun
+# TR çıktıları kesiliyordu; kartlar boş kalıyordu). Kesilmede kurtarma:
+# _assess_entity_with_recovery (2× token → gerekirse bağlamı yarıya indir).
 # Kesilmede batch bölme derinliği güvenlik sınırı. Doğal taban durumu tek makale
 # (len<=1) olduğu için 10'luk batch normalde 4 bölmede tek makaleye iner; bu sınır
 # yalnızca patolojik özyinelemeye karşı emniyet supabı (en kötü ihtimalle tek makale
@@ -72,6 +73,42 @@ _MAX_SPLIT_DEPTH = 6
 ASSESSMENT_READ_CAP = 200
 MAX_ANALYSIS_HISTORY = 100  # entity başına saklanacak en fazla değerlendirme kaydı
 SUGGESTION_TTL_DAYS = 30    # bu süreden eski + az anılan öneriler temizlenir
+
+
+def _assess_entity_with_recovery(client, build_fn, payload, name):
+    """Entity değerlendirmesini (TEK çağrı → batch gibi bölünemez) kesilmeye karşı
+    kurtarmalı çalıştırır. (adata, kullanılan_payload) döner.
+
+    Sıra: (1) settings.max_output_tokens ile dene → kesilirse (2) 2× token ile yeniden →
+    yine kesilirse (3) bağlam makalelerini YARIYA indirip 2× token ile son bir kez.
+    Böylece entity tamamen değerlendirmesiz (boş kart) kalmaz. Son deneme de kesilirse
+    TruncationError (ClaudeError alt sınıfı) yükselir; çağıran uyarıya çevirir.
+    """
+    base = get_settings().max_output_tokens
+    # Loglarda gerçekten hangi tavanın kullanıldığı görünsün (NEWSRADAR_MAX_OUTPUT_TOKENS
+    # okunuyor mu teşhisi için — eskiden sabit 4096'ya bağlıydı).
+    logger.info("[%s] değerlendirme çağrısı max_tokens=%d (%d makale bağlam)",
+                name, base, len(payload))
+
+    def _one(items, mt):
+        return client.call_tool(
+            system=SYSTEM_PROMPT, user=build_fn(items),
+            tool=ENTITY_ANALYSIS_TOOL, max_tokens=mt,
+        )
+
+    try:
+        return _one(payload, base), payload
+    except TruncationError:
+        logger.warning("[%s] değerlendirme kesildi (max_tokens=%d) → 2× (%d) ile yeniden.",
+                       name, base, base * 2)
+    try:
+        return _one(payload, base * 2), payload
+    except TruncationError:
+        half = max(1, len(payload) // 2)
+        logger.warning("[%s] hâlâ kesik → bağlam %d→%d makaleye indirilip 2× token ile deneniyor.",
+                       name, len(payload), half)
+        used = payload[:half]
+        return _one(used, base * 2), used
 
 
 def _suggestion_key(name: str, ticker: str | None) -> str:
@@ -632,15 +669,20 @@ async def analyze_all_async(
             price_ctx = await asyncio.to_thread(price_context_for, t["id"])
             analyst_ctx = await asyncio.to_thread(analyst_context_for, t["id"])
         if payload:
-            user = build_entity_prompt(
-                t["name"], t["query"], t["type"], payload,
-                price=price_ctx, language=t["language"], analyst=analyst_ctx,
-            )
+            def _build(items):
+                return build_entity_prompt(
+                    t["name"], t["query"], t["type"], items,
+                    price=price_ctx, language=t["language"], analyst=analyst_ctx,
+                )
             try:
-                adata = await _call(ENTITY_ANALYSIS_TOOL, user, ENTITY_ASSESSMENT_MAX_TOKENS)
+                # Kesilme kurtarmalı (2× token → gerekirse yarı bağlam). Semaphore altında.
+                async with sem:
+                    adata, used = await asyncio.to_thread(
+                        _assess_entity_with_recovery, client, _build, payload, t["name"]
+                    )
                 async with db_lock:
                     await asyncio.to_thread(
-                        _write_assessment, t["id"], adata, len(payload), _avg_sentiment(payload)
+                        _write_assessment, t["id"], adata, len(used), _avg_sentiment(used)
                     )
                 totals.entity_assessments += 1
             except ClaudeError as exc:
@@ -763,16 +805,16 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient) -> AnalyzeTotals:
 
     payload2 = _read_assessment_payload(entity_id)
     if payload2:
-        user = build_entity_prompt(
-            name, query, etype, payload2, price=price_context_for(entity_id),
-            language=lang, analyst=analyst_context_for(entity_id),
-        )
-        try:
-            adata = client.call_tool(
-                system=SYSTEM_PROMPT, user=user, tool=ENTITY_ANALYSIS_TOOL,
-                max_tokens=ENTITY_ASSESSMENT_MAX_TOKENS,
+        _price = price_context_for(entity_id)
+        _analyst = analyst_context_for(entity_id)
+        def _build2(items):
+            return build_entity_prompt(
+                name, query, etype, items, price=_price, language=lang, analyst=_analyst,
             )
-            _write_assessment(entity_id, adata, len(payload2), _avg_sentiment(payload2))
+        try:
+            # Kesilme kurtarmalı (settings.max_output_tokens → 2× → yarı bağlam).
+            adata, used = _assess_entity_with_recovery(client, _build2, payload2, name)
+            _write_assessment(entity_id, adata, len(used), _avg_sentiment(used))
             totals.entity_assessments += 1
         except ClaudeError as exc:
             totals.warnings.append(f"[{name}] değerlendirme başarısız: {exc}")
