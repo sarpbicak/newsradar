@@ -127,6 +127,7 @@ export function logoutAll() {
 export const api = {
   me: () => req("/users/me"),
   finishTutorial: () => req("/users/me/tutorial-done", { method: "POST" }),
+  setLanguage: (language) => req("/users/me/language", { method: "POST", body: JSON.stringify({ language }) }),
   // Geri bildirim (herkese açık — anon da gönderebilir)
   sendFeedback: (message, contact) =>
     req("/feedback", { method: "POST", body: JSON.stringify({ message, contact }) }),

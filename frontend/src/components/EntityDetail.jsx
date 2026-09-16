@@ -11,6 +11,7 @@ import ArticleTable from "./ArticleTable.jsx";
 import ChatPanel from "./ChatPanel.jsx";
 import TimeSeriesCharts from "./TimeSeriesCharts.jsx";
 import AnalystConsensus from "./AnalystConsensus.jsx";
+import { tt, fmtDateTime } from "../i18n.jsx";
 
 function MiniStat({ label, value, color }) {
   return (
@@ -41,8 +42,8 @@ export default function EntityDetail({ entityId, onBack }) {
     };
   }, [entityId]);
 
-  if (loading) return <div className="p-8 text-slate-500">Yükleniyor…</div>;
-  if (error) return <div className="p-8 text-rose-400">Hata: {error}</div>;
+  if (loading) return <div className="p-8 text-slate-500">{tt("detail.loading")}</div>;
+  if (error) return <div className="p-8 text-rose-400">{tt("detail.error", { msg: error })}</div>;
   if (!data) return null;
 
   const { entity, articles, risk_history, price_history, article_status: st } = data;
@@ -52,10 +53,10 @@ export default function EntityDetail({ entityId, onBack }) {
   const upside = entity.analyst?.upside_percent;
 
   const tabs = [
-    { key: "summary", label: "Özet", icon: FileText },
-    { key: "charts", label: "Grafikler", icon: TrendingUp },
-    { key: "news", label: "Haberler", icon: Newspaper },
-    ...(isTicker ? [{ key: "analysts", label: "Analistler", icon: BarChart3 }] : []),
+    { key: "summary", label: tt("detail.tabSummary"), icon: FileText },
+    { key: "charts", label: tt("detail.tabCharts"), icon: TrendingUp },
+    { key: "news", label: tt("detail.tabNews"), icon: Newspaper },
+    ...(isTicker ? [{ key: "analysts", label: tt("detail.tabAnalysts"), icon: BarChart3 }] : []),
   ];
   const activeTab = tabs.some((t) => t.key === tab) ? tab : "summary";
 
@@ -67,7 +68,7 @@ export default function EntityDetail({ entityId, onBack }) {
         onClick={onBack}
         className="inline-flex min-h-[44px] items-center gap-1 rounded-lg pr-3 text-sm text-slate-500 transition hover:text-slate-200"
       >
-        <ChevronLeft className="h-4 w-4" /> genel görünüm
+        <ChevronLeft className="h-4 w-4" /> {tt("detail.back")}
       </button>
 
       {/* ---- ÜST SABİT ÖZET ---- */}
@@ -100,10 +101,10 @@ export default function EntityDetail({ entityId, onBack }) {
 
         {a && (
           <div className="mt-4 grid grid-cols-3 divide-x divide-ink-700 rounded-lg border border-ink-700">
-            <MiniStat label="Yön" value={stanceLabel(a.stance)} color={dir} />
-            <MiniStat label="Vade" value={horizonLabel(entity.horizon)} />
+            <MiniStat label={tt("detail.dir")} value={stanceLabel(a.stance)} color={dir} />
+            <MiniStat label={tt("detail.horizon")} value={horizonLabel(entity.horizon)} />
             <MiniStat
-              label="Kanıt"
+              label={tt("detail.evidence")}
               value={evidenceLabel(entity.evidence_strength)}
               color={evidenceColor(entity.evidence_strength)}
             />
@@ -122,7 +123,7 @@ export default function EntityDetail({ entityId, onBack }) {
                 />
                 {entity.analyst?.target_mean != null && (
                   <span className="inline-flex items-baseline gap-1.5 text-slate-400">
-                    <span className="text-slate-600">·</span> hedef
+                    <span className="text-slate-600">·</span> {tt("detail.target")}
                     <span className="font-semibold text-slate-100">${entity.analyst.target_mean.toFixed(2)}</span>
                     {upside != null && (
                       <span className={`font-semibold ${upside >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
@@ -133,10 +134,10 @@ export default function EntityDetail({ entityId, onBack }) {
                 )}
               </>
             ) : (
-              <span className="text-slate-500">Fiyat verisi yok (ABD dışı borsa olabilir).</span>
+              <span className="text-slate-500">{tt("detail.noPrice")}</span>
             )
           ) : (
-            <span className="text-slate-500">Borsada işlem görmüyor (özel şirket).</span>
+            <span className="text-slate-500">{tt("detail.notPublic")}</span>
           )}
         </div>
 
@@ -149,16 +150,16 @@ export default function EntityDetail({ entityId, onBack }) {
                 : "bg-ink-700/60 text-slate-500"
             }`}
           >
-            <span>{st.total} makale</span>·<span>{st.analyzed} analiz</span>·
-            <span>{st.prefiltered} elenen</span>·
-            <span className={st.pending > 0 ? "font-semibold text-slate-300" : ""}>{st.pending} bekliyor</span>
+            <span>{tt("detail.articlesN", { n: st.total })}</span>·<span>{tt("detail.analyzedN", { n: st.analyzed })}</span>·
+            <span>{tt("detail.prefilteredN", { n: st.prefiltered })}</span>·
+            <span className={st.pending > 0 ? "font-semibold text-slate-300" : ""}>{tt("detail.pendingN", { n: st.pending })}</span>
           </div>
         )}
       </div>
 
       {!a ? (
         <div className="rounded-xl border border-ink-600 bg-ink-800 p-6 text-slate-400">
-          Bu varlık için henüz analiz yok. Üstteki <strong>Yenile</strong> düğmesine basın.
+          {tt("detail.noAnalysisBox", { refresh: tt("header.refresh") })}
         </div>
       ) : (
         <>
@@ -220,11 +221,10 @@ function SummaryTab({ a, entity }) {
           <Lock className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
           <div>
             <div className="text-sm font-semibold text-slate-200">
-              Özel şirket — borsada işlem görmüyor
+              {tt("card.private")}
             </div>
             <p className="mt-0.5 text-[13px] leading-relaxed text-slate-400">
-              {entity.name} halka açık olmadığı için fiyat ve analist hedefi yok.
-              Aşağıdaki değerlendirme yalnızca haber akışına dayanıyor.
+              {tt("card.privateBody")}
             </p>
           </div>
         </div>
@@ -234,11 +234,11 @@ function SummaryTab({ a, entity }) {
       {a.ai_take && (
         <div className="rounded-xl border border-accent/30 bg-accent/10 p-5">
           <div className="mb-2 flex items-center gap-2 font-display text-sm font-semibold text-accent">
-            <Sparkles className="h-4 w-4" /> AI ne düşünüyor?
+            <Sparkles className="h-4 w-4" /> {tt("sum.aiTake")}
           </div>
           <p className="text-[15px] leading-relaxed text-slate-100">{a.ai_take}</p>
           <p className="mt-3 text-[11px] text-slate-500">
-            Bu bir yorum, yatırım tavsiyesi değil — kararlar sana ait.
+            {tt("sum.aiDisclaimer")}
           </p>
         </div>
       )}
@@ -249,15 +249,15 @@ function SummaryTab({ a, entity }) {
           <RiskScore score={a.risk_score} />
           <RiskDelta delta={entity.delta} />
           <div className="text-xs text-slate-500">
-            {a.articles_considered} habere dayalı · {new Date(a.created_at).toLocaleString("tr-TR")}
-            {entity.previous_analysis && <> · önceki: {entity.previous_analysis.risk_score}</>}
+            {tt("sum.basedOn", { n: a.articles_considered })} · {fmtDateTime(a.created_at)}
+            {entity.previous_analysis && <> · {tt("sum.previous", { v: entity.previous_analysis.risk_score })}</>}
           </div>
         </div>
         <p className="text-sm leading-relaxed text-slate-200">{a.summary}</p>
 
         {a.top_drivers?.length > 0 && (
           <div className="mt-4">
-            <div className="mb-1.5 text-[11px] uppercase tracking-wide text-slate-500">Ana etkenler</div>
+            <div className="mb-1.5 text-[11px] uppercase tracking-wide text-slate-500">{tt("sum.drivers")}</div>
             <div className="flex flex-wrap gap-2">
               {a.top_drivers.map((d, i) => (
                 <span key={i} className="rounded-md border border-ink-500 bg-ink-700 px-2.5 py-1 text-xs text-slate-300">
@@ -272,7 +272,7 @@ function SummaryTab({ a, entity }) {
       <div className="space-y-4">
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
           <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-amber-300">
-            ✓ Harekete geçmeden önce doğrula
+            {tt("sum.verify")}
           </div>
           <ul className="space-y-2 text-sm text-slate-300">
             {a.what_to_verify.map((v, i) => (
@@ -286,7 +286,7 @@ function SummaryTab({ a, entity }) {
 
         <div className="rounded-xl border border-ink-600 bg-ink-800 p-4">
           <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            Görüşü çürütecek olay
+            {tt("sum.invalidation")}
           </div>
           <p className="text-sm text-slate-300">{a.invalidation}</p>
         </div>

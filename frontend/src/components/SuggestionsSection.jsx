@@ -1,8 +1,10 @@
 // "Bunları da izlemek ister misin?" — co-mentioned şirket önerileri.
 // Öneri yoksa hiç render edilmez (boş başlık durmasın).
 import React, { useState } from "react";
+import { useI18n } from "../i18n.jsx";
 
 export default function SuggestionsSection({ suggestions, onAdd, onDismiss, embedded = false }) {
+  const { t } = useI18n();
   const [busyId, setBusyId] = useState(null);
 
   if (!suggestions || suggestions.length === 0) return null;
@@ -20,11 +22,11 @@ export default function SuggestionsSection({ suggestions, onAdd, onDismiss, embe
     <div className={embedded ? "" : "rounded-xl border border-ink-600 bg-ink-800/60 p-4"}>
       {!embedded && (
         <div className="mb-1 text-sm font-semibold text-slate-200">
-          Bunları da izlemek ister misin?
+          {t("sug.title")}
         </div>
       )}
       <div className="mb-3 text-[11px] text-slate-500">
-        Haberlerinde sık geçen, izleme listende olmayan şirketler.
+        {t("sug.subtitle")}
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -43,7 +45,7 @@ export default function SuggestionsSection({ suggestions, onAdd, onDismiss, embe
                   )}
                 </div>
                 <span className="shrink-0 rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">
-                  {s.mention_count} haberde geçti
+                  {t("sug.mentioned", { n: s.mention_count })}
                 </span>
               </div>
 
@@ -53,17 +55,17 @@ export default function SuggestionsSection({ suggestions, onAdd, onDismiss, embe
 
               {s.source_entity_names?.length > 0 && (
                 <div className="text-[11px] text-slate-500">
-                  {s.source_entity_names.join(", ")} haberlerinde
+                  {t("sug.inNews", { names: s.source_entity_names.join(", ") })}
                 </div>
               )}
 
               {/* Eklenince ne olacağı — sürpriz olmasın */}
               <div className="text-[11px] text-slate-500">
                 {s.add_as_type === "ticker" ? (
-                  <span className="text-sky-400">↳ ticker olarak eklenecek (ABD borsası)</span>
+                  <span className="text-sky-400">{t("sug.addTicker")}</span>
                 ) : (
                   <span className="text-slate-400">
-                    ↳ keyword{s.add_as_language ? ` (${s.add_as_language})` : ""} olarak eklenecek
+                    {t("sug.addKeyword", { lang: s.add_as_language ? ` (${s.add_as_language})` : "" })}
                   </span>
                 )}
               </div>
@@ -74,14 +76,14 @@ export default function SuggestionsSection({ suggestions, onAdd, onDismiss, embe
                   disabled={busy}
                   className="rounded-md bg-accent px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
                 >
-                  {busy ? "…" : "+ Ekle"}
+                  {busy ? "…" : t("sug.add")}
                 </button>
                 <button
                   onClick={() => handle(onDismiss, s.id)}
                   disabled={busy}
                   className="rounded-md border border-ink-500 px-3 py-1 text-xs text-slate-400 hover:text-slate-200 disabled:opacity-50"
                 >
-                  Gizle
+                  {t("sug.hide")}
                 </button>
               </div>
             </div>

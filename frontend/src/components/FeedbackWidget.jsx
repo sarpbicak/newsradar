@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { MessageSquare, X, Send } from "lucide-react";
 import { api } from "../api.js";
 import { useVisualViewport } from "./ui.jsx";
+import { useI18n } from "../i18n.jsx";
 
 // Odaklanınca alanı görünür alanın ortasına kaydır (klavye açılınca kaybolmasın).
 function scrollFocusIntoView(e) {
@@ -52,10 +53,11 @@ function SocialIcon({ href, label, children }) {
 
 // Kurucu imzası + sosyal hesaplar (panel altında ve boş butonun temsili).
 function FounderSignature() {
+  const { t } = useI18n();
   return (
     <div className="mt-5 flex items-center justify-between gap-3 border-t border-ink-600 pt-4">
       <div className="text-xs text-slate-500">
-        Bu aracı <span className="font-semibold text-slate-300">Sarp Bıçak</span> yaptı.
+        {t("fb.builtBy", { name: "Sarp Bıçak" })}
       </div>
       <div className="flex items-center gap-2">
         <SocialIcon href={LINKEDIN_URL} label="LinkedIn">
@@ -76,6 +78,7 @@ export default function FeedbackWidget({ raised = false }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [sent, setSent] = useState(false);
+  const { t } = useI18n();
   const vp = useVisualViewport(); // iOS klavyesi açılınca panel klavyenin üstünde kalsın
 
   function close() {
@@ -101,7 +104,7 @@ export default function FeedbackWidget({ raised = false }) {
       // Teşekkür mesajını göster, sonra paneli kapat.
       setTimeout(close, 1600);
     } catch (err) {
-      setError(err.message || "Gönderilemedi, lütfen tekrar deneyin.");
+      setError(err.message || t("fb.fail"));
     } finally {
       setBusy(false);
     }
@@ -116,10 +119,10 @@ export default function FeedbackWidget({ raised = false }) {
           className={`fixed right-4 z-40 inline-flex min-h-[44px] items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-4 text-sm font-medium text-accent shadow-card backdrop-blur-sm transition hover:bg-accent/20 md:right-6 ${
             raised ? "bottom-[68px] md:bottom-6" : "bottom-4 md:bottom-6"
           }`}
-          aria-label="Geri bildirim gönder"
+          aria-label={t("fb.button")}
         >
           <MessageSquare className="h-4 w-4" />
-          Geri bildirim
+          {t("fb.button")}
         </button>
       )}
 
@@ -135,7 +138,7 @@ export default function FeedbackWidget({ raised = false }) {
           >
             <button
               onClick={close}
-              aria-label="Kapat"
+              aria-label={t("common.close")}
               className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-ink-700 hover:text-slate-200"
             >
               <X className="h-4 w-4" />
@@ -147,17 +150,16 @@ export default function FeedbackWidget({ raised = false }) {
                   <MessageSquare className="h-6 w-6" />
                 </div>
                 <p className="font-display text-lg font-semibold text-slate-100">
-                  Teşekkürler, okuyacağım.
+                  {t("fb.thanks")}
                 </p>
               </div>
             ) : (
               <>
                 <h2 className="mb-1.5 pr-8 font-display text-lg font-bold text-slate-100">
-                  Düşüncelerin benim için değerli
+                  {t("fb.title")}
                 </h2>
                 <p className="text-[13px] leading-relaxed text-slate-400">
-                  NewsRadar'ı geliştirmek için geri bildirime ihtiyacım var. Ne işe
-                  yaradı, ne eksik, ne kafa karıştırıcı — hepsini duymak isterim.
+                  {t("fb.body")}
                 </p>
 
                 <form onSubmit={submit} className="mt-4 space-y-3">
@@ -169,7 +171,7 @@ export default function FeedbackWidget({ raised = false }) {
                     rows={4}
                     maxLength={2000}
                     autoFocus
-                    placeholder="Ne düşünüyorsun?"
+                    placeholder={t("fb.placeholder")}
                     className="w-full resize-y rounded-lg border border-ink-500 bg-ink-900 px-3 py-2 text-base leading-relaxed text-slate-200 outline-none transition focus:border-accent"
                   />
                   <div>
@@ -178,11 +180,11 @@ export default function FeedbackWidget({ raised = false }) {
                       onChange={(e) => setContact(e.target.value)}
                       onFocus={scrollFocusIntoView}
                       maxLength={200}
-                      placeholder="E-posta / kullanıcı adı (zorunlu değil)"
+                      placeholder={t("fb.contact")}
                       className="min-h-[44px] w-full rounded-lg border border-ink-500 bg-ink-900 px-3 py-2 text-base text-slate-200 outline-none transition focus:border-accent"
                     />
                     <p className="mt-1 text-[11px] text-slate-500">
-                      Cevap istersen iletişim bırak — zorunlu değil.
+                      {t("fb.contactNote")}
                     </p>
                   </div>
 
@@ -194,7 +196,7 @@ export default function FeedbackWidget({ raised = false }) {
                     className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-medium text-white transition hover:brightness-105 disabled:opacity-50"
                   >
                     <Send className="h-4 w-4" />
-                    {busy ? "Gönderiliyor…" : "Gönder"}
+                    {busy ? t("fb.sending") : t("fb.send")}
                   </button>
                 </form>
               </>

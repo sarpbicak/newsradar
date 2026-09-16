@@ -3,15 +3,17 @@
 //  - keyword: sadece Ad (query=name), Sembol gizli, dil seçici görünür.
 import React, { useEffect, useRef, useState } from "react";
 import { api } from "../api.js";
+import { useI18n } from "../i18n.jsx";
 
 const LANGUAGES = [
-  { code: "en", label: "İngilizce" },
-  { code: "tr", label: "Türkçe" },
-  { code: "de", label: "Almanca" },
-  { code: "fr", label: "Fransızca" },
+  { code: "en", tkey: "lang.en" },
+  { code: "tr", tkey: "lang.tr" },
+  { code: "de", tkey: "lang.de" },
+  { code: "fr", tkey: "lang.fr" },
 ];
 
 export default function WatchlistManager({ cards, onCreate, onDelete, embedded = false }) {
+  const { t } = useI18n();
   const [name, setName] = useState("");
   const [type, setType] = useState("ticker");
   const [query, setQuery] = useState(""); // sembol (yalnızca ticker)
@@ -93,8 +95,8 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
 
   // Eksik alanlar (tip-bazlı).
   const missing = [];
-  if (!name.trim()) missing.push("Ad");
-  if (type === "ticker" && !query.trim()) missing.push("Sembol");
+  if (!name.trim()) missing.push(t("wl.fieldName"));
+  if (type === "ticker" && !query.trim()) missing.push(t("wl.symbol"));
   const canSubmit = missing.length === 0 && !busy;
 
   async function submit(e) {
@@ -123,26 +125,26 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
 
   return (
     <div className={embedded ? "" : "rounded-xl border border-ink-600 bg-ink-800 p-4"}>
-      {!embedded && <h3 className="mb-3 text-sm font-semibold text-slate-200">İzleme Listesi</h3>}
+      {!embedded && <h3 className="mb-3 text-sm font-semibold text-slate-200">{t("wl.title")}</h3>}
 
       <form onSubmit={submit} className="mb-3 flex flex-col gap-2 md:flex-row md:flex-wrap md:items-end">
         {/* Tip */}
         <div className="flex flex-col">
-          <label className="mb-1 text-[10px] uppercase text-slate-500">Tip</label>
+          <label className="mb-1 text-[10px] uppercase text-slate-500">{t("wl.type")}</label>
           <select
             value={type}
             onChange={(e) => changeType(e.target.value)}
             className="min-h-[44px] w-full rounded-md border border-ink-500 bg-ink-900 px-2 py-2 text-sm outline-none focus:border-accent md:w-auto"
           >
-            <option value="ticker">ticker (ABD hissesi)</option>
-            <option value="keyword">keyword (şirket/konu)</option>
+            <option value="ticker">{t("wl.typeTicker")}</option>
+            <option value="keyword">{t("wl.typeKeyword")}</option>
           </select>
         </div>
 
         {/* Ad — ticker'da arama kutusu, keyword'de arama terimi */}
         <div className="relative flex flex-col md:flex-1">
           <label className="mb-1 text-[10px] uppercase text-slate-500">
-            {type === "ticker" ? "Ad (ara)" : "Ad / arama terimi"}
+            {type === "ticker" ? t("wl.nameSearch") : t("wl.nameTerm")}
           </label>
           <input
             value={name}
@@ -156,7 +158,7 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
           {showDropdown && (searching || results.length > 0 || searched) && (
             <div className="absolute top-full z-20 mt-1 w-full overflow-hidden rounded-md border border-ink-500 bg-ink-900 shadow-xl md:w-72">
               {searching && (
-                <div className="px-3 py-2 text-xs text-slate-500">Aranıyor…</div>
+                <div className="px-3 py-2 text-xs text-slate-500">{t("wl.searching")}</div>
               )}
               {!searching &&
                 results.map((r) => (
@@ -186,8 +188,7 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
                 ))}
               {!searching && searched && results.length === 0 && (
                 <div className="px-3 py-2 text-xs text-amber-300">
-                  Bulunamadı — Türk/Avrupa şirketleri için tip olarak{" "}
-                  <strong>keyword</strong> seçip dili ayarlayın.
+                  {t("wl.notFound")}
                 </div>
               )}
             </div>
@@ -197,7 +198,7 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
         {/* Sembol — yalnızca ticker */}
         {type === "ticker" && (
           <div className="flex flex-col">
-            <label className="mb-1 text-[10px] uppercase text-slate-500">Sembol</label>
+            <label className="mb-1 text-[10px] uppercase text-slate-500">{t("wl.symbol")}</label>
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value.toUpperCase().replace(/\s+/g, ""))}
@@ -211,7 +212,7 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
         {/* Dil — yalnızca keyword */}
         {type === "keyword" && (
           <div className="flex flex-col">
-            <label className="mb-1 text-[10px] uppercase text-slate-500">Dil</label>
+            <label className="mb-1 text-[10px] uppercase text-slate-500">{t("wl.language")}</label>
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
@@ -219,7 +220,7 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
             >
               {LANGUAGES.map((l) => (
                 <option key={l.code} value={l.code}>
-                  {l.label}
+                  {t(l.tkey)}
                 </option>
               ))}
             </select>
@@ -228,14 +229,14 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
 
         <button
           disabled={!canSubmit}
-          title={missing.length ? `Eksik: ${missing.join(", ")}` : ""}
+          title={missing.length ? t("wl.missing", { fields: missing.join(", ") }) : ""}
           className="min-h-[44px] w-full rounded-md bg-accent px-3 py-2 text-sm font-medium text-white disabled:opacity-50 md:w-auto"
         >
-          {busy ? "Ekleniyor…" : "Ekle"}
+          {busy ? t("wl.adding") : t("wl.add")}
         </button>
 
         {missing.length > 0 && (
-          <span className="text-[11px] text-slate-500 md:self-center">Eksik: {missing.join(", ")}</span>
+          <span className="text-[11px] text-slate-500 md:self-center">{t("wl.missing", { fields: missing.join(", ") })}</span>
         )}
       </form>
       {err && <p className="mb-2 text-xs text-rose-400">{err}</p>}
@@ -258,7 +259,7 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
             )}
             <button
               onClick={() => onDelete(c.id)}
-              title="Kaldır"
+              title={t("wl.remove")}
               className="text-slate-500 hover:text-rose-400"
             >
               ✕

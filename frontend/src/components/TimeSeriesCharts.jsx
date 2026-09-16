@@ -19,13 +19,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { tt } from "../i18n.jsx";
 
 const DAY = 86400000;
 const NAVY = "#1E3A5F";   // vurgu — grafik ana çizgisi
 const GRID = "#EDEAE3";   // çok soluk yatay ızgara
 const ZERO = "#D8D3C7";   // sentiment sıfır çizgisi
 const MUTED = "#8A867E";  // eksen etiketi / haber havası
-const RANGES = [["7g", 7], ["30g", 30], ["90g", 90], ["Tümü", Infinity]];
+const RANGES = [["chart.r7", 7], ["chart.r30", 30], ["chart.r90", 90], ["chart.rangeAll", Infinity]];
 
 function dayKey(iso) {
   const d = new Date(iso);
@@ -94,8 +95,8 @@ function ChartTip({ active, payload, label }) {
   };
   const risk = get("risk"), sent = get("sentiment"), price = get("price");
   const parts = [];
-  if (risk != null) parts.push(`risk ${Math.round(risk)}`);
-  if (sent != null) parts.push(`havası ${sent >= 0 ? "+" : ""}${sent.toFixed(1)}`);
+  if (risk != null) parts.push(tt("chart.tipRisk", { v: Math.round(risk) }));
+  if (sent != null) parts.push(tt("chart.tipMood", { v: `${sent >= 0 ? "+" : ""}${sent.toFixed(1)}` }));
   if (price != null) parts.push(`$${price.toFixed(2)}`);
   return (
     <div className="rounded-lg border border-ink-500 bg-ink-800 px-2.5 py-1.5 text-[11px] text-slate-300 shadow-card-hover">
@@ -148,12 +149,12 @@ function RiskSentimentChart({ data, isMobile }) {
   const hasSent = data.some((d) => d.sentiment != null);
   return (
     <Panel>
-      <div className="mb-1 text-[13px] font-medium text-slate-300">Risk ve haber havası</div>
-      <div ref={wrapRef} onDoubleClick={reset} className="relative select-none" title="Kaydır/yakınlaştır: alttaki şeridi sürükle · tekerlek · çift tık sıfırlar">
+      <div className="mb-1 text-[13px] font-medium text-slate-300">{tt("chart.riskSent")}</div>
+      <div ref={wrapRef} onDoubleClick={reset} className="relative select-none">
         {/* Çizgi ucu yerine köşe etiketleri (efsane yok) */}
-        <span className="pointer-events-none absolute left-8 top-1 z-10 text-[10px] font-semibold" style={{ color: NAVY }}>risk</span>
+        <span className="pointer-events-none absolute left-8 top-1 z-10 text-[10px] font-semibold" style={{ color: NAVY }}>{tt("chart.risk")}</span>
         {hasSent && (
-          <span className="pointer-events-none absolute right-7 top-1 z-10 text-[10px] font-semibold" style={{ color: MUTED }}>haber havası</span>
+          <span className="pointer-events-none absolute right-7 top-1 z-10 text-[10px] font-semibold" style={{ color: MUTED }}>{tt("chart.newsMood")}</span>
         )}
         <ResponsiveContainer width="100%" height={isMobile ? 190 : 210}>
           <ComposedChart data={data} margin={{ top: 16, right: 8, bottom: 0, left: -18 }} syncId="ts">
@@ -179,7 +180,7 @@ function RiskSentimentChart({ data, isMobile }) {
         </ResponsiveContainer>
       </div>
       {!hasRisk && (
-        <div className="mt-1 text-[11px] text-slate-500">Risk verisi için en az 2 tarama gerekir.</div>
+        <div className="mt-1 text-[11px] text-slate-500">{tt("chart.riskNeed2")}</div>
       )}
     </Panel>
   );
@@ -191,8 +192,8 @@ function PriceChart({ data, updatedNote }) {
   const lastPt = [...data].reverse().find((d) => d.price != null);
   return (
     <Panel>
-      <div className="mb-1 text-[13px] font-medium text-slate-300">Fiyat geçmişi</div>
-      <div ref={wrapRef} onDoubleClick={reset} className="select-none" title="Kaydır/yakınlaştır: alttaki şeridi sürükle · tekerlek · çift tık sıfırlar">
+      <div className="mb-1 text-[13px] font-medium text-slate-300">{tt("chart.price")}</div>
+      <div ref={wrapRef} onDoubleClick={reset} className="select-none">
         <ResponsiveContainer width="100%" height={180}>
           <LineChart data={data} margin={{ top: 8, right: 42, bottom: 0, left: -6 }} syncId="ts">
             <CartesianGrid vertical={false} stroke={GRID} />
@@ -215,7 +216,7 @@ function PriceChart({ data, updatedNote }) {
         </ResponsiveContainer>
       </div>
       <div className="mt-2 text-[10px] text-slate-500">
-        Not: Fiyat yalnızca haberin fiyatlanıp fiyatlanmadığını görmek için — hedef/tahmin değil.
+        {tt("chart.priceNote")}
         {updatedNote}
       </div>
     </Panel>
@@ -244,7 +245,7 @@ export default function TimeSeriesCharts({ riskHistory, priceHistory, articles, 
   // Seçici (her iki grafiğe birden uygulanır)
   const selector = (
     <div className="flex items-center gap-1">
-      <span className="mr-1 text-[11px] text-slate-500">Aralık:</span>
+      <span className="mr-1 text-[11px] text-slate-500">{tt("chart.range")}</span>
       {RANGES.map(([label, days]) => {
         const on = rangeDays === days;
         return (
@@ -255,7 +256,7 @@ export default function TimeSeriesCharts({ riskHistory, priceHistory, articles, 
               on ? "bg-accent text-white" : "text-slate-500 hover:bg-ink-700 hover:text-slate-300"
             }`}
           >
-            {label}
+            {tt(label)}
           </button>
         );
       })}
@@ -266,13 +267,13 @@ export default function TimeSeriesCharts({ riskHistory, priceHistory, articles, 
     return (
       <div className="space-y-3">
         {selector}
-        <Empty text="Grafik için en az 2 gün veri gerekli — bir sonraki yenilemelerde dolacak." />
+        <Empty text={tt("chart.need2days")} />
       </div>
     );
   }
 
   const body = !windowedHasData ? (
-    <Empty text="Bu aralıkta veri yok, daha geniş bir aralık seçin." />
+    <Empty text={tt("chart.noDataRange")} />
   ) : isMobile ? (
     // MOBİL: önce fiyat; risk+havası "göster" ile açılır. Ticker değilse combo birincil.
     <div className="space-y-4">
@@ -283,7 +284,7 @@ export default function TimeSeriesCharts({ riskHistory, priceHistory, articles, 
           onClick={() => setShowCombo((v) => !v)}
           className="min-h-[44px] w-full rounded-lg border border-ink-500 bg-ink-800 text-sm font-medium text-slate-300 transition hover:bg-ink-700"
         >
-          {showCombo ? "Risk ve haber havasını gizle" : "Risk ve haber havasını göster"}
+          {showCombo ? tt("chart.hideRiskSent") : tt("chart.showRiskSent")}
         </button>
       )}
     </div>

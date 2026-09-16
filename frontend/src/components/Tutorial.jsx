@@ -2,31 +2,17 @@
 // Tamamlanınca/kapatılınca bir daha gösterilmez (backend User.tutorial_done).
 import React, { useState } from "react";
 import { X, Radar, TrendingUp, Sparkles, ShieldCheck } from "lucide-react";
+import { useI18n } from "../i18n.jsx";
 
 const STEPS = [
-  {
-    icon: Radar,
-    title: "NewsRadar'a hoş geldin!",
-    body: "Takip etmek istediğin şirketleri ekle; gerisini biz hallederiz. Haberleri toplar, yapay zekâ ile analiz eder ve sana özetleriz.",
-  },
-  {
-    icon: TrendingUp,
-    title: "Şirketleri nasıl eklersin?",
-    body: "Halka açık şirketler için ticker seç (Tesla → TSLA). Özel şirketler ya da konular için keyword kullan (SpaceX, OpenAI). Arama kutusu sembolü senin için bulur.",
-  },
-  {
-    icon: Sparkles,
-    title: "Yapay zekâ ne yapar?",
-    body: "Her şirket için haberleri okur ve tek bir değerlendirme üretir: haberlerin genel havası (olumlu/olumsuz), ne kadar güvenilir olduğu ve — borsadakiler için — analist hedef fiyatı.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Önemli not",
-    body: "Bu bir yatırım tavsiyesi değil, haber akışının özetidir. Hedef fiyatlar gerçek analistlerden gelir, bizim tahminimiz değildir. Kararlar sana aittir.",
-  },
+  { icon: Radar, titleKey: "tut.s1.title", bodyKey: "tut.s1.body" },
+  { icon: TrendingUp, titleKey: "tut.s2.title", bodyKey: "tut.s2.body" },
+  { icon: Sparkles, titleKey: "tut.s3.title", bodyKey: "tut.s3.body" },
+  { icon: ShieldCheck, titleKey: "tut.note.title", bodyKey: "tut.s4.disclaimer" },
 ];
 
 export default function Tutorial({ onClose }) {
+  const { t } = useI18n();
   const [step, setStep] = useState(0);
   const s = STEPS[step];
   const Icon = s.icon;
@@ -37,7 +23,7 @@ export default function Tutorial({ onClose }) {
       <div className="relative w-full max-w-md rounded-2xl border border-ink-600 bg-ink-800 p-6 shadow-card-hover">
         <button
           onClick={onClose}
-          aria-label="Kapat"
+          aria-label={t("common.close")}
           className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-ink-700 hover:text-slate-200"
         >
           <X className="h-4 w-4" />
@@ -47,8 +33,8 @@ export default function Tutorial({ onClose }) {
           <Icon className="h-6 w-6" />
         </div>
 
-        <h2 className="mb-2 font-display text-xl font-bold text-slate-100">{s.title}</h2>
-        <p className="text-[15px] leading-relaxed text-slate-300">{s.body}</p>
+        <h2 className="mb-2 font-display text-xl font-bold text-slate-100">{t(s.titleKey)}</h2>
+        <p className="text-[15px] leading-relaxed text-slate-300">{t(s.bodyKey)}</p>
 
         {/* Adım göstergesi */}
         <div className="mt-6 flex items-center justify-center gap-1.5">
@@ -67,7 +53,7 @@ export default function Tutorial({ onClose }) {
             onClick={onClose}
             className="text-sm text-slate-500 transition hover:text-slate-300"
           >
-            Geç
+            {t("tut.skip")}
           </button>
           <div className="flex items-center gap-2">
             {step > 0 && (
@@ -75,14 +61,14 @@ export default function Tutorial({ onClose }) {
                 onClick={() => setStep((v) => v - 1)}
                 className="rounded-lg px-3 py-2 text-sm text-slate-400 transition hover:bg-ink-700 hover:text-slate-200"
               >
-                Geri
+                {t("tut.back")}
               </button>
             )}
             <button
               onClick={() => (last ? onClose() : setStep((v) => v + 1))}
               className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:brightness-105"
             >
-              {last ? "Başla" : "İleri"}
+              {last ? t("tut.start") : t("tut.next")}
             </button>
           </div>
         </div>

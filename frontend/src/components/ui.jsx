@@ -1,5 +1,9 @@
 // Paylaşılan UI atomları: rozetler, göstergeler, çipler.
 import React, { useEffect, useRef, useState } from "react";
+import { getLang, tt, timeAgo as _timeAgo } from "../i18n.jsx";
+
+// timeAgo dil-farkında sürümü i18n'de; geriye uyum için buradan da dışa aç.
+export const timeAgo = _timeAgo;
 
 const REDUCED_MOTION =
   typeof window !== "undefined" &&
@@ -94,7 +98,7 @@ const STANCE = {
 const CONVICTION = { low: "düşük", medium: "orta", high: "yüksek" };
 
 export function stanceLabel(stance) {
-  return (STANCE[stance] || STANCE.neutral).label;
+  return tt(`stance.${STANCE[stance] ? stance : "neutral"}`);
 }
 
 // Yön/vade/kanıt için renk + etiket yardımcıları. Koyu zeminde parlak sinyal tonları.
@@ -103,10 +107,10 @@ export function stanceColor(stance) {
   return STANCE_COLOR[stance] || STANCE_COLOR.neutral;
 }
 export function horizonLabel(h) {
-  return { short: "Kısa", medium: "Orta", long: "Uzun" }[h] || "—";
+  return ["short", "medium", "long"].includes(h) ? tt(`horizon.${h}`) : "—";
 }
 export function evidenceLabel(e) {
-  return { strong: "Güçlü", medium: "Orta", weak: "Zayıf" }[e] || "—";
+  return ["strong", "medium", "weak"].includes(e) ? tt(`evidence.${e}`) : "—";
 }
 export function evidenceColor(e) {
   return { strong: "#0F8A4C", medium: "#B45309", weak: "#C62828" }[e] || "#7A7770";
@@ -173,22 +177,23 @@ export function InfoTip({ text, className = "" }) {
 // --- Genel sinyal: yön + kanıt gücünü 5 kademeli tek ölçeğe indirger ---
 // Sol (güçlü olumsuz, kırmızı) → sağ (güçlü olumlu, yeşil). Fiyat tahmini DEĞİL.
 const SIGNAL_LEVELS = [
-  { key: -2, label: "Güçlü olumsuz", color: "#A81E1E" },
-  { key: -1, label: "Olumsuz", color: "#C62828" },
-  { key: 0, label: "Nötr", color: "#7A7770" },
-  { key: 1, label: "Olumlu", color: "#0F8A4C" },
-  { key: 2, label: "Güçlü olumlu", color: "#0B7A42" },
+  { key: -2, tkey: "sig.strongNeg", color: "#A81E1E" },
+  { key: -1, tkey: "sig.neg", color: "#C62828" },
+  { key: 0, tkey: "sig.neutral", color: "#7A7770" },
+  { key: 1, tkey: "sig.pos", color: "#0F8A4C" },
+  { key: 2, tkey: "sig.strongPos", color: "#0B7A42" },
 ];
 
 // Beş durumun renk eşlemesi tek yerde. Beklenmedik stance/evidence (büyük-küçük harf,
-// boş) → NÖTR (gri #7A7770). ASLA koyu/siyaha düşmez.
-const NEUTRAL = SIGNAL_LEVELS.find((l) => l.key === 0); // { Nötr, #7A7770 }
+// boş) → NÖTR (gri #7A7770). ASLA koyu/siyaha düşmez. label dile göre çevrilir.
+const NEUTRAL = SIGNAL_LEVELS.find((l) => l.key === 0);
 export function overallSignal(stance, evidence) {
   const s = String(stance || "").toLowerCase();
   const base = s === "bullish" ? 1 : s === "bearish" ? -1 : 0;
   const strong = String(evidence || "").toLowerCase() === "strong";
   const level = base === 0 ? 0 : base > 0 ? (strong ? 2 : 1) : strong ? -2 : -1;
-  return SIGNAL_LEVELS.find((l) => l.key === level) || NEUTRAL;
+  const lvl = SIGNAL_LEVELS.find((l) => l.key === level) || NEUTRAL;
+  return { ...lvl, label: tt(lvl.tkey) };
 }
 
 // Durum "pill" stili: güçlü uçlar dolu+beyaz metin; ortalar soluk dolgu+renkli metin.
@@ -226,7 +231,7 @@ export function SignalBand({ stance, evidence, showLabel = true, minimal = false
         <div className={`mb-1.5 flex items-center ${minimal ? "justify-end" : "justify-between"}`}>
           {!minimal && (
             <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-              Genel sinyal
+              {tt("sig.overall")}
             </span>
           )}
           <span className="text-xs font-bold" style={{ color: sig.color }}>
@@ -298,8 +303,12 @@ export function StanceBadge({ stance, conviction }) {
   const s = STANCE[stance] || STANCE.neutral;
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-semibold ${s.cls}`}>
-      {s.label}
-      {conviction && <span className="opacity-70 font-normal">· {CONVICTION[conviction] || conviction} kanaat</span>}
+      {stanceLabel(stance)}
+      {conviction && (
+        <span className="opacity-70 font-normal">
+          · {tt(`conviction.${["low", "medium", "high"].includes(conviction) ? conviction : "medium"}`)} {tt("conviction.suffix")}
+        </span>
+      )}
     </span>
   );
 }
@@ -330,8 +339,8 @@ export function RiskScore({ score }) {
         </span>
       </div>
       <div className="text-xs text-slate-400 leading-tight">
-        <div className="text-slate-300 font-medium">Risk</div>
-        <div>{score == null ? "analiz yok" : "0–100"}</div>
+        <div className="text-slate-300 font-medium">{tt("sum.riskLabel")}</div>
+        <div>{score == null ? tt("sum.riskNone") : tt("sum.riskScale")}</div>
       </div>
     </div>
   );
@@ -347,7 +356,7 @@ export function SentimentGauge({ value }) {
       <div className="flex justify-between text-[10px] text-slate-500 mb-1">
         <span>−</span>
         <span className="text-slate-400">
-          duygu {value == null ? "–" : v.toFixed(2)}
+          {tt("gauge.sentiment")} {value == null ? "–" : v.toFixed(2)}
         </span>
         <span>+</span>
       </div>
@@ -361,33 +370,31 @@ export function SentimentGauge({ value }) {
 
 // --- Trend oku ---
 export function TrendArrow({ trend }) {
-  const map = {
-    improving: { icon: "▲", cls: "text-emerald-400", label: "iyileşiyor" },
-    stable: { icon: "▬", cls: "text-slate-400", label: "stabil" },
-    deteriorating: { icon: "▼", cls: "text-rose-400", label: "kötüleşiyor" },
-  };
-  const t = map[trend] || map.stable;
+  const icons = { improving: "▲", stable: "▬", deteriorating: "▼" };
+  const clsMap = { improving: "text-emerald-400", stable: "text-slate-400", deteriorating: "text-rose-400" };
+  const key = icons[trend] ? trend : "stable";
   return (
-    <span className={`inline-flex items-center gap-1 text-xs ${t.cls}`}>
-      <span>{t.icon}</span>
-      <span className="text-slate-400">{t.label}</span>
+    <span className={`inline-flex items-center gap-1 text-xs ${clsMap[key]}`}>
+      <span>{icons[key]}</span>
+      <span className="text-slate-400">{tt(`trend.${key}`)}</span>
     </span>
   );
 }
 
-// --- Risk bayrağı çipi ---
+// --- Risk bayrağı çipi (iki dilli) ---
 const FLAG_LABELS = {
-  regulatory: "düzenleme",
-  competition: "rekabet",
-  financial: "finansal",
-  legal: "hukuki",
-  product: "ürün",
-  supply_chain: "tedarik",
-  macro: "makro",
-  reputation: "itibar",
+  regulatory: { tr: "düzenleme", en: "regulatory" },
+  competition: { tr: "rekabet", en: "competition" },
+  financial: { tr: "finansal", en: "financial" },
+  legal: { tr: "hukuki", en: "legal" },
+  product: { tr: "ürün", en: "product" },
+  supply_chain: { tr: "tedarik", en: "supply chain" },
+  macro: { tr: "makro", en: "macro" },
+  reputation: { tr: "itibar", en: "reputation" },
 };
 export function flagLabel(f) {
-  return FLAG_LABELS[f] || f;
+  const e = FLAG_LABELS[f];
+  return e ? e[getLang()] || e.tr : f;
 }
 export function FlagChip({ flag }) {
   return (
@@ -398,19 +405,14 @@ export function FlagChip({ flag }) {
 }
 
 const EVENT_LABELS = {
-  earnings: "bilanço", product: "ürün", regulation: "düzenleme", lawsuit: "dava",
-  partnership: "ortaklık", funding: "yatırım", macro: "makro", leadership: "yönetim", other: "diğer",
+  earnings: { tr: "bilanço", en: "earnings" }, product: { tr: "ürün", en: "product" },
+  regulation: { tr: "düzenleme", en: "regulation" }, lawsuit: { tr: "dava", en: "lawsuit" },
+  partnership: { tr: "ortaklık", en: "partnership" }, funding: { tr: "yatırım", en: "funding" },
+  macro: { tr: "makro", en: "macro" }, leadership: { tr: "yönetim", en: "leadership" },
+  other: { tr: "diğer", en: "other" },
 };
 export function eventLabel(e) {
-  return EVENT_LABELS[e] || e || "–";
+  const x = EVENT_LABELS[e];
+  return x ? x[getLang()] || x.tr : e || "–";
 }
 
-export function timeAgo(iso) {
-  if (!iso) return "hiç";
-  const d = new Date(iso);
-  const diff = (Date.now() - d.getTime()) / 1000;
-  if (diff < 60) return "az önce";
-  if (diff < 3600) return `${Math.floor(diff / 60)} dk önce`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)} sa önce`;
-  return `${Math.floor(diff / 86400)} gün önce`;
-}

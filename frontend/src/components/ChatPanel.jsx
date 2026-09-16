@@ -1,8 +1,10 @@
 // Entity detayı içindeki sohbet paneli — AI ile streaming konuşma.
 import React, { useRef, useState, useEffect } from "react";
 import { streamChat } from "../api.js";
+import { useI18n } from "../i18n.jsx";
 
 export default function ChatPanel({ entityId, entityName }) {
+  const { t } = useI18n();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -54,13 +56,13 @@ export default function ChatPanel({ entityId, entityName }) {
   return (
     <div className="flex h-[520px] flex-col rounded-xl border border-ink-600 bg-ink-800">
       <div className="border-b border-ink-600 px-4 py-2 text-sm font-semibold text-slate-200">
-        💬 {entityName} — haberleri AI ile konuş
+        💬 {t("chat.title", { name: entityName })}
       </div>
 
       <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-4">
         {messages.length === 0 && (
           <p className="text-sm text-slate-500">
-            Bu varlığın haber akışını sor: “Şu an nasıl konumlanmalıyım?”, “En büyük risk ne?”
+            {t("chat.placeholderHint")}
           </p>
         )}
         {messages.map((m, i) => (
@@ -83,15 +85,15 @@ export default function ChatPanel({ entityId, entityName }) {
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Bir soru yaz…"
+          placeholder={t("chat.ask")}
           disabled={streaming}
-          className="flex-1 rounded-md border border-ink-500 bg-ink-900 px-3 py-2 text-sm outline-none focus:border-accent disabled:opacity-60"
+          className="flex-1 rounded-md border border-ink-500 bg-ink-900 px-3 py-2 text-base outline-none focus:border-accent disabled:opacity-60"
         />
         <button
           disabled={streaming || !input.trim()}
           className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
-          {streaming ? "…" : "Gönder"}
+          {streaming ? "…" : t("chat.send")}
         </button>
       </form>
     </div>

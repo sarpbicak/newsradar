@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { FlagChip, eventLabel, flagLabel } from "./ui.jsx";
+import { tt, useI18n, fmtDate, fmtDateTime } from "../i18n.jsx";
 
 const RISK_FLAGS = ["regulatory","competition","financial","legal","product","supply_chain","macro","reputation"];
 const EVENT_TYPES = ["earnings","product","regulation","lawsuit","partnership","funding","macro","leadership","other"];
@@ -13,7 +14,7 @@ function sentimentColor(v) {
 }
 function sentimentLabel(v) {
   if (v == null) return "—";
-  return v > 0.15 ? "olumlu" : v < -0.15 ? "olumsuz" : "nötr";
+  return tt(v > 0.15 ? "sent.pos" : v < -0.15 ? "sent.neg" : "sent.neu");
 }
 
 // Duygu rozeti — renkli nokta + etiket (mobil kart + tablo ortak).
@@ -39,7 +40,7 @@ function SourceCount({ n }) {
       className="inline-flex items-center rounded-full bg-ink-700 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500"
       title={`Bu haber ${n} kaynakta çıktı — önem sinyali (kopyalar tek sayıldı)`}
     >
-      {n} kaynak
+      {tt("art.sources", { n })}
     </span>
   );
 }
@@ -59,6 +60,7 @@ function Title({ a }) {
 }
 
 export default function ArticleTable({ articles }) {
+  const { t } = useI18n();
   const [flag, setFlag] = useState("");
   const [event, setEvent] = useState("");
 
@@ -76,15 +78,15 @@ export default function ArticleTable({ articles }) {
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
-        <span className="text-slate-500">Filtre:</span>
+        <span className="text-slate-500">{t("art.filter")}</span>
         <select value={flag} onChange={(e) => setFlag(e.target.value)} className={selectCls}>
-          <option value="">tüm risk bayrakları</option>
+          <option value="">{t("art.allFlags")}</option>
           {RISK_FLAGS.map((f) => (
             <option key={f} value={f}>{flagLabel(f)}</option>
           ))}
         </select>
         <select value={event} onChange={(e) => setEvent(e.target.value)} className={selectCls}>
-          <option value="">tüm olay tipleri</option>
+          <option value="">{t("art.allEvents")}</option>
           {EVENT_TYPES.map((e) => (
             <option key={e} value={e}>{eventLabel(e)}</option>
           ))}
@@ -94,15 +96,15 @@ export default function ArticleTable({ articles }) {
             onClick={() => { setFlag(""); setEvent(""); }}
             className="min-h-[40px] px-2 text-slate-500 hover:text-slate-300"
           >
-            temizle
+            {t("art.clear")}
           </button>
         )}
-        <span className="ml-auto text-slate-500">{rows.length} haber</span>
+        <span className="ml-auto text-slate-500">{t("art.count", { n: rows.length })}</span>
       </div>
 
       {rows.length === 0 && (
         <div className="rounded-xl border border-ink-600 bg-ink-800 px-4 py-6 text-center text-sm text-slate-500">
-          Bu filtreyle haber yok.
+          {t("art.none")}
         </div>
       )}
 
@@ -112,12 +114,12 @@ export default function ArticleTable({ articles }) {
           <div key={a.id} className="rounded-xl border border-ink-600 bg-ink-800 p-4 shadow-card">
             <Title a={a} />
             <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
-              <span>{a.source || "kaynak yok"}</span>
+              <span>{a.source || t("art.noSource")}</span>
               <SourceCount n={a.source_count} />
               {a.published_at && (
                 <>
                   <span className="text-slate-600">·</span>
-                  <span>{new Date(a.published_at).toLocaleDateString("tr-TR")}</span>
+                  <span>{fmtDate(a.published_at)}</span>
                 </>
               )}
               <span className="text-slate-600">·</span>
@@ -141,12 +143,12 @@ export default function ArticleTable({ articles }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-ink-600 bg-ink-700/50 text-left text-[11px] uppercase tracking-wide text-slate-500">
-              <th className="px-4 py-3 font-medium">Başlık</th>
-              <th className="px-4 py-3 font-medium">Kaynak</th>
-              <th className="px-4 py-3 font-medium">Duygu</th>
-              <th className="px-4 py-3 font-medium">Olay</th>
-              <th className="px-4 py-3 font-medium">Riskler</th>
-              <th className="px-4 py-3 font-medium">Gerekçe</th>
+              <th className="px-4 py-3 font-medium">{t("art.title")}</th>
+              <th className="px-4 py-3 font-medium">{t("art.source")}</th>
+              <th className="px-4 py-3 font-medium">{t("art.sentiment")}</th>
+              <th className="px-4 py-3 font-medium">{t("art.event")}</th>
+              <th className="px-4 py-3 font-medium">{t("art.risks")}</th>
+              <th className="px-4 py-3 font-medium">{t("art.rationale")}</th>
             </tr>
           </thead>
           <tbody>
@@ -156,7 +158,7 @@ export default function ArticleTable({ articles }) {
                   <Title a={a} />
                   {a.published_at && (
                     <div className="mt-0.5 text-[10px] text-slate-500">
-                      {new Date(a.published_at).toLocaleString("tr-TR")}
+                      {fmtDateTime(a.published_at)}
                     </div>
                   )}
                 </td>

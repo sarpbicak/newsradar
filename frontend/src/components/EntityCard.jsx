@@ -7,6 +7,7 @@
 import React from "react";
 import { ArrowRight, Lock } from "lucide-react";
 import { SignalPill, overallSignal, AnimatedNumber, horizonLabel } from "./ui.jsx";
+import { tt } from "../i18n.jsx";
 
 // Kompakt analist barı — al/tut/sat segmentleri + baskın görüş + analist sayısı.
 const ANALYST_SEG = [
@@ -19,9 +20,9 @@ const ANALYST_SEG = [
 function analystLean(a) {
   const buyish = a.strong_buy + a.buy;
   const sellish = a.sell + a.strong_sell;
-  if (buyish > a.hold && buyish >= sellish) return { text: "Al ağırlıklı", color: "#0F8A4C" };
-  if (sellish > a.hold && sellish > buyish) return { text: "Sat ağırlıklı", color: "#C62828" };
-  return { text: "Tut ağırlıklı", color: "#7A7770" };
+  if (buyish > a.hold && buyish >= sellish) return { text: tt("card.buyLean"), color: "#0F8A4C" };
+  if (sellish > a.hold && sellish > buyish) return { text: tt("card.sellLean"), color: "#C62828" };
+  return { text: tt("card.holdLean"), color: "#7A7770" };
 }
 function AnalystMiniBar({ a }) {
   const total = a.total || 1;
@@ -36,7 +37,7 @@ function AnalystMiniBar({ a }) {
           return <div key={s.key} style={{ width: `${(n / total) * 100}%`, background: s.color }} />;
         })}
       </div>
-      <span className="whitespace-nowrap text-slate-500">{a.total} analist</span>
+      <span className="whitespace-nowrap text-slate-500">{tt("card.analysts", { n: a.total })}</span>
     </div>
   );
 }
@@ -48,11 +49,10 @@ function PrivateCompanyBox() {
     <div className={PRIVATE_SHELL}>
       <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-300">
         <Lock className="h-3.5 w-3.5 text-slate-500" />
-        Özel şirket — borsada işlem görmüyor
+        {tt("card.private")}
       </div>
       <div className="mt-1 text-[11px] leading-snug text-slate-500">
-        Halka açık olmadığı için fiyat ve analist hedefi yok. Değerlendirme
-        yalnızca haber akışına dayanıyor.
+        {tt("card.privateBody")}
       </div>
     </div>
   );
@@ -62,7 +62,7 @@ function PrivateCompanyBox() {
 function TopDriverLine({ text }) {
   return (
     <div className="flex items-baseline gap-1.5 text-[11px]">
-      <span className="shrink-0 font-medium text-slate-500">Öne çıkan:</span>
+      <span className="shrink-0 font-medium text-slate-500">{tt("card.topDriver")}</span>
       <span className="min-w-0 flex-1 truncate text-slate-400">{text}</span>
     </div>
   );
@@ -74,7 +74,7 @@ function CompactPriceLine({ card }) {
   const chg = card.change_percent;
   const target = card.analyst?.target_mean;
   if (price == null) {
-    return <div className="text-[13px] text-slate-500">Fiyat verisi yok · sadece haber analizi</div>;
+    return <div className="text-[13px] text-slate-500">{tt("card.noPrice")} · {tt("card.newsOnly")}</div>;
   }
   return (
     <div className="flex flex-wrap items-baseline gap-x-1.5 font-mono text-[13px] tabular-nums text-slate-300">
@@ -86,7 +86,7 @@ function CompactPriceLine({ card }) {
       )}
       {target != null && (
         <span className="text-slate-500">
-          → hedef <span className="font-semibold text-slate-300">${target.toFixed(0)}</span>
+          → {tt("detail.target")} <span className="font-semibold text-slate-300">${target.toFixed(0)}</span>
         </span>
       )}
     </div>
@@ -97,9 +97,9 @@ function CompactPriceLine({ card }) {
 function CompactPrivateLine({ drivers }) {
   return (
     <div className="text-[13px] text-slate-500">
-      Özel şirket — sadece haber analizi
+      {tt("card.privateShort")}
       {drivers?.[0] && (
-        <span className="mt-0.5 block truncate text-slate-400">Öne çıkan: {drivers[0]}</span>
+        <span className="mt-0.5 block truncate text-slate-400">{tt("card.topDriver")} {drivers[0]}</span>
       )}
     </div>
   );
@@ -117,8 +117,8 @@ function PriceBox({ card }) {
   if (price == null) {
     return (
       <div className={`${shell} text-center`}>
-        <div className="text-sm text-slate-400">Fiyat verisi yok</div>
-        <div className="mt-0.5 text-[10px] text-slate-500">sadece haber analizi</div>
+        <div className="text-sm text-slate-400">{tt("card.noPrice")}</div>
+        <div className="mt-0.5 text-[10px] text-slate-500">{tt("card.newsOnly")}</div>
       </div>
     );
   }
@@ -130,7 +130,7 @@ function PriceBox({ card }) {
           <div className="font-mono text-base font-semibold tabular-nums text-slate-100">
             <AnimatedNumber value={price} decimals={2} prefix="$" />
           </div>
-          <div className="text-[10px] text-slate-500">şimdi</div>
+          <div className="text-[10px] text-slate-500">{tt("card.now")}</div>
         </div>
         <ArrowRight className="h-4 w-4 shrink-0 text-slate-500" />
         <div className="min-w-0 flex-1 text-center">
@@ -149,7 +149,7 @@ function PriceBox({ card }) {
             )}
           </div>
           <div className="text-[10px] text-slate-500">
-            {target != null ? "analist hedefi" : "hedef yok"}
+            {target != null ? tt("card.analystTarget") : tt("card.noTarget")}
           </div>
         </div>
       </div>
@@ -193,7 +193,7 @@ export default function EntityCard({ card, onOpen, big = false }) {
             <SignalPill stance={a.stance} evidence={card.evidence_strength} />
           ) : (
             <span className="inline-flex items-center rounded-full bg-ink-700 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">
-              analiz yok
+              {tt("card.noAnalysis")}
             </span>
           )}
           {/* Katman 1 nedeni — neden "bugün önemli" (mobilde gizli: sadeleştirme) */}
@@ -244,17 +244,17 @@ export default function EntityCard({ card, onOpen, big = false }) {
                 </>
               )}
               <div className="text-xs text-slate-500">
-                {horizonLabel(card.horizon)} vade
+                {tt("card.horizon", { h: horizonLabel(card.horizon) })}
                 <span className="text-slate-600"> · </span>
-                {card.evidence_count} haber
-                {changed && <span className="text-amber-400"> · yön değişti</span>}
+                {tt("card.newsCount", { n: card.evidence_count })}
+                {changed && <span className="text-amber-400"> · {tt("card.stanceChanged")}</span>}
               </div>
             </div>
           </div>
         </>
       ) : (
         <div className="mt-auto text-sm text-slate-400">
-          Henüz analiz yok — <strong className="text-slate-200">Yenile</strong>'ye basın.
+          {tt("card.pressRefresh", { refresh: tt("header.refresh") })}
         </div>
       )}
     </div>
@@ -279,9 +279,9 @@ export function EntityRow({ card, onOpen }) {
         {card.type === "ticker" ? "$" : "#"}{card.query}
       </span>
       <span className="min-w-0 flex-1 truncate text-[13px] text-slate-400">
-        {a ? a.headline_verdict || a.summary : "Henüz analiz yok"}
+        {a ? a.headline_verdict || a.summary : tt("card.noAnalysisYet")}
       </span>
-      {changed && <span className="hidden shrink-0 text-[11px] font-medium text-amber-400 md:inline">yön değişti</span>}
+      {changed && <span className="hidden shrink-0 text-[11px] font-medium text-amber-400 md:inline">{tt("card.stanceChanged")}</span>}
       {a && (
         <span
           className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums"

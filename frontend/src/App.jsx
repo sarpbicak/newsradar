@@ -9,13 +9,25 @@ import PrivacyModal from "./components/PrivacyModal.jsx";
 import AdminPanel from "./components/AdminPanel.jsx";
 import Tutorial from "./components/Tutorial.jsx";
 import FeedbackWidget from "./components/FeedbackWidget.jsx";
+import { LanguageModal, LanguageSwitcher } from "./components/LanguageBits.jsx";
 import { Skeleton, useIsMobile } from "./components/ui.jsx";
+import { useI18n } from "./i18n.jsx";
 import { RefreshCw, Menu, X, LogOut, ShieldCheck, LayoutDashboard, Radar, HelpCircle, UserPlus, ArrowDown } from "lucide-react";
 
 // Mobil aşağı-çekip-yenile eşiği (px). Bu mesafeyi geçince bırakınca yenilenir.
 const PULL_THRESHOLD = 70;
 
-export default function App() {
+export default function App({ setLang }) {
+  const { t, lang } = useI18n();
+  // İlk ziyarette dil sorulur (localStorage'da seçim yoksa).
+  const [showLangModal, setShowLangModal] = useState(() => !localStorage.getItem("nr_lang"));
+
+  // Dili uygula: provider + localStorage + backend (kalıcı, her girişte hatırlanır).
+  const applyLang = useCallback((l) => {
+    setLang(l);
+    localStorage.setItem("nr_lang", l);
+    api.setLanguage(l).catch(() => {});
+  }, [setLang]);
   const [user, setUser] = useState(null);            // kişisel kullanıcı (anon ya da kayıtlı)
   const [checkingSession, setCheckingSession] = useState(true);
   const [account, setAccount] = useState(null);      // "upgrade" | "login" | null (modal)
@@ -101,6 +113,9 @@ export default function App() {
       }
       if (alive) {
         setUser(u);
+        // Kullanıcı bir seçim yapmadıysa (localStorage boş), backend'in dilini benimse
+        // (anon: tarayıcı dili; kayıtlı: kayıtlı dil). Modal yine de bir kez onay ister.
+        if (u && !localStorage.getItem("nr_lang") && u.language) setLang(u.language);
         setCheckingSession(false);
       }
     })();
@@ -159,14 +174,14 @@ export default function App() {
           setStarting(false);
           const sm = s.last_summary;
           if (sm) {
-            const parts = [`${sm.fetched_new} yeni haber`, `${sm.analyzed} analiz`];
-            if (sm.prefiltered) parts.push(`${sm.prefiltered} ön-filtre`);
-            if (sm.discarded) parts.push(`${sm.discarded} elenen`);
+            const parts = [t("notice.newNews", { n: sm.fetched_new }), t("notice.analyzed", { n: sm.analyzed })];
+            if (sm.prefiltered) parts.push(t("notice.prefiltered", { n: sm.prefiltered }));
+            if (sm.discarded) parts.push(t("notice.discarded", { n: sm.discarded }));
             const warns = sm.warnings || [];
             setNotice({
               type: warns.length ? "warn" : "ok",
-              text: `Yenilendi: ${parts.join(" · ")}.` +
-                (warns.length ? ` ${warns.length} uyarı.` : ""),
+              text: t("notice.refreshed", { parts: parts.join(" · ") }) +
+                (warns.length ? t("notice.warnings", { n: warns.length }) : ""),
               details: warns,              // yalnızca GERÇEK uyarılar (amber kutu)
               infos: sm.infos || [],       // normal atlamalar (soluk, küçük not)
             });
@@ -216,7 +231,7 @@ export default function App() {
   if (!authed)
     return (
       <div className="flex min-h-screen items-center justify-center p-6 text-center text-sm text-slate-400">
-        {loadError || "Oturum başlatılamadı. Sayfayı yenileyin."}
+        {loadError || t("notice.sessionFailShort")}
       </div>
     );
 
@@ -233,7 +248,7 @@ export default function App() {
       const isQuota = /limit/i.test(e.message);
       setNotice({
         type: "warn",
-        text: isQuota ? e.message : `Yenileme başlatılamadı: ${e.message}`,
+        text: isQuota ? e.message : t("notice.refreshFail", { msg: e.message }),
         details: [],
       });
     }
@@ -269,7 +284,7 @@ export default function App() {
     if (refreshExhausted) {
       setNotice({
         type: "warn",
-        text: `Günlük yenileme hakkın doldu ${refreshQuotaLabel}. Yarın tekrar deneyebilirsin.`,
+        text: t("notice.refreshQuotaFull", { label: refreshQuotaLabel }),
         details: [],
       });
       return;
@@ -292,7 +307,7 @@ export default function App() {
     await loadCards(); // entity listesi + öneriler otomatik güncellensin
     setNotice({
       type: "ok",
-      text: `${entity.name} izleme listesine eklendi — bir sonraki yenilemede analiz edilecek.`,
+      text: t("notice.entityAdded", { name: entity.name }),
       details: [],
     });
   }
@@ -328,7 +343,7 @@ export default function App() {
         >
           <div className="flex items-center gap-2 rounded-full border border-ink-500 bg-ink-800 px-3 py-1.5 text-xs text-slate-400 shadow-card">
             <ArrowDown className={`h-4 w-4 transition-transform ${pull >= PULL_THRESHOLD ? "rotate-180 text-accent" : ""}`} />
-            {pull >= PULL_THRESHOLD ? "Bırak → yenile" : "Yenilemek için çek"}
+            {pull >= PULL_THRESHOLD ? t("pull.release") : t("pull.pull")}
           </div>
         </div>
       )}
@@ -346,10 +361,13 @@ export default function App() {
               NewsRadar
             </button>
             <span className="hidden font-mono text-[11px] uppercase tracking-wide text-slate-500 md:inline">
-              haber akışı · risk paneli
+              {t("app.subtitle")}
             </span>
           </div>
           <div className="flex items-center gap-2">
+            {/* Dil değiştirici (masaüstü + mobilde görünür, küçük) */}
+            <LanguageSwitcher lang={lang} onChange={applyLang} />
+
             {/* Yenile — her zaman görünür (mobilde ikon, masaüstünde metin) */}
             <button
               onClick={handleRefresh}
@@ -360,23 +378,23 @@ export default function App() {
               <span className="hidden md:inline">
                 {isRefreshing
                   ? running
-                    ? `Yenileniyor… (${status.progress_done}/${status.progress_total})`
-                    : "Başlatılıyor…"
+                    ? t("header.refreshing", { done: status.progress_done, total: status.progress_total })
+                    : t("header.starting")
                   : refreshQuotaLabel
-                  ? `Yenile ${refreshQuotaLabel}`
-                  : "Yenile"}
+                  ? `${t("header.refresh")} ${refreshQuotaLabel}`
+                  : t("header.refresh")}
               </span>
             </button>
 
             {/* Nasıl çalışır — masaüstünde görünür; mobilde "…" menüsüne toplanır */}
             <button
               onClick={() => setShowTutorial(true)}
-              title="Nasıl çalışır?"
-              aria-label="Nasıl çalışır?"
+              title={t("header.howItWorks")}
+              aria-label={t("header.howItWorks")}
               className="hidden min-h-[44px] items-center gap-1.5 rounded-lg px-2.5 text-sm text-slate-500 transition hover:bg-ink-700 hover:text-slate-200 md:inline-flex"
             >
               <HelpCircle className="h-5 w-5" />
-              <span className="hidden md:inline">Nasıl çalışır?</span>
+              <span className="hidden md:inline">{t("header.howItWorks")}</span>
             </button>
 
             {/* MASAÜSTÜ: admin + kullanıcı + çıkış inline (NewsAPI kotası header'da
@@ -392,7 +410,7 @@ export default function App() {
                   }`}
                 >
                   {view === "admin" ? <LayoutDashboard className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
-                  {view === "admin" ? "Pano" : "Admin"}
+                  {view === "admin" ? t("header.dashboard") : t("header.admin")}
                 </button>
               )}
               {user?.is_anonymous ? (
@@ -401,13 +419,13 @@ export default function App() {
                     onClick={() => setAccount("upgrade")}
                     className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg bg-accent px-3 text-sm font-medium text-white transition hover:brightness-105"
                   >
-                    <UserPlus className="h-4 w-4" /> Hesap oluştur
+                    <UserPlus className="h-4 w-4" /> {t("header.createAccount")}
                   </button>
                   <button
                     onClick={() => setAccount("login")}
                     className="inline-flex min-h-[40px] items-center rounded-lg border border-ink-500 px-3 text-sm text-slate-300 transition hover:bg-ink-700"
                   >
-                    Giriş yap
+                    {t("header.login")}
                   </button>
                 </>
               ) : (
@@ -420,7 +438,7 @@ export default function App() {
                   </span>
                   <button
                     onClick={handleLogout}
-                    title="Çıkış (misafire dön)"
+                    title={t("header.logout")}
                     className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border border-ink-500 text-slate-400 transition hover:bg-ink-700 hover:text-slate-200"
                   >
                     <LogOut className="h-4 w-4" />
@@ -433,7 +451,7 @@ export default function App() {
             <div className="relative md:hidden">
               <button
                 onClick={() => setMenuOpen((o) => !o)}
-                aria-label="menü"
+                aria-label={t("header.menu")}
                 className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-ink-500 text-slate-500 transition hover:bg-ink-700 hover:text-slate-200"
               >
                 {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -444,7 +462,7 @@ export default function App() {
                   <div className="absolute right-0 top-full z-20 mt-2 w-60 rounded-xl border border-ink-500 bg-ink-800 p-2 shadow-card-hover">
                     <div className="flex items-center justify-between gap-2 border-b border-ink-600 px-3 py-2">
                       <span className="font-medium text-slate-200">
-                        {user?.is_anonymous ? "Misafir" : user?.username}
+                        {user?.is_anonymous ? t("header.guest") : user?.username}
                       </span>
                       {user?.is_admin && (
                         <span className="rounded bg-ink-700 px-1.5 text-[10px] font-semibold text-slate-500">admin</span>
@@ -455,7 +473,7 @@ export default function App() {
                       onClick={() => { setShowTutorial(true); setMenuOpen(false); }}
                       className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-slate-300 hover:bg-ink-700"
                     >
-                      <HelpCircle className="h-4 w-4" /> Nasıl çalışır?
+                      <HelpCircle className="h-4 w-4" /> {t("header.howItWorks")}
                     </button>
                     {user?.is_anonymous && (
                       <>
@@ -463,13 +481,13 @@ export default function App() {
                           onClick={() => { setAccount("upgrade"); setMenuOpen(false); }}
                           className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-slate-300 hover:bg-ink-700"
                         >
-                          <UserPlus className="h-4 w-4" /> Hesap oluştur
+                          <UserPlus className="h-4 w-4" /> {t("header.createAccount")}
                         </button>
                         <button
                           onClick={() => { setAccount("login"); setMenuOpen(false); }}
                           className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-slate-300 hover:bg-ink-700"
                         >
-                          Giriş yap
+                          {t("header.login")}
                         </button>
                       </>
                     )}
@@ -482,7 +500,7 @@ export default function App() {
                         className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-slate-300 hover:bg-ink-700"
                       >
                         {view === "admin" ? <LayoutDashboard className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
-                        {view === "admin" ? "Panoya dön" : "Admin paneli"}
+                        {view === "admin" ? t("header.dashboard") : t("header.admin")}
                       </button>
                     )}
                     {!user?.is_anonymous && (
@@ -493,7 +511,7 @@ export default function App() {
                         }}
                         className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-slate-300 hover:bg-ink-700"
                       >
-                        <LogOut className="h-4 w-4" /> Çıkış (misafire dön)
+                        <LogOut className="h-4 w-4" /> {t("header.logout")}
                       </button>
                     )}
                   </div>
@@ -511,7 +529,7 @@ export default function App() {
         <>
         {loadError && (
           <div className="mb-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
-            API'ye bağlanılamadı: {loadError}. Backend çalışıyor mu? (uvicorn app.api.main:app)
+            {t("notice.apiFail", { msg: loadError })}
           </div>
         )}
 
@@ -519,21 +537,16 @@ export default function App() {
           <div className="mb-4 flex items-center gap-3 rounded-lg border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-slate-200">
             <span className="inline-block h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-accent/40 border-t-accent" />
             {running ? (
-              <span>
-                Tarama sürüyor… <strong>{status.progress_done}/{status.progress_total}</strong> şirket işlendi.
-                İlk yenileme birikmiş haberler nedeniyle uzun sürebilir; bittiğinde pano
-                otomatik güncellenecek — sayfayı kapatabilirsiniz.
-              </span>
+              <span>{t("notice.scanRunning", { done: status.progress_done, total: status.progress_total })}</span>
             ) : (
-              <span>Yenileme başlatılıyor…</span>
+              <span>{t("notice.scanStarting")}</span>
             )}
           </div>
         )}
 
         {status?.budget_exceeded && (
           <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-            Günlük analiz kapasitesi doldu — yeni analiz bugünlük durduruldu, yarın tekrar
-            deneyin. Mevcut değerlendirmeler görüntülenmeye devam eder.
+            {t("notice.budgetExceeded")}
           </div>
         )}
 
@@ -636,16 +649,20 @@ export default function App() {
       {showPrivacy && <PrivacyModal onClose={() => setShowPrivacy(false)} />}
 
       <footer className="mx-auto max-w-7xl px-6 pb-10 pt-6 text-center text-xs leading-relaxed text-slate-500">
-        Haber akışı bazlı sinyal — değerleme veya fiyat tahmini değil. Analist hedefleri
-        Finnhub konsensüs verisidir. Kararlar size aittir.
+        {t("footer.disclaimer")}
         <button onClick={() => setShowPrivacy(true)} className="ml-1 underline hover:text-slate-300">
-          Gizlilik
+          {t("footer.privacy")}
         </button>
       </footer>
 
       {/* Sağ altta sabit geri bildirim butonu (kurucu imzası panel içinde).
           Mobilde detay sayfasının alt sekme çubuğuyla çakışmasın diye yükseltilir. */}
       <FeedbackWidget raised={isMobile && view === "dashboard" && selected != null} />
+
+      {/* İlk giriş dil seçimi (localStorage'da seçim yoksa) */}
+      {showLangModal && (
+        <LanguageModal onSelect={(l) => { applyLang(l); setShowLangModal(false); }} />
+      )}
     </div>
   );
 }

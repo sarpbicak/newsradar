@@ -2,6 +2,7 @@
 import React, { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { useIsMobile } from "./ui.jsx";
+import { tt } from "../i18n.jsx";
 import EntityCard, { EntityRow } from "./EntityCard.jsx";
 import WatchlistManager from "./WatchlistManager.jsx";
 import SuggestionsSection from "./SuggestionsSection.jsx";
@@ -34,11 +35,10 @@ function EmptyState({ onCreate }) {
   return (
     <div className="rounded-2xl border border-ink-600 bg-ink-800 p-8 text-center">
       <h2 className="font-display text-xl font-bold text-slate-100">
-        Henüz takip ettiğin şirket yok
+        {tt("ov.emptyTitle")}
       </h2>
       <p className="mx-auto mt-2 max-w-md text-[15px] leading-relaxed text-slate-400">
-        İzleme listene şirket ekleyerek başla. Aşağıdakilerden biriyle hemen
-        deneyebilir ya da aşağıdaki formdan istediğini ekleyebilirsin.
+        {tt("ov.emptyBody")}
       </p>
       <div className="mt-5 flex flex-wrap justify-center gap-2">
         {STARTERS.map((s) => (
@@ -58,7 +58,7 @@ function EmptyState({ onCreate }) {
       </div>
       {err && <p className="mt-3 text-xs text-rose-400">{err}</p>}
       <p className="mt-4 text-xs text-slate-500">
-        Eklediğin şirketler bir sonraki yenilemede analiz edilir.
+        {tt("ov.emptyNote")}
       </p>
     </div>
   );
@@ -67,10 +67,10 @@ function EmptyState({ onCreate }) {
 // Katman 2 sıralaması (Katman 1 zaten backend'de öncelik skoruyla seçilir).
 const SORTS = {
   risk: {
-    label: "Risk",
+    tkey: "ov.sortRisk",
     fn: (a, b) => (b.analysis?.risk_score ?? -1) - (a.analysis?.risk_score ?? -1),
   },
-  alpha: { label: "Alfabetik", fn: (a, b) => a.name.localeCompare(b.name, "tr") },
+  alpha: { tkey: "ov.sortAlpha", fn: (a, b) => a.name.localeCompare(b.name, "tr") },
 };
 
 export default function Overview({
@@ -130,7 +130,7 @@ export default function Overview({
         /* ── AZ ŞİRKET — büyük kart(lar), nötr başlık ─────────────── */
         <section className="space-y-3">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-            Takip ettiklerin
+            {tt("ov.following")}
           </h2>
           {bigGrid}
           {/* MOBİL: 2'den fazla varsa kalanı sıkışık liste olarak göster */}
@@ -147,13 +147,13 @@ export default function Overview({
           {/* ── KATMAN 1 — "Bugün önemli" ─────────────────────────────── */}
           <section className="space-y-3">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Bugün önemli
+              {tt("ov.todayImportant")}
             </h2>
             {tier1.length > 0 ? (
               bigGrid
             ) : (
               <div className="rounded-xl border border-dashed border-ink-600 bg-ink-800/50 px-4 py-6 text-center text-sm text-slate-400">
-                Bugün önemli bir değişiklik yok — tüm varlıklar aşağıdaki listede.
+                {tt("ov.noChangeToday")}
               </div>
             )}
           </section>
@@ -163,11 +163,11 @@ export default function Overview({
             <section className="space-y-2.5">
               <div className="flex items-center justify-between">
                 <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Liste ({listRows.length})
+                  {tt("ov.list", { n: listRows.length })}
                 </h2>
                 <div className="flex items-center gap-1 text-[11px]">
-                  <span className="mr-1 text-slate-500">Sırala:</span>
-                  {Object.entries(SORTS).map(([key, { label }]) => (
+                  <span className="mr-1 text-slate-500">{tt("ov.sort")}</span>
+                  {Object.entries(SORTS).map(([key, { tkey }]) => (
                     <button
                       key={key}
                       onClick={() => setSort(key)}
@@ -177,7 +177,7 @@ export default function Overview({
                           : "text-slate-500 hover:text-slate-300"
                       }`}
                     >
-                      {label}
+                      {tt(tkey)}
                     </button>
                   ))}
                 </div>
@@ -194,7 +194,7 @@ export default function Overview({
 
       {/* Öneriler — katlanabilir, varsayılan kapalı */}
       {suggestions.length > 0 && (
-        <Collapsible title={`Öneriler (${suggestions.length})`}>
+        <Collapsible title={tt("ov.suggestions", { n: suggestions.length })}>
           <SuggestionsSection
             suggestions={suggestions}
             onAdd={onAddSuggestion}
@@ -205,7 +205,7 @@ export default function Overview({
       )}
 
       {/* İzleme listesi — katlanabilir, varsayılan kapalı */}
-      <Collapsible title={`İzleme listesi (${cards.length})`}>
+      <Collapsible title={tt("ov.watchlist", { n: cards.length })}>
         <WatchlistManager cards={cards} onCreate={onCreate} onDelete={onDelete} embedded />
       </Collapsible>
     </div>
