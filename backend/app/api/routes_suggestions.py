@@ -204,7 +204,7 @@ def add_suggestion(
                 add_to_watchlist(db, user.id, existing.id)
             record_event(db, user.id, "add_suggestion", {"entity_id": existing.id, "name": existing.name})
             db.commit()
-            return entity_card(db, existing)
+            return entity_card(db, existing, user.language)
 
         entity = Entity(name=sug.name.strip(), type=etype, query=query, language=language)
         db.add(entity)
@@ -222,9 +222,9 @@ def add_suggestion(
                 add_to_watchlist(db, user.id, existing.id)
             record_event(db, user.id, "add_suggestion", {"entity_id": existing.id, "name": existing.name})
             db.commit()
-            return entity_card(db, existing)
+            return entity_card(db, existing, user.language)
 
         add_to_watchlist(db, user.id, entity.id)
         record_event(db, user.id, "add_suggestion", {"entity_id": entity.id, "name": entity.name})
         db.commit()
-        return entity_card(db, entity)
+        return entity_card(db, entity, user.language)

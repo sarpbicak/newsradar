@@ -75,13 +75,11 @@ haber akışına dayalı bir hisse/varlık risk analistisin.
    (ISO ülke kodu: US, TR, DE...) ve `exchange` (ana borsa: NASDAQ, NYSE, BIST...) doldur; \
    emin değilsen null. Bu bilgi şirketin ticker mı yoksa keyword olarak mı izleneceğini \
    belirler (ABD borsası dışındakiler keyword olur). Ayrıca her şirket için `why_relevant`: \
-   O ŞİRKETİN (analiz edilen varlığın değil) neden gündemde olduğunu tek cümle TÜRKÇE yaz \
+   O ŞİRKETİN (analiz edilen varlığın değil) neden gündemde olduğunu tek cümle yaz \
    (ör. "AMD, MI400 ile NVIDIA'nın veri merkezi payını hedefliyor"). Emin değilsen null.
 
-DİL (KATI): TÜM metin alanları (rationale, summary, ai_take, headline_verdict, top_drivers, \
-what_to_verify, invalidation, why_relevant) AKICI ve DOĞAL TÜRKÇE olacak. İngilizce kelime \
-KARIŞTIRMA — yalnızca özel adlar (şirket/ürün/kişi: NVIDIA, Helios, Lisa Su) İngilizce kalır. \
-İngilizce bağlaç/kalıp (however, thus, overall, meanwhile) ya da yarım İngilizce cümle YASAK. \
+DİL: Metin alanlarının ÇIKTI DİLİ her istekte AYRICA belirtilir; o dile KESİNLİKLE uy \
+(akıcı/doğal, karışık dil yok; yalnızca özel adlar — şirket/ürün/kişi — olduğu gibi kalır). \
 Kategorik alanlar (event_type, impact_horizon, stance, conviction, sentiment_trend, risk_flags) \
 YALNIZCA verilen enum değerlerinden seçilecek — yeni kategori UYDURMA.
 """
@@ -107,11 +105,30 @@ _LANG_LABELS = {"en": "İngilizce", "tr": "Türkçe", "de": "Almanca", "fr": "Fr
 
 
 def language_line(language: str) -> str:
-    """Prompt'a eklenecek kaynak-dil bağlam satırı (çıktı yine TÜRKÇE olacak)."""
+    """Prompt'a eklenecek KAYNAK-dil bağlam satırı (çıktı dili ayrıca belirtilir)."""
     label = _LANG_LABELS.get((language or "en").lower(), language)
     return (
-        f"Kaynak haber dili: {label}. Haberler bu dilde olabilir; içeriği bu dilde "
-        "anla ama analiz ÇIKTINI yine TÜRKÇE üret."
+        f"Kaynak haber dili: {label}. Haberler bu dilde olabilir; içeriği bu dilde anla."
+    )
+
+
+# Çıktı dili direktifi (KATI). Entity değerlendirmesi hem tr hem en üretilir; makale
+# analizi + sohbet çağıranın diline göre. Özel adlar (şirket/ürün/kişi) olduğu gibi kalır.
+def output_language_directive(out_lang: str) -> str:
+    if (out_lang or "tr").lower() == "en":
+        return (
+            "ÇIKTI DİLİ (KATI): TÜM metin alanları (rationale, summary, ai_take, "
+            "headline_verdict, top_drivers, what_to_verify, invalidation, why_relevant) "
+            "AKICI ve DOĞAL İNGİLİZCE olacak. Türkçe kelime/bağlaç KARIŞTIRMA; yalnızca "
+            "özel adlar (şirket/ürün/kişi) olduğu gibi kalır. Yarım/karışık dil YASAK. "
+            "Kategorik alanlar (event_type, stance, …) enum değerleri olarak İngilizce kalır."
+        )
+    return (
+        "ÇIKTI DİLİ (KATI): TÜM metin alanları (rationale, summary, ai_take, "
+        "headline_verdict, top_drivers, what_to_verify, invalidation, why_relevant) "
+        "AKICI ve DOĞAL TÜRKÇE olacak. İngilizce kelime/bağlaç (however, thus, overall, "
+        "meanwhile) KARIŞTIRMA; yalnızca özel adlar (NVIDIA, Helios, Lisa Su) İngilizce "
+        "kalır. Yarım İngilizce cümle YASAK."
     )
 
 
@@ -133,6 +150,9 @@ def build_article_batch_prompt(
         f"Varlık: {entity_name} (arama: {entity_query}).",
         entity_type_line(entity_type),
         language_line(language),
+        # Makale-başı analiz TEK sefer üretilir → çıktı (rationale/why_relevant) TÜRKÇE.
+        # (Entity değerlendirmesi ayrıca tr+en üretilir; makale metni ona bağlam.)
+        output_language_directive("tr"),
         utc_context_line(),
         "",
         "Aşağıdaki haberleri BU varlık açısından analiz et. Her makale için "
@@ -218,12 +238,17 @@ def build_entity_prompt(
     price: dict | None = None,
     language: str = "en",
     analyst: dict | None = None,
+    out_lang: str = "tr",
 ) -> str:
-    """Entity-başı toplu değerlendirme için kullanıcı mesajı."""
+    """Entity-başı toplu değerlendirme için kullanıcı mesajı.
+
+    language = KAYNAK haber dili (anlama bağlamı); out_lang = ÇIKTI dili (tr/en).
+    Değerlendirme her iki dilde ayrı çağrılarla üretilir (bkz. pipeline)."""
     lines = [
         f"Varlık: {entity_name} (arama: {entity_query}).",
         entity_type_line(entity_type),
         language_line(language),
+        output_language_directive(out_lang),
         utc_context_line(),
         *_price_lines(price),
         *_analyst_lines(analyst),

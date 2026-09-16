@@ -249,6 +249,8 @@ class EntityCardOut(BaseModel):
     top_flags: list[str]
     last_updated: datetime | None
     analysis: AnalysisOut | None
+    analysis_language: str | None = None   # gösterilen değerlendirmenin dili (tr/en); UI diliyle
+                                           # farklıysa frontend "başka dilde üretildi" notu koyar
     # Kart hiyerarşisi için türetilmiş "3 saniyelik" alanlar (analiz varsa dolu).
     horizon: str | None = None            # çoğunluk vade: short | medium | long
     evidence_strength: str | None = None  # strong | medium | weak

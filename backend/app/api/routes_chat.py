@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from ..analysis.claude_client import ClaudeError, MissingAPIKeyError
 from ..analysis.llm import get_llm_provider
-from ..analysis.prompts import SYSTEM_PROMPT, utc_context_line
+from ..analysis.prompts import SYSTEM_PROMPT, output_language_directive, utc_context_line
 from ..db.database import get_db
 from ..db.models import Article, Entity, EntityAnalysis, User
 from ..watchlist import in_watchlist
@@ -98,7 +98,11 @@ def chat(
         raise HTTPException(status_code=400, detail="İlk mesaj 'user' olmalı ve boş olamaz.")
 
     context = _build_context(db, entity)
-    system = f"{SYSTEM_PROMPT}\n\nBAĞLAM (bu varlığın haber akışı):\n{context}"
+    # Sohbet çıktısı kullanıcının arayüz diline uysun (SYSTEM_PROMPT artık dil-nötr).
+    system = (
+        f"{SYSTEM_PROMPT}\n\n{output_language_directive(getattr(user, 'language', 'tr'))}"
+        f"\n\nBAĞLAM (bu varlığın haber akışı):\n{context}"
+    )
 
     def event_stream():
         # GÜVENLİK: kullanıcıya GENEL mesaj (model adı/config/iç ayrıntı sızdırma);

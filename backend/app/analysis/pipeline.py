@@ -461,13 +461,18 @@ def _avg_sentiment(payload: list[dict]) -> float | None:
     return round(sum(vals) / len(vals), 3) if vals else None
 
 
-def _write_assessment(entity_id: int, data: dict, considered: int, avg_sentiment: float | None) -> None:
-    """Entity-başı değerlendirmeyi APPEND-ONLY kaydeder ve geçmişi 100 kayıtla sınırlar."""
+def _write_assessment(entity_id: int, data: dict, considered: int,
+                      avg_sentiment: float | None, language: str = "tr") -> None:
+    """Entity-başı değerlendirmeyi APPEND-ONLY kaydeder (DİL BAŞINA) ve geçmişi sınırlar.
+
+    Aynı taramada tr ve en ayrı satır yazılır; geçmiş DİL BAŞINA 100 kayıtla sınırlanır ki
+    delta/risk-geçmişi aynı dildeki kayıtlar arasında tutarlı kalsın."""
     clean = sanitize_entity_analysis(data)
     with session_scope() as session:
         session.add(
             EntityAnalysis(
                 entity_id=entity_id,
+                language=language,
                 headline_verdict=clean["headline_verdict"],
                 ai_take=clean["ai_take"],
                 risk_score=clean["risk_score"],
@@ -483,10 +488,10 @@ def _write_assessment(entity_id: int, data: dict, considered: int, avg_sentiment
             )
         )
         session.flush()
-        # Geçmiş korunur ama DB şişmesin: en yeni 100 dışındaki eski kayıtları temizle.
+        # DB şişmesin: bu DİLDE en yeni 100 dışındaki eski kayıtları temizle.
         stale = session.scalars(
             select(EntityAnalysis.id)
-            .where(EntityAnalysis.entity_id == entity_id)
+            .where(EntityAnalysis.entity_id == entity_id, EntityAnalysis.language == language)
             .order_by(EntityAnalysis.created_at.desc())
             .offset(MAX_ANALYSIS_HISTORY)
         ).all()
@@ -669,24 +674,28 @@ async def analyze_all_async(
             price_ctx = await asyncio.to_thread(price_context_for, t["id"])
             analyst_ctx = await asyncio.to_thread(analyst_context_for, t["id"])
         if payload:
-            def _build(items):
-                return build_entity_prompt(
-                    t["name"], t["query"], t["type"], items,
-                    price=price_ctx, language=t["language"], analyst=analyst_ctx,
-                )
-            try:
-                # Kesilme kurtarmalı (2× token → gerekirse yarı bağlam). Semaphore altında.
-                async with sem:
-                    adata, used = await asyncio.to_thread(
-                        _assess_entity_with_recovery, client, _build, payload, t["name"]
+            # İKİ DİLDE değerlendirme: arayüzü İngilizce olan kullanıcı içeriği de
+            # İngilizce görsün. Makale analizi tek sefer; bu yalnızca +1 çağrı/dil.
+            for out_lang in ("tr", "en"):
+                def _build(items, _ol=out_lang):
+                    return build_entity_prompt(
+                        t["name"], t["query"], t["type"], items,
+                        price=price_ctx, language=t["language"], analyst=analyst_ctx,
+                        out_lang=_ol,
                     )
-                async with db_lock:
-                    await asyncio.to_thread(
-                        _write_assessment, t["id"], adata, len(used), _avg_sentiment(used)
-                    )
-                totals.entity_assessments += 1
-            except ClaudeError as exc:
-                totals.warnings.append(f"[{t['name']}] değerlendirme başarısız: {exc}")
+                try:
+                    # Kesilme kurtarmalı (2× token → gerekirse yarı bağlam). Semaphore altında.
+                    async with sem:
+                        adata, used = await asyncio.to_thread(
+                            _assess_entity_with_recovery, client, _build, payload, f"{t['name']}/{out_lang}"
+                        )
+                    async with db_lock:
+                        await asyncio.to_thread(
+                            _write_assessment, t["id"], adata, len(used), _avg_sentiment(used), out_lang
+                        )
+                    totals.entity_assessments += 1
+                except ClaudeError as exc:
+                    totals.warnings.append(f"[{t['name']}/{out_lang}] değerlendirme başarısız: {exc}")
 
         done += 1
         if progress_cb:
@@ -807,16 +816,18 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient) -> AnalyzeTotals:
     if payload2:
         _price = price_context_for(entity_id)
         _analyst = analyst_context_for(entity_id)
-        def _build2(items):
-            return build_entity_prompt(
-                name, query, etype, items, price=_price, language=lang, analyst=_analyst,
-            )
-        try:
-            # Kesilme kurtarmalı (settings.max_output_tokens → 2× → yarı bağlam).
-            adata, used = _assess_entity_with_recovery(client, _build2, payload2, name)
-            _write_assessment(entity_id, adata, len(used), _avg_sentiment(used))
-            totals.entity_assessments += 1
-        except ClaudeError as exc:
-            totals.warnings.append(f"[{name}] değerlendirme başarısız: {exc}")
+        for out_lang in ("tr", "en"):
+            def _build2(items, _ol=out_lang):
+                return build_entity_prompt(
+                    name, query, etype, items, price=_price, language=lang,
+                    analyst=_analyst, out_lang=_ol,
+                )
+            try:
+                # Kesilme kurtarmalı (settings.max_output_tokens → 2× → yarı bağlam).
+                adata, used = _assess_entity_with_recovery(client, _build2, payload2, f"{name}/{out_lang}")
+                _write_assessment(entity_id, adata, len(used), _avg_sentiment(used), out_lang)
+                totals.entity_assessments += 1
+            except ClaudeError as exc:
+                totals.warnings.append(f"[{name}/{out_lang}] değerlendirme başarısız: {exc}")
 
     return totals

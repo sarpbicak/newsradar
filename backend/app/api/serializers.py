@@ -20,7 +20,18 @@ from .schemas import (
 )
 
 
-def _latest_analysis(session: Session, entity_id: int) -> EntityAnalysis | None:
+def _latest_analysis(session: Session, entity_id: int, language: str | None = None) -> EntityAnalysis | None:
+    """Kullanıcı dilindeki EN SON değerlendirme; o dilde yoksa herhangi bir dile düşer
+    (eski kayıtlar tr; yeni bir dil henüz üretilmemiş olabilir). Gösterilen kaydın
+    .language alanı gerçek dili söyler → arayüz gerekirse 'başka dilde üretildi' notu koyar."""
+    if language:
+        row = session.scalar(
+            select(EntityAnalysis)
+            .where(EntityAnalysis.entity_id == entity_id, EntityAnalysis.language == language)
+            .order_by(EntityAnalysis.created_at.desc())
+        )
+        if row is not None:
+            return row
     return session.scalar(
         select(EntityAnalysis)
         .where(EntityAnalysis.entity_id == entity_id)
@@ -28,15 +39,13 @@ def _latest_analysis(session: Session, entity_id: int) -> EntityAnalysis | None:
     )
 
 
-def _previous_analysis(session: Session, entity_id: int) -> EntityAnalysis | None:
-    """Son değerlendirmeden bir öncekini döner (yoksa None → yeterli geçmiş yok)."""
-    return session.scalar(
-        select(EntityAnalysis)
-        .where(EntityAnalysis.entity_id == entity_id)
-        .order_by(EntityAnalysis.created_at.desc())
-        .offset(1)
-        .limit(1)
-    )
+def _previous_analysis(session: Session, entity_id: int, language: str | None = None) -> EntityAnalysis | None:
+    """Son değerlendirmeden bir öncekini döner — AYNI dilde (delta tr'yi en ile
+    karşılaştırmasın). yoksa None → yeterli geçmiş yok."""
+    q = select(EntityAnalysis).where(EntityAnalysis.entity_id == entity_id)
+    if language:
+        q = q.where(EntityAnalysis.language == language)
+    return session.scalar(q.order_by(EntityAnalysis.created_at.desc()).offset(1).limit(1))
 
 
 def _previous_out(prev: EntityAnalysis | None) -> PreviousAnalysisOut | None:
@@ -69,14 +78,18 @@ def _delta_out(
     )
 
 
-def risk_history(session: Session, entity_id: int, limit: int = 30) -> list[RiskPointOut]:
-    """Son ~N değerlendirmenin risk skoru zaman serisi (eski → yeni)."""
-    rows = session.scalars(
-        select(EntityAnalysis)
-        .where(EntityAnalysis.entity_id == entity_id)
-        .order_by(EntityAnalysis.created_at.desc())
-        .limit(limit)
-    ).all()
+def risk_history(session: Session, entity_id: int, limit: int = 30,
+                 language: str | None = None) -> list[RiskPointOut]:
+    """Son ~N değerlendirmenin risk skoru zaman serisi (eski → yeni). DİL FİLTRELİ:
+    her taramada tr+en yazıldığı için filtrelenmezse noktalar İKİYE katlanırdı."""
+    def _q(lang):
+        q = select(EntityAnalysis).where(EntityAnalysis.entity_id == entity_id)
+        if lang:
+            q = q.where(EntityAnalysis.language == lang)
+        return session.scalars(q.order_by(EntityAnalysis.created_at.desc()).limit(limit)).all()
+    rows = _q(language)
+    if not rows and language:  # o dilde kayıt yoksa herhangi bir dile düş
+        rows = _q(None)
     return [
         RiskPointOut(created_at=r.created_at, risk_score=r.risk_score, stance=r.stance)
         for r in reversed(rows)  # kronolojik: eski → yeni
@@ -209,8 +222,8 @@ def _priority(analysis, delta, change_percent, analyst) -> tuple[int, str | None
     return score, reason
 
 
-def entity_card(session: Session, entity: Entity) -> EntityCardOut:
-    """Overview kartı için entity özetini toplar."""
+def entity_card(session: Session, entity: Entity, language: str = "tr") -> EntityCardOut:
+    """Overview kartı için entity özetini toplar (kullanıcı diline göre değerlendirme)."""
     article_count = session.scalar(
         select(func.count()).select_from(Article).where(Article.entity_id == entity.id)
     ) or 0
@@ -237,8 +250,10 @@ def entity_card(session: Session, entity: Entity) -> EntityCardOut:
             counter[f] += 1
     top_flags = [f for f, _ in counter.most_common(4)]
 
-    latest = _latest_analysis(session, entity.id)
-    previous = _previous_analysis(session, entity.id)
+    latest = _latest_analysis(session, entity.id, language)
+    # Gösterilen değerlendirmenin GERÇEK dili (fallback olabilir); delta/önceki aynı dilde.
+    shown_lang = latest.language if latest else language
+    previous = _previous_analysis(session, entity.id, shown_lang)
     delta = _delta_out(latest, previous)
     horizon, evidence_strength, evidence_count = _horizon_and_evidence(session, entity.id, latest)
 
@@ -276,6 +291,7 @@ def entity_card(session: Session, entity: Entity) -> EntityCardOut:
         top_flags=top_flags,
         last_updated=latest.created_at if latest else None,
         analysis=analysis_out(latest),
+        analysis_language=latest.language if latest else None,
         horizon=horizon,
         evidence_strength=evidence_strength,
         evidence_count=evidence_count,

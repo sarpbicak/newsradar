@@ -53,9 +53,9 @@ def entity_dashboard(
     )
 
     return DashboardOut(
-        entity=entity_card(db, entity),
+        entity=entity_card(db, entity, user.language),
         articles=[article_out(a) for a in articles],
         article_status=status,
-        risk_history=risk_history(db, entity_id, limit=30),
+        risk_history=risk_history(db, entity_id, limit=30, language=user.language),
         price_history=price_history(db, entity_id, limit=30),
     )

@@ -74,7 +74,7 @@ def list_entities(
     entities = db.scalars(
         select(Entity).where(Entity.id.in_(ids)).order_by(Entity.created_at)
     ).all()
-    cards = [entity_card(db, e) for e in entities]
+    cards = [entity_card(db, e, user.language) for e in entities]
     # AZ ŞİRKET (≤ eşik): kademe uygulama — hepsi büyük kart (tier=1). 1 şirket varken
     # "Bugün önemli" boş kalıp sayfa boş görünmesin. Liste büyüdükçe kademeye geçilir.
     if len(cards) <= FEW_ENTITIES_THRESHOLD:
@@ -125,7 +125,7 @@ def create_entity(
             record_event(db, user.id, "add_entity",
                          {"entity_id": existing.id, "name": existing.name, "pool_hit": True})
             db.commit()
-            return entity_card(db, existing)
+            return entity_card(db, existing, user.language)
 
         # YENİ entity (havuzda yok) → sistem-geneli günlük ekleme sınırını uygula.
         if not _daily_new_entity_ok(db, user):
@@ -152,12 +152,12 @@ def create_entity(
                 add_to_watchlist(db, user.id, existing.id)
             record_event(db, user.id, "add_entity", {"entity_id": existing.id, "name": existing.name})
             db.commit()
-            return entity_card(db, existing)
+            return entity_card(db, existing, user.language)
 
         add_to_watchlist(db, user.id, entity.id)
         record_event(db, user.id, "add_entity", {"entity_id": entity.id, "name": entity.name})
         db.commit()
-        return entity_card(db, entity)
+        return entity_card(db, entity, user.language)
 
 
 @router.delete("/{entity_id}", status_code=204)
