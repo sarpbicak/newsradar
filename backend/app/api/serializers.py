@@ -197,26 +197,28 @@ def _priority(analysis, delta, change_percent, analyst) -> tuple[int, str | None
     kararsızlık yaptığında (nötr-gürültü) bu sahte aciliyet üretiyordu (çoğu entity
     skor≥2 → seçim ayrımsız). Artık yalnızca GERÇEK tersine dönüş ağır puan alır.
     """
+    # reason artık KANONİK ANAHTAR döner (dil-nötr); frontend kullanıcı diline çevirir
+    # (eskiden sabit Türkçe string idi → İngilizce kartta "sert hareket" görünüyordu).
     reasons: list[tuple[str, int]] = []
     if delta is not None:
         if delta.stance_changed:
             prev = delta.previous_stance
             curr = analysis.stance if analysis is not None else None
             if prev in ("bullish", "bearish") and curr in ("bullish", "bearish") and prev != curr:
-                reasons.append(("yön değişti", 3))   # tam tersine dönüş — önemli
+                reasons.append(("stance_reversed", 3))   # tam tersine dönüş — önemli
             else:
-                reasons.append(("yön netleşti", 1))  # nötr↔yönlü — hafif sinyal
+                reasons.append(("stance_clarified", 1))  # nötr↔yönlü — hafif sinyal
         if abs(delta.risk_delta) >= 5:
-            reasons.append(("risk sıçraması", 2))
+            reasons.append(("risk_jump", 2))
     if change_percent is not None and abs(change_percent) >= 2:
-        reasons.append(("sert hareket", 2))
+        reasons.append(("sharp_move", 2))
     if analysis is not None and analyst is not None:
         buyish = analyst.strong_buy + analyst.buy
         sellish = analyst.sell + analyst.strong_sell
         analyst_buy = buyish > sellish and buyish > analyst.hold
         analyst_sell = sellish > buyish and sellish > analyst.hold
         if (analysis.stance == "bearish" and analyst_buy) or (analysis.stance == "bullish" and analyst_sell):
-            reasons.append(("ayrışma", 1))
+            reasons.append(("divergence", 1))
     score = sum(w for _, w in reasons)
     reason = max(reasons, key=lambda r: r[1])[0] if reasons else None
     return score, reason

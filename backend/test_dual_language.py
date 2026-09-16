@@ -14,8 +14,9 @@ os.environ.update(
     NEWSRADAR_SEED_ON_START="off", NEWSRADAR_LLM_PROVIDER="anthropic",
 )
 
-from app.analysis.prompts import build_entity_prompt, output_language_directive  # noqa: E402
-from app.api.serializers import entity_card, _latest_analysis, _previous_analysis, _delta_out, risk_history  # noqa: E402
+from app.analysis.prompts import build_entity_prompt, output_language_directive, entity_assessment_rules  # noqa: E402
+from app.analysis.schemas import sanitize_entity_analysis  # noqa: E402
+from app.api.serializers import entity_card, _latest_analysis, _previous_analysis, _delta_out, risk_history, _priority  # noqa: E402
 from app.db.database import init_db, session_scope  # noqa: E402
 from app.db.models import Entity, EntityAnalysis  # noqa: E402
 
@@ -99,6 +100,34 @@ def main():
     check(prev_en is None, "EN tek kayıt → önceki yok (TR ile karşılaştırmıyor)")
     check(len(rh_tr) == 2 and len(rh_en) == 1,
           f"risk_history dil filtreli (tr={len(rh_tr)}, en={len(rh_en)}) — noktalar ikiye katlanmıyor")
+
+    print("\n== İngilizce prompt kuralları (yatırım tavsiyesi / risk bandı / şablon / jargon / enum) ==")
+    r = entity_assessment_rules("en")
+    check("NOT INVESTMENT ADVICE" in r and "is a buy" in r and "own price target" in r,
+          "EN kural: yatırım tavsiyesi YASAK + 'is a buy' + kendi hedefini üretme")
+    check("RISK SCORE must vary" in r and "do NOT default to 60" in r and "15-30" in r and "75-90" in r,
+          "EN kural: risk bandı + 60'a düşme yasağı")
+    check("NO TEMPLATES" in r and "pasted onto another company" in r, "EN kural: şablon yasağı + şirkete özgü")
+    check("NO JARGON" in r and "ENUM" in r, "EN kural: jargon yasağı + enum")
+    check("~24 words" in r and "trail off" in r, "EN kural: hüküm tek cümle, ~24 kelime, yarım bırakma")
+    rt = entity_assessment_rules("tr")
+    check("YATIRIM TAVSİYESİ DEĞİL" in rt and "FARKLILAŞMALI" in rt, "TR kural bloğu da paritede (tavsiye+risk)")
+
+    print("\n== Hüküm kelime tavanı DİLE göre (İngilizce yarım kesilmesin) ==")
+    long_en = " ".join(["word"] * 26)  # 26 kelime
+    long_tr = " ".join(["kelime"] * 26)
+    en_v = sanitize_entity_analysis({"headline_verdict": long_en}, "en")["headline_verdict"]
+    tr_v = sanitize_entity_analysis({"headline_verdict": long_tr}, "tr")["headline_verdict"]
+    check(len(en_v.split()) == 26, f"EN hüküm 26 kelime korundu (kesilmedi): {len(en_v.split())}")
+    check(len(tr_v.split()) == 16, f"TR hüküm 16 kelimeye kırpıldı: {len(tr_v.split())}")
+
+    print("\n== priority_reason KANONİK ANAHTAR (Türkçe sabit değil) ==")
+    class _A: stance = "bullish"
+    class _D:
+        stance_changed = True; previous_stance = "bearish"; risk_delta = 10
+    score, reason = _priority(_A(), _D(), 3.0, None)
+    check(reason in ("stance_reversed", "risk_jump", "sharp_move") and " " not in reason,
+          f"priority_reason kanonik anahtar döndü ('{reason}', boşluksuz — frontend çevirir)")
 
     print(f"\n{'='*54}\nSONUÇ: {PASS} geçti, {FAIL} başarısız")
     return FAIL == 0

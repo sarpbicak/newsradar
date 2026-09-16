@@ -277,4 +277,65 @@ def build_entity_prompt(
         )
         if a.get("rationale"):
             lines.append(f"    gerekçe: {a['rationale']}")
+    # Kritik kurallar — ÇIKIŞ DİLİNDE, sonda (model sonu ağır tartar). Türkçe/İngilizce
+    # aynı kurallar; İngilizce üretimde bunlar yoksa model "is a buy", sabit 60 risk,
+    # kesik cümle üretiyordu.
+    lines.append("")
+    lines.append(entity_assessment_rules(out_lang))
     return "\n".join(lines)
+
+
+# Entity değerlendirmesi için KRİTİK kurallar — çıkış dilinde birebir aynı içerik.
+# (Tool şeması dil-nötr; asıl kural gücü buradan gelir. TR ile EN eşdeğer olmalı.)
+def entity_assessment_rules(out_lang: str) -> str:
+    if (out_lang or "tr").lower() == "en":
+        return (
+            "CRITICAL RULES (follow exactly):\n"
+            "1) NOT INVESTMENT ADVICE. This is a news-flow signal, never a recommendation. "
+            "NEVER write 'is a buy', 'is a sell', 'should buy/sell', 'recommend buying', "
+            "'buy at $X', or any entry/exit level. NEVER invent your own price target — you "
+            "may ONLY relay the provided analyst (FMP) target numbers, never make one up. "
+            "You cannot value the company; you only read the news flow, price action and "
+            "analyst data. State uncertainty honestly.\n"
+            "2) RISK SCORE must vary meaningfully across companies — do NOT default to 60. "
+            "First decide the news direction, then pick from its band: strongly positive → "
+            "15-30; mildly positive → 30-42; genuinely mixed/unclear → 45-58; negative → "
+            "60-74; seriously negative (scandal, lawsuit, security breach, big loss) → 75-90. "
+            "Never give a positive-news company 60 (that is low); never give a "
+            "seriously-negative company 60 (that is high). Avoid round anchors (50, 60).\n"
+            "3) NO TEMPLATES. Every headline_verdict, ai_take and driver must contain at least "
+            "one CONCRETE, company-specific detail (product/event name, number, sector "
+            "dynamic). A sentence that could be pasted onto another company is WRONG. Don't "
+            "repeat boilerplate like 'news is mixed, analysts target higher — divergence'; "
+            "explain any divergence with THIS company's concrete situation.\n"
+            "4) NO JARGON: avoid 'volatility', 'momentum', 'consolidation', 'valuation', "
+            "'catalyst'; use plain English a high-schooler understands.\n"
+            "5) ENUM fields (stance, conviction, sentiment_trend) use ONLY the allowed enum "
+            "values (English enum tokens).\n"
+            "6) headline_verdict: ONE natural English sentence, up to ~24 words, complete (do "
+            "not trail off); lowercase mid-sentence except proper nouns."
+        )
+    return (
+        "KRİTİK KURALLAR (aynen uygula):\n"
+        "1) YATIRIM TAVSİYESİ DEĞİL. Bu bir haber-akışı sinyalidir, tavsiye değil. ASLA "
+        "'al', 'sat', 'şu seviyeden al', 'alınmalı', 'satın al öneririm' gibi ifadeler "
+        "kullanma. KENDİ hedef fiyatını ASLA üretme — yalnızca verilen analist (FMP) "
+        "hedefini aktarabilirsin, rakam İCAT ETME. Değerleme yapamazsın; yalnızca haber "
+        "akışı, fiyat hareketi ve analist verisine bakarsın. Belirsizliği dürüstçe söyle.\n"
+        "2) RİSK SKORU şirketler arasında anlamlı biçimde FARKLILAŞMALI — 60'a VARSAYILAN "
+        "olarak düşme. Önce haber yönünü belirle, sonra bandından seç: güçlü olumlu → 15-30; "
+        "hafif olumlu → 30-42; gerçekten karışık/belirsiz → 45-58; olumsuz → 60-74; ciddi "
+        "olumsuz (skandal, dava, güvenlik ihlali, büyük kayıp) → 75-90. Olumlu habere 60 "
+        "verme (düşük olmalı); ciddi olumsuza da 60 verme (yüksek olmalı). Yuvarlak "
+        "çıpalardan (50, 60) kaç.\n"
+        "3) ŞABLON YOK. headline_verdict, ai_take ve her etken BU şirkete özgü EN AZ BİR "
+        "SOMUT detay içermeli (ürün/olay adı, rakam, sektörel dinamik). Başka şirkete "
+        "kopyalanabilen cümle YANLIŞTIR. 'Haberler karışık, analistler yüksek hedefte — "
+        "ayrışma var' gibi kalıpları tekrarlama; ayrışmayı o şirketin somut durumuyla anlat.\n"
+        "4) JARGON YOK: 'volatilite', 'momentum', 'konsolidasyon', 'değerleme', 'katalizör' "
+        "kullanma; lise öğrencisinin anlayacağı düz Türkçe.\n"
+        "5) ENUM alanları (stance, conviction, sentiment_trend) YALNIZCA izinli enum "
+        "değerlerinden.\n"
+        "6) headline_verdict: tek doğal Türkçe cümle, ~14 kelimeye kadar, TAM (yarım "
+        "bırakma); cümle ortasında rastgele büyük harf yok."
+    )

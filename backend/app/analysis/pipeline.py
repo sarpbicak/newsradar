@@ -467,7 +467,7 @@ def _write_assessment(entity_id: int, data: dict, considered: int,
 
     Aynı taramada tr ve en ayrı satır yazılır; geçmiş DİL BAŞINA 100 kayıtla sınırlanır ki
     delta/risk-geçmişi aynı dildeki kayıtlar arasında tutarlı kalsın."""
-    clean = sanitize_entity_analysis(data)
+    clean = sanitize_entity_analysis(data, language)
     with session_scope() as session:
         session.add(
             EntityAnalysis(
