@@ -3,37 +3,29 @@
 // olmadığını düz Türkçe açıklayan bir not gösterilir (özel şirket / desteklenmeyen borsa).
 // compact=true: kart için kısa gösterim. false: detay için tam gösterim + hedef aralık barı.
 import React from "react";
+import { tt } from "../i18n.jsx";
 
 // Veri yokken gösterilecek açıklama (boşluk bir eksiklik değil, bir açıklama gibi görünsün).
 function noDataNote(type, hasPrice) {
-  if (type === "keyword") {
-    return "Bu şirket borsada işlem görmüyor (özel şirket) — hedef fiyat ve analist " +
-      "verisi yok. Değerlendirme sadece haber akışına dayanıyor.";
-  }
-  if (!hasPrice) {
-    // Ticker ama fiyat da yok → ABD dışı borsa (BIST/Avrupa) — kaynağımız kapsamıyor.
-    return "Bu borsa için fiyat ve analist verisi kaynağımızda yok (ör. Türkiye/Avrupa " +
-      "borsaları). Değerlendirme haber akışına dayanıyor.";
-  }
-  // Ticker + fiyat var ama analist verisi yok.
-  return "Bu şirket için analist tavsiyesi ve hedef fiyatı şu an kaynağımızda yok. " +
-    "Değerlendirme haber akışına dayanıyor.";
+  if (type === "keyword") return tt("an.noKeyword");
+  if (!hasPrice) return tt("an.noExchange"); // ABD dışı borsa — kaynağımız kapsamıyor
+  return tt("an.noAnalyst");                 // ticker+fiyat var ama analist yok
 }
 
 const SEGMENTS = [
-  { key: "strong_buy", label: "Güçlü Al", color: "#0B7A42" },
-  { key: "buy", label: "Al", color: "#0F8A4C" },
-  { key: "hold", label: "Tut", color: "#7A7770" },
-  { key: "sell", label: "Sat", color: "#C62828" },
-  { key: "strong_sell", label: "Güçlü Sat", color: "#A81E1E" },
+  { key: "strong_buy", tkey: "an.segStrongBuy", color: "#0B7A42" },
+  { key: "buy", tkey: "an.segBuy", color: "#0F8A4C" },
+  { key: "hold", tkey: "an.segHold", color: "#7A7770" },
+  { key: "sell", tkey: "an.segSell", color: "#C62828" },
+  { key: "strong_sell", tkey: "an.segStrongSell", color: "#A81E1E" },
 ];
 
 function consensusLabel(a) {
   const buyish = a.strong_buy + a.buy;
   const sellish = a.sell + a.strong_sell;
-  if (buyish > a.hold && buyish >= sellish) return { text: "Al ağırlıklı", color: "#0F8A4C" };
-  if (sellish > a.hold && sellish > buyish) return { text: "Sat ağırlıklı", color: "#C62828" };
-  return { text: "Tut ağırlıklı", color: "#7A7770" };
+  if (buyish > a.hold && buyish >= sellish) return { text: tt("card.buyLean"), color: "#0F8A4C" };
+  if (sellish > a.hold && sellish > buyish) return { text: tt("card.sellLean"), color: "#C62828" };
+  return { text: tt("card.holdLean"), color: "#7A7770" };
 }
 
 function Bar({ analyst }) {
@@ -44,7 +36,7 @@ function Bar({ analyst }) {
         const n = analyst[s.key] || 0;
         if (!n) return null;
         return (
-          <div key={s.key} style={{ width: `${(n / total) * 100}%`, background: s.color }} title={`${s.label}: ${n}`} />
+          <div key={s.key} style={{ width: `${(n / total) * 100}%`, background: s.color }} title={`${tt(s.tkey)}: ${n}`} />
         );
       })}
     </div>
@@ -71,20 +63,20 @@ function TargetRangeBar({ low, high, mean, price }) {
           <div
             className="absolute top-1/2 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded bg-slate-100"
             style={{ left: pos(price) }}
-            title={`Güncel fiyat $${price.toFixed(2)}`}
+            title={`${tt("an.curPrice")} $${price.toFixed(2)}`}
           />
         )}
         {/* ortalama hedef işareti (nokta) */}
         <div
           className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-ink-800"
-          style={{ left: pos(mean), background: "#8B7CFF" }}
-          title={`Ortalama hedef $${mean.toFixed(2)}`}
+          style={{ left: pos(mean), background: "#1E3A5F" }}
+          title={`${tt("an.avgTarget")} $${mean.toFixed(2)}`}
         />
       </div>
       <div className="mt-1 flex justify-between text-[10px] tabular-nums text-slate-500">
-        <span>düşük ${low.toFixed(0)}</span>
-        <span className="font-semibold text-slate-300">ort ${mean.toFixed(0)}</span>
-        <span>yüksek ${high.toFixed(0)}</span>
+        <span>{tt("an.low")} ${low.toFixed(0)}</span>
+        <span className="font-semibold text-slate-300">{tt("an.avg")} ${mean.toFixed(0)}</span>
+        <span>{tt("an.high")} ${high.toFixed(0)}</span>
       </div>
     </div>
   );
@@ -99,7 +91,7 @@ function TargetLine({ price, mean, upside, compact }) {
     <div className={`flex items-baseline gap-1.5 ${compact ? "text-xs" : "text-sm"}`}>
       {price != null && <span className="tabular-nums text-slate-400">${price.toFixed(compact ? 0 : 2)}</span>}
       <span className="inline-flex items-center gap-0.5 text-slate-500">
-        → hedef
+        → {tt("detail.target")}
       </span>
       <span className="font-semibold tabular-nums text-slate-100">${mean.toFixed(compact ? 0 : 2)}</span>
       {up != null && (
@@ -121,7 +113,7 @@ export default function AnalystConsensus({ analyst, price, type, compact = false
     return (
       <div className="rounded-xl border border-ink-600 bg-ink-800 p-4">
         <div className="mb-1 flex items-center gap-1 text-[11px] uppercase text-slate-500">
-          Analist verisi
+          {tt("an.title")}
         </div>
         <p className="text-sm leading-relaxed text-slate-400">{noDataNote(type, price != null)}</p>
       </div>
@@ -139,14 +131,14 @@ export default function AnalystConsensus({ analyst, price, type, compact = false
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-semibold" style={{ color: lean.color }}>{lean.text}</span>
             <div className="min-w-[60px] flex-1"><Bar analyst={analyst} /></div>
-            <span className="text-[10px] tabular-nums text-slate-500">{analyst.total} analist</span>
+            <span className="text-[10px] tabular-nums text-slate-500">{tt("card.analysts", { n: analyst.total })}</span>
           </div>
         )}
         {hasTarget && (
           <>
             <TargetLine price={curPrice} mean={analyst.target_mean} upside={analyst.upside_percent} compact />
             <span className="text-[10px] text-slate-500">
-              {hasRec ? `${analyst.total} analist · ` : ""}hedef konsensüsü (FMP)
+              {hasRec ? `${tt("card.analysts", { n: analyst.total })} · ` : ""}{tt("an.targetConsensus")}
             </span>
           </>
         )}
@@ -159,7 +151,7 @@ export default function AnalystConsensus({ analyst, price, type, compact = false
     <div className="rounded-xl border border-ink-600 bg-ink-800 p-4">
       <div className="mb-2 flex items-baseline justify-between">
         <span className="inline-flex items-center gap-1 text-[11px] uppercase text-slate-500">
-          Analist verisi
+          {tt("an.title")}
         </span>
         {hasRec && (
           <span className="text-xs font-semibold" style={{ color: lean.color }}>{lean.text}</span>
@@ -189,7 +181,7 @@ export default function AnalystConsensus({ analyst, price, type, compact = false
             {SEGMENTS.map((s) => (
               <span key={s.key} className="flex items-center gap-1 text-slate-400">
                 <span className="h-2 w-2 rounded-full" style={{ background: s.color }} />
-                {s.label} <span className="font-semibold text-slate-200">{analyst[s.key] || 0}</span>
+                {tt(s.tkey)} <span className="font-semibold text-slate-200">{analyst[s.key] || 0}</span>
               </span>
             ))}
           </div>
@@ -198,8 +190,7 @@ export default function AnalystConsensus({ analyst, price, type, compact = false
 
       {/* Net kaynak etiketi — bu rakamlar Claude'dan değil, gerçek analistlerden gelir. */}
       <div className="mt-3 text-[10px] leading-relaxed text-slate-500">
-        Analist tavsiyesi Finnhub, hedef fiyat FMP verisidir{analyst.period ? ` · ${analyst.period}` : ""} —
-        NewsRadar'ın tahmini değildir.
+        {tt("an.source", { period: analyst.period ? ` · ${analyst.period}` : "" })}
       </div>
     </div>
   );

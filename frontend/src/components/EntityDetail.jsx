@@ -11,7 +11,18 @@ import ArticleTable from "./ArticleTable.jsx";
 import ChatPanel from "./ChatPanel.jsx";
 import TimeSeriesCharts from "./TimeSeriesCharts.jsx";
 import AnalystConsensus from "./AnalystConsensus.jsx";
-import { tt, fmtDateTime } from "../i18n.jsx";
+import { tt, fmtDateTime, getLang } from "../i18n.jsx";
+
+// "Bu değerlendirme İngilizce üretildi" — gösterilen analizin dili UI dilinden farklıysa.
+function LangNote({ analysisLang }) {
+  if (!analysisLang || analysisLang === getLang()) return null;
+  const name = tt(analysisLang === "tr" ? "lang.tr.name" : "lang.en.name");
+  return (
+    <p className="mt-1.5 text-[11px] italic text-slate-500">
+      {tt("detail.langNote", { lang: name })}
+    </p>
+  );
+}
 
 function MiniStat({ label, value, color }) {
   return (
@@ -92,6 +103,7 @@ export default function EntityDetail({ entityId, onBack }) {
             {a.headline_verdict}
           </p>
         )}
+        {a && <LangNote analysisLang={entity.analysis_language} />}
 
         {a && (
           <div className="mt-4 max-w-md">

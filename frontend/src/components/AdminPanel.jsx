@@ -4,27 +4,11 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../api.js";
 import { timeAgo } from "./ui.jsx";
+import { tt, fmtDate, fmtDateTime } from "../i18n.jsx";
 
-const EVENT_LABELS = {
-  login: "giriş",
-  login_failed: "başarısız giriş",
-  register_failed: "başarısız kayıt",
-  refresh: "yenileme",
-  view_entity: "görüntüleme",
-  add_entity: "şirket ekleme",
-  remove_entity: "şirket çıkarma",
-  chat: "sohbet",
-  add_suggestion: "öneri ekleme",
-  dismiss_suggestion: "öneri gizleme",
-  delete_user: "kullanıcı silme",
-  password_reset: "şifre sıfırlama",
-  feedback_sent: "geri bildirim",
-};
 function eventLabel(t) {
-  return EVENT_LABELS[t] || t;
-}
-function fmtDate(iso) {
-  return iso ? new Date(iso).toLocaleString("tr-TR") : "—";
+  const s = tt(`ev.${t}`);
+  return s.startsWith("ev.") ? t : s; // bilinmeyen tip → ham anahtar
 }
 
 function StatCard({ label, value, hint }) {
@@ -64,7 +48,7 @@ export default function AdminPanel({ currentUserId }) {
     try {
       await api.adminMarkFeedbackRead(id);
     } catch (err) {
-      window.alert(`İşaretlenemedi: ${err.message}`);
+      window.alert(tt("adm.markFail", { m: err.message }));
       reload().catch(() => {});
     }
   }
@@ -81,7 +65,7 @@ export default function AdminPanel({ currentUserId }) {
 
   async function handleDelete(u, e) {
     e.stopPropagation(); // satır tıklamasıyla detay açılmasın
-    if (!window.confirm(`${u.username} kullanıcısını ve tüm verilerini silmek istediğinize emin misiniz?`))
+    if (!window.confirm(tt("adm.confirmDelete", { u: u.username })))
       return;
     setDeleting(u.id);
     try {
@@ -89,7 +73,7 @@ export default function AdminPanel({ currentUserId }) {
       if (selected === u.id) setSelected(null);
       await reload();
     } catch (err) {
-      window.alert(`Silinemedi: ${err.message}`);
+      window.alert(tt("adm.deleteFail", { m: err.message }));
     } finally {
       setDeleting(null);
     }
@@ -98,28 +82,28 @@ export default function AdminPanel({ currentUserId }) {
   const [resetting, setResetting] = useState(null);
   async function handleReset(u, e) {
     e.stopPropagation();
-    if (!window.confirm(`${u.username} kullanıcısının şifresi sıfırlansın mı? Geçici bir şifre üretilecek.`))
+    if (!window.confirm(tt("adm.confirmReset", { u: u.username })))
       return;
     setResetting(u.id);
     try {
       const r = await api.adminResetPassword(u.id);
       window.prompt(
-        `${r.username} için geçici şifre (kopyalayın, kullanıcıya iletin — bir daha gösterilmez):`,
+        tt("adm.tempPrompt", { u: r.username }),
         r.temp_password
       );
     } catch (err) {
-      window.alert(`Sıfırlanamadı: ${err.message}`);
+      window.alert(tt("adm.resetFail", { m: err.message }));
     } finally {
       setResetting(null);
     }
   }
 
-  if (loading) return <div className="p-8 text-slate-500">Kullanım verileri yükleniyor…</div>;
-  if (error) return <div className="p-8 text-rose-400">Hata: {error}</div>;
+  if (loading) return <div className="p-8 text-slate-500">{tt("adm.loading")}</div>;
+  if (error) return <div className="p-8 text-rose-400">{tt("adm.errPrefix", { m: error })}</div>;
 
   return (
     <div className="space-y-6">
-      <h2 className="font-display text-xl font-bold text-slate-100">Kullanım paneli</h2>
+      <h2 className="font-display text-xl font-bold text-slate-100">{tt("adm.title")}</h2>
 
       {/* Genel istatistik */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -131,28 +115,28 @@ export default function AdminPanel({ currentUserId }) {
           return (
             <div className={`rounded-xl border bg-ink-800 p-4 shadow-card ${
               over ? "border-rose-500/50" : "border-ink-600"}`}>
-              <div className="text-[11px] uppercase tracking-wide text-slate-500">Kullanıcı (kayıt/limit)</div>
+              <div className="text-[11px] uppercase tracking-wide text-slate-500">{tt("adm.userLimit")}</div>
               <div className={`mt-1 font-display text-2xl font-bold ${over ? "text-rose-400" : "text-slate-100"}`}>
                 {label}
               </div>
               <div className={`mt-0.5 text-xs ${over ? "text-rose-400" : "text-slate-500"}`}>
-                {over ? "⚠ limit aşıldı!" : stats.max_users > 0 ? "kayıt sınırı" : "sınırsız"}
+                {over ? tt("adm.limitReached") : stats.max_users > 0 ? tt("adm.regLimit") : tt("adm.unlimited")}
               </div>
             </div>
           );
         })()}
-        <StatCard label="Bugün aktif" value={stats.active_today} hint="en az 1 eylem" />
-        <StatCard label="Bugünkü yenileme" value={stats.refreshes_today} />
+        <StatCard label={tt("adm.activeToday")} value={stats.active_today} hint={tt("adm.atLeast1")} />
+        <StatCard label={tt("adm.refreshesToday")} value={stats.refreshes_today} />
         {/* Okunmamış geri bildirim — >0 ise lacivert vurguyla dikkat çeker */}
         <div className={`rounded-xl border bg-ink-800 p-4 shadow-card ${
           stats.unread_feedback > 0 ? "border-accent/50" : "border-ink-600"}`}>
-          <div className="text-[11px] uppercase tracking-wide text-slate-500">Okunmamış geri bildirim</div>
+          <div className="text-[11px] uppercase tracking-wide text-slate-500">{tt("adm.unreadFb")}</div>
           <div className={`mt-1 font-display text-2xl font-bold ${
             stats.unread_feedback > 0 ? "text-accent" : "text-slate-100"}`}>
             {stats.unread_feedback}
           </div>
           <div className="mt-0.5 text-xs text-slate-500">
-            {stats.unread_feedback > 0 ? "okunmayı bekliyor" : "hepsi okundu"}
+            {stats.unread_feedback > 0 ? tt("adm.unreadWaiting") : tt("adm.allRead")}
           </div>
         </div>
       </div>
@@ -166,17 +150,17 @@ export default function AdminPanel({ currentUserId }) {
             : `${(stats.tokens_today / 1000).toFixed(0)}K`;
           return (
             <div className={`rounded-xl border bg-ink-800 p-4 shadow-card ${over ? "border-rose-500/50" : "border-ink-600"}`}>
-              <div className="text-[11px] uppercase tracking-wide text-slate-500">Bugün token (bütçe)</div>
+              <div className="text-[11px] uppercase tracking-wide text-slate-500">{tt("adm.tokenBudget")}</div>
               <div className={`mt-1 font-display text-2xl font-bold ${over ? "text-rose-400" : "text-slate-100"}`}>{label}</div>
               <div className={`mt-0.5 text-xs ${over ? "text-rose-400" : "text-slate-500"}`}>
-                {over ? "⚠ günlük kapasite doldu" : stats.daily_token_budget > 0 ? "günlük tavan" : "sınırsız"}
+                {over ? tt("adm.budgetFull") : stats.daily_token_budget > 0 ? tt("adm.dailyCap") : tt("adm.unlimited")}
               </div>
             </div>
           );
         })()}
-        <StatCard label="Bugünkü maliyet" value={`$${stats.cost_today_usd.toFixed(2)}`} hint="tahmini (token × birim)" />
-        <StatCard label="30 günlük maliyet" value={`$${stats.cost_month_usd.toFixed(2)}`} hint={`${(stats.tokens_month / 1000).toFixed(0)}K token`} />
-        <StatCard label="Toplam şirket" value={stats.total_entities} hint="havuzda benzersiz" />
+        <StatCard label={tt("adm.costToday")} value={`$${stats.cost_today_usd.toFixed(2)}`} hint={tt("adm.costEst")} />
+        <StatCard label={tt("adm.cost30")} value={`$${stats.cost_month_usd.toFixed(2)}`} hint={tt("adm.tokenK", { n: (stats.tokens_month / 1000).toFixed(0) })} />
+        <StatCard label={tt("adm.totalEntities")} value={stats.total_entities} hint={tt("adm.poolUnique")} />
       </div>
 
       {/* Geri bildirim gelen kutusu — okunmamışlar önce, vurgulu */}
@@ -186,14 +170,14 @@ export default function AdminPanel({ currentUserId }) {
       <div className="rounded-xl border border-ink-600 bg-ink-800 p-4">
         <div className="mb-2 flex items-center justify-between">
           <div className="text-[11px] uppercase tracking-wide text-slate-500">
-            En çok takip edilen şirketler
+            {tt("adm.mostFollowed")}
           </div>
           <div className="text-[11px] text-slate-500">
-            Havuzda <span className="font-semibold text-slate-300">{stats.total_entities}</span> benzersiz şirket
+            {tt("adm.poolUniqueN", { n: stats.total_entities })}
           </div>
         </div>
         {stats.most_followed.length === 0 ? (
-          <span className="text-sm text-slate-500">Henüz kimse şirket takip etmiyor.</span>
+          <span className="text-sm text-slate-500">{tt("adm.noneFollow")}</span>
         ) : (
           <div className="flex flex-wrap gap-2">
             {stats.most_followed.map((e) => (
@@ -206,7 +190,7 @@ export default function AdminPanel({ currentUserId }) {
                 </span>
                 {e.name}
                 <span className="rounded bg-ink-700 px-1.5 font-semibold text-slate-500">
-                  {e.followers} kişi
+                  {tt("adm.person", { n: e.followers })}
                 </span>
               </span>
             ))}
@@ -218,7 +202,7 @@ export default function AdminPanel({ currentUserId }) {
       {stats.top_entities.length > 0 && (
         <div className="rounded-xl border border-ink-600 bg-ink-800 p-4">
           <div className="mb-2 text-[11px] uppercase tracking-wide text-slate-500">
-            En çok görüntülenen şirketler
+            {tt("adm.mostViewed")}
           </div>
           <div className="flex flex-wrap gap-2">
             {stats.top_entities.map((e) => (
@@ -238,14 +222,14 @@ export default function AdminPanel({ currentUserId }) {
         <table className="w-full text-left text-sm">
           <thead className="border-b border-ink-600 text-[11px] uppercase text-slate-500">
             <tr>
-              <th className="px-4 py-2.5">Kullanıcı</th>
-              <th className="px-4 py-2.5">Kayıt</th>
-              <th className="px-4 py-2.5">Son giriş</th>
-              <th className="px-4 py-2.5 text-right">Giriş</th>
-              <th className="px-4 py-2.5 text-right">Yenileme</th>
-              <th className="px-4 py-2.5 text-right">Toplam eylem</th>
-              <th className="px-4 py-2.5">Son aktiflik</th>
-              <th className="px-4 py-2.5 text-right">İşlem</th>
+              <th className="px-4 py-2.5">{tt("adm.thUser")}</th>
+              <th className="px-4 py-2.5">{tt("adm.thReg")}</th>
+              <th className="px-4 py-2.5">{tt("adm.thLastLogin")}</th>
+              <th className="px-4 py-2.5 text-right">{tt("adm.thLogin")}</th>
+              <th className="px-4 py-2.5 text-right">{tt("adm.thRefresh")}</th>
+              <th className="px-4 py-2.5 text-right">{tt("adm.thTotal")}</th>
+              <th className="px-4 py-2.5">{tt("adm.thActive")}</th>
+              <th className="px-4 py-2.5 text-right">{tt("adm.thAction")}</th>
             </tr>
           </thead>
           <tbody>
@@ -263,7 +247,7 @@ export default function AdminPanel({ currentUserId }) {
                     </span>
                   )}
                 </td>
-                <td className="px-4 py-2.5 text-slate-500">{fmtDate(u.created_at).split(" ")[0]}</td>
+                <td className="px-4 py-2.5 text-slate-500">{fmtDate(u.created_at)}</td>
                 <td className="px-4 py-2.5 text-slate-500">{u.last_login_at ? timeAgo(u.last_login_at) : "—"}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-slate-300">{u.login_count}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-slate-300">{u.refresh_count}</td>
@@ -276,21 +260,21 @@ export default function AdminPanel({ currentUserId }) {
                     <button
                       onClick={(e) => handleReset(u, e)}
                       disabled={resetting === u.id}
-                      title="Şifre sıfırla (geçici şifre üret)"
+                      title={tt("adm.pwResetTitle")}
                       className="rounded-md border border-ink-500 px-2 py-1 text-[11px] font-medium text-slate-400 transition hover:bg-ink-700 hover:text-slate-200 disabled:opacity-50"
                     >
-                      {resetting === u.id ? "…" : "Şifre"}
+                      {resetting === u.id ? "…" : tt("adm.pwReset")}
                     </button>
                     {u.id === currentUserId ? (
-                      <span className="text-[11px] text-slate-600">siz</span>
+                      <span className="text-[11px] text-slate-600">{tt("adm.you")}</span>
                     ) : (
                       <button
                         onClick={(e) => handleDelete(u, e)}
                         disabled={deleting === u.id}
-                        title="Kullanıcıyı ve tüm verilerini sil"
+                        title={tt("adm.deleteTitle")}
                         className="rounded-md border border-rose-500/30 px-2 py-1 text-[11px] font-medium text-rose-400 transition hover:bg-rose-500/10 disabled:opacity-50"
                       >
-                        {deleting === u.id ? "Siliniyor…" : "Sil"}
+                        {deleting === u.id ? tt("adm.deleting") : tt("adm.delete")}
                       </button>
                     )}
                   </div>
@@ -312,17 +296,17 @@ function FeedbackInbox({ items, onMarkRead }) {
   return (
     <div className="rounded-xl border border-ink-600 bg-ink-800 p-4">
       <div className="mb-3 flex items-center gap-2">
-        <span className="text-[11px] uppercase tracking-wide text-slate-500">Geri bildirimler</span>
+        <span className="text-[11px] uppercase tracking-wide text-slate-500">{tt("adm.feedbackTitle")}</span>
         {unread > 0 && (
           <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-semibold text-accent">
-            {unread} okunmamış
+            {tt("adm.unread", { n: unread })}
           </span>
         )}
-        <span className="ml-auto text-[11px] text-slate-500">{items.length} toplam</span>
+        <span className="ml-auto text-[11px] text-slate-500">{tt("adm.totalN", { n: items.length })}</span>
       </div>
 
       {items.length === 0 ? (
-        <span className="text-sm text-slate-500">Henüz geri bildirim yok.</span>
+        <span className="text-sm text-slate-500">{tt("adm.noFeedback")}</span>
       ) : (
         <div className="space-y-2.5">
           {items.map((f) => (
@@ -346,17 +330,15 @@ function FeedbackInbox({ items, onMarkRead }) {
                   <button
                     onClick={() => onMarkRead(f.id)}
                     className="shrink-0 rounded-md border border-ink-500 px-2 py-1 text-[11px] font-medium text-slate-400 transition hover:bg-ink-700 hover:text-slate-200"
-                  >
-                    Okundu
-                  </button>
+                  >{tt("adm.read")}</button>
                 ) : (
-                  <span className="shrink-0 text-[10px] uppercase tracking-wide text-slate-600">okundu</span>
+                  <span className="shrink-0 text-[10px] uppercase tracking-wide text-slate-600">{tt("adm.readMark")}</span>
                 )}
               </div>
 
               <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
                 <span className="font-medium text-slate-400">
-                  {f.username || "anonim"}
+                  {f.username || tt("adm.anon")}
                 </span>
                 {f.contact && (
                   <>
@@ -397,7 +379,7 @@ function UserDetail({ userId, onClose }) {
     <div className="rounded-xl border border-accent/30 bg-accent/5 p-5">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="font-display text-lg font-semibold text-slate-100">
-          {data ? data.user.username : "Yükleniyor…"}
+          {data ? data.user.username : tt("detail.loading")}
           {data?.user.is_admin && (
             <span className="ml-2 rounded bg-ink-700 px-1.5 text-[10px] font-semibold text-slate-500">
               admin
@@ -405,20 +387,20 @@ function UserDetail({ userId, onClose }) {
           )}
         </h3>
         <button onClick={onClose} className="text-slate-500 hover:text-slate-200">
-          ✕ kapat
+          {tt("adm.close")}
         </button>
       </div>
 
-      {error && <div className="text-sm text-rose-400">Hata: {error}</div>}
+      {error && <div className="text-sm text-rose-400">{tt("adm.errPrefix", { m: error })}</div>}
       {data && (
         <div className="grid gap-5 md:grid-cols-2">
           {/* Eylem dökümü + en çok baktığı şirketler */}
           <div className="space-y-4">
             <div>
-              <div className="mb-2 text-[11px] uppercase tracking-wide text-slate-500">Eylem dökümü</div>
+              <div className="mb-2 text-[11px] uppercase tracking-wide text-slate-500">{tt("adm.eventBreakdown")}</div>
               <div className="flex flex-wrap gap-2">
                 {Object.keys(data.event_counts).length === 0 && (
-                  <span className="text-sm text-slate-500">Henüz eylem yok.</span>
+                  <span className="text-sm text-slate-500">{tt("adm.noActions")}</span>
                 )}
                 {Object.entries(data.event_counts).map(([t, c]) => (
                   <span
@@ -433,7 +415,7 @@ function UserDetail({ userId, onClose }) {
             {data.top_entities.length > 0 && (
               <div>
                 <div className="mb-2 text-[11px] uppercase tracking-wide text-slate-500">
-                  En çok baktığı şirketler
+                  {tt("adm.topViewed")}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {data.top_entities.map((e) => (
@@ -450,10 +432,10 @@ function UserDetail({ userId, onClose }) {
             {/* İzleme listesi — kullanıcının TAKİP ETTİĞİ şirketler (B6) */}
             <div>
               <div className="mb-2 text-[11px] uppercase tracking-wide text-slate-500">
-                İzleme listesi ({data.watchlist_size})
+                {tt("adm.watchlistN", { n: data.watchlist_size })}
               </div>
               {data.watchlist_size === 0 ? (
-                <span className="text-sm text-slate-500">Takip ettiği şirket yok.</span>
+                <span className="text-sm text-slate-500">{tt("adm.noWatch")}</span>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {data.watchlist.map((e) => (
@@ -471,19 +453,17 @@ function UserDetail({ userId, onClose }) {
               )}
             </div>
             <div className="text-xs text-slate-500">
-              Kayıt: {fmtDate(data.user.created_at)} · Son giriş:{" "}
-              {data.user.last_login_at ? fmtDate(data.user.last_login_at) : "—"}
+              {tt("adm.registered", { d: fmtDateTime(data.user.created_at) })} ·{" "}
+              {tt("adm.lastLoginLine", { d: data.user.last_login_at ? fmtDateTime(data.user.last_login_at) : "—" })}
             </div>
           </div>
 
           {/* Zaman çizelgesi — son eylemler */}
           <div>
-            <div className="mb-2 text-[11px] uppercase tracking-wide text-slate-500">
-              Son eylemler
-            </div>
+            <div className="mb-2 text-[11px] uppercase tracking-wide text-slate-500">{tt("adm.recentActions")}</div>
             <div className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
               {data.recent_events.length === 0 && (
-                <span className="text-sm text-slate-500">Kayıt yok.</span>
+                <span className="text-sm text-slate-500">{tt("adm.noRecords")}</span>
               )}
               {data.recent_events.map((ev, i) => (
                 <div key={i} className="flex items-baseline gap-2 text-sm">
