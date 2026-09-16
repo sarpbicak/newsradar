@@ -88,6 +88,7 @@ class UserOut(BaseModel):
     last_login_at: datetime | None = None
     guide_dismissed: bool = False   # "NewsRadar ne yapar?" kutusu kapatıldı mı
     tutorial_done: bool = False     # ilk giriş tutorial'ı tamamlandı mı
+    language: str = "tr"            # arayüz dili (tr/en)
 
 
 class UserTokenOut(BaseModel):

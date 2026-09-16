@@ -66,7 +66,10 @@ def bootstrap(request: Request, response: Response, db: Session = Depends(get_db
                     detail="Site şu an kapasitede — lütfen daha sonra tekrar deneyin.",
                 )
         device_id = new_device_id()
-        user = create_anonymous_user(db, device_id)
+        # Tarayıcı dilini varsayılan öner (Accept-Language "tr..." → tr, aksi halde en).
+        accept = (request.headers.get("accept-language") or "").strip().lower()
+        default_lang = "tr" if accept.startswith("tr") else "en"
+        user = create_anonymous_user(db, device_id, language=default_lang)
 
     _set_device_cookie(response, device_id)  # süreyi her ziyarette tazele
     return UserTokenOut(token=make_user_token(user), user=_user_out(user))

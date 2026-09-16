@@ -63,6 +63,9 @@ def init_db() -> None:
     _ensure_column("users", "last_active_at", "DATETIME")
     _ensure_column("users", "is_anonymous", "BOOLEAN NOT NULL DEFAULT 0")
     _ensure_column("users", "device_id_hash", "VARCHAR(64)")
+    _ensure_column("users", "language", "VARCHAR(5) NOT NULL DEFAULT 'tr'")
+    # Analiz kayıtlarının dili (tr/en); eski kayıtlar tr üretildi.
+    _ensure_column("entity_analyses", "language", "VARCHAR(5) NOT NULL DEFAULT 'tr'")
 
 
 def _ensure_column(table: str, column: str, ddl_type: str) -> None:

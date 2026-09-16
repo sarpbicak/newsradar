@@ -34,9 +34,10 @@ def find_user_by_device(db: Session, device_id: str) -> User | None:
     )
 
 
-def create_anonymous_user(db: Session, device_id: str) -> User:
+def create_anonymous_user(db: Session, device_id: str, language: str = "tr") -> User:
     """Yeni anonim kullanıcı satırı: sentetik username ('anon:<hash8>', insan kaydedemez —
-    kayıt regex'i ':' içermez), kullanılamaz rastgele şifre hash'i, is_anonymous=True."""
+    kayıt regex'i ':' içermez), kullanılamaz rastgele şifre hash'i, is_anonymous=True.
+    language: tarayıcı diline göre varsayılan (kullanıcı sonra modal'dan değiştirir)."""
     from .api.routes_auth import hash_password
 
     dh = hash_device_id(device_id)
@@ -45,6 +46,7 @@ def create_anonymous_user(db: Session, device_id: str) -> User:
         password_hash=hash_password(secrets.token_urlsafe(16)),  # login'de kullanılamaz
         is_anonymous=True,
         device_id_hash=dh,
+        language=language if language in ("tr", "en") else "tr",
     )
     db.add(user)
     db.flush()

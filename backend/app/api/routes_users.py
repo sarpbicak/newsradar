@@ -12,6 +12,7 @@ import threading
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -76,6 +77,7 @@ def _user_out(u: User) -> UserOut:
         is_anonymous=u.is_anonymous,
         created_at=u.created_at, last_login_at=u.last_login_at,
         guide_dismissed=u.guide_dismissed, tutorial_done=u.tutorial_done,
+        language=getattr(u, "language", "tr") or "tr",
     )
 
 
@@ -227,4 +229,17 @@ def dismiss_guide(user: User = Depends(get_current_user), db: Session = Depends(
 def finish_tutorial(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> UserOut:
     """İlk giriş tutorial'ını tamamlandı işaretle (bir daha gösterilmez)."""
     user.tutorial_done = True
+    return _user_out(user)
+
+
+class LanguageIn(BaseModel):
+    language: str
+
+
+@router.post("/me/language", response_model=UserOut)
+def set_language(payload: LanguageIn, user: User = Depends(get_current_user),
+                 db: Session = Depends(get_db)) -> UserOut:
+    """Arayüz dilini kaydet ("tr" | "en"). Geçersizse tr'ye düşer."""
+    lang = (payload.language or "").strip().lower()
+    user.language = lang if lang in ("tr", "en") else "tr"
     return _user_out(user)

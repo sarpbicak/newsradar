@@ -381,6 +381,9 @@ class User(Base):
     is_anonymous: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # device_id cookie'sinin sha256'sı (düz device_id ASLA saklanmaz). Cihazdan kullanıcı bulunur.
     device_id_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    # Arayüz dili: "tr" | "en". İlk girişte sorulur, kullanıcıya kaydedilir, her girişte
+    # hatırlanır. Analiz metinleri de bu dile göre gösterilir (EntityAnalysis.language).
+    language: Mapped[str] = mapped_column(String(5), default="tr", nullable=False)
 
     # Büyük/küçük harf duyarsız benzersizlik (SQLite functional unique index).
     __table_args__ = (
@@ -417,8 +420,11 @@ class EntityAnalysis(Base):
         ForeignKey("entities.id", ondelete="CASCADE"), nullable=False, index=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    # Bu değerlendirmenin dili ("tr" | "en"). Aynı taramada her iki dilde birer satır
+    # üretilir; kullanıcı diline göre ilgili satır gösterilir. Eski kayıtlar "tr".
+    language: Mapped[str] = mapped_column(String(5), default="tr", nullable=False, index=True)
 
-    # Finans bilmeyen için tek cümlelik düz Türkçe hüküm (kartın başında). Eski
+    # Finans bilmeyen için tek cümlelik düz hüküm (kartın başında). Eski
     # kayıtlarda None → kart özete/yöne düşer.
     headline_verdict: Mapped[str | None] = mapped_column(Text, nullable=True)
     # "AI ne düşünüyor?" — 3-5 cümlelik bütünsel yorum (detay sayfası). Sağlayıcıdan
