@@ -199,7 +199,7 @@ export default function EntityCard({ card, onOpen, big = false }) {
           {/* Katman 1 nedeni — neden "bugün önemli" (mobilde gizli: sadeleştirme) */}
           {big && card.priority_reason && (
             <span className="hidden items-center rounded-full bg-accent/15 px-2.5 py-1 text-[11px] font-semibold text-accent md:inline-flex">
-              {card.priority_reason}
+              {tt(`pr.${card.priority_reason}`)}
             </span>
           )}
         </div>

@@ -58,6 +58,12 @@ const STR = {
   "card.horizon": { tr: "{h} vade", en: "{h} horizon" },
   "card.newsCount": { tr: "{n} haber", en: "{n} news" },
   "card.stanceChanged": { tr: "yön değişti", en: "stance changed" },
+  // Katman 1 kartındaki "neden önemli" rozeti (backend kanonik anahtar döndürür)
+  "pr.stance_reversed": { tr: "yön değişti", en: "stance reversed" },
+  "pr.stance_clarified": { tr: "yön netleşti", en: "stance clarified" },
+  "pr.risk_jump": { tr: "risk sıçraması", en: "risk jump" },
+  "pr.sharp_move": { tr: "sert hareket", en: "sharp move" },
+  "pr.divergence": { tr: "ayrışma", en: "divergence" },
 
   // ---- Etiketler (yön/vade/kanıt/trend) ----
   "stance.bullish": { tr: "YÜKSELİŞ", en: "BULLISH" },
