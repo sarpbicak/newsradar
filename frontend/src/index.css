@@ -108,6 +108,42 @@ body {
   pointer-events: none;
 }
 
+/* ── Tarama animasyonu — haber akışı → analiz → sonuç (tamamen CSS) ──────────
+   Soyut/geometrik, sakin, kağıt temasıyla uyumlu. Parçacıklar soldan merkeze akar
+   (haberler), merkez nabız atar (analiz), sağa renkli noktalar süzülür (sonuç). */
+.nr-scan { position: relative; height: 64px; overflow: hidden; flex: none; }
+.nr-scan__p { position: absolute; border-radius: 9999px; will-change: transform, opacity; }
+.nr-news { height: 3px; background: rgba(30, 58, 95, 0.45); animation: nr-flow linear infinite; }
+.nr-result { height: 6px; width: 6px; animation: nr-flow ease-out infinite; }
+.nr-core {
+  position: absolute; top: 50%; height: 20px; width: 20px; margin-top: -10px;
+  border-radius: 9999px; border: 2px solid #1E3A5F;
+  animation: nr-pulse 1.7s ease-in-out infinite;
+}
+.nr-core::after {
+  content: ""; position: absolute; inset: 4px; border-radius: 9999px;
+  background: rgba(30, 58, 95, 0.18);
+}
+@keyframes nr-flow {
+  0% { transform: translateX(0); opacity: 0; }
+  25% { opacity: var(--op, 0.5); }
+  78% { opacity: var(--op, 0.5); }
+  100% { transform: translateX(var(--dist, 110px)); opacity: 0; }
+}
+@keyframes nr-pulse {
+  0%, 100% { transform: scale(0.82); opacity: 0.4; }
+  50% { transform: scale(1.12); opacity: 0.85; }
+}
+/* Tamamlanınca yumuşak sönme */
+.nr-scan--fade { animation: nr-fade 0.5s ease forwards; }
+@keyframes nr-fade { to { opacity: 0; transform: scale(0.98); } }
+/* reduced-motion: animasyon yok, sade belirli ilerleme çubuğu */
+.nr-scan-bar { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .nr-scan { display: none; }
+  .nr-scan-bar { display: block; }
+}
+
 /* Skeleton (iskelet) — layout zıplamasın */
 .skeleton {
   background: linear-gradient(90deg, #f1eee8 25%, #e7e3da 37%, #f1eee8 63%);

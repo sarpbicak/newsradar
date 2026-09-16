@@ -9,6 +9,7 @@ import PrivacyModal from "./components/PrivacyModal.jsx";
 import AdminPanel from "./components/AdminPanel.jsx";
 import Tutorial from "./components/Tutorial.jsx";
 import FeedbackWidget from "./components/FeedbackWidget.jsx";
+import ScanStrip from "./components/ScanStrip.jsx";
 import { LanguageModal, LanguageSwitcher } from "./components/LanguageBits.jsx";
 import { Skeleton, useIsMobile } from "./components/ui.jsx";
 import { useI18n } from "./i18n.jsx";
@@ -201,6 +202,13 @@ export default function App({ setLang }) {
       clearTimeout(timer);
     };
   }, [authed, isRefreshing]);
+
+  // Tamamlanma bildirimi ("Yenilendi: …") birkaç saniye sonra kendiliğinden kaybolsun.
+  useEffect(() => {
+    if (notice?.type !== "ok") return;
+    const id = setTimeout(() => setNotice(null), 7000);
+    return () => clearTimeout(id);
+  }, [notice]);
 
   // Logo → ana sayfa (pano). Detay/admin'den döner; zaten anasayfadaysa en üste kaydırır.
   function goHome() {
@@ -534,8 +542,11 @@ export default function App({ setLang }) {
         )}
 
         {isRefreshing && (
-          <div className="mb-4 flex items-center gap-3 rounded-lg border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-slate-200">
-            <span className="inline-block h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-accent/40 border-t-accent" />
+          <div className="mb-4 flex flex-col gap-3 rounded-lg border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-slate-200 sm:flex-row sm:items-center">
+            <ScanStrip
+              isMobile={isMobile}
+              progress={running && status.progress_total ? status.progress_done / status.progress_total : 0}
+            />
             {running ? (
               <span>{t("notice.scanRunning", { done: status.progress_done, total: status.progress_total })}</span>
             ) : (
