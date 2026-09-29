@@ -617,6 +617,12 @@ export default function App({ setLang }) {
           </div>
         )}
 
+        {status?.last_summary?.quota_error && (
+          <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+            {t("notice.analysisUnavailable")}
+          </div>
+        )}
+
         {status?.budget_exceeded && (
           <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
             {t("notice.budgetExceeded")}

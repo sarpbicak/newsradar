@@ -23,7 +23,13 @@ import logging
 from collections.abc import Iterator
 
 from ..config import get_settings
-from .claude_client import ClaudeClient, ClaudeError, MissingAPIKeyError, TruncationError
+from .claude_client import (
+    ClaudeClient,
+    ClaudeError,
+    MissingAPIKeyError,
+    ProviderQuotaError,
+    TruncationError,
+)
 
 logger = logging.getLogger("newsradar.llm")
 
@@ -113,9 +119,18 @@ class OpenAICompatProvider(LLMProvider):
         self.call_count = 0
 
     def _raise_for_openai(self, exc: Exception) -> None:
-        """OpenAI istisnalarını anlaşılır ClaudeError'a çevirir (429 = rate limit)."""
+        """OpenAI istisnalarını anlaşılır ClaudeError'a çevirir (429 = rate limit).
+
+        402/403 = KALICI kota/bakiye hatası (OpenRouter 'Key limit exceeded' / 'Insufficient
+        balance') → ProviderQuotaError; pipeline bunu alınca taramayı durdurur (yeniden
+        denemez). Böylece tek hata 89 kez tekrarlanmaz."""
         import openai
 
+        if isinstance(exc, openai.APIStatusError) and exc.status_code in (402, 403):
+            raise ProviderQuotaError(
+                f"Sağlayıcı kota/bakiye hatası ({exc.status_code}): {exc.message}",
+                exc.status_code,
+            ) from exc
         if isinstance(exc, openai.RateLimitError):
             raise ClaudeError("LLM rate limit (429) — kısa süre bekleyin.") from exc
         if isinstance(exc, openai.APIStatusError):

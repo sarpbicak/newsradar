@@ -32,7 +32,7 @@ from ..db.models import PREFILTER_VERSION, Article, Entity, EntityAnalysis, Sugg
 from ..analyst import analyst_context_for
 from ..prices import price_context_for
 from ..providers import get_provider_for
-from .claude_client import ClaudeClient, ClaudeError, TruncationError
+from .claude_client import ClaudeClient, ClaudeError, ProviderQuotaError, TruncationError
 from .prompts import (
     SYSTEM_PROMPT,
     build_article_batch_prompt,
@@ -213,6 +213,8 @@ class AnalyzeTotals:
     unmatched: int = 0          # döndürülüp bu entity'ye eşleşmeyen id (teşhis)
     selected: int = 0           # _prefilter'ın batch'e seçtiği makale sayısı (teşhis)
     warnings: list[str] = field(default_factory=list)
+    quota_error: bool = False   # sağlayıcı kalıcı kota/bakiye hatası → tarama erken durdu
+    quota_status_code: int | None = None  # 402/403 (sağlık paneli/teşhis)
 
 
 # ------------------------------ Ön-filtre ------------------------------ #
@@ -577,16 +579,44 @@ async def analyze_all_async(
     sem = asyncio.Semaphore(concurrency)
     db_lock = asyncio.Lock()
 
+    # Sağlayıcı KALICI kota/bakiye hatası (402/403): İLK alındığında bu yenilemenin TÜM
+    # kalan LLM çağrılarını durdur (yeniden deneme YOK) ve TEK uyarı ver. Aksi halde her
+    # batch tek tek aynı 403'ü alır → 89 aynı uyarı + boşa token yakımı.
+    _quota_stopped = {"flag": False}
+
+    def _note_quota(exc: ProviderQuotaError) -> None:
+        """İlk kota hatasını işaretle + TEK uyarı. Idempotent (sonrakiler sessiz)."""
+        if _quota_stopped["flag"]:
+            return
+        _quota_stopped["flag"] = True
+        totals.quota_error = True
+        totals.quota_status_code = getattr(exc, "status_code", None)
+        totals.warnings.append(
+            "Analiz servisi geçici olarak kullanılamıyor (sağlayıcı kapasite/bakiye "
+            "limiti) — bu yenilemede analiz durduruldu, çekilen haberler kaydedildi."
+        )
+        logger.error("[quota] Sağlayıcı kota hatası — kalan LLM çağrıları durduruldu: %s", exc)
+
     async def _call(tool, user, max_tokens):
-        """Semaphore altında tek Claude çağrısı (sync istemci → to_thread)."""
+        """Semaphore altında tek Claude çağrısı (sync istemci → to_thread).
+
+        Kota durduysa ağa HİÇ çıkma — anında iptal (uyarı zaten bir kez verildi)."""
+        if _quota_stopped["flag"]:
+            raise ProviderQuotaError("Analiz durduruldu (kota).", None)
         async with sem:
-            return await asyncio.to_thread(
-                client.call_tool,
-                system=SYSTEM_PROMPT,
-                user=user,
-                tool=tool,
-                max_tokens=max_tokens,
-            )
+            if _quota_stopped["flag"]:
+                raise ProviderQuotaError("Analiz durduruldu (kota).", None)
+            try:
+                return await asyncio.to_thread(
+                    client.call_tool,
+                    system=SYSTEM_PROMPT,
+                    user=user,
+                    tool=tool,
+                    max_tokens=max_tokens,
+                )
+            except ProviderQuotaError as exc:
+                _note_quota(exc)
+                raise
 
     async def _run_batch(t: dict, b: list[dict], depth: int = 0):
         """Bir batch'i analiz eder. YALNIZCA KESİLME'de (TruncationError) batch'i ikiye
@@ -595,6 +625,8 @@ async def analyze_all_async(
         user = build_article_batch_prompt(t["name"], t["query"], t["type"], b, t["language"])
         try:
             return await _call(ARTICLE_ANALYSIS_TOOL, user, settings.max_output_tokens)
+        except ProviderQuotaError:
+            return None  # kota durdu — tek uyarı _note_quota'da; batch başına uyarı YOK
         except TruncationError as exc:
             if len(b) <= 1:
                 aid = b[0].get("id", "?") if b else "?"
@@ -627,6 +659,12 @@ async def analyze_all_async(
 
     async def _process_entity(t: dict):
         nonlocal done
+        # KOTA DURDU: kalan entity'lere hiç başlama (LLM çağrısı yok), yalnızca ilerlemeyi say.
+        if _quota_stopped["flag"]:
+            done += 1
+            if progress_cb:
+                progress_cb(done, len(entity_tasks))
+            return
         # SİSTEM BÜTÇE: tavana ulaşıldıysa bu entity'nin LLM çağrılarını YAPMA (atla).
         if _over_budget():
             if not _budget_stopped["flag"]:
@@ -659,7 +697,9 @@ async def analyze_all_async(
         # SESSİZ ARIZA KORUMASI: makale gönderdik ama LLM 0 analiz döndürdüyse
         # (ör. geçersiz model, boş yanıt) bunu bir uyarı olarak yüzeye çıkar — beş tur
         # teşhise mal olan "sessizce 0" durumu bir daha görünmez kalmasın.
-        if t["batches"] and applied["returned"] == 0:
+        # KOTA DURDUYSA istisna: 0 analiz beklenen sonuçtur (kota uyarısı zaten verildi) →
+        # entity başına "0 analiz" uyarısı EKLEME (aksi halde kota yine N uyarı biriktirir).
+        if t["batches"] and applied["returned"] == 0 and not _quota_stopped["flag"]:
             totals.warnings.append(
                 f"[{t['name']}] LLM 0 analiz döndürdü ({len(t['batches'])} batch "
                 "gönderildi) — model/endpoint sorunu olabilir (NEWSRADAR_LLM_MODEL?)."
@@ -683,6 +723,8 @@ async def analyze_all_async(
             # İKİ DİLDE değerlendirme: arayüzü İngilizce olan kullanıcı içeriği de
             # İngilizce görsün. Makale analizi tek sefer; bu yalnızca +1 çağrı/dil.
             for out_lang in ("tr", "en"):
+                if _quota_stopped["flag"]:
+                    break  # kota durdu → dil döngüsünü de kes (yeniden deneme yok)
                 def _build(items, _ol=out_lang):
                     return build_entity_prompt(
                         t["name"], t["query"], t["type"], items,
@@ -692,6 +734,8 @@ async def analyze_all_async(
                 try:
                     # Kesilme kurtarmalı (2× token → gerekirse yarı bağlam). Semaphore altında.
                     async with sem:
+                        if _quota_stopped["flag"]:
+                            break
                         adata, used = await asyncio.to_thread(
                             _assess_entity_with_recovery, client, _build, payload, f"{t['name']}/{out_lang}"
                         )
@@ -700,6 +744,9 @@ async def analyze_all_async(
                             _write_assessment, t["id"], adata, len(used), _avg_sentiment(used), out_lang
                         )
                     totals.entity_assessments += 1
+                except ProviderQuotaError as exc:
+                    _note_quota(exc)  # değerlendirme _call'ı kullanmaz → burada işaretle
+                    break
                 except ClaudeError as exc:
                     totals.warnings.append(f"[{t['name']}/{out_lang}] değerlendirme başarısız: {exc}")
 

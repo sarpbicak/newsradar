@@ -157,6 +157,17 @@ class AdminFeedbackOut(BaseModel):
     created_at: datetime
 
 
+class AdminHealthOut(BaseModel):
+    """LLM sistem sağlığı özeti (admin paneli)."""
+
+    last_kind: str | None = None           # 'ok' | 'quota' | 'error' | None (hiç olay yok)
+    last_at: datetime | None = None        # son sağlık olayının zamanı
+    last_status_code: int | None = None    # son kota hatasının HTTP kodu (402/403)
+    last_ok_at: datetime | None = None     # en son başarılı LLM çağrısı
+    quota_errors_24h: int = 0              # son 24 saatteki kota hatası sayısı
+    errors_24h: int = 0                    # son 24 saatteki diğer LLM hataları
+
+
 class AdminStatsOut(BaseModel):
     """Genel istatistikler."""
 
@@ -169,12 +180,17 @@ class AdminStatsOut(BaseModel):
     total_entities: int                    # havuzdaki benzersiz (takip edilen) entity sayısı
     # Maliyet takibi (LLM token → tahmini USD) + günlük bütçe durumu.
     tokens_today: int = 0
+    tokens_week: int = 0
     tokens_month: int = 0
     cost_today_usd: float = 0.0
+    cost_week_usd: float = 0.0
     cost_month_usd: float = 0.0
     daily_token_budget: int = 0            # 0 = sınırsız
     budget_exceeded: bool = False
     unread_feedback: int = 0               # okunmamış geri bildirim sayısı
+    # Sistem sağlığı (LLM): son çağrı sonucu + son 24s kota/hata sayısı. Sorunu
+    # kullanıcıdan önce admin görsün (ör. OpenRouter kota/bakiye limiti).
+    health: AdminHealthOut | None = None
 
 
 # --------------------------- Yanıt modelleri --------------------------- #
@@ -349,6 +365,7 @@ class RefreshSummaryOut(BaseModel):
     entity_assessments: int
     warnings: list[str]
     infos: list[str] = []
+    quota_error: bool = False  # sağlayıcı kota/bakiye limiti → analiz durdu (kullanıcı banner'ı)
 
 
 class RefreshAck(BaseModel):

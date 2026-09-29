@@ -33,6 +33,17 @@ class MissingAPIKeyError(ClaudeError):
     """ANTHROPIC_API_KEY tanımlı değil."""
 
 
+class ProviderQuotaError(ClaudeError):
+    """Sağlayıcının KALICI kota/bakiye hatası (ör. OpenRouter 403 'Key limit exceeded',
+    402 'Insufficient balance'). Yeniden denemek anlamsız — aynı hata döner ve token/uyarı
+    biriktirir. Pipeline bunu alınca o yenilemenin TÜM kalan LLM çağrılarını durdurur ve
+    TEK bir uyarı verir (89 aynı uyarı yerine). status_code teşhis/sağlık paneli için taşınır."""
+
+    def __init__(self, message: str, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+
 class TruncationError(ClaudeError):
     """Yanıt max_tokens'ta kesildi (yarım/bozuk JSON). Batch bölünüp yeniden denenebilir.
 
@@ -80,6 +91,11 @@ class ClaudeClient:
             logger.error(msg)
             raise ModelNotFoundError(msg) from exc
         except anthropic.APIStatusError as exc:
+            # 402/403 = kalıcı kota/bakiye/yetki → yeniden deneme, tüm taramayı durdur.
+            if exc.status_code in (402, 403):
+                msg = f"Sağlayıcı kota/bakiye hatası ({exc.status_code}): {exc.message}"
+                logger.error(msg)
+                raise ProviderQuotaError(msg, exc.status_code) from exc
             msg = f"Claude API hatası ({exc.status_code}): {exc.message}"
             logger.error(msg)
             raise ClaudeError(msg) from exc

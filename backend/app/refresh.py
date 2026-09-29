@@ -37,6 +37,7 @@ class RefreshSummary:
     entity_assessments: int = 0
     warnings: list[str] = field(default_factory=list)  # gerçek sorunlar
     infos: list[str] = field(default_factory=list)     # normal bilgi (tazelik/kota atlaması)
+    quota_error: bool = False   # sağlayıcı kalıcı kota/bakiye hatası → analiz erken durdu
 
 
 # --------------------------- Süreç durumu --------------------------- #
@@ -198,11 +199,22 @@ def run_refresh(
         summary.discarded = totals.discarded
         summary.entity_assessments = totals.entity_assessments
         summary.warnings.extend(totals.warnings)
+        summary.quota_error = totals.quota_error
 
         # Kullanımı kaydet (maliyet takibi + günlük bütçe sayacı).
         dp = (getattr(client, "total_prompt_tokens", 0) or 0) - base_p
         dc = (getattr(client, "total_completion_tokens", 0) or 0) - base_c
-        record_llm_usage(dp, dc, (getattr(client, "call_count", 0) or 0) - base_calls)
+        calls_made = (getattr(client, "call_count", 0) or 0) - base_calls
+        record_llm_usage(dp, dc, calls_made)
+
+        # SAĞLIK: bu yenilemenin LLM sonucunu kaydet (admin paneli 'sistem sağlığı' için).
+        # Kota hatası → 'quota'; en az bir başarılı çağrı olduysa → 'ok'. Hiç çağrı yoksa
+        # (analiz edilecek bir şey yoktu) sağlık değişmez — son gerçek denemeyi yansıtır.
+        from .health import record_llm_health
+        if totals.quota_error:
+            record_llm_health("quota", None, totals.quota_status_code)
+        elif calls_made > 0:
+            record_llm_health("ok")
 
         logger.info(
             "Yenileme tamam: yeni=%d ön-filtre=%d analiz=%d elenen=%d değerlendirme=%d",

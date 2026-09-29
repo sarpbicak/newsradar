@@ -27,6 +27,7 @@ from .routes_feedback import device_from_user_agent
 from .schemas import (
     AdminEventOut,
     AdminFeedbackOut,
+    AdminHealthOut,
     AdminStatsOut,
     AdminUserDetail,
     AdminUserRow,
@@ -240,7 +241,9 @@ def stats(db: Session = Depends(get_db)) -> AdminStatsOut:
     from datetime import timedelta
 
     from .. import budget as _budget
+    from ..health import health_snapshot
     tok_today = _budget.daily_tokens_used()
+    tok_week = _budget.tokens_since(_start_of_today() - timedelta(days=7))
     tok_month = _budget.tokens_since(_start_of_today() - timedelta(days=30))
     unread_feedback = db.scalar(
         select(func.count()).select_from(Feedback).where(Feedback.is_read.is_(False))
@@ -254,12 +257,15 @@ def stats(db: Session = Depends(get_db)) -> AdminStatsOut:
         most_followed=most_followed,
         total_entities=total_entities,
         tokens_today=tok_today,
+        tokens_week=tok_week,
         tokens_month=tok_month,
         cost_today_usd=_budget.estimated_cost_usd(tok_today),
+        cost_week_usd=_budget.estimated_cost_usd(tok_week),
         cost_month_usd=_budget.estimated_cost_usd(tok_month),
         daily_token_budget=get_settings().daily_token_budget,
         budget_exceeded=_budget.is_budget_exceeded(),
         unread_feedback=unread_feedback,
+        health=AdminHealthOut(**health_snapshot()),
     )
 
 

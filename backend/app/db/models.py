@@ -215,6 +215,22 @@ class LlmUsage(Base):
     calls: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
 
+class LlmHealthEvent(Base):
+    """LLM sağlık olayı — her yenileme sonunda bir satır: sağlayıcı çağrıları başarılı
+    mıydı yoksa kalıcı kota/hata mı aldı. Admin paneli 'sistem sağlığı' göstergesi bunu
+    okur (son çağrı başarılı mı, son 24 saatteki kota hataları) — sorun kullanıcıdan önce
+    görülsün. kind: 'ok' | 'quota' | 'error'.
+    """
+
+    __tablename__ = "llm_health_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False, index=True)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    status_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 class Feedback(Base):
     """Kullanıcı geri bildirimi (herkese açık — anon da yazabilir). Yalnızca admin okur.
 

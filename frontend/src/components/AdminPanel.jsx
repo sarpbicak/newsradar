@@ -21,6 +21,61 @@ function StatCard({ label, value, hint }) {
   );
 }
 
+// LLM sistem sağlığı: son çağrı başarılı mıydı + son 24s kota/hata sayısı.
+// Sorun (ör. OpenRouter kota/bakiye limiti) kullanıcı fark etmeden admin'e görünsün.
+export function HealthBanner({ health }) {
+  const h = health || {};
+  const quota = h.quota_errors_24h || 0;
+  const errs = h.errors_24h || 0;
+  // Durum: kota hatası → kırmızı; diğer hata → amber; son çağrı ok → yeşil; veri yok → nötr.
+  let tone, dot, title;
+  if (h.last_kind == null) {
+    tone = "border-ink-600 bg-ink-800 text-slate-400"; dot = "bg-slate-500";
+    title = tt("adm.healthNoData");
+  } else if (quota > 0 || h.last_kind === "quota") {
+    tone = "border-rose-500/50 bg-rose-500/10 text-rose-300"; dot = "bg-rose-400";
+    title = tt("adm.healthQuota");
+  } else if (errs > 0 || h.last_kind === "error") {
+    tone = "border-amber-500/50 bg-amber-500/10 text-amber-200"; dot = "bg-amber-400";
+    title = tt("adm.healthErrors");
+  } else {
+    tone = "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"; dot = "bg-emerald-400";
+    title = tt("adm.healthOk");
+  }
+  return (
+    <div className={`rounded-xl border p-4 shadow-card ${tone}`}>
+      <div className="flex items-center gap-2">
+        <span className={`inline-block h-2.5 w-2.5 rounded-full ${dot}`} />
+        <span className="text-[11px] font-semibold uppercase tracking-wide">
+          {tt("adm.healthTitle")}
+        </span>
+      </div>
+      <div className="mt-1.5 text-sm font-medium">{title}</div>
+      <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-400">
+        <span>
+          {tt("adm.healthLastOk")}:{" "}
+          <span className="text-slate-300">
+            {h.last_ok_at ? timeAgo(h.last_ok_at) : tt("adm.healthNever")}
+          </span>
+        </span>
+        <span>
+          {tt("adm.healthQuota24h")}:{" "}
+          <span className={quota > 0 ? "font-semibold text-rose-400" : "text-slate-300"}>{quota}</span>
+        </span>
+        <span>
+          {tt("adm.healthErr24h")}:{" "}
+          <span className={errs > 0 ? "font-semibold text-amber-300" : "text-slate-300"}>{errs}</span>
+        </span>
+        {h.last_status_code ? (
+          <span>
+            {tt("adm.healthCode")}: <span className="font-mono text-slate-300">{h.last_status_code}</span>
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPanel({ currentUserId }) {
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
@@ -105,6 +160,9 @@ export default function AdminPanel({ currentUserId }) {
     <div className="space-y-6">
       <h2 className="font-display text-xl font-bold text-slate-100">{tt("adm.title")}</h2>
 
+      {/* SİSTEM SAĞLIĞI (LLM) — sorunu kullanıcıdan önce gör. En üstte, dikkat çekici. */}
+      <HealthBanner health={stats.health} />
+
       {/* Genel istatistik */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {(() => {
@@ -158,9 +216,9 @@ export default function AdminPanel({ currentUserId }) {
             </div>
           );
         })()}
-        <StatCard label={tt("adm.costToday")} value={`$${stats.cost_today_usd.toFixed(2)}`} hint={tt("adm.costEst")} />
+        <StatCard label={tt("adm.costToday")} value={`$${stats.cost_today_usd.toFixed(2)}`} hint={tt("adm.tokenK", { n: (stats.tokens_today / 1000).toFixed(0) })} />
+        <StatCard label={tt("adm.cost7")} value={`$${(stats.cost_week_usd ?? 0).toFixed(2)}`} hint={tt("adm.tokenK", { n: ((stats.tokens_week ?? 0) / 1000).toFixed(0) })} />
         <StatCard label={tt("adm.cost30")} value={`$${stats.cost_month_usd.toFixed(2)}`} hint={tt("adm.tokenK", { n: (stats.tokens_month / 1000).toFixed(0) })} />
-        <StatCard label={tt("adm.totalEntities")} value={stats.total_entities} hint={tt("adm.poolUnique")} />
       </div>
 
       {/* Geri bildirim gelen kutusu — okunmamışlar önce, vurgulu */}
