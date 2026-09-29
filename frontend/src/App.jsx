@@ -22,13 +22,7 @@ export default function App({ setLang }) {
   const { t, lang } = useI18n();
   // İlk ziyarette dil sorulur (localStorage'da seçim yoksa).
   const [showLangModal, setShowLangModal] = useState(() => !localStorage.getItem("nr_lang"));
-
-  // Dili uygula: provider + localStorage + backend (kalıcı, her girişte hatırlanır).
-  const applyLang = useCallback((l) => {
-    setLang(l);
-    localStorage.setItem("nr_lang", l);
-    api.setLanguage(l).catch(() => {});
-  }, [setLang]);
+  const [switchingLang, setSwitchingLang] = useState(false); // dil değişiminde kısa fade
   const [user, setUser] = useState(null);            // kişisel kullanıcı (anon ya da kayıtlı)
   const [checkingSession, setCheckingSession] = useState(true);
   const [account, setAccount] = useState(null);      // "upgrade" | "login" | null (modal)
@@ -148,6 +142,44 @@ export default function App({ setLang }) {
   useEffect(() => {
     if (authed) loadCards();
   }, [authed, loadCards]);
+
+  // Dili uygula: ÖNCE backend'e kaydet (bekle) → sonra UI dilini çevir + veriyi yeni
+  // dilde YENİDEN ÇEK. Backend AI içeriğini user.language'e göre döndürdüğü için, önce
+  // POST /users/me/language tamamlanmadan çekersek eski dil gelir. Detay sayfası da
+  // `lang` prop'u değişince kendini yeniler (EntityDetail). Geçişte kısa fade.
+  const applyLang = useCallback(async (l) => {
+    if (l === lang) return;
+    setSwitchingLang(true);            // içerik kısaca soluklaşsın (kullanıcı değişimi görsün)
+    try {
+      await api.setLanguage(l);        // KALICI: get_current_user artık yeni dili okur
+    } catch {
+      /* token yoksa/hatalıysa yoksay — UI dili yine de değişsin */
+    }
+    localStorage.setItem("nr_lang", l);
+    setLang(l);                        // i18n stringleri + provider (detay refetch tetikler)
+    if (authed) {
+      try {
+        await loadCards();            // kartlar/durum/öneriler yeni dilde
+      } catch {
+        /* loadCards kendi hatasını setLoadError ile yönetir */
+      }
+    }
+    setSwitchingLang(false);           // fade geri
+  }, [lang, setLang, authed, loadCards]);
+
+  // Kullanıcı yüklendiğinde cihazdaki seçili dil (localStorage) backend'le eşleşmiyorsa
+  // senkronla — ilk ziyaret yarışını (modal seçimi POST'tan önce) ve cihaz-başı tercihi
+  // garanti eder ki AI içeriği doğru dilde gelsin. (user kimliği başına bir kez.)
+  useEffect(() => {
+    if (!user) return;
+    const saved = localStorage.getItem("nr_lang");
+    if (saved && (saved === "tr" || saved === "en") && saved !== user.language) {
+      api.setLanguage(saved)
+        .then(() => setUser((u) => (u ? { ...u, language: saved } : u)))
+        .catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   // Bir tarama sürerken her 5 sn'de bir status + kartları yenile (canlı ilerleme).
   // Tarama bitince verileri son bir kez çekip tamamlanma bildirimini göster.
@@ -530,7 +562,7 @@ export default function App({ setLang }) {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+      <main className={`mx-auto max-w-7xl px-4 py-6 transition-opacity duration-200 sm:px-6 ${switchingLang ? "opacity-40" : "opacity-100"}`}>
         {view === "admin" && user?.is_admin ? (
           <AdminPanel currentUserId={user?.id} />
         ) : (
@@ -640,7 +672,7 @@ export default function App({ setLang }) {
             scanning={isRefreshing}
           />
         ) : (
-          <EntityDetail entityId={selected} onBack={() => setSelected(null)} />
+          <EntityDetail entityId={selected} lang={lang} onBack={() => setSelected(null)} />
         )}
         </>
         )}

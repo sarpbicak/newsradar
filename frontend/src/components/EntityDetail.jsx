@@ -33,13 +33,15 @@ function MiniStat({ label, value, color }) {
   );
 }
 
-export default function EntityDetail({ entityId, onBack }) {
+export default function EntityDetail({ entityId, lang, onBack }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState("summary");
   const isMobile = useIsMobile();
 
+  // entityId ya da DİL değişince yeniden çek — dil değişiminde AI içeriği (dashboard)
+  // yeni dilde gelsin. (App önce POST /users/me/language'i bekler; bu efekt sonra çalışır.)
   useEffect(() => {
     let alive = true;
     setLoading(true);
@@ -51,7 +53,7 @@ export default function EntityDetail({ entityId, onBack }) {
     return () => {
       alive = false;
     };
-  }, [entityId]);
+  }, [entityId, lang]);
 
   if (loading) return <div className="p-8 text-slate-500">{tt("detail.loading")}</div>;
   if (error) return <div className="p-8 text-rose-400">{tt("detail.error", { msg: error })}</div>;
