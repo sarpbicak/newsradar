@@ -120,6 +120,7 @@ def status(
         is_running=mine_running,
         progress_done=st["progress_done"] if mine_running else 0,
         progress_total=st["progress_total"] if mine_running else 0,
+        current_entity=st["current_entity"] if mine_running else None,
         last_completed_at=st["last_completed_at"] if mine_last else None,
         last_summary=st["last_summary"] if mine_last else None,
         refresh_limit=r_limit,

@@ -43,6 +43,9 @@ export default function App({ setLang }) {
   const [loaded, setLoaded] = useState(false); // ilk yükleme tamamlandı mı (skeleton için)
   const [loadError, setLoadError] = useState(null);
   const [notice, setNotice] = useState(null);
+  // Tarama tamamlanınca kısa süre gösterilen bitiş kartı ({news, analyses}) + sönme.
+  const [scanDone, setScanDone] = useState(null);
+  const [scanFading, setScanFading] = useState(false);
 
   // Tarama sürüyor mu: sunucu durumu VEYA iyimser 'başlatılıyor' bayrağı.
   const running = !!status?.is_running;
@@ -203,21 +206,28 @@ export default function App({ setLang }) {
           setStarting(false); // sunucu çalıştığını doğruladı
           timer = setTimeout(tick, 5000);
         } else {
-          // Tamamlandı → özet bildirimi (status.last_summary'den).
+          // Tamamlandı → çubuğun kendi içinde "Tamamlandı · N haber · N analiz" göster,
+          // birkaç saniye sonra yumuşakça söndür. Uyarı/atlama varsa ayrıca not kutusu.
           setStarting(false);
           const sm = s.last_summary;
           if (sm) {
-            const parts = [t("notice.newNews", { n: sm.fetched_new }), t("notice.analyzed", { n: sm.analyzed })];
-            if (sm.prefiltered) parts.push(t("notice.prefiltered", { n: sm.prefiltered }));
-            if (sm.discarded) parts.push(t("notice.discarded", { n: sm.discarded }));
+            setScanDone({ news: sm.fetched_new, analyses: sm.analyzed });
             const warns = sm.warnings || [];
-            setNotice({
-              type: warns.length ? "warn" : "ok",
-              text: t("notice.refreshed", { parts: parts.join(" · ") }) +
-                (warns.length ? t("notice.warnings", { n: warns.length }) : ""),
-              details: warns,              // yalnızca GERÇEK uyarılar (amber kutu)
-              infos: sm.infos || [],       // normal atlamalar (soluk, küçük not)
-            });
+            const infos = sm.infos || [];
+            // GERÇEK uyarılar (ya da atlama notları) varsa ayrı kalıcı-ish kutu göster;
+            // sade başarı durumunda çubuğun bitiş satırı yeterli (ikinci mesaj yok).
+            if (warns.length || infos.length) {
+              const parts = [t("notice.newNews", { n: sm.fetched_new }), t("notice.analyzed", { n: sm.analyzed })];
+              if (sm.prefiltered) parts.push(t("notice.prefiltered", { n: sm.prefiltered }));
+              if (sm.discarded) parts.push(t("notice.discarded", { n: sm.discarded }));
+              setNotice({
+                type: warns.length ? "warn" : "ok",
+                text: t("notice.refreshed", { parts: parts.join(" · ") }) +
+                  (warns.length ? t("notice.warnings", { n: warns.length }) : ""),
+                details: warns,              // yalnızca GERÇEK uyarılar (amber kutu)
+                infos,                       // normal atlamalar (soluk, küçük not)
+              });
+            }
           }
           // isRefreshing artık false → efekt temizlenir, döngü durur.
         }
@@ -241,6 +251,26 @@ export default function App({ setLang }) {
     const id = setTimeout(() => setNotice(null), 7000);
     return () => clearTimeout(id);
   }, [notice]);
+
+  // Bitiş çubuğu: birkaç saniye "Tamamlandı" göster, sonra yumuşakça söndürüp kaldır.
+  useEffect(() => {
+    if (!scanDone) return;
+    setScanFading(false);
+    const fadeAt = setTimeout(() => setScanFading(true), 3500);   // gösterim süresi
+    const clearAt = setTimeout(() => {                            // fade (0.5s) sonrası kaldır
+      setScanDone(null);
+      setScanFading(false);
+    }, 4000);
+    return () => {
+      clearTimeout(fadeAt);
+      clearTimeout(clearAt);
+    };
+  }, [scanDone]);
+
+  // Yeni bir tarama başlarsa önceki bitiş çubuğu görünmesin.
+  useEffect(() => {
+    if (isRefreshing) setScanDone(null);
+  }, [isRefreshing]);
 
   // Logo → ana sayfa (pano). Detay/admin'den döner; zaten anasayfadaysa en üste kaydırır.
   function goHome() {
@@ -573,17 +603,17 @@ export default function App({ setLang }) {
           </div>
         )}
 
-        {isRefreshing && (
-          <div className="mb-4 flex flex-col gap-3 rounded-lg border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-slate-200 sm:flex-row sm:items-center">
+        {(isRefreshing || scanDone) && (
+          <div className="mb-4">
             <ScanStrip
               isMobile={isMobile}
-              progress={running && status.progress_total ? status.progress_done / status.progress_total : 0}
+              phase={scanDone ? "done" : running ? "running" : "starting"}
+              currentEntity={running ? status.current_entity : null}
+              done={running ? status.progress_done : 0}
+              total={running ? status.progress_total : scanDone ? 0 : 0}
+              summary={scanDone}
+              fading={scanFading}
             />
-            {running ? (
-              <span>{t("notice.scanRunning", { done: status.progress_done, total: status.progress_total })}</span>
-            ) : (
-              <span>{t("notice.scanStarting")}</span>
-            )}
           </div>
         )}
 

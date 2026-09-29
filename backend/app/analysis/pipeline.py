@@ -503,6 +503,7 @@ def _write_assessment(entity_id: int, data: dict, considered: int,
 async def analyze_all_async(
     client: ClaudeClient,
     progress_cb=None,
+    entity_cb=None,
     entity_ids: set[int] | None = None,
 ) -> AnalyzeTotals:
     """Aktif entity'ler için ön-filtre + paralel analiz + değerlendirme.
@@ -510,6 +511,7 @@ async def analyze_all_async(
     entity_ids verilirse yalnızca o entity'ler işlenir (kişisel elle yenileme);
     None ise tüm aktif entity'ler (scheduler). progress_cb(done, total): her entity
     tamamlandığında çağrılır (ilerleme kişisel elle yenilemede kullanıcının listesine göre).
+    entity_cb(name): bir entity analize BAŞLADIĞINDA çağrılır (UI 'X analiz ediliyor…').
     """
     settings = get_settings()
     batch_size = max(1, settings.batch_size)
@@ -637,6 +639,10 @@ async def analyze_all_async(
             if progress_cb:
                 progress_cb(done, len(entity_tasks))
             return
+        # UI: bu entity analize başladı → "X analiz ediliyor…" (eşzamanlı olduğu için
+        # en son başlayan görünür; kullanıcıya taramanın canlı ve nerede olduğunu gösterir).
+        if entity_cb:
+            entity_cb(t["name"])
         # 1) Makale batch'leri — hepsi paralel (global semaphore ile sınırlı).
         #    Batch'ler hem entity içinde hem entity'ler arası eşzamanlı çalışır;
         #    aynı anda en fazla `concurrency` çağrı olur.

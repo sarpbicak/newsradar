@@ -391,6 +391,7 @@ class ProviderStatusOut(BaseModel):
     is_running: bool = False
     progress_done: int = 0
     progress_total: int = 0
+    current_entity: str | None = None  # şu an analiz edilen şirket adı (UI: "Tesla analiz ediliyor…")
     last_completed_at: datetime | None = None
     last_summary: RefreshSummaryOut | None = None
     # Kişisel elle yenileme kotası (rolling 24s). refresh_limit=0 → sınırsız.

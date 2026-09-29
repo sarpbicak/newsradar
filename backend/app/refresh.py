@@ -48,6 +48,7 @@ class _State:
     is_running: bool = False
     progress_done: int = 0
     progress_total: int = 0
+    current_entity: str | None = None  # şu an analiz edilen şirket adı (yaklaşık: en son başlayan)
     last_completed_at: datetime | None = None
     last_summary: RefreshSummary | None = None
     user_id: int | None = None        # şu an çalışan taramayı başlatan kullanıcı
@@ -65,6 +66,7 @@ def get_state() -> dict:
             "is_running": _state.is_running,
             "progress_done": _state.progress_done,
             "progress_total": _state.progress_total,
+            "current_entity": _state.current_entity,
             "last_completed_at": _state.last_completed_at,
             "last_summary": asdict(_state.last_summary) if _state.last_summary else None,
             "user_id": _state.user_id,
@@ -83,6 +85,7 @@ def _set_running(running: bool, total: int = 0, user_id: int | None = None) -> N
         if running:
             _state.progress_done = 0
             _state.progress_total = total
+            _state.current_entity = None
             _state.user_id = user_id
 
 
@@ -92,12 +95,20 @@ def _set_progress(done: int, total: int) -> None:
         _state.progress_total = total
 
 
+def _set_current_entity(name: str | None) -> None:
+    """Şu an analiz edilen şirket (UI 'X analiz ediliyor…' gösterir). Entity'ler
+    eşzamanlı işlendiği için bu yaklaşık: en son başlayan entity'nin adı."""
+    with _state_lock:
+        _state.current_entity = name
+
+
 def _record_completion(summary: RefreshSummary) -> None:
     with _state_lock:
         _state.last_completed_at = datetime.now(timezone.utc)
         _state.last_summary = summary
         _state.last_user_id = _state.user_id
         _state.user_id = None
+        _state.current_entity = None
 
 
 # --------------------------- Çekirdek akış --------------------------- #
@@ -177,7 +188,10 @@ def run_refresh(
         base_calls = getattr(client, "call_count", 0) or 0
 
         totals = asyncio.run(
-            analyze_all_async(client, progress_cb=_set_progress, entity_ids=entity_ids)
+            analyze_all_async(
+                client, progress_cb=_set_progress, entity_cb=_set_current_entity,
+                entity_ids=entity_ids,
+            )
         )
         summary.prefiltered = totals.prefiltered
         summary.analyzed = totals.analyzed
