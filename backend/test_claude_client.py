@@ -177,6 +177,14 @@ kw = fm.calls[0]
 check(kw["tool_choice"] == {"type": "auto"}, "Sonnet 5.5: tool_choice=auto (zorunlu 400 verir)")
 check("`t` aracını" in kw["messages"][0]["content"], "Sonnet 5.5: araç talimatı user'a eklendi")
 check("temperature" not in kw, "temperature gönderilmiyor (5.5 modelleri 400 verir)")
+check(kw["tools"][0].get("strict") is True, "Sonnet 5.5: tool strict=true")
+c, fm = client_with([message()], model="claude-haiku-5-5")
+call(c)
+check(fm.calls[0]["tools"][0].get("strict") is True and "strict" not in TOOL,
+      "Haiku 5.5: tool strict=true (orijinal tool sözlüğü değişmedi)")
+c, fm = client_with([message()], model="bilinmeyen-model")
+call(c)
+check("strict" not in fm.calls[0]["tools"][0], "tabloda olmayan model: strict YOK (temkinli)")
 
 print("== H: prompt caching ==")
 from app.analysis.prompts import SYSTEM_PROMPT  # noqa: E402

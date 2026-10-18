@@ -271,6 +271,8 @@ class ClaudeClient:
                             "araç dışında metin yazma.")
         if self.spec.tool_effort:
             kwargs["output_config"] = {"effort": self.spec.tool_effort}
+        if self.spec.strict_tools:
+            tool = {**tool, "strict": True}
 
         def _do():
             with self._client.messages.stream(

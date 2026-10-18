@@ -398,6 +398,7 @@ _PING_TOOL = {
         "type": "object",
         "properties": {"echo": {"type": "string", "description": "Geri yazılan kelime"}},
         "required": ["echo"],
+        "additionalProperties": False,
     },
 }
 
@@ -433,7 +434,8 @@ def cmd_llm_check(_args: argparse.Namespace) -> None:
         print(f"\n▶ {model}  (kullanım: {', '.join(used_for)})")
         print(f"  tabloda: {'evet' if is_known(model) else 'HAYIR — fiyat/sınır bilinmiyor'} · "
               f"max_output={spec.max_output_tokens} · zorunlu tool_choice="
-              f"{'evet' if spec.forced_tool_choice else 'hayır (auto)'}")
+              f"{'evet' if spec.forced_tool_choice else 'hayır (auto)'} · strict="
+              f"{'evet' if spec.strict_tools else 'hayır'}")
         try:
             c = get_llm_provider(used_for[0], model=model)
         except MissingAPIKeyError as exc:

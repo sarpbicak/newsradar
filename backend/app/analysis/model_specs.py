@@ -35,6 +35,10 @@ class ModelSpec:
     forced_tool_choice: bool
     # Yapılandırılmış (tool) çağrılarda output_config.effort; None = modelin varsayılanı.
     tool_effort: str | None = None
+    # Tool tanımlarına strict: true (grammar-constrained sampling): tool input'u şemaya
+    # BİREBİR uyar — dizi yerine string gibi tip hataları kökten kesilir. Şemalar strict
+    # kısıtlarına uygun olmalı (additionalProperties: false, minimum/maxLength vb. yok).
+    strict_tools: bool = False
     price: Price | None = None
     # Uzun prompt fiyat kademesi: prompt (input + cache write + cache read) bu eşiği
     # AŞARSA isteğin TÜM kalemleri long_price ile faturalanır (Haiku 5.5: 100k → 5×).
@@ -43,19 +47,22 @@ class ModelSpec:
 
 
 MODEL_SPECS: dict[str, ModelSpec] = {
-    # Haiku 5.5: 128K çıktı; zorunlu tool_choice kabul (bu durumda thinking atlanır).
+    # Haiku 5.5: 128K çıktı; zorunlu tool_choice kabul (bu durumda thinking atlanır);
+    # strict + zorunlu tool_choice birlikte canlı doğrulandı (2026-10-18).
     # Fiyat iki kademeli: prompt ≤100k → $0.10/$0.50; >100k → $0.50/$2.50 (cache dahil).
     "claude-haiku-5-5": ModelSpec(
-        max_output_tokens=128_000, forced_tool_choice=True,
+        max_output_tokens=128_000, forced_tool_choice=True, strict_tools=True,
         price=Price(input=0.10, output=0.50, cache_write=0.125, cache_read=0.01),
         long_prompt_threshold=100_000,
         long_price=Price(input=0.50, output=2.50, cache_write=0.625, cache_read=0.05),
     ),
     # Sonnet 5.5: 128K çıktı; zorunlu tool_choice 400 → auto. Adaptive thinking açık,
     # varsayılan effort 'high' — maliyet için yapılandırılmış çağrılarda 'medium'.
-    # Cache okuma 0.05× girdi ($0.10).
+    # Cache okuma 0.05× girdi ($0.10). strict + auto: docs'un forced tool_choice yerine
+    # önerdiği desen (şema garantisini korur).
     "claude-sonnet-5-5": ModelSpec(
         max_output_tokens=128_000, forced_tool_choice=False, tool_effort="medium",
+        strict_tools=True,
         price=Price(input=2.00, output=10.00, cache_write=2.50, cache_read=0.10),
     ),
 }

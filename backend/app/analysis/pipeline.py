@@ -41,7 +41,7 @@ from .prompts import (
     build_article_batch_prompt,
     build_entity_prompt,
 )
-from .text_quality import PROMPT_LIMITS, hard_cap, word_count
+from .text_quality import PROMPT_LIMITS, banned_phrase_hits, hard_cap, word_count
 from .schemas import (
     ARTICLE_ANALYSIS_TOOL,
     ENTITY_ANALYSIS_TOOL,
@@ -125,7 +125,8 @@ def _fit_assessment_context(client, build_fn, payload: list[dict], name: str) ->
     return items
 
 
-# Hüküm emniyet tavanını aşarsa bir kez eklenen "daha kısa yaz" notu (çıkış dilinde).
+# Kalite tekrar denemesi notları (çıkış dilinde). Hüküm emniyet tavanını aşarsa "daha kısa
+# yaz"; hüküm/ai_take/summary yasaklı ifade içerirse "şu ifadeleri kullanma".
 _SHORTER_NOTE = {
     "tr": ("NOT: Önceki denemede headline_verdict {n} kelimeydi — çok uzun. Bu sefer en fazla "
            "{limit} kelimelik TEK cümle yaz; sığmıyorsa daha az şey söyle. Diğer alanlar da "
@@ -134,36 +135,60 @@ _SHORTER_NOTE = {
            "write ONE sentence of at most {limit} words; if it doesn't fit, say fewer things. "
            "Keep the other fields within their limits too."),
 }
+_BANNED_NOTE = {
+    "tr": ("NOT: Önceki denemede yasaklı kalıp ifadeler kullanıldı. Şu ifadeleri KULLANMA: {phrases}. "
+           "Bunların yerine bu şirketin somut olayıyla başla."),
+    "en": ("NOTE: The previous attempt used banned boilerplate phrases. Do NOT use: {phrases}. "
+           "Lead with this company's concrete event instead."),
+}
+_BANNED_FIELDS = ("headline_verdict", "ai_take", "summary")
+
+
+def _quality_notes(data: dict, lang: str) -> list[str]:
+    """Yeniden istemeyi gerektiren kalite sorunları için notlar (boş = temiz)."""
+    notes = []
+    n = word_count(str(data.get("headline_verdict") or ""))
+    if n > hard_cap("headline_verdict", lang):
+        notes.append(_SHORTER_NOTE[lang].format(n=n, limit=PROMPT_LIMITS["headline_verdict"][lang]))
+    text = " ".join(str(data.get(f) or "") for f in _BANNED_FIELDS)
+    hits = banned_phrase_hits(text, lang)
+    if hits:
+        notes.append(_BANNED_NOTE[lang].format(phrases=", ".join(f"'{h}'" for h in hits)))
+    return notes
 
 
 def _assess_entity_with_recovery(client, build_fn, payload, name, lang: str = "tr"):
-    """Değerlendirme + uzunluk denetimi. (adata, kullanılan_payload) döner.
+    """Değerlendirme + kalite denetimi. (adata, kullanılan_payload) döner.
 
-    Hüküm emniyet tavanını (text_quality.HARD_CAPS) aşarsa değerlendirme BİR KEZ "daha kısa
-    yaz" notuyla yeniden istenir. Yine aşarsa ikinci yanıt kullanılır ve sanitize hükmü son
-    tam cümlede keser (cümle sonu yoksa olduğu gibi bırakır — yarım cümle üretilmez)."""
+    Hüküm emniyet tavanını (text_quality.HARD_CAPS) aşarsa ya da hüküm/ai_take/summary
+    yasaklı ifade (text_quality.BANNED_PHRASES) içerirse değerlendirme BİR KEZ ilgili
+    notlarla yeniden istenir (sorunlar birlikteyse notlar tek denemede gider — en fazla bir
+    ek çağrı, döngü yok). Daha az sorunlu yanıt kullanılır (eşitlikte yenisi); kalan sorun
+    loglanır: uzun hükmü sanitize son tam cümlede keser, yasaklı ifade olduğu gibi kalır."""
     lang = "en" if (lang or "tr").lower() == "en" else "tr"
     data, used = _assess_with_truncation_recovery(client, build_fn, payload, name)
-    n = word_count(str(data.get("headline_verdict") or ""))
-    cap = hard_cap("headline_verdict", lang)
-    if n <= cap:
+    notes = _quality_notes(data, lang)
+    if not notes:
         return data, used
-    limit = PROMPT_LIMITS["headline_verdict"][lang]
-    logger.warning("[%s] hüküm %d kelime > %d emniyet tavanı → 'daha kısa yaz' notuyla bir kez "
-                   "yeniden isteniyor.", name, n, cap)
-    note = _SHORTER_NOTE[lang].format(n=n, limit=limit)
+    logger.warning("[%s] kalite sorunu → notlarla bir kez yeniden isteniyor: %s",
+                   name, " | ".join(notes))
+    note = "\n\n".join(notes)
     try:
         data2, used2 = _assess_with_truncation_recovery(
             client, lambda items: f"{build_fn(items)}\n\n{note}", used, name)
     except ProviderQuotaError:
         raise
     except ClaudeError as exc:
-        logger.warning("[%s] kısaltma denemesi başarısız (%s) — ilk yanıt kullanılıyor.", name, exc)
+        logger.warning("[%s] kalite tekrar denemesi başarısız (%s) — ilk yanıt kullanılıyor.",
+                       name, exc)
         return data, used
-    n2 = word_count(str(data2.get("headline_verdict") or ""))
-    if n2 > cap:
-        logger.warning("[%s] kısaltma sonrası hüküm hâlâ %d kelime — son tam cümlede kesilecek.",
-                       name, n2)
+    notes2 = _quality_notes(data2, lang)
+    if len(notes2) > len(notes):
+        logger.warning("[%s] tekrar deneme daha sorunlu — ilk yanıt kullanılıyor.", name)
+        data2, used2, notes2 = data, used, notes
+    if notes2:
+        logger.warning("[%s] tekrar denemeden sonra kalan sorun (metin olduğu gibi tutuldu, "
+                       "uzun hüküm son tam cümlede kesilecek): %s", name, " | ".join(notes2))
     return data2, used2
 
 

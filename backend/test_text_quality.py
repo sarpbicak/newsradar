@@ -138,6 +138,37 @@ c = FakeClient([" ".join(["word"] * 31) + ".", "Short verdict."])
 _assess_entity_with_recovery(c, build, [{"x": 1}], "EN", "en")
 check("say fewer things" in c.users[1], "EN'de not İngilizce")
 
+print("== E2: yasaklı ifade tekrar denemesi ==")
+class FakeClient2:
+    model = "fake"
+    def __init__(self, outs):
+        self.outs = list(outs)
+        self.users = []
+    def call_tool(self, *, system, user, tool, max_tokens=4096):
+        self.users.append(user)
+        return self.outs.pop(0)
+
+BAN = {"headline_verdict": "Haberler ağırlıklı olarak olumsuz, marjlar baskıda.", "summary": "s."}
+OK = {"headline_verdict": "Marjlar baskıda, Q3 teslimatları güçlü.", "summary": "s."}
+c = FakeClient2([BAN, OK])
+data, _ = _assess_entity_with_recovery(c, build, [{"x": 1}], "Ban", "tr")
+check(len(c.users) == 2 and data == OK, "yasaklı ifade → bir kez yeniden, temiz yanıt alındı")
+check("KULLANMA: 'ağırlıklı olarak olumsuz'" in c.users[1], "not yasaklı ifadeyi adıyla söylüyor")
+c = FakeClient2([BAN, BAN])
+data, _ = _assess_entity_with_recovery(c, build, [{"x": 1}], "İnatçıBan", "tr")
+check(len(c.users) == 2 and data == BAN, "yine yasaklı → metin olduğu gibi, üçüncü çağrı YOK")
+c = FakeClient2([{"headline_verdict": "Fine.", "ai_take": "Coverage is largely negative.", "summary": "s."},
+                 {"headline_verdict": "Fine.", "ai_take": "Margins fell 2 points.", "summary": "s."}])
+_assess_entity_with_recovery(c, build, [{"x": 1}], "EN", "en")
+check(len(c.users) == 2 and "Do NOT use: 'largely negative'" in c.users[1], "ai_take'teki EN yasaklı ifade de yakalandı")
+c = FakeClient2([{"headline_verdict": LONG + " Ağırlıklı olarak olumsuz.", "summary": "s."}, OK])
+_assess_entity_with_recovery(c, build, [{"x": 1}], "İkiSorun", "tr")
+check(len(c.users) == 2 and "daha az şey söyle" in c.users[1] and "KULLANMA" in c.users[1],
+      "uzunluk + yasaklı ifade → iki not TEK tekrar denemesinde")
+c = FakeClient2([{"headline_verdict": "Temiz kısa hüküm.", "top_drivers": ["ağırlıklı olarak olumlu."], "summary": "s."}])
+_assess_entity_with_recovery(c, build, [{"x": 1}], "Liste", "tr")
+check(len(c.users) == 1, "yalnızca hüküm/ai_take/summary denetlenir (liste maddesi tekrar tetiklemez)")
+
 print("== F: prompt kuralları ==")
 for lang, needles in {
     "tr": ["en fazla 14 kelime", "en fazla 100 kelime", "daha az şey söyle", "TAM CÜMLE",
