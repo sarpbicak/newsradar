@@ -4,8 +4,8 @@
 - `call_tool(...)`: zorunlu tool-use ile yapılandırılmış JSON al (analiz hattı).
 - `stream_chat(...)`: sohbet için token-token streaming (SSE ucu bunu kullanır).
 
-Model: varsayılan `claude-sonnet-4-6` (config'ten). Sonnet 4.6 katı structured
-outputs desteklemediği için yapılandırılmış çıktıyı tool_choice ile zorluyoruz.
+Model kullanım amacına göre config'ten gelir (purpose: article | assessment | chat →
+NEWSRADAR_ARTICLE_MODEL / NEWSRADAR_ASSESSMENT_MODEL / NEWSRADAR_CHAT_MODEL).
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ class ClaudeError(RuntimeError):
 
 
 class ModelNotFoundError(ClaudeError):
-    """Model adı geçersiz/bulunamadı (404). Genelde yanlış NEWSRADAR_MODEL değeri."""
+    """Model adı geçersiz/bulunamadı (404). Genelde yanlış NEWSRADAR_*_MODEL değeri."""
 
 
 class MissingAPIKeyError(ClaudeError):
@@ -52,13 +52,14 @@ class TruncationError(ClaudeError):
 
 
 class ClaudeClient:
-    def __init__(self, model: str | None = None) -> None:
+    def __init__(self, model: str | None = None, purpose: str = "article") -> None:
         settings = get_settings()
         if not settings.claude_available:
             raise MissingAPIKeyError(
                 "ANTHROPIC_API_KEY tanımlı değil. .env dosyasına anahtarınızı ekleyin."
             )
-        self.model = model or settings.anthropic_model
+        self.purpose = purpose
+        self.model = model or settings.model_for(purpose)
         self._client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
 
     def call_tool(
@@ -86,7 +87,7 @@ class ClaudeClient:
         except anthropic.NotFoundError as exc:
             # 404 = model adı geçersiz/erişilemez. Bu, "Claude 0 döndürdü" sessiz
             # arızasının klasik sebebi — AÇIK mesaj ver ve logla, asla yut.
-            msg = (f"Claude modeli '{self.model}' bulunamadı (404). NEWSRADAR_MODEL "
+            msg = (f"Claude modeli '{self.model}' bulunamadı (404). NEWSRADAR_{self.purpose.upper()}_MODEL "
                    "değerini geçerli bir model adıyla güncelleyin.")
             logger.error(msg)
             raise ModelNotFoundError(msg) from exc

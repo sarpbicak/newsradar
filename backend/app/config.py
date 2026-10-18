@@ -78,13 +78,19 @@ class Settings:
         # Geri bildirim: IP başına saatlik sınır (spam koruması; 0 = sınırsız).
         self.feedback_per_ip_hour: int = int(_env("NEWSRADAR_FEEDBACK_PER_IP_HOUR", "5"))
 
-        # NOT: Geçersiz bir model adı API'de sessiz boş/404 yanıta yol açabilir;
-        # yalnızca geçerli, güncel bir model kullanın. (Yalnızca provider=anthropic'te
-        # kullanılır; OpenAI-uyumlu endpoint'te model NEWSRADAR_LLM_MODEL'den gelir.)
-        self.anthropic_model: str = _env("NEWSRADAR_MODEL", "claude-sonnet-4-6")
-        # LLM seçimi (GERİ DÖNÜLEBİLİR): anthropic → Claude; başka her değer → OpenAI-uyumlu
-        # endpoint (OpenRouter/NVIDIA/…). Sorun çıkarsa NEWSRADAR_LLM_PROVIDER=anthropic.
-        self.llm_provider: str = _env("NEWSRADAR_LLM_PROVIDER", "openrouter").lower()
+        # LLM seçimi (GERİ DÖNÜLEBİLİR): anthropic (varsayılan) → Claude; başka her değer
+        # (openrouter/nvidia/…) → OpenAI-uyumlu endpoint. Geri dönüş:
+        # NEWSRADAR_LLM_PROVIDER=openrouter (+ NEWSRADAR_LLM_* ayarları aşağıda).
+        self.llm_provider: str = _env("NEWSRADAR_LLM_PROVIDER", "anthropic").lower()
+        # Claude modelleri — KULLANIM AMACINA göre üç ayrı ayar (yalnızca provider=anthropic).
+        # Geçerli adlar + fiyat/sınırlar: app/analysis/model_specs.py. Geçersiz ad 404 →
+        # ModelNotFoundError; `python -m app.cli llm-check` her birini doğrular.
+        #   article    : makale-batch analizi (hacimli sınıflandırma/çıkarım)
+        #   assessment : entity değerlendirmesi (kullanıcının okuduğu TR+EN metin)
+        #   chat       : sohbet (SSE)
+        self.article_model: str = _env("NEWSRADAR_ARTICLE_MODEL", "claude-haiku-5-5")
+        self.assessment_model: str = _env("NEWSRADAR_ASSESSMENT_MODEL", "claude-haiku-5-5")
+        self.chat_model: str = _env("NEWSRADAR_CHAT_MODEL", "claude-haiku-5-5")
         # OpenAI-uyumlu endpoint ayarları. Varsayılan: OpenRouter.
         self.llm_base_url: str = _env("NEWSRADAR_LLM_BASE_URL", "https://openrouter.ai/api/v1")
         self.llm_model: str = _env("NEWSRADAR_LLM_MODEL", "meta-llama/llama-3.3-70b-instruct")
@@ -159,6 +165,14 @@ class Settings:
     @property
     def claude_available(self) -> bool:
         return bool(self.anthropic_api_key)
+
+    def model_for(self, purpose: str) -> str:
+        """Kullanım amacına göre Claude model adı ('article' | 'assessment' | 'chat')."""
+        return {
+            "article": self.article_model,
+            "assessment": self.assessment_model,
+            "chat": self.chat_model,
+        }[purpose]
 
     @property
     def llm_available(self) -> bool:

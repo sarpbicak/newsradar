@@ -1,12 +1,13 @@
 """LLM sağlayıcı soyutlaması — GERİ DÖNÜLEBİLİR + OpenAI-uyumlu HERHANGİ bir endpoint.
 
-Analiz motoru env ile seçilir: NEWSRADAR_LLM_PROVIDER = anthropic → Claude; başka her
-değer (openrouter/nvidia/…) → OpenAICompatProvider. OpenAI-uyumlu sağlayıcı üç env'den
+Analiz motoru env ile seçilir: NEWSRADAR_LLM_PROVIDER = anthropic (varsayılan) → Claude;
+başka her değer (openrouter/nvidia/…) → OpenAICompatProvider. OpenAI-uyumlu sağlayıcı üç env'den
 okur: NEWSRADAR_LLM_BASE_URL, NEWSRADAR_LLM_API_KEY, NEWSRADAR_LLM_MODEL. Böylece
 OpenRouter, NVIDIA, Together, yerel vLLM… hepsi tek kodla çalışır.
 
-Claude kodu (claude_client.ClaudeClient) SİLİNMEZ; AnthropicProvider onu sarar. Bir
-sorun çıkarsa NEWSRADAR_LLM_PROVIDER=anthropic ile tek değişkenle geri dönülür.
+Claude yolunda model KULLANIM AMACINA göre seçilir (purpose: article | assessment | chat →
+NEWSRADAR_ARTICLE_MODEL / _ASSESSMENT_MODEL / _CHAT_MODEL). OpenAI-uyumlu yol SİLİNMEDİ;
+NEWSRADAR_LLM_PROVIDER=openrouter ile tek değişkenle geri dönülür (tek model: NEWSRADAR_LLM_MODEL).
 
 Sözleşme:
   call_tool(system, user, tool, max_tokens) -> dict   (zorunlu tool-use → JSON)
@@ -58,11 +59,12 @@ class LLMProvider:
 
 # --------------------------- Anthropic (mevcut) --------------------------- #
 class AnthropicProvider(LLMProvider):
-    """Mevcut ClaudeClient'ı sarar — davranış birebir korunur."""
+    """ClaudeClient'ı sarar — davranış birebir korunur."""
 
-    def __init__(self, model: str | None = None) -> None:
-        self._client = ClaudeClient(model=model)
+    def __init__(self, model: str | None = None, purpose: str = "article") -> None:
+        self._client = ClaudeClient(model=model, purpose=purpose)
         self.model = self._client.model
+        self.purpose = purpose
 
     def call_tool(self, *, system: str, user: str, tool: dict, max_tokens: int = 4096) -> dict:
         return self._client.call_tool(system=system, user=user, tool=tool, max_tokens=max_tokens)
@@ -239,13 +241,15 @@ NvidiaProvider = OpenAICompatProvider
 
 
 # ------------------------------- Fabrika ------------------------------- #
-def get_llm_provider(model: str | None = None) -> LLMProvider:
-    """Env'e göre sağlayıcı döner. anthropic → Claude; başka her değer → OpenAI-uyumlu
-    endpoint (NEWSRADAR_LLM_BASE_URL/API_KEY/MODEL). Varsayılan: OpenAI-uyumlu."""
+def get_llm_provider(purpose: str = "article", model: str | None = None) -> LLMProvider:
+    """Env'e göre sağlayıcı döner. anthropic (varsayılan) → Claude, model `purpose`'a göre
+    (article | assessment | chat); başka her değer → OpenAI-uyumlu endpoint
+    (NEWSRADAR_LLM_BASE_URL/API_KEY/MODEL — tek model, purpose yok sayılır).
+    `model` verilirse amaç ayarını ezer (karşılaştırma testleri / llm-check)."""
     provider = get_settings().llm_provider
     if provider == "anthropic":
-        return AnthropicProvider(model)
-    return OpenAICompatProvider(model=model)  # varsayılan (openrouter/nvidia/…)
+        return AnthropicProvider(model, purpose=purpose)
+    return OpenAICompatProvider(model=model)  # openrouter/nvidia/…
 
 
 def provider_name() -> str:

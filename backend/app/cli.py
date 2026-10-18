@@ -80,11 +80,13 @@ def cmd_analyze(args: argparse.Namespace) -> None:
 
     init_db()
     try:
-        client = get_llm_provider()
+        client = get_llm_provider("article")
+        assess_client = get_llm_provider("assessment")
     except MissingAPIKeyError as exc:
         print(exc)
         sys.exit(1)
-    print(f"(LLM sağlayıcı: {provider_name()} · model: {client.model})")
+    print(f"(LLM sağlayıcı: {provider_name()} · makale modeli: {client.model} · "
+          f"değerlendirme modeli: {assess_client.model})")
 
     with session_scope() as session:
         # diagnose ile AYNI geniş eşleşmeyi kullan — hangi entity'ye çözüldüğü
@@ -116,7 +118,7 @@ def cmd_analyze(args: argparse.Namespace) -> None:
         print(f"→ analiz edilen entity: #{entity.id} {entity.name!r} "
               f"[{entity.type}:{entity.query!r}] (query len={len(entity.query)})")
 
-    totals = analyze_entity_sync(entity_id, client)
+    totals = analyze_entity_sync(entity_id, client, assess_client=assess_client)
     print(f"\n=== {args.query} analizi (entity #{entity_id}) ===")
     # KRİTİK: _prefilter'ın BU analiz yolunda batch'e kaç makale seçtiği. diagnose'un
     # gösterdiği sayı ile karşılaştır — farklıysa iki komut farklı entity'ye çözülüyor.

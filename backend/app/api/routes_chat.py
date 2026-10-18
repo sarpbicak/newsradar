@@ -109,7 +109,7 @@ def chat(
         # gerçek hatayı sunucuda logla.
         _log = logging.getLogger("newsradar.chat")
         try:
-            client = get_llm_provider()
+            client = get_llm_provider("chat")
         except MissingAPIKeyError as exc:
             _log.warning("chat: sağlayıcı yok: %s", exc)
             yield _sse("error", {"message": "Sohbet şu an kullanılamıyor."})

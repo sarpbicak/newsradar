@@ -15,7 +15,9 @@ services:
       # --- Sırlar — Render Dashboard'da elle girin (repoya gitmez) ---
       - key: APP_PASSWORD           # genel giriş şifresi
         sync: false
-      - key: NEWSRADAR_LLM_API_KEY  # OpenRouter anahtarı (analiz motoru)
+      - key: ANTHROPIC_API_KEY      # Claude API (analiz motoru)
+        sync: false
+      - key: NEWSRADAR_LLM_API_KEY  # OpenRouter — GERİ DÖNÜŞ için (provider=openrouter)
         sync: false
       - key: FINNHUB_API_KEY        # ticker haberleri + analist tavsiyesi
         sync: false
@@ -23,14 +25,19 @@ services:
         sync: false
       - key: FMP_API_KEY            # analist hedef fiyatı
         sync: false
-      - key: ANTHROPIC_API_KEY      # Claude — GERİ DÖNÜŞ için (provider=anthropic)
-        sync: false
       # Frontend static site'ın adresi (deploy sonrası doldurun).
       - key: FRONTEND_URL
         sync: false
-      # --- LLM motoru: OpenAI-uyumlu endpoint (OpenRouter). Sır değil, sabit. ---
+      # --- LLM motoru: Claude API. Sır değil, sabit. ---
       - key: NEWSRADAR_LLM_PROVIDER
-        value: openrouter
+        value: anthropic
+      - key: NEWSRADAR_ARTICLE_MODEL
+        value: claude-haiku-5-5
+      - key: NEWSRADAR_ASSESSMENT_MODEL
+        value: claude-haiku-5-5
+      - key: NEWSRADAR_CHAT_MODEL
+        value: claude-haiku-5-5
+      # --- GERİ DÖNÜŞ: OpenAI-uyumlu endpoint (provider=openrouter iken kullanılır) ---
       - key: NEWSRADAR_LLM_BASE_URL
         value: https://openrouter.ai/api/v1
       - key: NEWSRADAR_LLM_MODEL

@@ -507,8 +507,12 @@ async def analyze_all_async(
     progress_cb=None,
     entity_cb=None,
     entity_ids: set[int] | None = None,
+    assess_client=None,
 ) -> AnalyzeTotals:
     """Aktif entity'ler için ön-filtre + paralel analiz + değerlendirme.
+
+    client: makale-batch analizi; assess_client: entity değerlendirmesi (ayrı model
+    olabilir — NEWSRADAR_ASSESSMENT_MODEL). Verilmezse ikisi için de `client` kullanılır.
 
     entity_ids verilirse yalnızca o entity'ler işlenir (kişisel elle yenileme);
     None ise tüm aktif entity'ler (scheduler). progress_cb(done, total): her entity
@@ -519,6 +523,7 @@ async def analyze_all_async(
     batch_size = max(1, settings.batch_size)
     max_articles = settings.max_articles_per_entity  # 0 = sınırsız (_prefilter yorumlar)
     concurrency = max(1, settings.analysis_concurrency)
+    assess_client = assess_client or client
 
     # SİSTEM BÜTÇE TAVANI (canlı): bugün kullanılan token + bu taramanın canlı deltası
     # tavana ulaşırsa YENİ entity analizine başlama (büyük scheduler taramasını da durdurur).
@@ -737,7 +742,7 @@ async def analyze_all_async(
                         if _quota_stopped["flag"]:
                             break
                         adata, used = await asyncio.to_thread(
-                            _assess_entity_with_recovery, client, _build, payload, f"{t['name']}/{out_lang}"
+                            _assess_entity_with_recovery, assess_client, _build, payload, f"{t['name']}/{out_lang}"
                         )
                     async with db_lock:
                         await asyncio.to_thread(
@@ -781,9 +786,12 @@ async def analyze_all_async(
     return totals
 
 
-def analyze_entity_sync(entity_id: int, client: ClaudeClient) -> AnalyzeTotals:
-    """CLI/test için tek entity'yi senkron analiz eder (ön-filtre + batch + değerlendirme)."""
+def analyze_entity_sync(entity_id: int, client: ClaudeClient, assess_client=None) -> AnalyzeTotals:
+    """CLI/test için tek entity'yi senkron analiz eder (ön-filtre + batch + değerlendirme).
+
+    assess_client verilmezse değerlendirme de `client` ile yapılır."""
     settings = get_settings()
+    assess_client = assess_client or client
     batch_size = max(1, settings.batch_size)
     max_articles = settings.max_articles_per_entity  # 0 = sınırsız (_prefilter yorumlar)
     totals = AnalyzeTotals()
@@ -877,7 +885,7 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient) -> AnalyzeTotals:
                 )
             try:
                 # Kesilme kurtarmalı (settings.max_output_tokens → 2× → yarı bağlam).
-                adata, used = _assess_entity_with_recovery(client, _build2, payload2, f"{name}/{out_lang}")
+                adata, used = _assess_entity_with_recovery(assess_client, _build2, payload2, f"{name}/{out_lang}")
                 _write_assessment(entity_id, adata, len(used), _avg_sentiment(used), out_lang)
                 totals.entity_assessments += 1
             except ClaudeError as exc:

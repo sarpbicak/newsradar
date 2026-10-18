@@ -167,9 +167,11 @@ def run_refresh(
             prune_quota(session)  # eski api_call kayıtlarını temizle
 
         # 2) Analiz (ön-filtre + paralel). Anahtar yoksa çekme yine geçerli kalır.
-        #    Sağlayıcı env'den seçilir (nvidia/anthropic) — geri dönülebilir.
+        #    Sağlayıcı env'den seçilir (anthropic/openrouter) — geri dönülebilir. Model
+        #    amaca göre: makale analizi ve entity değerlendirmesi ayrı istemciler.
         try:
-            client = get_llm_provider()
+            client = get_llm_provider("article")
+            assess_client = get_llm_provider("assessment")
         except MissingAPIKeyError as exc:
             summary.warnings.append(str(exc))
             return summary
@@ -191,7 +193,7 @@ def run_refresh(
         totals = asyncio.run(
             analyze_all_async(
                 client, progress_cb=_set_progress, entity_cb=_set_current_entity,
-                entity_ids=entity_ids,
+                entity_ids=entity_ids, assess_client=assess_client,
             )
         )
         summary.prefiltered = totals.prefiltered
