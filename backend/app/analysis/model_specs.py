@@ -47,11 +47,13 @@ class ModelSpec:
 
 
 MODEL_SPECS: dict[str, ModelSpec] = {
-    # Haiku 5.5: 128K çıktı; zorunlu tool_choice kabul (bu durumda thinking atlanır);
-    # strict + zorunlu tool_choice birlikte canlı doğrulandı (2026-10-18).
+    # Haiku 5.5: 128K çıktı; zorunlu tool_choice kabul (bu durumda thinking atlanır).
+    # strict KAPALI: API kabul ediyor, ama canlı koşularda strict açıkken string alanlara
+    # tool-call işaretlemesi sızdı (~33 çağrıda 3; kapalıyken ~46 çağrıda 0). Haiku zorunlu
+    # tool_choice ile tip hatası üretmedi; sızıntı temizliği + string→liste emniyeti yerinde.
     # Fiyat iki kademeli: prompt ≤100k → $0.10/$0.50; >100k → $0.50/$2.50 (cache dahil).
     "claude-haiku-5-5": ModelSpec(
-        max_output_tokens=128_000, forced_tool_choice=True, strict_tools=True,
+        max_output_tokens=128_000, forced_tool_choice=True, strict_tools=False,
         price=Price(input=0.10, output=0.50, cache_write=0.125, cache_read=0.01),
         long_prompt_threshold=100_000,
         long_price=Price(input=0.50, output=2.50, cache_write=0.625, cache_read=0.05),

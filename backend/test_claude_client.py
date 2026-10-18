@@ -180,8 +180,8 @@ check("temperature" not in kw, "temperature gönderilmiyor (5.5 modelleri 400 ve
 check(kw["tools"][0].get("strict") is True, "Sonnet 5.5: tool strict=true")
 c, fm = client_with([message()], model="claude-haiku-5-5")
 call(c)
-check(fm.calls[0]["tools"][0].get("strict") is True and "strict" not in TOOL,
-      "Haiku 5.5: tool strict=true (orijinal tool sözlüğü değişmedi)")
+check("strict" not in fm.calls[0]["tools"][0] and "strict" not in TOOL,
+      "Haiku 5.5: strict KAPALI (işaretleme sızıntısı gözlendi)")
 c, fm = client_with([message()], model="bilinmeyen-model")
 call(c)
 check("strict" not in fm.calls[0]["tools"][0], "tabloda olmayan model: strict YOK (temkinli)")
