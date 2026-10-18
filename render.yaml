@@ -28,6 +28,11 @@ services:
       # Frontend static site'ın adresi (deploy sonrası doldurun).
       - key: FRONTEND_URL
         sync: false
+      # Gizlilik metnindeki iletişim adresi (veri silme talepleri).
+      - key: NEWSRADAR_CONTACT_EMAIL
+        sync: false
+      - key: NEWSRADAR_HOSTING_PROVIDER
+        value: Render
       # --- LLM motoru: Claude API. Sır değil, sabit. ---
       - key: NEWSRADAR_LLM_PROVIDER
         value: anthropic

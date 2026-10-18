@@ -29,6 +29,14 @@ def _job() -> None:
         logger.exception("Zamanlanmış yenileme başarısız")
 
 
+def _prune_ip_job() -> None:
+    try:
+        from .security import prune_ip_records
+        prune_ip_records()
+    except Exception:  # noqa: BLE001 — zamanlayıcı thread'i asla çökmesin
+        logger.exception("IP kayıt temizliği başarısız")
+
+
 def start() -> None:
     """Zamanlayıcıyı başlatır (config'e göre açık/kapalı). Uygulama açılışında çağrılır."""
     global _scheduler, _enabled
@@ -39,6 +47,8 @@ def start() -> None:
     hours = settings.scheduler_hours
     _scheduler = BackgroundScheduler(daemon=True)
     _scheduler.add_job(_job, "interval", hours=hours, id=_JOB_ID, max_instances=1)
+    # GİZLİLİK: IP saklama süresi temizliği — yenileme açık/kapalı olsun her gün çalışır.
+    _scheduler.add_job(_prune_ip_job, "interval", hours=24, id="ip_prune", max_instances=1)
     _scheduler.start()
     logger.info("Zamanlayıcı başladı (aktif=%s, her %d saatte)", _enabled, hours)
 

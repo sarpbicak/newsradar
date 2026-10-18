@@ -5,6 +5,7 @@
 - install_log_masking: tüm log kayıtlarını mask_secrets'ten geçiren filtre (kök handler'lara).
 - LoginRateLimiter: IP başına başarısız giriş denemesini sınırlar (kaba kuvvet).
 - get_client_ip: proxy (Render) arkasında gerçek IP (X-Forwarded-For).
+- prune_ip_records: kötüye kullanım önleme kayıtlarındaki IP'leri N gün sonra siler.
 """
 
 from __future__ import annotations
@@ -183,3 +184,47 @@ account_limiter = LoginRateLimiter(max_fails=10, window_s=900, lock_s=900)
 def account_key(username: str) -> str:
     """Hesap-bazlı hız sayacı anahtarı (IP anahtarlarıyla çakışmayan ad-alanı)."""
     return f"user:{username.strip().lower()}"
+
+
+# Başarısız giriş/kayıt olaylarında detail.ip tutulur (admin panelinde kötüye kullanım
+# incelemesi için) — saklama süresi sonunda yalnızca 'ip' alanı silinir, olay kalır.
+_IP_EVENT_TYPES = ("login_failed", "register_failed")
+
+
+def prune_ip_records(days: int | None = None) -> dict:
+    """GİZLİLİK: `days` günden eski IP kayıtlarını siler. {'login_rate': n, 'events': m}.
+
+    - login_rate: son güncellemesi eski VE kilidi bitmiş satırlar (IP ve 'user:' anahtarları).
+      Başarılı giriş satırı zaten anında siler; bu, yalnızca başarısız deneme kalan IP'ler için.
+    - usage_events (login_failed / register_failed): detail.ip alanı çıkarılır, olay korunur.
+    Bellek-içi sınırlayıcılar (anonim oturum, geri bildirim) diske yazmaz; 1 saatlik pencere.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    from sqlalchemy import delete as _delete, select as _select
+
+    from .config import get_settings
+    from .db.database import session_scope
+    from .db.models import LoginRate, UsageEvent
+
+    days = days if days is not None else get_settings().ip_retention_days
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    cutoff = now - timedelta(days=days)
+    with session_scope() as s:
+        res = s.execute(
+            _delete(LoginRate).where(LoginRate.updated_at < cutoff,
+                                     LoginRate.locked_until < time.time())
+        )
+        n_rate = res.rowcount or 0
+        n_events = 0
+        for ev in s.scalars(
+            _select(UsageEvent).where(UsageEvent.event_type.in_(_IP_EVENT_TYPES),
+                                      UsageEvent.created_at < cutoff)
+        ):
+            if isinstance(ev.detail, dict) and "ip" in ev.detail:
+                ev.detail = {k: v for k, v in ev.detail.items() if k != "ip"}  # yeni dict → değişiklik algılanır
+                n_events += 1
+    if n_rate or n_events:
+        logger.info("[gizlilik] %d günden eski IP kayıtları silindi: login_rate=%d, olay=%d",
+                    days, n_rate, n_events)
+    return {"login_rate": n_rate, "events": n_events}

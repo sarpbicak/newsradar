@@ -65,6 +65,13 @@ async def lifespan(_app: FastAPI):
         )
     except Exception:  # noqa: BLE001 — reconcile hatası açılışı çökertmesin
         _log.exception("Ön-filtre reconcile açılışta başarısız (atlandı).")
+    # GİZLİLİK: saklama süresini aşan IP kayıtlarını açılışta da temizle (günlük iş ayrıca).
+    try:
+        from ..security import prune_ip_records
+
+        prune_ip_records()
+    except Exception:  # noqa: BLE001 — temizlik hatası açılışı çökertmesin
+        _log.exception("IP kayıt temizliği açılışta başarısız (atlandı).")
     # Deploy: kalıcı olmayan diskte DB boş başlamasın diye opsiyonel oto-seed.
     if get_settings().seed_on_start:
         from ..seed import seed
@@ -154,3 +161,20 @@ app.include_router(routes_admin.router)
 def health() -> dict:
     """Basit sağlık kontrolü — kasıtlı olarak korumasız."""
     return {"status": "ok"}
+
+
+@app.get("/privacy-info", tags=["health"])
+def privacy_info() -> dict:
+    """Gizlilik metni için gerçek değerler — kasıtlı olarak korumasız (giriş öncesi okunur).
+
+    Metin koddan beslenir: LLM sağlayıcısı aktif provider env'inden, barındırma ve iletişim
+    adresi env'den, IP saklama süresi temizlik işinin kullandığı ayardan gelir."""
+    from ..analysis.llm import provider_display_name
+
+    s = get_settings()
+    return {
+        "llm_provider": provider_display_name(),
+        "hosting_provider": s.hosting_provider,
+        "contact_email": s.contact_email or None,
+        "ip_retention_days": s.ip_retention_days,
+    }

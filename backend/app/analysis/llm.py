@@ -263,3 +263,20 @@ def get_llm_provider(purpose: str = "article", model: str | None = None) -> LLMP
 
 def provider_name() -> str:
     return get_settings().llm_provider
+
+
+# Kullanıcıya gösterilen LLM sağlayıcı adı — TEK kaynak (gizlilik metni bunu kullanır).
+# provider env'i değişince metin de değişir.
+_PROVIDER_DISPLAY = {"anthropic": "Anthropic (Claude API)"}
+_HOST_DISPLAY = {"openrouter.ai": "OpenRouter", "integrate.api.nvidia.com": "NVIDIA",
+                 "api.together.xyz": "Together AI"}
+
+
+def provider_display_name() -> str:
+    """Aktif LLM sağlayıcısının okunur adı. OpenAI-uyumlu yolda base_url'in host'undan."""
+    settings = get_settings()
+    if settings.llm_provider in _PROVIDER_DISPLAY:
+        return _PROVIDER_DISPLAY[settings.llm_provider]
+    from urllib.parse import urlparse
+    host = (urlparse(settings.llm_base_url).hostname or "").lower()
+    return _HOST_DISPLAY.get(host) or host or settings.llm_provider

@@ -72,6 +72,15 @@ class Settings:
         # Anonim oturum oluşturma: IP başına saatlik sınır (cookie silip sonsuz "yeni
         # kullanıcı" üretilmesin).
         self.anon_sessions_per_ip_hour: int = int(_env("NEWSRADAR_ANON_SESSIONS_PER_IP_HOUR", "10"))
+        # GİZLİLİK: kötüye kullanım önleme kayıtlarındaki IP adresleri (login_rate tablosu,
+        # başarısız giriş/kayıt olaylarındaki 'ip' alanı) bu kadar gün sonra otomatik silinir
+        # (security.prune_ip_records — açılışta + günlük). Gizlilik metni bu değeri gösterir.
+        self.ip_retention_days: int = max(1, int(_env("NEWSRADAR_IP_RETENTION_DAYS", "7")))
+        # Gizlilik metnindeki iletişim adresi (veri silme talepleri). Boşsa metin genel
+        # "yöneticiyle iletişime geç" ifadesine düşer.
+        self.contact_email: str = _env("NEWSRADAR_CONTACT_EMAIL", "")
+        # Gizlilik metnindeki barındırma sağlayıcısı (AWS'ye geçince env'den güncellenir).
+        self.hosting_provider: str = _env("NEWSRADAR_HOSTING_PROVIDER", "Render")
         # Geri bildirim: IP başına saatlik sınır (spam koruması; 0 = sınırsız).
         self.feedback_per_ip_hour: int = int(_env("NEWSRADAR_FEEDBACK_PER_IP_HOUR", "5"))
 
