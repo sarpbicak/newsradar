@@ -5,7 +5,8 @@ Ana kural: kullanıcının gördüğü hiçbir alan cümle ortasında bitmez.
 - Koddaki tavanlar (HARD_CAPS) yalnızca EMNİYET: aşılırsa metin, sınır içindeki SON TAM
   CÜMLENİN sonunda kesilir. Sınır içinde hiç cümle sonu yoksa kesilmez — metin olduğu gibi
   bırakılır ve loglanır. Yarım cümle, tam ama uzun cümleden her zaman daha kötüdür.
-- Şablon kalıpları: BANNED_PHRASES (prompt'a yasak olarak yazılır, eval'de denetlenir) ve
+- Şablon kalıpları: BANNED_PATTERNS (regex denetim; okunur hali BANNED_PHRASES prompt'a
+  yasak olarak yazılır, eval'de denetlenir) ve
   entity'ler arasında tekrar eden 3+ kelimelik öbekler (repeated_ngrams).
 """
 
@@ -42,19 +43,35 @@ def hard_cap(field: str, language: str) -> int:
     return cap
 
 
-# Şablon kalıpları — her şirkete yapıştırılabilen, bilgi taşımayan açılış/yargı öbekleri.
-# Prompt'ta YASAK olarak listelenir; eval'de geçerse BAŞARISIZ.
+# Şablon kalıpları — her şirkete yapıştırılabilen, bilgi taşımayan yargı öbekleri.
+# BANNED_PHRASES: prompt'ta ve tekrar deneme notunda gösterilen OKUNUR liste.
+# BANNED_PATTERNS: asıl denetim (regex). Kalıp ailesi: [niceleyici] (+ en fazla bir ara kelime)
+# [yön sıfatı] — ara kelime 'ağırlıklı OLARAK olumlu', 'ağırlıkla SERT olumsuz',
+# 'mostly VERY negative' gibi hallerini de yakalar. TR sıfat ekleri de sayılır ('olumsuzdu').
 BANNED_PHRASES = {
     "tr": [
-        "ağırlıklı olarak olumlu", "ağırlıklı olarak olumsuz",
-        "ağırlıkla olumlu", "ağırlıkla olumsuz",
-        "haber akışı karışık", "haberler karışık",
+        "ağırlıklı olarak olumlu/olumsuz", "ağırlıkla/ağırlıkta olumlu/olumsuz",
+        "çoğunlukla olumlu/olumsuz", "büyük ölçüde olumlu/olumsuz",
+        "genel olarak olumlu/olumsuz", "haberler karışık", "haber akışı karışık",
     ],
     "en": [
-        "largely positive", "largely negative",
-        "mostly positive", "mostly negative",
-        "news flow leans positive", "news flow leans negative",
-        "news flow is mixed",
+        "largely/mostly/predominantly/broadly/generally positive/negative/bullish/bearish",
+        "news flow leans positive/negative", "news flow is mixed",
+    ],
+}
+_GAP = r"(?:\s+[^\W\d_]+)?\s+"  # en fazla bir ara kelime
+BANNED_PATTERNS = {
+    "tr": [
+        re.compile(r"\b(?:ağırlık\w*|çoğunlukla|büyük\s+ölçüde|genel\s+olarak)" + _GAP
+                   + r"(?:olumlu|olumsuz)\w*", re.IGNORECASE),
+        re.compile(r"\bhaberler" + _GAP + r"karışık\w*", re.IGNORECASE),
+        re.compile(r"\bhaber\s+akışı" + _GAP + r"karışık\w*", re.IGNORECASE),
+    ],
+    "en": [
+        re.compile(r"\b(?:largely|mostly|predominantly|broadly|generally)" + _GAP
+                   + r"(?:positive|negative|bullish|bearish)\b", re.IGNORECASE),
+        re.compile(r"\bnews\s+flow\s+leans" + _GAP + r"(?:positive|negative)\b", re.IGNORECASE),
+        re.compile(r"\bnews\s+flow\s+is" + _GAP + r"mixed\b", re.IGNORECASE),
     ],
 }
 
@@ -132,20 +149,15 @@ def unterminated_fields(data: dict) -> list[tuple[str, str]]:
     return bad
 
 
-def _phrase_regex(phrase: str) -> re.Pattern:
-    """Son kelimeden önce en fazla BİR ara kelimeye izin veren desen: 'ağırlıkla olumsuz'
-    → 'ağırlıkla sert olumsuz' da yakalanır; 'mostly negative' → 'mostly very negative'."""
-    words = [re.escape(w) for w in phrase.split()]
-    body = r"\s+".join(words[:-1]) + r"(?:\s+[^\W\d_]+)?\s+" + words[-1] if len(words) > 1 else words[0]
-    return re.compile(r"\b" + body + r"\b", re.IGNORECASE)
-
-
-_BANNED_RX = {lang: [(p, _phrase_regex(p)) for p in phrases] for lang, phrases in BANNED_PHRASES.items()}
-
-
 def banned_phrase_hits(text: str, language: str) -> list[str]:
-    """Metinde geçen yasaklı ifadeler (liste adlarıyla)."""
-    return [p for p, rx in _BANNED_RX["en" if language == "en" else "tr"] if rx.search(text or "")]
+    """Metinde BULUNAN yasaklı ifadeler (eşleşen metin, küçük harf, tekrarsız, sırayla)."""
+    hits: list[str] = []
+    for rx in BANNED_PATTERNS["en" if language == "en" else "tr"]:
+        for m in rx.finditer(text or ""):
+            found = " ".join(m.group(0).lower().split())
+            if found not in hits:
+                hits.append(found)
+    return hits
 
 
 _STOP = {

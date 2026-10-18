@@ -92,15 +92,44 @@ fields = sorted(f for f, _ in unterminated_fields(bad))
 check(fields == ["headline_verdict", "top_drivers"], f"kesik alanlar yakalandı: {fields}")
 
 print("== D: yasaklı ifadeler + öbek tekrarı ==")
-check(banned_phrase_hits("Haberler ağırlıklı olarak olumlu.", "tr") == ["ağırlıklı olarak olumlu"],
-      "TR yasaklı ifade yakalandı")
-check(banned_phrase_hits("Coverage is largely negative.", "en") == ["largely negative"],
-      "EN yasaklı ifade yakalandı")
-check(banned_phrase_hits("Azure grew 43%.", "en") == [], "temiz metin")
-check(banned_phrase_hits("SpaceX haberleri ağırlıkla sert olumsuz.", "tr") == ["ağırlıkla olumsuz"],
-      "araya giren tek kelime ('sert') yakalandı")
-check(banned_phrase_hits("Mostly very negative coverage.", "en") == ["mostly negative"], "EN ara kelime")
-check(banned_phrase_hits("Çoğunlukla olumlu bir çeyrek.", "tr") == [], "kalıp dışı ifade işaretlenmedi")
+def hits(t, lang):
+    return banned_phrase_hits(t, lang)
+
+
+# TR: (ağırlık\w*|çoğunlukla|büyük ölçüde|genel olarak) (+ ara kelime) (olumlu|olumsuz)
+for t, exp in [
+    ("Haberler ağırlıklı olarak olumlu.", ["ağırlıklı olarak olumlu"]),
+    ("Tablo ağırlıkla olumsuz.", ["ağırlıkla olumsuz"]),
+    ("Haberler ağırlıkta negatif değil, ağırlıkta olumsuz.", ["ağırlıkta olumsuz"]),
+    ("SpaceX haberleri ağırlıkla sert olumsuz.", ["ağırlıkla sert olumsuz"]),
+    ("Haberler çoğunlukla olumlu bir çeyrek.", ["çoğunlukla olumlu"]),
+    ("Akış büyük ölçüde olumsuzdu.", ["büyük ölçüde olumsuzdu"]),
+    ("Genel olarak olumlu bir tablo.", ["genel olarak olumlu"]),
+    ("GENEL OLARAK OLUMSUZ.", ["genel olarak olumsuz"]),
+    ("Bu hafta haberler karışık.", ["haberler karışık"]),
+    ("Haber akışı oldukça karışık.", ["haber akışı oldukça karışık"]),
+]:
+    check(hits(t, "tr") == exp, f"TR yakalandı: {t!r} → {hits(t, 'tr')}")
+# EN: (largely|mostly|predominantly|broadly|generally) (+ ara kelime) (positive|negative|bullish|bearish)
+for t, exp in [
+    ("Coverage is largely negative.", ["largely negative"]),
+    ("Mostly very negative coverage.", ["mostly very negative"]),
+    ("Sentiment is predominantly bullish.", ["predominantly bullish"]),
+    ("Analysts are broadly bearish.", ["broadly bearish"]),
+    ("News is generally positive.", ["generally positive"]),
+    ("Tesla's news flow leans negative.", ["news flow leans negative"]),
+    ("The news flow is mixed.", ["news flow is mixed"]),
+    ("Mostly positive, mostly positive.", ["mostly positive"]),
+]:
+    check(hits(t, "en") == exp, f"EN yakalandı: {t!r} → {hits(t, 'en')}")
+for t, lang in [
+    ("Azure grew 43%.", "en"),
+    ("Analysts mostly raised targets after positive guidance.", "en"),
+    ("Marjlar olumlu yönde ağırlıklı bir rol oynadı ama kâr düştü.", "tr"),
+    ("Olumlu bir çeyrek: Azure yüzde 43 büyüdü.", "tr"),
+    ("Generally, positive cash flow returned.", "en"),
+]:
+    check(hits(t, lang) == [], f"temiz: {t!r} → {hits(t, lang)}")
 grams = repeated_ngrams({
     "Tesla": "Tesla's news flow leans negative after a weak quarter.",
     "Nvidia": "Nvidia's news flow leans positive on chip bookings.",
@@ -157,15 +186,15 @@ OK = {"headline_verdict": "Marjlar baskıda, Q3 teslimatları güçlü.", "summa
 c = FakeClient2([BAN, OK])
 data, _ = _assess_entity_with_recovery(c, build, [{"x": 1}], "Ban", "tr")
 check(len(c.users) == 2 and data == OK, "yasaklı ifade → bir kez yeniden, temiz yanıt alındı")
-check("('ağırlıklı olarak olumsuz')" in c.users[1] and "'haberler karışık'" in c.users[1],
-      "not bulunan ifadeyi ve TÜM yasaklı listeyi veriyor")
+check("('ağırlıklı olarak olumsuz')" in c.users[1] and "'çoğunlukla olumlu/olumsuz'" in c.users[1]
+      and "'haberler karışık'" in c.users[1], "not bulunan ifadeyi ve TÜM yasaklı listeyi veriyor")
 c = FakeClient2([BAN, BAN])
 data, _ = _assess_entity_with_recovery(c, build, [{"x": 1}], "İnatçıBan", "tr")
 check(len(c.users) == 2 and data == BAN, "yine yasaklı → metin olduğu gibi, üçüncü çağrı YOK")
 c = FakeClient2([{"headline_verdict": "Fine.", "ai_take": "Coverage is largely negative.", "summary": "s."},
                  {"headline_verdict": "Fine.", "ai_take": "Margins fell 2 points.", "summary": "s."}])
 _assess_entity_with_recovery(c, build, [{"x": 1}], "EN", "en")
-check(len(c.users) == 2 and "('largely negative')" in c.users[1] and "'mostly positive'" in c.users[1],
+check(len(c.users) == 2 and "('largely negative')" in c.users[1] and "predominantly" in c.users[1],
       "ai_take'teki EN yasaklı ifade de yakalandı, not tüm listeyi veriyor")
 c = FakeClient2([{"headline_verdict": LONG + " Ağırlıklı olarak olumsuz.", "summary": "s."}, OK])
 _assess_entity_with_recovery(c, build, [{"x": 1}], "İkiSorun", "tr")
@@ -190,9 +219,9 @@ check(len(c.users) == 2 and data == OK and "düz metin" in c.users[1],
 print("== F: prompt kuralları ==")
 for lang, needles in {
     "tr": ["en fazla 14 kelime", "en fazla 100 kelime", "daha az şey söyle", "TAM CÜMLE",
-           "ağırlıklı olarak olumlu"],
+           "ağırlıklı olarak olumlu/olumsuz", "genel olarak olumlu/olumsuz"],
     "en": ["at most 16 words", "at most 100 words", "say fewer things", "COMPLETE SENTENCES",
-           "largely positive"],
+           "largely/mostly/predominantly/broadly/generally positive/negative/bullish/bearish"],
 }.items():
     r = entity_assessment_rules(lang)
     missing = [n for n in needles if n not in r]

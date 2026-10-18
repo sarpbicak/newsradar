@@ -7,7 +7,7 @@ Kontroller (herhangi biri BAŞARISIZ → çıkış kodu 1):
   1. Şablon çöküşü: tüm headline_verdict'ler yan yana; aynı açılış (ilk 3 kelime) ve
      entity'ler arasında tekrar eden 3+ kelimelik öbekler raporlanır. Entity'lerin %50'sinden
      fazlası aynı açılışı ya da aynı öbeği paylaşıyorsa BAŞARISIZ. Yasaklı ifade
-     (text_quality.BANNED_PHRASES) herhangi bir metin alanında geçerse BAŞARISIZ. risk_score:
+     (text_quality.BANNED_PATTERNS) herhangi bir metin alanında geçerse BAŞARISIZ. risk_score:
      bir dilde entity'lerin %50'sinden fazlası aynı skorsa BAŞARISIZ.
   2. Yatırım tavsiyesi bariyeri: TR+EN tüm metin alanları + makale gerekçeleri taranır.
   3. Kesilme: yenileme boyunca TruncationError (log) sayısı.

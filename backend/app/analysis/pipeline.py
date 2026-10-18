@@ -183,7 +183,7 @@ def _assess_entity_with_recovery(client, build_fn, payload, name, lang: str = "t
     """Değerlendirme + kalite denetimi. (adata, kullanılan_payload) döner.
 
     Hüküm emniyet tavanını (text_quality.HARD_CAPS) aşarsa, hüküm/ai_take/summary yasaklı
-    ifade (text_quality.BANNED_PHRASES) içerirse ya da bir metin alanına tool-call
+    ifade (text_quality.BANNED_PATTERNS) içerirse ya da bir metin alanına tool-call
     işaretlemesi sızarsa değerlendirme BİR KEZ ilgili
     notlarla yeniden istenir (sorunlar birlikteyse notlar tek denemede gider — en fazla bir
     ek çağrı, döngü yok). Daha az sorunlu yanıt kullanılır (eşitlikte yenisi); kalan sorun
