@@ -13,16 +13,33 @@ function scrollFocusIntoView(e) {
 }
 
 // Marka ikonları (lucide bu sürümde brand glyph'lerini içermiyor) — küçük inline SVG.
+// İkisi de AYNI stil: 24'lük viewBox, fill="none" + 2px stroke, h-4 w-4, kendi margin/
+// padding'i yok. Şekiller viewBox'ta ortalı (LinkedIn 2..22 × 2.5..21.5) — eski dolgulu
+// LinkedIn glifi 0..22 × 1..22.5 aralığındaydı, butonda sola/yukarı kaymış duruyordu.
+const ICON_PROPS = {
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round",
+  strokeLinejoin: "round",
+  className: "block h-4 w-4 shrink-0",
+  "aria-hidden": true,
+};
 function LinkedInIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4" aria-hidden="true">
-      <path d="M4.98 3.5C4.98 4.88 3.87 6 2.5 6S0 4.88 0 3.5 1.12 1 2.5 1s2.48 1.12 2.48 2.5zM.24 8h4.52v14.5H.24V8zM8.24 8h4.33v1.98h.06c.6-1.14 2.07-2.34 4.26-2.34 4.56 0 5.4 3 5.4 6.9v8.96h-4.52v-7.94c0-1.9-.03-4.34-2.64-4.34-2.64 0-3.05 2.06-3.05 4.2v8.08H8.24V8z" />
+    <svg {...ICON_PROPS}>
+      <g transform="translate(0 0.5)">
+        <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z" />
+        <rect x="2" y="9" width="4" height="12" />
+        <circle cx="4" cy="4" r="2" />
+      </g>
     </svg>
   );
 }
 function InstagramIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4" aria-hidden="true">
+    <svg {...ICON_PROPS}>
       <rect x="2" y="2" width="20" height="20" rx="5" />
       <circle cx="12" cy="12" r="4" />
       <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
@@ -44,7 +61,7 @@ function SocialIcon({ href, label, children }) {
       rel="noreferrer"
       aria-label={label}
       title={label}
-      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-ink-500 text-slate-500 transition hover:border-accent/60 hover:text-accent"
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-ink-500 text-slate-500 transition hover:border-accent/60 hover:text-accent"
     >
       {children}
     </a>
