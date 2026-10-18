@@ -74,6 +74,15 @@ check(d3["headline_verdict"] == "Kısa bir giriş.", "tavanı aşan hüküm son 
 d4 = sanitize_entity_analysis({"what_to_verify": ["Birinci kontrol tamam. " + " ".join(["x"] * 70) + "."]}, "en")
 check(d4["what_to_verify"] == ["Birinci kontrol tamam."], "liste maddesi de aynı kurala tabi")
 
+print("== B2: liste alanı string gelirse (Sonnet 5.5) ==")
+d5 = sanitize_entity_analysis({"what_to_verify": "Google sızıntısını doğrula.\nIPO tarihini kontrol et."}, "tr")
+check(d5["what_to_verify"] == ["Google sızıntısını doğrula.", "IPO tarihini kontrol et."],
+      f"satırlara bölündü (karakterlere DEĞİL): {d5['what_to_verify']}")
+d6 = sanitize_entity_analysis({"top_drivers": '["Azure büyüdü.", "CMA incelemesi."]'}, "en")
+check(d6["top_drivers"] == ["Azure büyüdü.", "CMA incelemesi."], "JSON dizi string'i parse edildi")
+d7 = sanitize_entity_analysis({"what_to_verify": "Tek bir kontrol cümlesi."}, "en")
+check(d7["what_to_verify"] == ["Tek bir kontrol cümlesi."], "tek string → tek madde")
+
 print("== C: kesik cümle denetimi ==")
 good = {"headline_verdict": "Tam cümle.", "ai_take": "Bir. İki!", "summary": "Özet?",
         "invalidation": "Olursa çürür.", "top_drivers": ["A oldu."], "what_to_verify": ['"B" kontrol.']}

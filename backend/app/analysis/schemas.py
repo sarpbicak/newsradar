@@ -7,6 +7,10 @@ JSON'unu okuyoruz. (Bkz. analysis/claude_client.py, model_specs.py)
 
 from __future__ import annotations
 
+import json
+import logging
+import re
+
 from ..db.models import (
     CONVICTIONS,
     EVENT_TYPES,
@@ -16,6 +20,8 @@ from ..db.models import (
     STANCES,
 )
 from .text_quality import PROMPT_LIMITS, clip_to_sentence, hard_cap
+
+logger = logging.getLogger("newsradar.schemas")
 
 # --------------------------------------------------------------------------- #
 #  Makale-başı analiz tool'u
@@ -294,6 +300,28 @@ def sanitize_article_analysis(item: dict) -> dict:
     }
 
 
+def _as_list(value: object, label: str) -> list:
+    """Liste alanını güvenle listeye çevirir. Model (özellikle zorunlu tool_choice olmayan
+    Sonnet 5.5) bazen diziyi TEK string olarak döndürür; string'i karakter karakter dolaşmak
+    kartta "G • o • o • g" üretiyordu. JSON dizi string'i → parse; aksi halde satır/madde
+    işaretlerinden bölünür."""
+    if isinstance(value, list):
+        return value
+    if not isinstance(value, str) or not value.strip():
+        return []
+    text = value.strip()
+    logger.warning("[şema] %s dizi yerine string geldi — listeye çevriliyor.", label)
+    if text.startswith("["):
+        try:
+            parsed = json.loads(text)
+            if isinstance(parsed, list):
+                return parsed
+        except ValueError:
+            pass
+    parts = [p.strip(" \t•*-") for p in re.split(r"\n+|\s+•\s+|^\s*[-*•]\s+", text, flags=re.M)]
+    return [p for p in parts if p]
+
+
 def sanitize_entity_analysis(item: dict, language: str = "tr") -> dict:
     """Claude'dan gelen entity değerlendirmesini güvenli değerlere çeker.
 
@@ -308,8 +336,10 @@ def sanitize_entity_analysis(item: dict, language: str = "tr") -> dict:
     trend = item.get("sentiment_trend")
     stance = item.get("stance")
     conviction = item.get("conviction")
-    drivers = [clip("top_drivers", d) for d in item.get("top_drivers", []) if str(d).strip()]
-    verify = [clip("what_to_verify", v) for v in item.get("what_to_verify", []) if str(v).strip()]
+    drivers = [clip("top_drivers", d)
+               for d in _as_list(item.get("top_drivers"), "top_drivers") if str(d).strip()]
+    verify = [clip("what_to_verify", v)
+              for v in _as_list(item.get("what_to_verify"), "what_to_verify") if str(v).strip()]
     verdict = clip("headline_verdict", item.get("headline_verdict", ""))
     take = clip("ai_take", item.get("ai_take", ""))
     return {
