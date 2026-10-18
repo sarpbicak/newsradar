@@ -8,6 +8,7 @@ Doğrular:
   (E) tool_use yok / input boş → ClaudeError; refusal → ClaudeError
   (F) zorunlu tool_choice yalnızca destekleyen modelde; max_tokens model sınırına kırpılır
   (G) 404 → ModelNotFoundError
+  (H) system bloğuna cache_control; sohbette yalnızca sabit önek önbellekli
 Çalıştır: python test_claude_client.py
 """
 import os
@@ -111,6 +112,7 @@ check(isinstance(r, TruncationError), f"tool_use olsa bile TruncationError ({r})
 
 print("== B: kalıcı kota/bakiye → ProviderQuotaError, yeniden deneme yok ==")
 for code, etype, msg in [
+    (401, "authentication_error", "invalid x-api-key"),
     (402, "billing_error", "billing"),
     (400, "invalid_request_error", "Your credit balance is too low to access the Anthropic API."),
     (403, "permission_error", "forbidden"),
@@ -160,6 +162,19 @@ kw = fm.calls[0]
 check(kw["tool_choice"] == {"type": "auto"}, "Sonnet 5.5: tool_choice=auto (zorunlu 400 verir)")
 check("`t` aracını" in kw["messages"][0]["content"], "Sonnet 5.5: araç talimatı user'a eklendi")
 check("temperature" not in kw, "temperature gönderilmiyor (5.5 modelleri 400 verir)")
+
+print("== H: prompt caching ==")
+from app.analysis.prompts import SYSTEM_PROMPT  # noqa: E402
+c, fm = client_with([message()])
+c.call_tool(system=SYSTEM_PROMPT, user="u", tool=TOOL, max_tokens=100)
+sysb = fm.calls[0]["system"]
+check(len(sysb) == 1 and sysb[0]["cache_control"] == {"type": "ephemeral"},
+      "tool çağrısı: system bloğunda cache_control (tools+system önbellekte)")
+chat_sys = f"{SYSTEM_PROMPT}\n\nDİL: tr\n\nBAĞLAM: x"
+blocks = cc.system_blocks(chat_sys)
+check(len(blocks) == 2 and blocks[0]["text"] == SYSTEM_PROMPT and "cache_control" in blocks[0]
+      and "cache_control" not in blocks[1] and blocks[1]["text"].startswith("DİL"),
+      "sohbet: yalnızca sabit SYSTEM_PROMPT önbellekli, bağlam ayrı blok")
 
 print("== G: 404 → ModelNotFoundError ==")
 c, fm = client_with([status_err(404, "not_found_error", "model: x")])

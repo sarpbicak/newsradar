@@ -10,11 +10,18 @@ sınırlar/davranış farkları: model_specs.py.
 
 Sessiz-hata korumaları (OpenAI-uyumlu yol ile AYNI sözleşme):
 - stop_reason == "max_tokens" → TruncationError (tool_use bloğu olsa bile).
-- Bakiye/kredi/kalıcı yetki-kota (402, kredi yetersiz, 403, kalıcı 429) → ProviderQuotaError.
+- Bakiye/kredi/kalıcı yetki-kota (401 geçersiz anahtar, 402, kredi yetersiz, 403, kalıcı
+  429) → ProviderQuotaError.
 - Geçici hatalar (529 overloaded, 5xx, geçici 429, bağlantı) → üstel geri çekilmeyle en
   fazla MAX_RETRIES yeniden deneme. SDK'nın kendi yeniden denemesi kapalı (max_retries=0)
   ki kalıcı 429 boşuna tekrarlanmasın.
 - tool_use yok / input boş → ClaudeError.
+
+Prompt caching: tools + SYSTEM_PROMPT her çağrıda aynı → system bloğuna cache_control
+(5 dk ephemeral) konur. Render sırası tools → system → messages olduğundan bu tek
+breakpoint tool şemasını da kapsar. Değişken kısım (sohbet bağlamı, makale listesi)
+breakpoint'ten SONRA gelir. Minimum önbelleklenebilir önek Haiku/Sonnet 5.5'te 512 token;
+cache_creation_input_tokens / cache_read_input_tokens kullanım kaydına ayrı yazılır.
 """
 
 from __future__ import annotations
@@ -30,6 +37,7 @@ import anthropic
 
 from ..config import get_settings
 from .model_specs import spec_for
+from .prompts import SYSTEM_PROMPT
 
 logger = logging.getLogger("newsradar.claude")
 
@@ -100,6 +108,8 @@ def classify_error(exc: Exception) -> str:
     msg = str(getattr(exc, "message", "") or exc).lower()
     if status == 404 or etype == "not_found_error":
         return "not_found"
+    if status == 401 or etype == "authentication_error":
+        return "quota"  # geçersiz/iptal anahtar: kalıcı — her çağrı aynı 401'i alır
     if status == 402 or etype == "billing_error":
         return "quota"
     if status == 403 or etype == "permission_error":
@@ -111,6 +121,22 @@ def classify_error(exc: Exception) -> str:
     if status == 529 or etype in ("overloaded_error", "api_error") or status >= 500:
         return "transient"
     return "fatal"
+
+
+def system_blocks(system: str) -> list[dict[str, Any]]:
+    """System prompt'u cache breakpoint'li bloklara böler.
+
+    SYSTEM_PROMPT ile başlıyorsa (sohbet: SYSTEM_PROMPT + dil yönergesi + bağlam) yalnızca
+    sabit SYSTEM_PROMPT önbelleğe alınır, gerisi ayrı (önbelleksiz) blok olur — böylece her
+    entity/dil için ortak önek tekrar kullanılır. Aksi halde tüm metin tek önbellekli blok."""
+    cache = {"type": "ephemeral"}
+    if system.startswith(SYSTEM_PROMPT) and len(system) > len(SYSTEM_PROMPT):
+        rest = system[len(SYSTEM_PROMPT):].lstrip("\n")
+        blocks = [{"type": "text", "text": SYSTEM_PROMPT, "cache_control": cache}]
+        if rest:
+            blocks.append({"type": "text", "text": rest})
+        return blocks
+    return [{"type": "text", "text": system, "cache_control": cache}]
 
 
 def _retry_delay(exc: Exception, attempt: int) -> float:
@@ -241,7 +267,7 @@ class ClaudeClient:
             with self._client.messages.stream(
                 model=self.model,
                 max_tokens=max_tokens,
-                system=system,
+                system=system_blocks(system),
                 tools=[tool],
                 messages=[{"role": "user", "content": user_content}],
                 **kwargs,
@@ -303,7 +329,7 @@ class ClaudeClient:
                 with self._client.messages.stream(
                     model=self.model,
                     max_tokens=max_tokens,
-                    system=system,
+                    system=system_blocks(system),
                     messages=messages,
                     output_config={"effort": _CHAT_EFFORT},
                 ) as stream:
