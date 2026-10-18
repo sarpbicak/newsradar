@@ -41,7 +41,9 @@ from .prompts import (
     build_article_batch_prompt,
     build_entity_prompt,
 )
-from .text_quality import PROMPT_LIMITS, banned_phrase_hits, hard_cap, word_count
+from .text_quality import (
+    PROMPT_LIMITS, banned_phrase_hits, hard_cap, has_markup_leak, word_count,
+)
 from .schemas import (
     ARTICLE_ANALYSIS_TOOL,
     ENTITY_ANALYSIS_TOOL,
@@ -141,7 +143,15 @@ _BANNED_NOTE = {
     "en": ("NOTE: The previous attempt used banned boilerplate phrases. Do NOT use: {phrases}. "
            "Lead with this company's concrete event instead."),
 }
+_MARKUP_NOTE = {
+    "tr": ("NOT: Önceki denemede bir metin alanının İÇİNE etiket/XML yazıldı (ör. '</summary>', "
+           "'<parameter ...>'). Metin alanlarına yalnızca düz metin yaz."),
+    "en": ("NOTE: The previous attempt wrote tags/XML INSIDE a text field (e.g. '</summary>', "
+           "'<parameter ...>'). Write plain text only in text fields."),
+}
 _BANNED_FIELDS = ("headline_verdict", "ai_take", "summary")
+_TEXT_FIELDS = ("headline_verdict", "ai_take", "summary", "invalidation")
+_LIST_FIELDS = ("top_drivers", "what_to_verify")
 
 
 def _quality_notes(data: dict, lang: str) -> list[str]:
@@ -154,17 +164,25 @@ def _quality_notes(data: dict, lang: str) -> list[str]:
     hits = banned_phrase_hits(text, lang)
     if hits:
         notes.append(_BANNED_NOTE[lang].format(phrases=", ".join(f"'{h}'" for h in hits)))
+    pieces = [str(data.get(f) or "") for f in _TEXT_FIELDS]
+    for f in _LIST_FIELDS:
+        v = data.get(f)
+        pieces += [str(x) for x in v] if isinstance(v, list) else [str(v or "")]
+    if any(has_markup_leak(p) for p in pieces):
+        notes.append(_MARKUP_NOTE[lang])
     return notes
 
 
 def _assess_entity_with_recovery(client, build_fn, payload, name, lang: str = "tr"):
     """Değerlendirme + kalite denetimi. (adata, kullanılan_payload) döner.
 
-    Hüküm emniyet tavanını (text_quality.HARD_CAPS) aşarsa ya da hüküm/ai_take/summary
-    yasaklı ifade (text_quality.BANNED_PHRASES) içerirse değerlendirme BİR KEZ ilgili
+    Hüküm emniyet tavanını (text_quality.HARD_CAPS) aşarsa, hüküm/ai_take/summary yasaklı
+    ifade (text_quality.BANNED_PHRASES) içerirse ya da bir metin alanına tool-call
+    işaretlemesi sızarsa değerlendirme BİR KEZ ilgili
     notlarla yeniden istenir (sorunlar birlikteyse notlar tek denemede gider — en fazla bir
     ek çağrı, döngü yok). Daha az sorunlu yanıt kullanılır (eşitlikte yenisi); kalan sorun
-    loglanır: uzun hükmü sanitize son tam cümlede keser, yasaklı ifade olduğu gibi kalır."""
+    loglanır: uzun hükmü sanitize son tam cümlede keser, sızan işaretlemeyi ilk etiketten
+    keser, yasaklı ifade olduğu gibi kalır."""
     lang = "en" if (lang or "tr").lower() == "en" else "tr"
     data, used = _assess_with_truncation_recovery(client, build_fn, payload, name)
     notes = _quality_notes(data, lang)

@@ -169,6 +169,18 @@ c = FakeClient2([{"headline_verdict": "Temiz kısa hüküm.", "top_drivers": ["a
 _assess_entity_with_recovery(c, build, [{"x": 1}], "Liste", "tr")
 check(len(c.users) == 1, "yalnızca hüküm/ai_take/summary denetlenir (liste maddesi tekrar tetiklemez)")
 
+print("== E3: tool-call işaretlemesi sızıntısı ==")
+from app.analysis.text_quality import has_markup_leak  # noqa: E402
+LEAK = 'Haber tablosu bu iyimserlikle uyuşmuyor.</summary>\n<parameter name="stance">bearish'
+d8 = sanitize_entity_analysis({"summary": LEAK, "what_to_verify": ["Kontrol et.<parameter name=\"x\">"]}, "tr")
+check(d8["summary"] == "Haber tablosu bu iyimserlikle uyuşmuyor.", f"sızan etiket kesildi: {d8['summary']!r}")
+check(d8["what_to_verify"] == ["Kontrol et."], "liste maddesinde de kesildi")
+check(not has_markup_leak("Marj <5% kaldı ve a<b durumu."), "'<5%' gibi haber metni etiket sayılmadı")
+c = FakeClient2([{"headline_verdict": "Temiz.", "summary": LEAK}, OK])
+data, _ = _assess_entity_with_recovery(c, build, [{"x": 1}], "Sızıntı", "tr")
+check(len(c.users) == 2 and data == OK and "düz metin" in c.users[1],
+      "sızıntı → bir kez yeniden istendi (notla)")
+
 print("== F: prompt kuralları ==")
 for lang, needles in {
     "tr": ["en fazla 14 kelime", "en fazla 100 kelime", "daha az şey söyle", "TAM CÜMLE",

@@ -230,6 +230,10 @@ def main() -> int:
                 "headline_verdict", "ai_take", "summary", "invalidation", "top_drivers", "what_to_verify")}
             cut += [f"{n}/{lang}/{f}: …{v[-60:]}" for f, v in unterminated_fields(data)]
     lines.append(f"- Noktalamasız biten alan/madde: {len(cut)}")
+    leaks = [m for lvl, m in cap.msgs if "işaretlemesi sızmış" in m]
+    retries = [m for lvl, m in cap.msgs if "kalite sorunu" in m]
+    lines.append(f"- Tool-call işaretlemesi sızıntısı (sanitize ilk etiketten kesti, bilgi): {len(leaks)}")
+    lines.append(f"- Kalite tekrar denemesi (uzun hüküm / yasaklı ifade / sızıntı, bilgi): {len(retries)}")
     lines += [f"  - {c}" for c in cut]
     if cut:
         fails.append(f"kesik/noktalamasız metin alanı: {len(cut)}")

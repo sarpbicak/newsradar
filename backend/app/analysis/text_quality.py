@@ -58,6 +58,27 @@ BANNED_PHRASES = {
     ],
 }
 
+# Tool-call işaretlemesi sızıntısı: model nadiren bir string alanın içine sonraki
+# parametrenin ham XML'ini yazıyor ('…uyuşmuyor.</summary>\n<parameter name="stance">').
+# strict mod bunu engelleyemez (yalnızca tipi garanti eder). Etiket = harfle başlayan
+# <ad ...> / </ad>; haber metnindeki '<5%' gibi ifadeler eşleşmez.
+_MARKUP = re.compile(r"</?[A-Za-z_][\w:.-]*(?:\s[^<>]*)?>")
+
+
+def has_markup_leak(text: str) -> bool:
+    return bool(_MARKUP.search(text or ""))
+
+
+def strip_markup_leak(text: str, label: str = "") -> str:
+    """İlk etiketten itibaren atar (sızan kısım hep metnin sonuna eklenmiş olur)."""
+    m = _MARKUP.search(text or "")
+    if not m:
+        return text
+    logger.warning("[metin] %s içinde tool-call işaretlemesi sızmış — ilk etiketten kesildi: %r",
+                   label or "alan", text[m.start():m.start() + 60])
+    return text[: m.start()].rstrip()
+
+
 # Cümle sonu: . ! ? … — ardından boşluk/metin sonu gelmeli (ondalık "4.5" cümle sonu değil).
 # Kapanış tırnağı/parantezi noktalamadan sonra gelebilir.
 _CLOSERS = "\"'”’)»]"

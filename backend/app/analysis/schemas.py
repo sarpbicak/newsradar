@@ -19,7 +19,7 @@ from ..db.models import (
     SENTIMENT_TRENDS,
     STANCES,
 )
-from .text_quality import PROMPT_LIMITS, clip_to_sentence, hard_cap
+from .text_quality import PROMPT_LIMITS, clip_to_sentence, hard_cap, strip_markup_leak
 
 logger = logging.getLogger("newsradar.schemas")
 
@@ -331,7 +331,9 @@ def sanitize_entity_analysis(item: dict, language: str = "tr") -> dict:
     lang = "en" if (language or "tr").lower() == "en" else "tr"
 
     def clip(field: str, value: object) -> str:
-        return clip_to_sentence(str(value or "").strip(), hard_cap(field, lang), f"{field}/{lang}")
+        label = f"{field}/{lang}"
+        text = strip_markup_leak(str(value or "").strip(), label)
+        return clip_to_sentence(text, hard_cap(field, lang), label)
 
     trend = item.get("sentiment_trend")
     stance = item.get("stance")
