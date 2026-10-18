@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <!-- NewsRadar favicon: header'daki lucide "Radar" ikonunun 16px için sadeleştirilmiş hali
+       (aynı motif: sağ üstte boşluklu dış halka, iç halka, merkez, tarama çizgisi; küçük
+       noktalar yok, kalın çizgi). Açık temada sitenin ana rengi (accent #1E3A5F), koyu
+       sekme çubuğunda okunur açık lacivert. -->
+  <style>
+    .r { stroke: #1E3A5F; stroke-width: 2.5; }
+    .d { fill: #1E3A5F; }
+    @media (prefers-color-scheme: dark) { .r { stroke: #9DB8DC; } .d { fill: #9DB8DC; } }
+  </style>
+  <path class="r" d="M21.4 8.58A10 10 0 1 1 15.42 2.6"/>
+  <path class="r" d="M17.17 10.12A5.5 5.5 0 1 1 13.88 6.83"/>
+  <path class="r" d="M12 12 19.42 4.58"/>
+  <circle class="d" cx="12" cy="12" r="1.9"/>
+</svg>
