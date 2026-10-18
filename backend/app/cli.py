@@ -391,6 +391,75 @@ def cmd_fmp_check(args: argparse.Namespace) -> None:
               "Bu durumda hedef fiyat GÖSTERİLMEZ (tavsiye/haber etkilenmez).")
 
 
+_PING_TOOL = {
+    "name": "record_ping",
+    "description": "Bağlantı testi: verilen kelimeyi geri yaz.",
+    "input_schema": {
+        "type": "object",
+        "properties": {"echo": {"type": "string", "description": "Geri yazılan kelime"}},
+        "required": ["echo"],
+    },
+}
+
+
+def cmd_llm_check(_args: argparse.Namespace) -> None:
+    """Yapılandırılmış HER modele küçük bir tool çağrısı: model adı / erişim / tool-use /
+    önbellek / maliyet satırı. Model adı karmaşası (404, eski ad) burada yakalanır."""
+    from .analysis.claude_client import ClaudeError, MissingAPIKeyError
+    from .analysis.llm import get_llm_provider, provider_name
+    from .analysis.model_specs import is_known, spec_for
+    from .analysis.prompts import SYSTEM_PROMPT
+
+    init_db()
+    settings = get_settings()
+    prov = provider_name()
+    print(f"LLM sağlayıcı: {prov}")
+    if prov != "anthropic":
+        try:
+            c = get_llm_provider("article")
+            data = c.call_tool(system="Test.", user="Kelime: radar", tool=_PING_TOOL, max_tokens=200)
+            print(f"  ✓ {c.model}: tool-use OK (echo={data.get('echo')!r}) · {c.last_usage}")
+        except ClaudeError as exc:
+            print(f"  ✗ {exc}")
+            sys.exit(1)
+        return
+
+    purposes: dict[str, list[str]] = {}
+    for p in ("article", "assessment", "chat"):
+        purposes.setdefault(settings.model_for(p), []).append(p)
+    failed = False
+    for model, used_for in purposes.items():
+        spec = spec_for(model)
+        print(f"\n▶ {model}  (kullanım: {', '.join(used_for)})")
+        print(f"  tabloda: {'evet' if is_known(model) else 'HAYIR — fiyat/sınır bilinmiyor'} · "
+              f"max_output={spec.max_output_tokens} · zorunlu tool_choice="
+              f"{'evet' if spec.forced_tool_choice else 'hayır (auto)'}")
+        try:
+            c = get_llm_provider(used_for[0], model=model)
+        except MissingAPIKeyError as exc:
+            print(f"  ✗ {exc}")
+            sys.exit(1)
+        # İki çağrı: aynı SYSTEM_PROMPT + tool → 1.'si önbelleğe yazar, 2.'si okumalı.
+        for i in (1, 2):
+            try:
+                data = c.call_tool(system=SYSTEM_PROMPT, user="Bağlantı testi. Kelime: radar",
+                                   tool=_PING_TOOL, max_tokens=300)
+            except ClaudeError as exc:
+                print(f"  ✗ çağrı {i}: {type(exc).__name__}: {exc}")
+                failed = True
+                break
+            u = c.last_usage or {}
+            ok = (data.get("echo") or "").strip().lower() == "radar"
+            print(f"  {'✓' if ok else '?'} çağrı {i}: erişim OK · tool-use OK (echo={data.get('echo')!r}) · "
+                  f"input={u.get('input_tokens')} cache_write={u.get('cache_creation_input_tokens')} "
+                  f"cache_read={u.get('cache_read_input_tokens')} output={u.get('output_tokens')} · "
+                  f"${u.get('cost_usd', 0):.5f}")
+        else:
+            u = c.last_usage or {}
+            print(f"  önbellek: {'✓ 2. çağrı önbellekten okudu' if u.get('cache_read_input_tokens') else '✗ önbellek isabeti YOK'}")
+    sys.exit(1 if failed else 0)
+
+
 def cmd_reconcile(_args: argparse.Namespace) -> None:
     """Eski ön-filtre sürümüyle elenmiş makaleleri yeniden değerlendirmeye açar."""
     from .analysis.pipeline import reconcile_prefilter
@@ -423,6 +492,10 @@ def main() -> None:
     )
     p_fmp.add_argument("symbol", nargs="?", default="AAPL", help="Sembol (örn. AMD). Vars: AAPL")
     p_fmp.set_defaults(func=cmd_fmp_check)
+
+    sub.add_parser(
+        "llm-check", help="Yapılandırılmış her modele küçük tool çağrısı (ad/erişim/tool/maliyet)"
+    ).set_defaults(func=cmd_llm_check)
 
     p_fetch = sub.add_parser("fetch", help="Haber çek + yazdır")
     p_fetch.add_argument("query", nargs="?", help="Tek entity (query, örn. TSLA). Boşsa hepsi.")

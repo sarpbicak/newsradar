@@ -192,7 +192,10 @@ class ClaudeClient:
             logger.error(msg)
             raise ModelNotFoundError(msg) from exc
         if kind == "quota":
-            msg = f"Sağlayıcı kota/bakiye hatası ({status}): {detail}"
+            if status == 401:
+                msg = f"Claude kimlik doğrulama hatası (401) — ANTHROPIC_API_KEY geçersiz: {detail}"
+            else:
+                msg = f"Sağlayıcı kota/bakiye hatası ({status}): {detail}"
             logger.error(msg)
             raise ProviderQuotaError(msg, status) from exc
         if isinstance(exc, anthropic.APIConnectionError):
