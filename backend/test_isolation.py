@@ -240,7 +240,7 @@ def main():
         check(st_a["is_running"] is False and st_a["progress_total"] == 0,
               f"A, userf'in taramasını GÖRMEZ (running={st_a['is_running']} total={st_a['progress_total']})")
         # tamamlanınca son özet yalnızca sahibine
-        summ = R.RefreshSummary(analyzed=2, warnings=["[Kf1] test uyarı"])
+        summ = R.RefreshSummary(analyzed=2, warnings=[{"code": "batch_error", "entity": "Kf1", "params": {"error": "test"}}])
         R._record_completion(summ)
         st_f2 = client.get("/status", headers=F).json()
         st_a2 = client.get("/status", headers=A).json()

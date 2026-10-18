@@ -14,6 +14,8 @@ from sqlalchemy.orm import Session
 
 from .db.database import session_scope
 from .db.models import AnalystSnapshot, Entity, PriceSnapshot
+from .messages import msg, with_entity
+from .provider_skip import is_skipped, mark_skip
 from .providers import get_analyst_provider, get_target_provider
 
 logger = logging.getLogger("newsradar.analyst")
@@ -30,7 +32,7 @@ def _latest_price(session: Session, entity_id: int) -> float | None:
     return snap.price if snap else None
 
 
-def refresh_analyst(entity_ids: set[int] | None = None) -> list[str]:
+def refresh_analyst(entity_ids: set[int] | None = None) -> list[dict]:
     """Aktif ticker'lar için analist TAVSİYESİ (Finnhub) + HEDEF FİYAT (FMP) çekip
     tek snapshot'ta birleştirir. İki kaynak da hata-toleranslı; biri yoksa diğeri yazılır.
 
@@ -39,7 +41,7 @@ def refresh_analyst(entity_ids: set[int] | None = None) -> list[str]:
     erişilemezse hedef None kalır (asla tahminle doldurulmaz)."""
     rec_provider = get_analyst_provider()   # Finnhub al/tut/sat
     target_provider = get_target_provider()  # FMP hedef fiyat
-    warnings: list[str] = []
+    warnings: list[dict] = []  # app.messages.msg(...)
     rec_on = rec_provider.is_available()
     target_on = target_provider.is_available()
     if not rec_on and not target_on:
@@ -56,24 +58,29 @@ def refresh_analyst(entity_ids: set[int] | None = None) -> list[str]:
             th = tl = tm = tmed = tcons = None
 
             # 1) Tavsiye (al/tut/sat) — Finnhub.
-            if rec_on:
+            # Kalıcı/beklenen hatası cache'lenmiş sembol için sağlayıcıya hiç gidilmez.
+            if rec_on and not is_skipped(session, rec_provider.name, e.query):
                 try:
                     res = rec_provider.fetch(e)
-                    if res.warning:
-                        warnings.append(f"[{e.name}] {res.warning}")
+                    if res.warning and res.expected:
+                        mark_skip(session, rec_provider.name, e.query, res.warning)  # yalnızca log
+                    elif res.warning:
+                        warnings.append(with_entity(res.warning, e.name))
                     elif res.rating:
                         r = res.rating
                         sb, b, h, s, ss = r.strong_buy, r.buy, r.hold, r.sell, r.strong_sell
                         period = r.period
                 except Exception as exc:  # noqa: BLE001
-                    warnings.append(f"[{e.name}] analist tavsiye hatası: {exc}")
+                    warnings.append(msg("provider_error", e.name, source="finnhub_analyst", error=exc))
 
             # 2) Hedef fiyat — FMP (gerçek analist konsensüsü; yoksa None kalır).
-            if target_on:
+            if target_on and not is_skipped(session, target_provider.name, e.query):
                 try:
                     tres = target_provider.fetch(e)
-                    if tres.warning:
-                        warnings.append(f"[{e.name}] {tres.warning}")
+                    if tres.warning and tres.expected:
+                        mark_skip(session, target_provider.name, e.query, tres.warning)  # yalnızca log
+                    elif tres.warning:
+                        warnings.append(with_entity(tres.warning, e.name))
                     elif tres.rating:
                         tr = tres.rating
                         th, tl, tm, tmed, tcons = (
@@ -81,7 +88,7 @@ def refresh_analyst(entity_ids: set[int] | None = None) -> list[str]:
                             tr.target_median, tr.target_consensus,
                         )
                 except Exception as exc:  # noqa: BLE001
-                    warnings.append(f"[{e.name}] hedef fiyat hatası: {exc}")
+                    warnings.append(msg("provider_error", e.name, source="fmp_target", error=exc))
 
             # İki kaynaktan da hiçbir şey gelmediyse snapshot yazma.
             if (sb + b + h + s + ss) == 0 and tm is None:

@@ -92,8 +92,8 @@ def main():
     fc = QuotaClient(status_code=403)
     totals = asyncio.run(analyze_all_async(fc, entity_ids=None))
 
-    quota_warns = [w for w in totals.warnings if "kullanılamıyor" in w and "kapasite" in w]
-    per_batch_warns = [w for w in totals.warnings if "bölünmedi" in w or "değerlendirme başarısız" in w]
+    quota_warns = [w for w in totals.warnings if w["code"] == "analysis_unavailable"]
+    per_batch_warns = [w for w in totals.warnings if w["code"] in ("batch_error", "assessment_failed")]
     # Batch sayısı ≈ entity başına ceil(10/batch_size)=1 → 8 batch + 8 entity değerlendirme çağrısı.
     # Düzeltme olmasa call_tool ~16+ kez çağrılır ve ~16 uyarı birikir. Düzeltmeyle: ~concurrency kadar.
     check(totals.quota_error is True, "totals.quota_error = True")
@@ -112,7 +112,7 @@ def main():
     fc2 = QuotaClient(status_code=402)
     totals2 = asyncio.run(analyze_all_async(fc2, entity_ids=None))
     check(totals2.quota_error and totals2.quota_status_code == 402, "402 → quota_error + status_code=402")
-    check(len([w for w in totals2.warnings if "kullanılamıyor" in w]) == 1, "402 → tek uyarı")
+    check(len([w for w in totals2.warnings if w["code"] == "analysis_unavailable"]) == 1, "402 → tek uyarı")
 
     print("\n== TEST C: kota DIŞI hata (500) → DURDURMAZ (her batch denenir, quota_error False) ==")
     ids = [seed_entity(arts) for _ in range(3)]
@@ -121,7 +121,7 @@ def main():
     check(totals3.quota_error is False, "500 hatası → quota_error False (kota değil)")
     # Her entity için en az bir batch + değerlendirme denendi (durmadı).
     check(fc3.calls >= 3, f"500'de durmadı — her entity denendi (call_tool {fc3.calls} kez)")
-    check(any("bölünmedi" in w for w in totals3.warnings), "500 → sıradan 'bölünmedi' uyarısı (kota uyarısı değil)")
+    check(any(w["code"] == "batch_error" for w in totals3.warnings), "500 → sıradan batch_error uyarısı (kota uyarısı değil)")
 
     print("\n== TEST D: ProviderQuotaError, ClaudeError alt sınıfı (pipeline'in genel yakalaması bozulmaz) ==")
     check(issubclass(ProviderQuotaError, ClaudeError), "ProviderQuotaError ⊂ ClaudeError")

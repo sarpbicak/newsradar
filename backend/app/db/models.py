@@ -223,6 +223,22 @@ class LlmUsage(Base):
     cost_usd: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
 
 
+class ProviderSkip(Base):
+    """Kalıcı/BEKLENEN sağlayıcı hatası cache'i (ör. FMP ücretsiz katman 403, ABD dışı sembol).
+
+    key = "<sağlayıcı>:<sembol>". until'e kadar o sembol için sağlayıcıya gidilmez ve
+    kullanıcıya uyarı gösterilmez — yalnızca sunucu (admin) logunda kalır.
+    """
+
+    __tablename__ = "provider_skips"
+
+    key: Mapped[str] = mapped_column(String(120), primary_key=True)
+    until: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    code: Mapped[str] = mapped_column(String(40), nullable=False)   # messages kodu
+    status: Mapped[int | None] = mapped_column(Integer, nullable=True)  # HTTP durumu
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
 class LlmHealthEvent(Base):
     """LLM sağlık olayı — her yenileme sonunda bir satır: sağlayıcı çağrıları başarılı
     mıydı yoksa kalıcı kota/hata mı aldı. Admin paneli 'sistem sağlığı' göstergesi bunu

@@ -65,7 +65,7 @@ def main():
             refresh._state.last_user_id = _admin_id()
             refresh._state.last_summary = refresh.RefreshSummary(
                 fetched_new=12, analyzed=0, quota_error=True,
-                warnings=["Analiz servisi geçici olarak kullanılamıyor (sağlayıcı kapasite/bakiye limiti)…"],
+                warnings=[{"code": "analysis_unavailable", "entity": None, "params": {}}],
             )
         stt = client.get("/status", headers=H).json()
         check(stt["last_summary"] is not None, "/status last_summary döndü")

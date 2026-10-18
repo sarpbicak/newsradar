@@ -7,12 +7,15 @@ Not: Ücretsiz katman ~24s gecikmeli ve `from` en fazla ~1 ay geriye gidebilir �
 
 from __future__ import annotations
 
+import logging
+
 from datetime import datetime, timezone
 
 import httpx
 
 from ..config import get_settings
 from ..db.models import Entity
+from ..messages import msg
 from .base import FetchedArticle, NewsProvider, ProviderResult
 
 _BASE = "https://newsapi.org/v2"
@@ -33,7 +36,7 @@ class NewsApiProvider(NewsProvider):
         if not self.is_available():
             return ProviderResult(
                 provider=self.name,
-                warning="NEWSAPI_KEY tanımlı değil — keyword haberleri atlandı.",
+                warning=msg("key_missing", key="NEWSAPI_KEY"),
             )
 
         query = entity.query.strip()
@@ -58,20 +61,24 @@ class NewsApiProvider(NewsProvider):
                 detail = exc.response.json().get("message", "")
             except Exception:
                 pass
+            logging.getLogger("newsradar.providers").warning(
+                "NewsAPI %s ('%s'): %s", exc.response.status_code, query, detail)
             return ProviderResult(
                 provider=self.name,
-                warning=f"NewsAPI hatası ({exc.response.status_code}) {detail} — '{query}' atlandı.",
+                warning=msg("http_error", source="newsapi", status=exc.response.status_code,
+                            symbol=query),
             )
         except (httpx.HTTPError, ValueError) as exc:
             return ProviderResult(
                 provider=self.name,
-                warning=f"NewsAPI bağlantı/çözümleme hatası: {exc}",
+                warning=msg("connection_error", source="newsapi", error=exc),
             )
 
         if data.get("status") != "ok":
             return ProviderResult(
                 provider=self.name,
-                warning=f"NewsAPI durum='{data.get('status')}': {data.get('message', '')}",
+                warning=msg("newsapi_status", status=data.get("status"),
+                            message=data.get("message", "")),
             )
 
         articles: list[FetchedArticle] = []

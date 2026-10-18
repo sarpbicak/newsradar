@@ -21,6 +21,7 @@ from .config import get_settings
 from .db.database import init_db, session_scope
 from .db.models import Article, Entity, EntityAnalysis
 from .ingest import IngestResult, fetch_all, fetch_for_entity
+from .messages import render
 from .providers import provider_status
 
 
@@ -28,7 +29,7 @@ def _print_result(r: IngestResult) -> None:
     print(f"\n=== {r.entity_name} (id={r.entity_id}) ===")
     print(f"  Çekilen: {r.fetched} | Yeni: {r.new_count} | Tekrar: {r.duplicates}")
     for w in r.warnings:
-        print(f"  ⚠ {w}")
+        print(f"  ⚠ {render(w)}")
     for a in r.new_articles[:15]:
         date = a.published_at.strftime("%Y-%m-%d %H:%M") if a.published_at else "tarih yok"
         print(f"   • [{date}] {a.title[:90]}")
@@ -159,7 +160,7 @@ def cmd_analyze(args: argparse.Namespace) -> None:
             print(f"\n  ⚠ SEBEP: {totals.discarded} makale relevance<0.3 ile elendi "
                   "(Claude alakasız buldu).")
     for w in totals.warnings:
-        print(f"  ⚠ {w}")
+        print(f"  ⚠ {render(w)}")
 
     with session_scope() as session:
         entity = session.scalar(select(Entity).where(Entity.query == args.query))

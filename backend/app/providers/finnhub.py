@@ -12,6 +12,7 @@ import httpx
 
 from ..config import get_settings
 from ..db.models import Entity
+from ..messages import msg
 from .base import FetchedArticle, NewsProvider, ProviderResult
 
 _BASE = "https://finnhub.io/api/v1"
@@ -31,7 +32,7 @@ class FinnhubProvider(NewsProvider):
         if not self.is_available():
             return ProviderResult(
                 provider=self.name,
-                warning="FINNHUB_API_KEY tanımlı değil — ticker haberleri atlandı.",
+                warning=msg("key_missing", key="FINNHUB_API_KEY"),
             )
 
         symbol = entity.query.upper().strip()
@@ -48,18 +49,19 @@ class FinnhubProvider(NewsProvider):
         except httpx.HTTPStatusError as exc:
             return ProviderResult(
                 provider=self.name,
-                warning=f"Finnhub API hatası ({exc.response.status_code}) — {symbol} atlandı.",
+                warning=msg("http_error", source="finnhub_news",
+                            status=exc.response.status_code, symbol=symbol),
             )
         except (httpx.HTTPError, ValueError) as exc:
             return ProviderResult(
                 provider=self.name,
-                warning=f"Finnhub bağlantı/çözümleme hatası: {exc}",
+                warning=msg("connection_error", source="finnhub_news", error=exc),
             )
 
         if not isinstance(data, list):
             return ProviderResult(
                 provider=self.name,
-                warning=f"Finnhub beklenmeyen yanıt döndü ({symbol}).",
+                warning=msg("bad_response", source="finnhub_news", symbol=symbol),
             )
 
         articles: list[FetchedArticle] = []

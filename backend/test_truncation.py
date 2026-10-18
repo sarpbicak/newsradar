@@ -123,7 +123,7 @@ def main():
     fc2 = FakeClient(threshold=0, mode="truncate")
     totals2 = analyze_entity_sync(eid2, fc2)
     n2 = analyzed_count(eid2)
-    skip_warns = [w for w in totals2.warnings if "analiz edilemedi" in w and "kesildi" in w]
+    skip_warns = [w for w in totals2.warnings if w["code"] == "article_truncated"]
     check(n2 == 0, f"Hiçbiri analiz edilemedi (analyzed={n2})")
     check(len(skip_warns) == 4, f"Her makale için 'atlandı' uyarısı (4 beklenir: {len(skip_warns)})")
     check(min(fc2.batch_calls) == 1, f"Tek makaleye kadar indi (en küçük çağrı: {min(fc2.batch_calls)})")
@@ -135,7 +135,7 @@ def main():
     n3 = analyzed_count(eid3)
     check(n3 == 0, f"Hata → analiz yok (analyzed={n3})")
     check(len(fc3.batch_calls) == 1, f"BÖLÜNMEDİ — tek çağrı (görülen: {len(fc3.batch_calls)} çağrı)")
-    check(any("bölünmedi" in w for w in totals3.warnings), "Uyarı 'bölünmedi' içeriyor")
+    check(any(w["code"] == "batch_error" for w in totals3.warnings), "Uyarı kodu batch_error (bölünmedi)")
 
     print(f"\n{'='*50}\nSONUÇ: {PASS} geçti, {FAIL} başarısız")
     return FAIL == 0

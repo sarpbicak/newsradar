@@ -25,13 +25,22 @@ class FetchedArticle:
     published_at: datetime | None = None
 
 
+# Kalıcı HTTP durumları: anahtar geçersiz (401) ya da uç ücretsiz katmanın dışında
+# (402/403). Tekrar denemek aynı sonucu verir → ProviderResult.expected=True.
+PERMANENT_HTTP = frozenset({401, 402, 403})
+
+
 @dataclass
 class ProviderResult:
     """Bir çekme işleminin sonucu: makaleler + (varsa) kullanıcıya gösterilecek uyarı."""
 
     provider: str
     articles: list[FetchedArticle] = field(default_factory=list)
-    warning: str | None = None  # örn. "anahtar yok" ya da "API hatası"
+    # Kullanıcıya gösterilecek uyarı: app.messages.msg(...) sözlüğü (kod + parametre).
+    warning: dict | None = None
+    # Kalıcı ve BEKLENEN durum (ücretsiz katman 401/402/403, sembol kapsam dışı): kullanıcıya
+    # uyarı olarak gösterilmez, yalnızca loglanır ve 24 saat tekrar denenmez (provider_skip).
+    expected: bool = False
 
 
 class NewsProvider(ABC):
@@ -86,7 +95,8 @@ class PriceResult:
 
     provider: str
     quote: PriceQuote | None = None
-    warning: str | None = None
+    warning: dict | None = None  # app.messages.msg(...)
+    expected: bool = False       # kalıcı/beklenen (bkz. ProviderResult.expected)
 
 
 class PriceProvider(ABC):
@@ -133,7 +143,8 @@ class AnalystRating:
 class AnalystResult:
     provider: str
     rating: AnalystRating | None = None
-    warning: str | None = None
+    warning: dict | None = None  # app.messages.msg(...)
+    expected: bool = False       # kalıcı/beklenen (bkz. ProviderResult.expected)
 
 
 class AnalystProvider(ABC):

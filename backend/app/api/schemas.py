@@ -360,16 +360,29 @@ class DashboardOut(BaseModel):
     price_history: list[PricePointOut] = []
 
 
-class RefreshSummaryOut(BaseModel):
-    """Son tamamlanan yenilemenin özeti (/status içinde)."""
+class MessageOut(BaseModel):
+    """Kullanıcıya giden uyarı/bilgi: kod + parametre (app/messages.py). Frontend
+    `msg.<code>` anahtarıyla kullanıcının dilinde metne çevirir."""
 
-    fetched_new: int
-    prefiltered: int
-    analyzed: int
-    discarded: int
+    code: str
+    entity: str | None = None
+    params: dict = {}
+
+
+class RefreshSummaryOut(BaseModel):
+    """Son tamamlanan yenilemenin özeti (/status içinde). Sayaçların anlamı:
+    refresh.RefreshSummary'deki açıklamaya bakın."""
+
+    fetched_new: int            # bu taramada YENİ eklenen makale
+    prefiltered: int            # LLM'e gitmeden elenen (kopya / ön-filtre)
+    analyzed: int               # LLM sonrası TUTULAN
+    discarded: int              # LLM sonrası ilgisiz bulunup elenen
+    llm_articles: int = 0       # bu taramada LLM'e gidip yanıtı alınan (kuyruktan gelenler dahil)
+    queued: int = 0             # hâlâ analiz bekleyen (sonraki yenilemede)
     entity_assessments: int
-    warnings: list[str]
-    infos: list[str] = []
+    assessments_skipped: int = 0
+    warnings: list[MessageOut]
+    infos: list[MessageOut] = []
     quota_error: bool = False  # sağlayıcı kota/bakiye limiti → analiz durdu (kullanıcı banner'ı)
 
 

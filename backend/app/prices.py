@@ -17,6 +17,8 @@ from sqlalchemy.orm import Session
 
 from .db.database import session_scope
 from .db.models import Entity, PriceSnapshot
+from .messages import msg, with_entity
+from .provider_skip import is_skipped, mark_skip
 from .providers import get_price_provider
 
 logger = logging.getLogger("newsradar.prices")
@@ -25,14 +27,14 @@ MAX_PRICE_HISTORY = 100   # entity başına saklanacak en fazla fiyat snapshot'�
 WEEK_WINDOW_DAYS = 7      # "son ~hafta değişimi" için pencere
 
 
-def refresh_prices(entity_ids: set[int] | None = None) -> list[str]:
+def refresh_prices(entity_ids: set[int] | None = None) -> list[dict]:
     """Aktif ticker'lar için güncel fiyatı çeker ve snapshot yazar.
 
     entity_ids verilirse yalnızca o entity'ler işlenir (kişisel elle yenileme);
     None ise tüm aktif ticker'lar (scheduler).
     """
     provider = get_price_provider()
-    warnings: list[str] = []
+    warnings: list[dict] = []  # app.messages.msg(...)
     if not provider.is_available():
         return warnings  # anahtar yoksa sessizce atla (haber tarafı zaten uyarıyor)
 
@@ -43,13 +45,19 @@ def refresh_prices(entity_ids: set[int] | None = None) -> list[str]:
             q = q.where(Entity.id.in_(entity_ids))
         tickers = session.scalars(q).all()
         for e in tickers:
+            # Kalıcı/beklenen durum (ABD dışı sembol, premium uç) cache'liyse hiç sorma.
+            if is_skipped(session, provider.name, e.query):
+                continue
             try:
                 res = provider.quote(e)
             except Exception as exc:  # noqa: BLE001 — tek entity hatası yenilemeyi çökertmesin
-                warnings.append(f"[{e.name}] fiyat beklenmeyen hata: {exc}")
+                warnings.append(msg("provider_error", e.name, source="finnhub_price", error=exc))
                 continue
             if res.warning:
-                warnings.append(f"[{e.name}] {res.warning}")
+                if res.expected:
+                    mark_skip(session, provider.name, e.query, res.warning)  # yalnızca log
+                else:
+                    warnings.append(with_entity(res.warning, e.name))
                 continue
             q = res.quote
             if q is None:

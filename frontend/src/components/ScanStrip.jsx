@@ -4,7 +4,7 @@
 // Bitişte çubuk dolar, kısa gecikmeyle "Tamamlandı · N haber · N analiz"e döner, söner.
 // prefers-reduced-motion: parlama (shimmer) durur, çubuk kalır.
 import React, { useEffect, useState } from "react";
-import { useI18n } from "../i18n.jsx";
+import { useI18n, refreshParts } from "../i18n.jsx";
 
 export default function ScanStrip({
   phase = "running", // "starting" | "running" | "done"
@@ -34,7 +34,7 @@ export default function ScanStrip({
   if (phase === "done") {
     // Önce çubuk dolsun (~300ms boşluk), sonra "Tamamlandı…" belirsin.
     label = showDone && summary
-      ? t("notice.scanDone", { news: summary.news, analyses: summary.analyses })
+      ? t("notice.scanDone", { parts: refreshParts(summary, t).slice(0, 2).join(" · ") })
       : " ";
     labelKey = showDone ? "done" : "done-fill";
   } else if (phase === "starting") {

@@ -12,7 +12,7 @@ import FeedbackWidget from "./components/FeedbackWidget.jsx";
 import ScanStrip from "./components/ScanStrip.jsx";
 import { LanguageModal, LanguageSwitcher } from "./components/LanguageBits.jsx";
 import { Skeleton, useIsMobile } from "./components/ui.jsx";
-import { useI18n } from "./i18n.jsx";
+import { fmtMsg, refreshParts, useI18n } from "./i18n.jsx";
 import { RefreshCw, Menu, X, LogOut, ShieldCheck, LayoutDashboard, Radar, HelpCircle, UserPlus, ArrowDown } from "lucide-react";
 
 // Mobil aşağı-çekip-yenile eşiği (px). Bu mesafeyi geçince bırakınca yenilenir.
@@ -211,19 +211,17 @@ export default function App({ setLang }) {
           setStarting(false);
           const sm = s.last_summary;
           if (sm) {
-            setScanDone({ news: sm.fetched_new, analyses: sm.analyzed });
+            setScanDone(sm);
             const warns = sm.warnings || [];
             const infos = sm.infos || [];
             // GERÇEK uyarılar (ya da atlama notları) varsa ayrı kalıcı-ish kutu göster;
             // sade başarı durumunda çubuğun bitiş satırı yeterli (ikinci mesaj yok).
             if (warns.length || infos.length) {
-              const parts = [t("notice.newNews", { n: sm.fetched_new }), t("notice.analyzed", { n: sm.analyzed })];
-              if (sm.prefiltered) parts.push(t("notice.prefiltered", { n: sm.prefiltered }));
-              if (sm.discarded) parts.push(t("notice.discarded", { n: sm.discarded }));
+              // Mesajlar backend'den KOD + parametre olarak gelir; ham halleri saklanır ve
+              // render'da çevrilir → kullanıcı dil değiştirirse not da o dile döner.
               setNotice({
                 type: warns.length ? "warn" : "ok",
-                text: t("notice.refreshed", { parts: parts.join(" · ") }) +
-                  (warns.length ? t("notice.warnings", { n: warns.length }) : ""),
+                summary: sm,
                 details: warns,              // yalnızca GERÇEK uyarılar (amber kutu)
                 infos,                       // normal atlamalar (soluk, küçük not)
               });
@@ -666,18 +664,22 @@ export default function App({ setLang }) {
                 : "border-amber-500/30 bg-amber-500/10 text-amber-200"
             }`}
           >
-            {notice.text}
+            {notice.summary
+              ? t("notice.refreshed", { parts: refreshParts(notice.summary, t).join(" · ") }) +
+                (notice.details?.length ? t("notice.warnings", { n: notice.details.length }) : "")
+              : notice.text}
             {notice.details?.length > 0 && (
               <ul className="mt-1 list-disc pl-5 text-xs opacity-80">
                 {notice.details.slice(0, 6).map((d, i) => (
-                  <li key={i}>{d}</li>
+                  <li key={i}>{fmtMsg(d, t)}</li>
                 ))}
               </ul>
             )}
             {/* Normal atlamalar (tazelik/kota) — çok soluk, küçük not (hata değil) */}
             {notice.infos?.length > 0 && (
               <div className="mt-1.5 text-[11px] opacity-50">
-                {notice.infos.length} bilgi (kota koruması): {notice.infos.slice(0, 2).join(" · ")}
+                {t("notice.infos", { n: notice.infos.length })}:{" "}
+                {notice.infos.slice(0, 2).map((m) => fmtMsg(m, t)).join(" · ")}
                 {notice.infos.length > 2 ? " …" : ""}
               </div>
             )}

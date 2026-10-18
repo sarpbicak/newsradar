@@ -19,6 +19,7 @@ from .analysis.pipeline import analyze_all_async
 from .analyst import refresh_analyst
 from .db.database import session_scope
 from .ingest import fetch_all
+from .messages import msg, render, with_entity
 from .prices import refresh_prices
 from .quota import prune as prune_quota
 
@@ -35,8 +36,19 @@ class RefreshSummary:
     analyzed: int = 0
     discarded: int = 0
     entity_assessments: int = 0
-    warnings: list[str] = field(default_factory=list)  # gerçek sorunlar
-    infos: list[str] = field(default_factory=list)     # normal bilgi (tazelik/kota atlaması)
+    # Sayaçların anlamı (banner bunları gösterir):
+    #   fetched_new  — bu taramada veritabanına YENİ eklenen makale (URL-hash tekil)
+    #   llm_articles — bu taramada LLM'e gidip yanıtı alınan makale (= analyzed + discarded);
+    #                  önceki taramalardan kuyrukta kalanlar da dahil (entity başı tavan)
+    #   analyzed     — bunlardan ilgili bulunup TUTULAN; discarded — ilgisiz bulunup elenen
+    #   prefiltered  — LLM'e hiç gitmeden elenen (aynı haberin kopyası / ön-filtre)
+    #   queued       — tarama sonunda hâlâ analiz bekleyen (sonraki yenilemede işlenir)
+    llm_articles: int = 0
+    queued: int = 0
+    assessments_skipped: int = 0
+    # Kullanıcıya giden mesajlar: app.messages.msg(...) — kod + parametre, frontend çevirir.
+    warnings: list[dict] = field(default_factory=list)  # gerçek sorunlar
+    infos: list[dict] = field(default_factory=list)     # normal bilgi (tazelik/kota atlaması)
     quota_error: bool = False   # sağlayıcı kalıcı kota/bakiye hatası → analiz erken durdu
 
 
@@ -112,6 +124,21 @@ def _record_completion(summary: RefreshSummary) -> None:
         _state.current_entity = None
 
 
+def _queued_count(entity_ids: set[int] | None) -> int:
+    """Tarama sonunda hâlâ analiz bekleyen makale (aktif, kapsamdaki entity'ler)."""
+    from sqlalchemy import func, select
+
+    from .db.models import Article, Entity
+
+    with session_scope() as s:
+        q = (select(func.count()).select_from(Article).join(Entity, Entity.id == Article.entity_id)
+             .where(Entity.active.is_(True), Article.analyzed.is_(False),
+                    Article.prefiltered.is_(False)))
+        if entity_ids is not None:
+            q = q.where(Article.entity_id.in_(entity_ids))
+        return int(s.scalar(q) or 0)
+
+
 # --------------------------- Çekirdek akış --------------------------- #
 def run_refresh(
     lookback_hours: int | None = None,
@@ -129,7 +156,7 @@ def run_refresh(
 
     if not _refresh_lock.acquire(blocking=False):
         logger.info("Yenileme atlandı: zaten çalışıyor.")
-        summary.warnings.append("refresh already running")
+        summary.warnings.append(msg("refresh_running"))
         return summary
 
     # İlerleme toplamı için (scoped) aktif entity sayısını baştan al (UI 0/Y gösterebilsin).
@@ -162,8 +189,8 @@ def run_refresh(
         with session_scope() as session:
             for r in fetch_all(session, lookback_hours, manual, entity_ids):
                 summary.fetched_new += r.new_count
-                summary.warnings.extend(f"[{r.entity_name}] {w}" for w in r.warnings)
-                summary.infos.extend(f"[{r.entity_name}] {i}" for i in r.infos)
+                summary.warnings.extend(with_entity(w, r.entity_name) for w in r.warnings)
+                summary.infos.extend(with_entity(i, r.entity_name) for i in r.infos)
             prune_quota(session)  # eski api_call kayıtlarını temizle
 
         # 2) Analiz (ön-filtre + paralel). Anahtar yoksa çekme yine geçerli kalır.
@@ -173,15 +200,13 @@ def run_refresh(
             client = get_llm_provider("article")
             assess_client = get_llm_provider("assessment")
         except MissingAPIKeyError as exc:
-            summary.warnings.append(str(exc))
+            summary.warnings.append(msg("llm_key_missing", detail=str(exc)))
             return summary
 
         # SİSTEM BÜTÇE TAVANI: günlük USD bütçesi dolduysa YENİ analiz yapma.
         from .budget import is_budget_exceeded
         if is_budget_exceeded():
-            summary.warnings.append(
-                "Günlük analiz kapasitesi doldu — yeni analiz durduruldu, yarın tekrar deneyin."
-            )
+            summary.warnings.append(msg("budget_exceeded"))
             logger.warning("[budget] Günlük USD bütçesi dolu — analiz atlandı.")
             return summary
 
@@ -204,6 +229,9 @@ def run_refresh(
         summary.analyzed = totals.analyzed
         summary.discarded = totals.discarded
         summary.entity_assessments = totals.entity_assessments
+        summary.llm_articles = totals.llm_articles
+        summary.assessments_skipped = totals.assessments_skipped
+        summary.queued = _queued_count(entity_ids)
         summary.warnings.extend(totals.warnings)
         summary.quota_error = totals.quota_error
 
@@ -219,11 +247,14 @@ def run_refresh(
             record_llm_health("ok")
 
         logger.info(
-            "Yenileme tamam: yeni=%d ön-filtre=%d analiz=%d elenen=%d değerlendirme=%d "
-            "atlanan_değerlendirme=%d",
-            summary.fetched_new, summary.prefiltered, summary.analyzed,
-            summary.discarded, summary.entity_assessments, totals.assessments_skipped,
+            "Yenileme tamam: yeni=%d llm_makale=%d tutulan=%d elenen=%d ön-filtre=%d "
+            "kuyrukta=%d değerlendirme=%d atlanan_değerlendirme=%d",
+            summary.fetched_new, summary.llm_articles, summary.analyzed, summary.discarded,
+            summary.prefiltered, summary.queued, summary.entity_assessments,
+            summary.assessments_skipped,
         )
+        for w in summary.warnings:
+            logger.warning("[yenileme uyarısı] %s", render(w))
         return summary
     finally:
         _record_completion(summary)

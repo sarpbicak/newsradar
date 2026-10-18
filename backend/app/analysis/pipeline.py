@@ -28,6 +28,7 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
 from ..config import get_settings
+from ..messages import msg
 from ..db.database import session_scope
 from ..db.models import (
     PREFILTER_VERSION, Article, Entity, EntityAnalysis, PriceSnapshot, Suggestion,
@@ -348,14 +349,15 @@ class AnalyzeTotals:
     """Tüm yenileme için analiz sayaçları."""
 
     prefiltered: int = 0        # ön-filtrede elenen (Claude'a hiç gitmedi)
-    analyzed: int = 0           # makale-başı analiz edilen
+    analyzed: int = 0           # makale-başı analiz edilip TUTULAN (relevance ≥ eşik)
+    llm_articles: int = 0       # bu taramada LLM'e gidip yanıtı alınan makale (tutulan + elenen)
     discarded: int = 0          # relevance < eşik → elenen
     entity_assessments: int = 0  # entity-başı değerlendirme üretilen
     assessments_skipped: int = 0  # yeni veri olmadığı için atlanan değerlendirme (dil başına)
     returned: int = 0           # Claude'un döndürdüğü toplam analiz (teşhis)
     unmatched: int = 0          # döndürülüp bu entity'ye eşleşmeyen id (teşhis)
     selected: int = 0           # _prefilter'ın batch'e seçtiği makale sayısı (teşhis)
-    warnings: list[str] = field(default_factory=list)
+    warnings: list[dict] = field(default_factory=list)  # app.messages.msg(...)
     quota_error: bool = False   # sağlayıcı kalıcı kota/bakiye hatası → tarama erken durdu
     quota_status_code: int | None = None  # 402/403 (sağlık paneli/teşhis)
 
@@ -743,7 +745,7 @@ async def analyze_all_async(
                 payload, pre = _prefilter(session, e, max_articles)
             except Exception as exc:  # noqa: BLE001
                 logger.exception("Ön-filtre çöktü, entity atlandı: %s", e.name)
-                totals.warnings.append(f"[{e.name}] ön-filtre hatası (atlandı): {exc}")
+                totals.warnings.append(msg("prefilter_error", e.name, error=exc))
                 continue
             totals.prefiltered += pre
             ebs = _effective_batch_size(batch_size, e.language)  # Türkçe → yarı batch
@@ -782,10 +784,7 @@ async def analyze_all_async(
         _quota_stopped["flag"] = True
         totals.quota_error = True
         totals.quota_status_code = getattr(exc, "status_code", None)
-        totals.warnings.append(
-            "Analiz servisi geçici olarak kullanılamıyor (sağlayıcı kapasite/bakiye "
-            "limiti) — bu yenilemede analiz durduruldu, çekilen haberler kaydedildi."
-        )
+        totals.warnings.append(msg("analysis_unavailable"))
         logger.error("[quota] Sağlayıcı kota hatası — kalan LLM çağrıları durduruldu: %s", exc)
 
     async def _call(tool, user, max_tokens):
@@ -815,20 +814,18 @@ async def analyze_all_async(
         DIŞI hatalar (rate limit/bağlantı/API) bölünmez — uyar + devam."""
         user = build_article_batch_prompt(t["name"], t["query"], t["type"], b, t["language"])
         try:
-            return await _call(ARTICLE_ANALYSIS_TOOL, user, settings.max_output_tokens)
+            data = await _call(ARTICLE_ANALYSIS_TOOL, user, settings.max_output_tokens)
+            totals.llm_articles += len(b)
+            return data
         except ProviderQuotaError:
             return None  # kota durdu — tek uyarı _note_quota'da; batch başına uyarı YOK
         except TruncationError as exc:
             if len(b) <= 1:
                 aid = b[0].get("id", "?") if b else "?"
-                totals.warnings.append(
-                    f"[{t['name']}] makale #{aid} analiz edilemedi: yanıt kesildi, "
-                    "makale çok uzun olabilir")
+                totals.warnings.append(msg("article_truncated", t["name"], article_id=aid))
                 return None
             if depth >= _MAX_SPLIT_DEPTH:
-                totals.warnings.append(
-                    f"[{t['name']}] {len(b)} makale atlandı: bölme sınırına ulaşıldı, "
-                    "yanıt hâlâ kesiliyor")
+                totals.warnings.append(msg("split_limit", t["name"], count=len(b)))
                 return None
             mid = len(b) // 2
             logger.info("[analiz] %s batch kesildi (%d makale) → %d+%d olarak yeniden deneniyor",
@@ -843,7 +840,7 @@ async def analyze_all_async(
             return {"analyses": merged} if merged else None
         except ClaudeError as exc:
             # Kesilme DIŞI hata → bölme YOK (tekrar denemek aynı hatayı verir + token yakar).
-            totals.warnings.append(f"[{t['name']}] batch analiz hatası (bölünmedi): {exc}")
+            totals.warnings.append(msg("batch_error", t["name"], error=exc))
             return None
 
     _budget_stopped = {"flag": False}
@@ -852,10 +849,7 @@ async def analyze_all_async(
         """Bütçe dolduğunda TEK uyarı (idempotent)."""
         if not _budget_stopped["flag"]:
             _budget_stopped["flag"] = True
-            totals.warnings.append(
-                "Günlük analiz bütçesi doldu — kalan analizler bu turda atlandı, yarın "
-                "yeniden denenecek."
-            )
+            totals.warnings.append(msg("budget_stopped"))
             logger.warning("[budget] Günlük USD bütçesi tarama sırasında doldu — kalan "
                            "analizler atlanıyor.")
 
@@ -897,10 +891,7 @@ async def analyze_all_async(
         # KOTA DURDUYSA istisna: 0 analiz beklenen sonuçtur (kota uyarısı zaten verildi) →
         # entity başına "0 analiz" uyarısı EKLEME (aksi halde kota yine N uyarı biriktirir).
         if t["batches"] and applied["returned"] == 0 and not _quota_stopped["flag"]:
-            totals.warnings.append(
-                f"[{t['name']}] LLM 0 analiz döndürdü ({len(t['batches'])} batch "
-                "gönderildi) — model/endpoint sorunu olabilir (NEWSRADAR_LLM_MODEL?)."
-            )
+            totals.warnings.append(msg("llm_zero", t["name"], batches=len(t["batches"])))
         # Entity-başı sonuç: batch geldi mi, kaç analiz/eleme oldu. AMD gibi takılan
         # bir entity'nin batch_datas boşsa (Claude hatası) burada görünür.
         logger.info(
@@ -955,7 +946,7 @@ async def analyze_all_async(
                     _note_quota(exc)  # değerlendirme _call'ı kullanmaz → burada işaretle
                     break
                 except ClaudeError as exc:
-                    totals.warnings.append(f"[{t['name']}/{out_lang}] değerlendirme başarısız: {exc}")
+                    totals.warnings.append(msg("assessment_failed", t["name"], lang=out_lang, error=exc))
 
         done += 1
         if progress_cb:
@@ -973,7 +964,7 @@ async def analyze_all_async(
             await _process_entity(t)
         except Exception as exc:  # noqa: BLE001 — tek entity hatası hattı durdurmasın
             logger.exception("Entity analiz task çöktü: %s", t["name"])
-            totals.warnings.append(f"[{t['name']}] analiz beklenmeyen hata (atlandı): {exc}")
+            totals.warnings.append(msg("entity_error", t["name"], error=exc))
             done += 1
             if progress_cb:
                 progress_cb(done, total)
@@ -1023,21 +1014,19 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient, assess_client=None
         (recursive; en kötü tek makale kaybı). Kesilme dışı hatalar bölünmez."""
         user = build_article_batch_prompt(name, query, etype, b, lang)
         try:
-            return client.call_tool(
+            data = client.call_tool(
                 system=SYSTEM_PROMPT, user=user, tool=ARTICLE_ANALYSIS_TOOL,
                 max_tokens=settings.max_output_tokens,
             )
+            totals.llm_articles += len(b)
+            return data
         except TruncationError as exc:
             if len(b) <= 1:
                 aid = b[0].get("id", "?") if b else "?"
-                totals.warnings.append(
-                    f"[{name}] makale #{aid} analiz edilemedi: yanıt kesildi, "
-                    "makale çok uzun olabilir")
+                totals.warnings.append(msg("article_truncated", name, article_id=aid))
                 return None
             if depth >= _MAX_SPLIT_DEPTH:
-                totals.warnings.append(
-                    f"[{name}] {len(b)} makale atlandı: bölme sınırına ulaşıldı, "
-                    "yanıt hâlâ kesiliyor")
+                totals.warnings.append(msg("split_limit", name, count=len(b)))
                 return None
             mid = len(b) // 2
             logger.info("[analiz] %s batch kesildi (%d makale) → %d+%d olarak yeniden deneniyor",
@@ -1049,7 +1038,7 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient, assess_client=None
                     merged.extend(r.get("analyses", []))
             return {"analyses": merged} if merged else None
         except ClaudeError as exc:
-            totals.warnings.append(f"[{name}] batch analiz hatası (bölünmedi): {exc}")
+            totals.warnings.append(msg("batch_error", name, error=exc))
             return None
 
     batch_datas: list[dict] = []
@@ -1072,10 +1061,7 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient, assess_client=None
     totals.unmatched = applied["unmatched"]
     # SESSİZ ARIZA KORUMASI (bkz. _process_entity): batch gönderildi ama 0 döndüyse uyar.
     if batches and applied["returned"] == 0:
-        totals.warnings.append(
-            f"[{name}] LLM 0 analiz döndürdü ({len(batches)} batch gönderildi) — "
-            "model/endpoint sorunu olabilir (NEWSRADAR_LLM_MODEL?)."
-        )
+        totals.warnings.append(msg("llm_zero", name, batches=len(batches)))
 
     langs = _assessment_langs(entity_id, name, force=force_assessment)
     totals.assessments_skipped += 2 - len(langs)
@@ -1096,6 +1082,6 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient, assess_client=None
                 _write_assessment(entity_id, adata, len(used), _avg_sentiment(used), out_lang)
                 totals.entity_assessments += 1
             except ClaudeError as exc:
-                totals.warnings.append(f"[{name}/{out_lang}] değerlendirme başarısız: {exc}")
+                totals.warnings.append(msg("assessment_failed", name, lang=out_lang, error=exc))
 
     return totals

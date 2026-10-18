@@ -12,7 +12,8 @@ import httpx
 
 from ..config import get_settings
 from ..db.models import Entity
-from .base import PriceProvider, PriceQuote, PriceResult
+from ..messages import msg
+from .base import PERMANENT_HTTP, PriceProvider, PriceQuote, PriceResult
 
 _BASE = "https://finnhub.io/api/v1"
 
@@ -30,7 +31,7 @@ class FinnhubPriceProvider(PriceProvider):
         if not self.is_available():
             return PriceResult(
                 provider=self.name,
-                warning="FINNHUB_API_KEY tanımlı değil — fiyat atlandı.",
+                warning=msg("key_missing", key="FINNHUB_API_KEY"),
             )
 
         symbol = entity.query.upper().strip()
@@ -40,14 +41,16 @@ class FinnhubPriceProvider(PriceProvider):
             resp.raise_for_status()
             d = resp.json()
         except httpx.HTTPStatusError as exc:
+            code = exc.response.status_code
             return PriceResult(
                 provider=self.name,
-                warning=f"Finnhub fiyat hatası ({exc.response.status_code}) — {symbol} atlandı.",
+                warning=msg("http_error", source="finnhub_price", status=code, symbol=symbol),
+                expected=code in PERMANENT_HTTP,
             )
         except (httpx.HTTPError, ValueError) as exc:
             return PriceResult(
                 provider=self.name,
-                warning=f"Finnhub fiyat bağlantı/çözümleme hatası: {exc}",
+                warning=msg("connection_error", source="finnhub_price", error=exc),
             )
 
         current = d.get("c")
@@ -55,7 +58,8 @@ class FinnhubPriceProvider(PriceProvider):
         if not current:
             return PriceResult(
                 provider=self.name,
-                warning=f"{symbol} için fiyat verisi yok (ABD dışı borsa olabilir).",
+                warning=msg("no_data", source="finnhub_price", symbol=symbol),
+                expected=True,  # ABD dışı borsa / kapsam dışı sembol — kalıcı
             )
 
         return PriceResult(

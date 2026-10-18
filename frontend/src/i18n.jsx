@@ -174,17 +174,22 @@ const STR = {
 
   // ---- Bildirimler / hatalar ----
   "notice.refreshed": { tr: "Yenilendi: {parts}.", en: "Refreshed: {parts}." },
-  "notice.newNews": { tr: "{n} yeni haber", en: "{n} new news" },
-  "notice.analyzed": { tr: "{n} analiz", en: "{n} analyzed" },
-  "notice.prefiltered": { tr: "{n} ön-filtre", en: "{n} prefiltered" },
-  "notice.discarded": { tr: "{n} elenen", en: "{n} discarded" },
+  "notice.newArticles": { tr: "{n} yeni makale", en: "{n} new articles" },
+  "notice.newArticles_one": { tr: "1 yeni makale", en: "1 new article" },
+  "notice.analyzedRun": { tr: "bu taramada {n} analiz", en: "{n} analyzed this run" },
+  "notice.filteredOut": { tr: "{n} elendi", en: "{n} filtered out" },
+  "notice.queued": { tr: "{n} makale sonraki taramada", en: "{n} queued for next refresh" },
+  "notice.queued_one": { tr: "1 makale sonraki taramada", en: "1 queued for next refresh" },
   "notice.warnings": { tr: " {n} uyarı.", en: " {n} warnings." },
+  "notice.warnings_one": { tr: " 1 uyarı.", en: " 1 warning." },
+  "notice.infos": { tr: "{n} bilgi (kota koruması)", en: "{n} notes (quota protection)" },
+  "notice.infos_one": { tr: "1 bilgi (kota koruması)", en: "1 note (quota protection)" },
   "notice.refreshFail": { tr: "Yenileme başlatılamadı: {msg}", en: "Couldn't start refresh: {msg}" },
   "notice.scanRunning": { tr: "Tarama sürüyor… {done}/{total} şirket işlendi. İlk yenileme birikmiş haberler nedeniyle uzun sürebilir; bittiğinde pano otomatik güncellenecek — sayfayı kapatabilirsiniz.", en: "Scan in progress… {done}/{total} companies processed. The first refresh can take a while due to accumulated news; the panel updates automatically when done — you can close the page." },
   "notice.scanStarting": { tr: "Yenileme başlatılıyor…", en: "Starting refresh…" },
   "notice.analyzing": { tr: "{name} analiz ediliyor…", en: "Analyzing {name}…" },
   "notice.scanWorking": { tr: "Haberler taranıyor…", en: "Scanning news…" },
-  "notice.scanDone": { tr: "Tamamlandı · {news} haber · {analyses} analiz", en: "Done · {news} news · {analyses} analyses" },
+  "notice.scanDone": { tr: "Tamamlandı · {parts}", en: "Done · {parts}" },
   "notice.budgetExceeded": { tr: "Günlük analiz kapasitesi doldu — yeni analiz bugünlük durduruldu, yarın tekrar deneyin. Mevcut değerlendirmeler görüntülenmeye devam eder.", en: "Daily analysis capacity is full — new analysis is paused for today, try tomorrow. Existing assessments remain visible." },
   "notice.analysisUnavailable": { tr: "Analiz servisi geçici olarak kullanılamıyor (kapasite limiti). Mevcut veriler gösteriliyor.", en: "The analysis service is temporarily unavailable (capacity limit). Showing existing data." },
   "notice.sessionFail": { tr: "Oturum başlatılamadı: {msg}", en: "Couldn't start session: {msg}" },
@@ -194,6 +199,38 @@ const STR = {
   "notice.entityAdded": { tr: "{name} izleme listesine eklendi — bir sonraki yenilemede analiz edilecek.", en: "{name} added to your watchlist — it'll be analyzed on the next refresh." },
   "pull.pull": { tr: "Yenilemek için çek", en: "Pull to refresh" },
   "pull.release": { tr: "Bırak → yenile", en: "Release → refresh" },
+
+  // ---- Backend mesajları (kod + parametre; backend/app/messages.py ile birebir) ----
+  "src.finnhub_news": { tr: "Finnhub", en: "Finnhub" },
+  "src.finnhub_price": { tr: "Finnhub fiyat", en: "Finnhub price" },
+  "src.finnhub_analyst": { tr: "Finnhub analist", en: "Finnhub analyst" },
+  "src.fmp_target": { tr: "FMP hedef fiyat", en: "FMP price target" },
+  "src.newsapi": { tr: "NewsAPI", en: "NewsAPI" },
+  "msg.refresh_running": { tr: "Yenileme zaten çalışıyor.", en: "A refresh is already running." },
+  "msg.llm_key_missing": { tr: "Analiz motorunun anahtarı tanımlı değil.", en: "The analysis engine's API key is not set." },
+  "msg.budget_exceeded": { tr: "Günlük analiz bütçesi dolu — yeni analiz yapılmadı, yarın tekrar deneyin.", en: "The daily analysis budget is used up — no new analysis was run; try again tomorrow." },
+  "msg.budget_stopped": { tr: "Günlük analiz bütçesi tarama sırasında doldu — kalan analizler yarın yapılacak.", en: "The daily analysis budget ran out during the scan — the rest will be analyzed tomorrow." },
+  "msg.analysis_unavailable": { tr: "Analiz servisi geçici olarak kullanılamıyor — çekilen haberler kaydedildi.", en: "The analysis service is temporarily unavailable — fetched news was saved." },
+  "msg.no_provider": { tr: "'{type}' tipi için haber kaynağı yok.", en: "No news source for type '{type}'." },
+  "msg.news_fresh_skip": { tr: "Son {hours} saatte çekildi — NewsAPI atlandı (mevcut veri kullanılıyor).", en: "Fetched in the last {hours} hours — NewsAPI skipped (using existing data)." },
+  "msg.newsapi_quota": { tr: "NewsAPI kotası doldu ({used}/{limit}), {hours} saat sonra sıfırlanır.", en: "NewsAPI quota used up ({used}/{limit}), resets in {hours} hours." },
+  "msg.db_write_error": { tr: "Kaydetme hatası, bu şirket atlandı ({error}).", en: "Save error, this company was skipped ({error})." },
+  "msg.key_missing": { tr: "{key} tanımlı değil — atlandı.", en: "{key} is not set — skipped." },
+  "msg.http_error": { tr: "{source} hatası ({status}) — {symbol} atlandı.", en: "{source} error ({status}) — {symbol} skipped." },
+  "msg.connection_error": { tr: "{source} bağlantı hatası.", en: "{source} connection error." },
+  "msg.no_data": { tr: "{symbol} için {source} verisi yok.", en: "No {source} data for {symbol}." },
+  "msg.bad_response": { tr: "{source} beklenmeyen yanıt döndü ({symbol}).", en: "{source} returned an unexpected response ({symbol})." },
+  "msg.newsapi_status": { tr: "NewsAPI hatası: {message}", en: "NewsAPI error: {message}" },
+  "msg.provider_error": { tr: "{source} beklenmeyen hata.", en: "{source} unexpected error." },
+  "msg.prefilter_error": { tr: "Ön-filtre hatası, bu şirket atlandı.", en: "Pre-filter error, this company was skipped." },
+  "msg.llm_zero": { tr: "Analiz motoru hiç sonuç döndürmedi ({batches} grup gönderildi).", en: "The analysis engine returned no results ({batches} batches sent)." },
+  "msg.llm_zero_one": { tr: "Analiz motoru hiç sonuç döndürmedi (1 grup gönderildi).", en: "The analysis engine returned no results (1 batch sent)." },
+  "msg.article_truncated": { tr: "Bir makale analiz edilemedi (yanıt kesildi).", en: "One article couldn't be analyzed (response cut off)." },
+  "msg.split_limit": { tr: "{count} makale atlandı (yanıt hâlâ kesiliyor).", en: "{count} articles skipped (response still cut off)." },
+  "msg.split_limit_one": { tr: "1 makale atlandı (yanıt hâlâ kesiliyor).", en: "1 article skipped (response still cut off)." },
+  "msg.batch_error": { tr: "Bir makale grubu analiz edilemedi.", en: "One batch of articles couldn't be analyzed." },
+  "msg.assessment_failed": { tr: "Değerlendirme üretilemedi ({lang}).", en: "Couldn't generate the assessment ({lang})." },
+  "msg.entity_error": { tr: "Analiz sırasında beklenmeyen hata, bu şirket atlandı.", en: "Unexpected error during analysis, this company was skipped." },
 
   // ---- Footer / gizlilik ----
   "footer.disclaimer": { tr: "Haber akışı bazlı sinyal — değerleme veya fiyat tahmini değil. Analist hedefleri Finnhub konsensüs verisidir. Kararlar size aittir.", en: "News-based signal — not a valuation or price forecast. Analyst targets are Finnhub consensus data. Decisions are yours." },
@@ -418,9 +455,7 @@ export function I18nProvider({ lang, setLang, children }) {
   if (typeof document !== "undefined") document.documentElement.lang = lang;
   const t = (key, vars) => {
     const entry = STR[key];
-    let s = entry ? entry[lang] ?? entry.tr : key;
-    if (vars) for (const k in vars) s = s.split(`{${k}}`).join(String(vars[k]));
-    return s;
+    return render(key, lang, vars);
   };
   return <Ctx.Provider value={{ lang, t, setLang }}>{children}</Ctx.Provider>;
 }
@@ -432,10 +467,54 @@ export function useI18n() {
 // Hook KULLANMAYAN çevirici (ui.jsx gibi düz fonksiyonlar için) — geçerli dili
 // getLang()'dan okur. React ağacı yeniden render olduğunda güncel dili yansıtır.
 export function tt(key, vars) {
-  const entry = STR[key];
-  let s = entry ? entry[_lang] ?? entry.tr : key;
+  return render(key, _lang, vars);
+}
+
+// Ortak çeviri: TEKİL/ÇOĞUL — vars.n === 1 ise ve "<anahtar>_one" tanımlıysa o kullanılır
+// ("1 warning" / "2 warnings"; Türkçe'de çoğul eki olmadığından _one çoğu zaman gereksiz).
+function render(key, lang, vars) {
+  const one = vars && vars.n === 1 ? STR[`${key}_one`] : null;
+  const entry = one || STR[key];
+  let s = entry ? entry[lang] ?? entry.tr : key;
   if (vars) for (const k in vars) s = s.split(`{${k}}`).join(String(vars[k]));
   return s;
+}
+
+// Yenileme özeti sayaçları → metin parçaları ("X yeni makale · bu taramada Y analiz ·
+// Z elendi · W sonraki taramada"). Y = LLM'e gidip yanıtı alınan makale (kuyruktan gelenler
+// dahil — "0 yeni" iken "Y analiz" olabilmesinin sebebi); Z = kopya/ön-filtre + ilgisiz.
+export function refreshParts(sm, t) {
+  if (!sm) return [];
+  const llm = sm.llm_articles ?? (sm.analyzed || 0) + (sm.discarded || 0);
+  const filtered = (sm.prefiltered || 0) + (sm.discarded || 0);
+  const parts = [t("notice.newArticles", { n: sm.fetched_new || 0 }), t("notice.analyzedRun", { n: llm })];
+  if (filtered) parts.push(t("notice.filteredOut", { n: filtered }));
+  if (sm.queued) parts.push(t("notice.queued", { n: sm.queued }));
+  return parts;
+}
+
+// Backend mesajı ({code, entity, params}) → kullanıcının dilinde metin. Kodlar:
+// backend/app/messages.py. `source` parametresi src.<kod> ile çevrilir. Bilinmeyen kod
+// ham haliyle gösterilir (sessizce kaybolmaz). Eski düz string mesajlar olduğu gibi döner.
+export function fmtMsg(m, t) {
+  if (m == null) return "";
+  if (typeof m === "string") return m;
+  const p = { ...(m.params || {}) };
+  if (p.source != null) {
+    const k = `src.${p.source}`;
+    const v = t(k);
+    if (v !== k) p.source = v;
+  }
+  if (p.lang != null) p.lang = String(p.lang).toUpperCase();
+  // Tekil/çoğul seçimi için sayıyı n'e taşı (count / batches).
+  if (p.n == null) {
+    const c = p.count ?? p.batches;
+    if (typeof c === "number") p.n = c;
+  }
+  const key = `msg.${m.code}`;
+  let s = t(key, p);
+  if (s === key) s = `${m.code} ${JSON.stringify(m.params || {})}`;
+  return m.entity ? `[${m.entity}] ${s}` : s;
 }
 
 // Dil-farkında tarih/zaman yardımcıları (locale'e göre biçim).

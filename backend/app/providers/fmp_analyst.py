@@ -18,7 +18,8 @@ import httpx
 
 from ..config import get_settings
 from ..db.models import Entity
-from .base import AnalystProvider, AnalystRating, AnalystResult
+from ..messages import msg
+from .base import PERMANENT_HTTP, AnalystProvider, AnalystRating, AnalystResult
 
 # Denenecek uçlar (sırayla): (insan-okur ad, tam URL şablonu).
 _CONSENSUS_ENDPOINTS = [
@@ -51,11 +52,12 @@ class FMPAnalystProvider(AnalystProvider):
         if not self.is_available():
             return AnalystResult(
                 provider=self.name,
-                warning="FMP_API_KEY tanımlı değil — hedef fiyat atlandı.",
+                warning=msg("key_missing", key="FMP_API_KEY"),
             )
 
         symbol = entity.query.upper().strip()
         last_warning = None
+        expected = True  # tüm uçlar kalıcı/beklenen sebeple düşerse True kalır
         for label, url in _CONSENSUS_ENDPOINTS:
             try:
                 resp = httpx.get(
@@ -64,24 +66,26 @@ class FMPAnalystProvider(AnalystProvider):
                     timeout=15.0,
                 )
             except httpx.HTTPError as exc:
-                last_warning = f"FMP bağlantı hatası ({label}): {exc}"
+                last_warning = msg("connection_error", source="fmp_target", error=exc)
+                expected = False
                 continue
 
             # 401/402/403 → anahtar geçersiz ya da uç premium (ücretsiz katman kapsamıyor).
-            if resp.status_code in (401, 402, 403):
-                last_warning = (
-                    f"FMP hedef fiyat erişilemedi ({resp.status_code}) — ücretsiz katman "
-                    f"bu ucu kapsamıyor olabilir ({symbol})."
-                )
+            if resp.status_code in PERMANENT_HTTP:
+                last_warning = msg("http_error", source="fmp_target",
+                                   status=resp.status_code, symbol=symbol)
                 continue
             if resp.status_code != 200:
-                last_warning = f"FMP hedef fiyat hatası ({resp.status_code}) — {symbol}."
+                last_warning = msg("http_error", source="fmp_target",
+                                   status=resp.status_code, symbol=symbol)
+                expected = False
                 continue
 
             try:
                 data = resp.json()
             except ValueError:
-                last_warning = f"FMP hedef fiyat çözümleme hatası ({symbol})."
+                last_warning = msg("bad_response", source="fmp_target", symbol=symbol)
+                expected = False
                 continue
 
             # Yanıt liste ([{...}]) ya da nesne ({...}) olabilir; ilk kaydı al.
@@ -91,19 +95,20 @@ class FMPAnalystProvider(AnalystProvider):
                 # FMP hata gövdesi de dict olabilir ("Error Message"); hedef alanı yoksa geç.
                 row = data if ("targetConsensus" in data or "targetMedian" in data) else None
                 if row is None and "Error Message" in data:
-                    last_warning = f"FMP: {str(data['Error Message'])[:120]} ({symbol})."
+                    # FMP ücretsiz katman/kapsam mesajı (200 gövdesinde) — kalıcı.
+                    last_warning = msg("no_data", source="fmp_target", symbol=symbol)
             else:
                 row = None
 
             if not row:
-                last_warning = f"{symbol} için FMP hedef verisi yok (kapsam dışı olabilir)."
+                last_warning = msg("no_data", source="fmp_target", symbol=symbol)
                 continue
 
             consensus = _num(row.get("targetConsensus"))
             median = _num(row.get("targetMedian"))
             mean = consensus if consensus is not None else median
             if mean is None:
-                last_warning = f"{symbol} için FMP hedef değeri boş."
+                last_warning = msg("no_data", source="fmp_target", symbol=symbol)
                 continue
 
             return AnalystResult(
@@ -118,4 +123,8 @@ class FMPAnalystProvider(AnalystProvider):
                 ),
             )
 
-        return AnalystResult(provider=self.name, warning=last_warning or "FMP hedef yok.")
+        return AnalystResult(
+            provider=self.name,
+            warning=last_warning or msg("no_data", source="fmp_target", symbol=symbol),
+            expected=expected,
+        )
