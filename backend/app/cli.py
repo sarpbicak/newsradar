@@ -474,7 +474,8 @@ def cmd_reconcile(_args: argparse.Namespace) -> None:
 def main() -> None:
     # CLI'de de analiz hattının [analiz] loglarını göster (entity-başı görünürlük).
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    logging.getLogger("httpx").setLevel(logging.WARNING)  # gürültü azalt
+    from .security import install_log_masking
+    install_log_masking()  # httpx/httpx2 URL loglaması kapalı + anahtar maskeleme
     parser = argparse.ArgumentParser(prog="newsradar-cli")
     sub = parser.add_subparsers(dest="cmd", required=True)
 

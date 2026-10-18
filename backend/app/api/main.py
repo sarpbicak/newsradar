@@ -29,14 +29,15 @@ from . import (
     routes_symbols,
     routes_users,
 )
+from ..security import install_log_masking
 from .routes_auth import get_current_user
 
 logging.basicConfig(level=logging.INFO)
-# GÜVENLİK (kritik): httpx/httpcore INFO seviyesinde tam istek URL'ini loglar; bu URL
-# NewsAPI/Finnhub/FMP anahtarını query parametresi olarak taşır → loglara sır sızar.
-# Bu logger'ları WARNING'e çekerek URL loglamayı kapat.
-for _noisy in ("httpx", "httpcore", "openai", "anthropic"):
-    logging.getLogger(_noisy).setLevel(logging.WARNING)
+# GÜVENLİK (kritik): httpx/httpcore (ve SDK 1.x'in httpx2'si) INFO seviyesinde tam istek
+# URL'ini loglar; bu URL NewsAPI/Finnhub/FMP anahtarını query parametresi olarak taşır.
+# install_log_masking bu logger'ları WARNING'e çeker VE tüm kayıtlarda anahtarları maskeler
+# (query parametresi + çıplak sk-ant-*/sk-or-v1-*/nvapi-* anahtarları).
+install_log_masking()
 
 
 @asynccontextmanager

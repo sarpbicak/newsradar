@@ -51,7 +51,8 @@ def main() -> int:
     from app.prices import price_context_for
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    logging.getLogger("httpx2").setLevel(logging.WARNING)
+    from app.security import install_log_masking
+    install_log_masking()  # sağlayıcı URL'lerindeki anahtarlar log'a düşmesin
     init_db()
 
     names = [n.strip() for n in args.entities.split(",") if n.strip()]

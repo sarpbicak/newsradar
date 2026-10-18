@@ -79,7 +79,8 @@ def main() -> int:
     from app.refresh import run_refresh
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    logging.getLogger("httpx2").setLevel(logging.WARNING)
+    from app.security import install_log_masking
+    install_log_masking()  # sağlayıcı URL'lerindeki anahtarlar log'a düşmesin
     cap = _LogCap()
     logging.getLogger("newsradar").addHandler(cap)
 

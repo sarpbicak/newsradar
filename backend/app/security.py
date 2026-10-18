@@ -1,7 +1,8 @@
 """Güvenlik yardımcıları: sır maskeleme, giriş hız sınırı, istemci IP.
 
-- mask_url_secrets: log/hata mesajlarındaki apiKey/token/password gibi query
-  parametrelerini ***'la maskeler (anahtar sızıntısını önler).
+- mask_secrets: log/hata mesajlarındaki apiKey/token/password gibi query parametrelerini
+  ve çıplak sağlayıcı anahtarlarını (sk-ant-*, sk-or-v1-*, nvapi-*) ***'la maskeler.
+- install_log_masking: tüm log kayıtlarını mask_secrets'ten geçiren filtre (kök handler'lara).
 - LoginRateLimiter: IP başına başarısız giriş denemesini sınırlar (kaba kuvvet).
 - get_client_ip: proxy (Render) arkasında gerçek IP (X-Forwarded-For).
 """
@@ -21,11 +22,55 @@ _QS_SECRET_RE = re.compile(
 )
 
 
-def mask_url_secrets(text: str) -> str:
-    """Bir metindeki (URL/hata) sır query parametrelerini ***'la maskeler."""
+# Çıplak sağlayıcı anahtarları. Anthropic anahtarının TÜRÜ ne olursa olsun (sk-ant-api03-…,
+# sk-ant-usr-…, sk-ant-admin01-…) sk-ant- ile başlayan her anahtar maskelenir; tür öneki
+# teşhis için görünür kalır. Tür segmenti olmayan sk-ant-… için yedek desen.
+_PROVIDER_KEY_RE = re.compile(
+    r"\b(sk-ant-[a-z]+[0-9]*-|sk-or-v1-|nvapi-)[A-Za-z0-9_-]{8,}"
+    r"|\b(sk-ant-)[A-Za-z0-9_-]{16,}"
+)
+
+
+def _mask_key(m: re.Match) -> str:
+    return f"{m.group(1) or m.group(2)}***"
+
+
+def mask_secrets(text: str) -> str:
+    """Bir metindeki sır query parametrelerini ve çıplak sağlayıcı anahtarlarını maskeler."""
     if not text:
         return text
-    return _QS_SECRET_RE.sub(r"\1***", str(text))
+    text = _QS_SECRET_RE.sub(r"\1***", str(text))
+    return _PROVIDER_KEY_RE.sub(_mask_key, text)
+
+
+mask_url_secrets = mask_secrets  # geriye uyum adı
+
+
+class SecretMaskingFilter(logging.Filter):
+    """Log kaydının biçimlenmiş mesajını mask_secrets'ten geçirir (args dahil)."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            msg = record.getMessage()
+        except Exception:  # noqa: BLE001 — bozuk format: kaydı olduğu gibi bırak
+            return True
+        masked = mask_secrets(msg)
+        if masked != msg:
+            record.msg, record.args = masked, None
+        return True
+
+
+def install_log_masking() -> None:
+    """Kök logger'ın handler'larına maskeleme filtresi ekler (idempotent).
+
+    Logger düzeyindeki filtreler alt logger'lardan yayılan kayıtlara uygulanmaz; handler
+    düzeyindeki filtreler hepsine uygulanır. logging.basicConfig'ten SONRA çağrılmalı.
+    httpx/httpx2 (Anthropic SDK 1.x) URL loglamasını da WARNING'e çeker."""
+    for name in ("httpx", "httpcore", "httpx2", "httpcore2", "openai", "anthropic"):
+        logging.getLogger(name).setLevel(logging.WARNING)
+    for h in logging.getLogger().handlers:
+        if not any(isinstance(f, SecretMaskingFilter) for f in h.filters):
+            h.addFilter(SecretMaskingFilter())
 
 
 def get_client_ip(request) -> str:
