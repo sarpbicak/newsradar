@@ -42,7 +42,7 @@ from .prompts import (
     build_entity_prompt,
 )
 from .text_quality import (
-    PROMPT_LIMITS, banned_phrase_hits, hard_cap, has_markup_leak, word_count,
+    BANNED_PHRASES, PROMPT_LIMITS, banned_phrase_hits, hard_cap, has_markup_leak, word_count,
 )
 from .schemas import (
     ARTICLE_ANALYSIS_TOOL,
@@ -137,11 +137,15 @@ _SHORTER_NOTE = {
            "write ONE sentence of at most {limit} words; if it doesn't fit, say fewer things. "
            "Keep the other fields within their limits too."),
 }
+# Not TÜM yasaklı listeyi verir (yalnızca bulunanı değil): aksi halde model kardeş ifadeye
+# kaçıyordu ('mostly positive' yasaklanınca 'mostly negative').
 _BANNED_NOTE = {
-    "tr": ("NOT: Önceki denemede yasaklı kalıp ifadeler kullanıldı. Şu ifadeleri KULLANMA: {phrases}. "
-           "Bunların yerine bu şirketin somut olayıyla başla."),
-    "en": ("NOTE: The previous attempt used banned boilerplate phrases. Do NOT use: {phrases}. "
-           "Lead with this company's concrete event instead."),
+    "tr": ("NOT: Önceki denemede yasaklı kalıp ifade kullanıldı ({found}). Şu ifadelerin HİÇBİRİNİ "
+           "ve benzerlerini KULLANMA: {phrases}. Yönü kalıp ifadeyle değil, bu şirketin somut "
+           "olayıyla anlat."),
+    "en": ("NOTE: The previous attempt used a banned boilerplate phrase ({found}). Do NOT use ANY "
+           "of these or close variants: {phrases}. Convey the direction through this company's "
+           "concrete event, not a stock phrase."),
 }
 _MARKUP_NOTE = {
     "tr": ("NOT: Önceki denemede bir metin alanının İÇİNE etiket/XML yazıldı (ör. '</summary>', "
@@ -163,7 +167,9 @@ def _quality_notes(data: dict, lang: str) -> list[str]:
     text = " ".join(str(data.get(f) or "") for f in _BANNED_FIELDS)
     hits = banned_phrase_hits(text, lang)
     if hits:
-        notes.append(_BANNED_NOTE[lang].format(phrases=", ".join(f"'{h}'" for h in hits)))
+        notes.append(_BANNED_NOTE[lang].format(
+            found=", ".join(f"'{h}'" for h in hits),
+            phrases=", ".join(f"'{p}'" for p in BANNED_PHRASES[lang])))
     pieces = [str(data.get(f) or "") for f in _TEXT_FIELDS]
     for f in _LIST_FIELDS:
         v = data.get(f)

@@ -132,9 +132,20 @@ def unterminated_fields(data: dict) -> list[tuple[str, str]]:
     return bad
 
 
+def _phrase_regex(phrase: str) -> re.Pattern:
+    """Son kelimeden önce en fazla BİR ara kelimeye izin veren desen: 'ağırlıkla olumsuz'
+    → 'ağırlıkla sert olumsuz' da yakalanır; 'mostly negative' → 'mostly very negative'."""
+    words = [re.escape(w) for w in phrase.split()]
+    body = r"\s+".join(words[:-1]) + r"(?:\s+[^\W\d_]+)?\s+" + words[-1] if len(words) > 1 else words[0]
+    return re.compile(r"\b" + body + r"\b", re.IGNORECASE)
+
+
+_BANNED_RX = {lang: [(p, _phrase_regex(p)) for p in phrases] for lang, phrases in BANNED_PHRASES.items()}
+
+
 def banned_phrase_hits(text: str, language: str) -> list[str]:
-    low = (text or "").lower()
-    return [p for p in BANNED_PHRASES["en" if language == "en" else "tr"] if p in low]
+    """Metinde geçen yasaklı ifadeler (liste adlarıyla)."""
+    return [p for p, rx in _BANNED_RX["en" if language == "en" else "tr"] if rx.search(text or "")]
 
 
 _STOP = {
