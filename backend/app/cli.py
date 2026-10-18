@@ -118,14 +118,16 @@ def cmd_analyze(args: argparse.Namespace) -> None:
         print(f"→ analiz edilen entity: #{entity.id} {entity.name!r} "
               f"[{entity.type}:{entity.query!r}] (query len={len(entity.query)})")
 
-    totals = analyze_entity_sync(entity_id, client, assess_client=assess_client)
+    totals = analyze_entity_sync(entity_id, client, assess_client=assess_client,
+                                 force_assessment=args.force_assessment)
     print(f"\n=== {args.query} analizi (entity #{entity_id}) ===")
     # KRİTİK: _prefilter'ın BU analiz yolunda batch'e kaç makale seçtiği. diagnose'un
     # gösterdiği sayı ile karşılaştır — farklıysa iki komut farklı entity'ye çözülüyor.
     print(f"  Batch'e giren makale (bu yolda _prefilter seçimi): {totals.selected}")
     print(f"  Ön-filtrede elenen: {totals.prefiltered} | Analiz edilen: {totals.analyzed} | "
           f"Elenen (alakasız): {totals.discarded} | "
-          f"Değerlendirme: {'evet' if totals.entity_assessments else 'hayır'}")
+          f"Değerlendirme: {'evet' if totals.entity_assessments else 'hayır'}"
+          f"{f' (atlanan: {totals.assessments_skipped})' if totals.assessments_skipped else ''}")
     print(f"  [teşhis] Claude döndürdü: {totals.returned} | eşleşmeyen id: {totals.unmatched}")
 
     # Analiz 0 çıktıysa: SEBEBİ tam burada ayrıştır ve hangi entity'de makale olduğunu göster.
@@ -429,6 +431,8 @@ def main() -> None:
 
     p_an = sub.add_parser("analyze", help="Tek entity'yi Claude ile analiz et")
     p_an.add_argument("query", help="Entity query (örn. TSLA)")
+    p_an.add_argument("--force-assessment", action="store_true",
+                      help="Yeni veri olmasa da TR+EN değerlendirmeyi yeniden üret")
     p_an.set_defaults(func=cmd_analyze)
 
     args = parser.parse_args()

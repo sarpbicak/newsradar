@@ -219,9 +219,10 @@ def run_refresh(
             record_llm_health("ok")
 
         logger.info(
-            "Yenileme tamam: yeni=%d ön-filtre=%d analiz=%d elenen=%d değerlendirme=%d",
+            "Yenileme tamam: yeni=%d ön-filtre=%d analiz=%d elenen=%d değerlendirme=%d "
+            "atlanan_değerlendirme=%d",
             summary.fetched_new, summary.prefiltered, summary.analyzed,
-            summary.discarded, summary.entity_assessments,
+            summary.discarded, summary.entity_assessments, totals.assessments_skipped,
         )
         return summary
     finally:

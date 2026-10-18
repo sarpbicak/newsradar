@@ -29,7 +29,9 @@ from sqlalchemy.orm import Session
 
 from ..config import get_settings
 from ..db.database import session_scope
-from ..db.models import PREFILTER_VERSION, Article, Entity, EntityAnalysis, Suggestion
+from ..db.models import (
+    PREFILTER_VERSION, Article, Entity, EntityAnalysis, PriceSnapshot, Suggestion,
+)
 from ..analyst import analyst_context_for
 from ..prices import price_context_for
 from ..providers import get_provider_for
@@ -73,6 +75,11 @@ _MAX_SPLIT_DEPTH = 6
 # okunacak analiz edilmiş makale üst sınırı (makale-başı analiz yine sınırsız).
 ASSESSMENT_READ_CAP = 200
 MAX_ANALYSIS_HISTORY = 100  # entity başına saklanacak en fazla değerlendirme kaydı
+# GEREKSİZ DEĞERLENDİRMEYİ ATLA (en büyük maliyet kazancı): entity değerlendirmesi (dil
+# başına) yalnızca (a) son değerlendirmeden sonra yeni analiz edilmiş makale varsa, (b) fiyat
+# o zamandan beri ≥ |%3| oynadıysa ya da (c) son değerlendirme 24 saatten eskiyse yapılır.
+ASSESSMENT_MAX_AGE_HOURS = 24
+ASSESSMENT_PRICE_MOVE_PCT = 3.0
 SUGGESTION_TTL_DAYS = 30    # bu süreden eski + az anılan öneriler temizlenir
 
 
@@ -252,6 +259,7 @@ class AnalyzeTotals:
     analyzed: int = 0           # makale-başı analiz edilen
     discarded: int = 0          # relevance < eşik → elenen
     entity_assessments: int = 0  # entity-başı değerlendirme üretilen
+    assessments_skipped: int = 0  # yeni veri olmadığı için atlanan değerlendirme (dil başına)
     returned: int = 0           # Claude'un döndürdüğü toplam analiz (teşhis)
     unmatched: int = 0          # döndürülüp bu entity'ye eşleşmeyen id (teşhis)
     selected: int = 0           # _prefilter'ın batch'e seçtiği makale sayısı (teşhis)
@@ -498,6 +506,57 @@ def _read_assessment_payload(entity_id: int) -> list[dict]:
             }
             for a in articles
         ]
+
+
+def _assessment_due(entity_id: int, language: str) -> str | None:
+    """Bu dilde yeni değerlendirme gerekiyorsa SEBEBİNİ, gerekmiyorsa None döndürür."""
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    with session_scope() as session:
+        last_at = session.scalar(
+            select(EntityAnalysis.created_at)
+            .where(EntityAnalysis.entity_id == entity_id, EntityAnalysis.language == language)
+            .order_by(EntityAnalysis.created_at.desc())
+            .limit(1)
+        )
+        if last_at is None:
+            return "ilk değerlendirme"
+        if now - last_at > timedelta(hours=ASSESSMENT_MAX_AGE_HOURS):
+            return f"son değerlendirme {ASSESSMENT_MAX_AGE_HOURS} saatten eski"
+        new_articles = session.scalar(
+            select(Article.id)
+            .where(Article.entity_id == entity_id, Article.analyzed.is_(True),
+                   Article.analyzed_at > last_at)
+            .limit(1)
+        )
+        if new_articles is not None:
+            return "yeni analiz edilmiş makale var"
+        latest = session.scalar(
+            select(PriceSnapshot.price).where(PriceSnapshot.entity_id == entity_id)
+            .order_by(PriceSnapshot.fetched_at.desc()).limit(1)
+        )
+        then = session.scalar(
+            select(PriceSnapshot.price)
+            .where(PriceSnapshot.entity_id == entity_id, PriceSnapshot.fetched_at <= last_at)
+            .order_by(PriceSnapshot.fetched_at.desc()).limit(1)
+        )
+        if latest and then:
+            move = (latest - then) / then * 100
+            if abs(move) >= ASSESSMENT_PRICE_MOVE_PCT:
+                return f"fiyat %{move:+.1f} oynadı"
+    return None
+
+
+def _assessment_langs(entity_id: int, name: str, force: bool = False) -> list[str]:
+    """Değerlendirilecek diller (tr/en); gereksizler loglanıp atlanır."""
+    langs = []
+    for lang in ("tr", "en"):
+        reason = "zorla" if force else _assessment_due(entity_id, lang)
+        if reason is None:
+            logger.info("[%s] değerlendirme atlandı: yeni veri yok (%s)", name, lang)
+        else:
+            logger.info("[%s] değerlendirme yapılacak (%s): %s", name, lang, reason)
+            langs.append(lang)
+    return langs
 
 
 def _avg_sentiment(payload: list[dict]) -> float | None:
@@ -760,15 +819,21 @@ async def analyze_all_async(
             applied["analyzed"], applied["discarded"],
         )
 
-        # 3) Değerlendirme payload'ını + fiyat bağlamını oku (DB), Claude çağır, yaz.
+        # 3) Değerlendirme gerekli mi (dil başına: yeni makale / fiyat ≥%3 / 24s)? Gerekliyse
+        #    payload + fiyat bağlamını oku (DB), Claude çağır, yaz.
         async with db_lock:
-            payload = await asyncio.to_thread(_read_assessment_payload, t["id"])
-            price_ctx = await asyncio.to_thread(price_context_for, t["id"])
-            analyst_ctx = await asyncio.to_thread(analyst_context_for, t["id"])
+            langs = await asyncio.to_thread(_assessment_langs, t["id"], t["name"])
+        totals.assessments_skipped += 2 - len(langs)
+        payload = []
+        if langs:
+            async with db_lock:
+                payload = await asyncio.to_thread(_read_assessment_payload, t["id"])
+                price_ctx = await asyncio.to_thread(price_context_for, t["id"])
+                analyst_ctx = await asyncio.to_thread(analyst_context_for, t["id"])
         if payload:
             # İKİ DİLDE değerlendirme: arayüzü İngilizce olan kullanıcı içeriği de
             # İngilizce görsün. Makale analizi tek sefer; bu yalnızca +1 çağrı/dil.
-            for out_lang in ("tr", "en"):
+            for out_lang in langs:
                 if _quota_stopped["flag"]:
                     break  # kota durdu → dil döngüsünü de kes (yeniden deneme yok)
                 if await asyncio.to_thread(_over_budget):
@@ -830,10 +895,12 @@ async def analyze_all_async(
     return totals
 
 
-def analyze_entity_sync(entity_id: int, client: ClaudeClient, assess_client=None) -> AnalyzeTotals:
+def analyze_entity_sync(entity_id: int, client: ClaudeClient, assess_client=None,
+                        force_assessment: bool = False) -> AnalyzeTotals:
     """CLI/test için tek entity'yi senkron analiz eder (ön-filtre + batch + değerlendirme).
 
-    assess_client verilmezse değerlendirme de `client` ile yapılır."""
+    assess_client verilmezse değerlendirme de `client` ile yapılır. Değerlendirme
+    yenilemedeki kuralla aynı şekilde atlanabilir; force_assessment=True her iki dili zorlar."""
     settings = get_settings()
     assess_client = assess_client or client
     batch_size = max(1, settings.batch_size)
@@ -917,11 +984,13 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient, assess_client=None
             "model/endpoint sorunu olabilir (NEWSRADAR_LLM_MODEL?)."
         )
 
-    payload2 = _read_assessment_payload(entity_id)
+    langs = _assessment_langs(entity_id, name, force=force_assessment)
+    totals.assessments_skipped += 2 - len(langs)
+    payload2 = _read_assessment_payload(entity_id) if langs else []
     if payload2:
         _price = price_context_for(entity_id)
         _analyst = analyst_context_for(entity_id)
-        for out_lang in ("tr", "en"):
+        for out_lang in langs:
             def _build2(items, _ol=out_lang):
                 return build_entity_prompt(
                     name, query, etype, items, price=_price, language=lang,
