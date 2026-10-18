@@ -22,7 +22,7 @@ os.environ.update(
     NEWSRADAR_SEED_ON_START="off",
     NEWSRADAR_MAX_ENTITIES_REGISTERED="15",  # kayıtlı kullanıcı kotası (test 15 bekliyor)
     NEWSRADAR_MAX_REFRESH_REGISTERED="5",    # yenileme kotası (test 5 bekliyor)
-    NEWSRADAR_DAILY_TOKEN_BUDGET="0",        # test'te bütçe kapalı
+    NEWSRADAR_DAILY_BUDGET_USD="0",        # test'te bütçe kapalı
     NEWSRADAR_LLM_PROVIDER="anthropic",  # refresh çağırmıyoruz; anahtar gerekmez
 )
 
