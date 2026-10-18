@@ -1,167 +1,125 @@
-# NewsRadar 📡 — Haber Akışı Bazlı Hisse Risk Analizi
+# NewsRadar 📡 — News-Based Stock Risk Analysis
 
-Bir izleme listesindeki şirketler (public ticker + özel startup) için finansal
-haberleri çeker, **her makaleyi Claude API ile analiz eder** ve bir web
-panosunda risk skorları, duygu (sentiment) ve sinyalleri gösterir.
+NewsRadar collects financial news for a watchlist of companies, analyses every article with an LLM and turns the results into a dashboard of risk scores, sentiment trends and signals, both for public tickers and for private companies such as startups.
 
-> **İlke:** Araç net bir yön belirtir (yükseliş / nötr / düşüş) + kanaat seviyesi,
-> ama **haber-akışı sinyalini fiyat tahmininden ayırır**. Haberin söyleyemediğini
-> (değerleme, hareketin zaten fiyatlanıp fiyatlanmadığı) açıkça belirtir ve her
-> konum görüşüne bir **"önce doğrula" kontrol listesi** ekler. Gerekçesiz AL/SAT yok.
+**Live demo:** https://newsradar-web.onrender.com
+*(Hosted on Render's free tier, so the first load after a period of inactivity can take 30–60 seconds while the server wakes up.)*
 
-Kişisel, tek kullanıcılık bir araçtır.
+> **Principle:** NewsRadar gives a clear direction (bullish / neutral / bearish) and a conviction level, but it keeps the **news-flow signal separate from price prediction**. It says explicitly what news cannot tell you (valuation, whether a move is already priced in) and adds a **"verify first" checklist** to every view. No unexplained BUY/SELL calls. This is not investment advice.
 
 ---
 
-## Mimari
+## Features
+
+- **Watchlist with two entity types:** `ticker` (public companies, news via Finnhub) and `keyword` (private companies and startups, news via NewsAPI), behind an interchangeable `NewsProvider` interface.
+- **Scheduled ingestion:** an APScheduler job refreshes news automatically. Articles are de-duplicated by URL hash, so the same article is never analysed (or paid for) twice.
+- **Two-level LLM analysis with structured output**
+  - *Per article:* sentiment (−1..1), event type, risk flags, impact horizon, relevance (articles below 0.3 are filtered out) and a short rationale.
+  - *Per entity:* risk score (0–100), sentiment trend, top 3 drivers, summary, stance and conviction, 2–4 "what to verify" points and an invalidation condition.
+- **Chat with the news:** a streaming (SSE) chat in which the latest ~15 articles of an entity are injected as context.
+- **Analyst consensus and price targets** (Finnhub / Financial Modeling Prep) shown next to the news signal.
+- **Bilingual (TR / EN):** both the interface and the AI analysis are generated in the user's language.
+- **Multi-user and cost-safe for a public site:** bcrypt passwords, signed session tokens, anonymous sessions, tiered per-user quotas, a system-wide **daily LLM budget in USD** and an **admin panel** with usage, spend per model, cache hit rate and system health.
+- **Cost controls:** every LLM call is recorded with its model and input / output / cache tokens and priced from a per-model price table; prompt caching on the system prompt and tool schemas; entity assessments are skipped when there is no new data; assessment prompts are kept below the 100k-token price tier.
+- **Output quality guards:** no user-facing field ends mid-sentence (length is steered by the prompt, code only trims at a sentence boundary as a safety net), boilerplate phrases are banned and retried once, and every assessment is scanned for investment-advice wording.
+- **Interactive charts** (daily averages, calendar axis, time selector, zoom/pan) built with Recharts.
+
+## Tech stack
+
+| Layer | Technologies |
+|---|---|
+| Backend | Python, FastAPI, SQLAlchemy, SQLite, APScheduler, Pydantic, bcrypt |
+| LLM | **Anthropic Claude API** (`claude-haiku-5-5` for article analysis, entity assessments and chat; configurable per purpose) behind a provider abstraction; any OpenAI-compatible endpoint (e.g. OpenRouter) can be switched in with one environment variable |
+| Data sources | Finnhub (ticker news, analyst recommendations), NewsAPI (keyword news), Financial Modeling Prep (price targets) |
+| Frontend | React 18, Vite, Tailwind CSS, Recharts |
+| Deployment | Render (web service + static site, defined in [`render.yaml`](render.yaml)), deployed from GitHub |
+
+## Architecture
 
 ```
 newsradar/
-├── backend/                      FastAPI + SQLite + APScheduler + Claude
+├── backend/                     FastAPI + SQLite + APScheduler + LLM
 │   ├── app/
-│   │   ├── config.py             .env tabanlı ayarlar (anahtarlar koda gömülmez)
-│   │   ├── db/                   SQLAlchemy modelleri (Entity, Article, EntityAnalysis)
-│   │   ├── providers/            NewsProvider arayüzü + Finnhub (ticker) + NewsAPI (keyword)
-│   │   ├── analysis/             Claude hattı: makale-başı + entity-başı yapılandırılmış çıktı
-│   │   ├── api/                  FastAPI uçları (entities, refresh, dashboard, chat SSE)
-│   │   ├── ingest.py             çekme + URL-hash dedupe + kalıcılaştırma
-│   │   ├── refresh.py            çek→analiz orkestrasyonu
-│   │   ├── scheduler.py          saatlik otomatik yenileme (aç/kapat)
-│   │   ├── seed.py               varsayılan izleme listesi
-│   │   └── cli.py                adım adım test CLI'ı
-│   ├── requirements.txt
+│   │   ├── config.py            settings from .env (no keys in code)
+│   │   ├── db/                  SQLAlchemy models
+│   │   ├── providers/           NewsProvider interface + Finnhub / NewsAPI / FMP
+│   │   ├── analysis/            LLM pipeline: prompts, schemas, provider abstraction,
+│   │   │                        model/price table, output-quality guards
+│   │   ├── api/                 routes: entities, refresh, dashboard, chat (SSE), auth, admin
+│   │   ├── ingest.py            fetching + URL-hash de-duplication
+│   │   ├── refresh.py           fetch → analyse orchestration
+│   │   ├── scheduler.py         automatic refresh
+│   │   ├── quota.py, budget.py  per-user quotas + per-call cost tracking, daily USD budget
+│   │   └── security.py          sessions, rate limiting, hardening
+│   ├── evals/                   live evaluation scripts (full refresh checks, model comparison)
+│   ├── test_*.py                17 test scripts (security, quotas, isolation, truncation, …)
 │   └── .env.example
-└── frontend/                     React (Vite) + Tailwind + recharts
-    └── src/                      Overview, EntityDetail, ArticleTable, ChatPanel, ...
+└── frontend/                    React (Vite) + Tailwind + Recharts
 ```
 
-### Temel kavramlar
+## Engineering notes: problems I ran into
 
-- **Entity** iki tiptedir: `ticker` (public — Finnhub `/company-news`) ve `keyword`
-  (startup/özel — NewsAPI `/v2/everything`). Çekme, takas edilebilir bir
-  `NewsProvider` arayüzü arkasındadır.
-- **Dedupe:** makaleler URL hash'e göre `(entity_id, url_hash)` çiftiyle tekilleştirilir.
-  Aynı makale iki kez analiz edilmez (token tasarrufu).
-- **Anahtar eksikse** o sağlayıcı zarifçe atlanır ve UI'da uyarı gösterilir — uygulama çökmez.
-- **LLM:** Anthropic Claude, model `claude-sonnet-4-6`. Yapılandırılmış çıktı, zorunlu
-  **tool-use** ile alınır (Sonnet 4.6 katı structured-outputs desteklemez).
+Building and running NewsRadar in production surfaced several real problems. These were the most instructive:
 
-### Claude analiz hattı
+- **Silently truncated LLM output.** Large article batches hit the output-token limit, so responses were cut off without an obvious error. Fix: configurable batch size and output-token cap, plus automatic batch splitting when a truncation is detected (covered by `test_truncation.py`).
+- **A relevance pre-filter that dropped Turkish articles.** Valid Turkish news was being filtered out before it ever reached the analysis step, so the filter had to be fixed to let non-English articles through.
+- **Templated LLM answers.** Example sentences in the system prompt made the model copy them almost word for word. Removing the examples fixed it.
+- **Making a public LLM app affordable.** Anyone can open the site, so costs are capped by per-user quotas, a system-wide daily USD budget and a per-IP limit on anonymous sessions. Switching to a small model with prompt caching and skipping assessments when nothing changed brought a full five-company refresh (TR + EN, up to 40 new articles per company) to roughly $0.07 in live tests.
+- **Model output that looks fine until it doesn't.** Hard word caps cut verdicts mid-sentence, a model occasionally returned a list as a single string, and tool-call markup once leaked into a text field. Each is now caught by an automated check and handled without producing broken text.
+- **Security hardening.** An attacker-perspective test suite (`test_security_audit.py`) led to fixes such as blocking brute force via spoofed `X-Forwarded-For` headers.
+- **Free-tier hosting constraints.** Render's free disk is not persistent, so the default watchlist is re-seeded on start-up.
 
-1. Her entity için son 48s haber çekilir (ayarlanabilir).
-2. Zaten analiz edilmiş makaleler atlanır (URL hash ile) — aynı makaleye iki kez ödeme yok.
-3. Yeni makaleler 10'arlı gruplar halinde tek Claude çağrısında analiz edilir.
-4. **Makale-başı** yapılandırılmış JSON: `sentiment (-1..1)`, `event_type`, `risk_flags[]`,
-   `impact_horizon`, `relevance (0..1; <0.3 elenir)`, `rationale (TR)`.
-5. **Entity-başı** toplu değerlendirme: `risk_score (0..100)`, `sentiment_trend`,
-   `top_drivers[3]`, `summary`, `stance`, `conviction`, `what_to_verify[2-4]`, `invalidation`.
+## Running locally
 
----
-
-## Kurulum & Çalıştırma
-
-### 1) Backend (FastAPI)
+### Backend
 
 ```bash
-cd newsradar/backend
-python3 -m venv .venv && source .venv/bin/activate     # opsiyonel ama önerilir
+cd backend
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-
-cp .env.example .env
-# .env dosyasını açıp anahtarları girin:
-#   ANTHROPIC_API_KEY=sk-ant-...     (analiz için ZORUNLU)
-#   FINNHUB_API_KEY=...              (ticker haberleri; yoksa atlanır)
-#   NEWSAPI_KEY=...                  (keyword haberleri; yoksa atlanır)
-
-python -m app.seed                  # varsayılan izleme listesi (TSLA, NVDA, MSFT, Anthropic, SpaceX)
-uvicorn app.api.main:app --reload   # http://localhost:8000  (docs: /docs)
+cp .env.example .env        # add your API keys (see comments in the file)
+python -m app.seed          # default watchlist
+uvicorn app.api.main:app --reload    # http://localhost:8000 (API docs: /docs)
 ```
 
-**CLI ile adım adım test (sunucu gerekmez):**
+Step-by-step checks without the server:
 
 ```bash
-python -m app.cli status            # sağlayıcı anahtarları + izleme listesi
-python -m app.cli fetch TSLA        # tek entity için haber çek + yazdır
-python -m app.cli analyze TSLA      # Claude ile analiz et + JSON yazdır
+python -m app.cli status          # provider keys + watchlist
+python -m app.cli llm-check       # each configured model: access, tool use, caching, cost
+python -m app.cli fetch TSLA      # fetch news for one entity
+python -m app.cli analyze TSLA    # run the LLM analysis and print JSON
 ```
 
-### 2) Frontend (React + Vite)
+Tests (each script uses an isolated temporary database):
 
 ```bash
-cd newsradar/frontend
+python test_security.py
+python test_truncation.py
+```
+
+Live evaluation (real API calls, runs on a copy of the local database):
+
+```bash
+python -m evals.eval_refresh --db /tmp/nr_eval.db --out evals/reports/refresh.md
+```
+
+### Frontend
+
+```bash
+cd frontend
 npm install
-npm run dev                          # http://localhost:5173
+npm run dev                 # http://localhost:5173
 ```
 
-Backend farklı bir adresteyse `cp .env.example .env` ile `VITE_API_URL`'i ayarlayın.
+If the backend runs elsewhere, set `VITE_API_URL` in `frontend/.env` (see `frontend/.env.example`).
+
+## How it was built
+
+I built NewsRadar as a personal project with AI-assisted development (Claude). I defined the product and its features, worked through the architecture and trade-offs, and tested and debugged it in production. I'm a Business Information Systems (Wirtschaftsinformatik) student at Hochschule Furtwangen University.
+
+**Sarp Bıçak** · [sarpbicak@gmail.com](mailto:sarpbicak@gmail.com)
 
 ---
 
-## Deploy (Render.com)
-
-İki ayrı servis: **backend** (web service) + **frontend** (static site). Kök dizindeki
-[`render.yaml`](render.yaml) blueprint bunları tanımlar; ya elle girin:
-
-### Backend — Web Service
-- **Root Directory:** `backend`
-- **Build Command:** `pip install -r requirements.txt`
-- **Start Command:** `uvicorn app.api.main:app --host 0.0.0.0 --port $PORT` (ayrıca [`backend/Procfile`](backend/Procfile)'da hazır)
-- **Environment Variables:** `APP_PASSWORD`, `ANTHROPIC_API_KEY`, `FINNHUB_API_KEY`,
-  `NEWSAPI_KEY`, `FRONTEND_URL` (frontend'in Render adresi — CORS için),
-  `NEWSRADAR_SEED_ON_START=on` (kalıcı olmayan diskte açılışta seed).
-
-### Frontend — Static Site
-- **Root Directory:** `frontend`
-- **Build Command:** `npm install && npm run build`
-- **Publish Directory:** `dist`
-- **Environment Variable:** `VITE_API_URL` = backend servisinin adresi (örn. `https://newsradar-api.onrender.com`)
-
-> **SQLite & kalıcılık:** Render bedava katmanında disk **kalıcı değildir** — her deploy/
-> yeniden başlatmada `newsradar.db` sıfırlanır. `NEWSRADAR_SEED_ON_START=on` ile açılışta
-> varsayılan izleme listesi tekrar eklenir; haber verisi için bir kez **Yenile**'ye basın.
-> Kalıcılık isterseniz ücretli **Persistent Disk** ekleyip `NEWSRADAR_DB`'yi mount yoluna
-> (örn. `/var/data/newsradar.db`) ayarlayın.
-
----
-
-## API Uçları
-
-| Yöntem | Yol | Açıklama |
-|--------|-----|----------|
-| `GET/POST/DELETE` | `/entities` | İzleme listesi CRUD |
-| `POST` | `/refresh` | Çek + analiz tetikle (ayrıca saatlik APScheduler; `?scheduler_enabled=` ile aç/kapat) |
-| `GET` | `/entities/{id}/dashboard` | Toplu sonuç + son analiz edilmiş makaleler |
-| `POST` | `/chat` | SSE streaming. Gövde: `{entity_id, messages[]}` — entity'nin son ~15 makalesi bağlam olarak enjekte edilir |
-| `GET` | `/status` | Sağlayıcı anahtarı durumu + Claude + zamanlayıcı (UI uyarıları) |
-
----
-
-## Frontend özellikleri
-
-- **Genel görünüm:** entity kartları ızgarası — yön rozeti (yükseliş/nötr/düşüş) +
-  kanaat, renk kodlu risk skoru (0–100), duygu göstergesi, trend oku, risk bayrağı
-  çipleri, son güncelleme.
-- **Entity detay:** özet, yön + kanaat, ana etkenler, **"önce doğrula" kontrol listesi**,
-  invalidation satırı, duygu grafiği (recharts) ve makale tablosu (risk_flag / event_type
-  filtreli, tıklanabilir başlık).
-- **Sohbet paneli:** o entity'nin haberleri hakkında Claude ile streaming konuşma.
-- **İzleme listesi yöneticisi:** ticker/keyword tip seçiciyle ekle/çıkar.
-- Global **Yenile** düğmesi (yükleniyor durumuyla), footer notu:
-  *"Haber akışı bazlı sinyal — fiyat tahmini değil, önce doğrula."*
-- Koyu, sade fintech estetiği.
-
----
-
-## Kalite / dayanıklılık
-
-- Hat, tek tek API hatalarında hayatta kalır: hata loglanır, gerisi devam eder
-  (bir kaynak/entity çökse bile yenileme tamamlanır).
-- `.env` yoksa/eksikse ilgili adım zarifçe atlanır; UI uyarı gösterir.
-- Type hint'ler ve docstring'ler; küçük modüller (`providers/`, `analysis/`, `api/`, `db/`).
-- Seed script'i varsayılan izleme listesini ekler.
-
-## Notlar
-
-- NewsAPI ücretsiz katmanı ~24s gecikmelidir — v1 için kabul edilebilir; analiz bunu
-  dikkate alır ve "haber zaten fiyatlanmış olabilir" uyarısını üretir.
-- Bu bir yatırım tavsiyesi değildir; haber akışı sinyalidir. Önce doğrulayın.
+*NewsRadar is a news-flow signal tool, not financial advice. Always verify before acting.*
