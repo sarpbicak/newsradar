@@ -1,9 +1,8 @@
 """Claude yapılandırılmış çıktı şemaları (tool-use ile zorlanır) + doğrulama.
 
-Sonnet 4.6 katı structured-outputs (output_config.format) desteklemediğinden,
-yapılandırılmış çıktıyı *zorunlu tool-use* ile alıyoruz: bir "tool" tanımlıyoruz,
-tool_choice ile onu zorluyoruz ve tool_use.input JSON'unu okuyoruz. Bu desen
-tüm modellerde çalışır. (Bkz. analysis/claude_client.py)
+Yapılandırılmış çıktıyı *tool-use* ile alıyoruz: bir "tool" tanımlıyoruz, modeli onu
+çağırmaya yönlendiriyoruz (destekleyen modelde zorunlu tool_choice) ve tool_use.input
+JSON'unu okuyoruz. (Bkz. analysis/claude_client.py, model_specs.py)
 """
 
 from __future__ import annotations
@@ -16,6 +15,7 @@ from ..db.models import (
     SENTIMENT_TRENDS,
     STANCES,
 )
+from .text_quality import PROMPT_LIMITS, clip_to_sentence, hard_cap
 
 # --------------------------------------------------------------------------- #
 #  Makale-başı analiz tool'u
@@ -152,8 +152,10 @@ ENTITY_ANALYSIS_TOOL = {
                 "type": "string",
                 "description": (
                     "Finans bilmeyen bir LİSE ÖĞRENCİSİNİN anlayacağı, düz, İSTENEN ÇIKIŞ "
-                    "DİLİNDE tek TAM cümle HÜKÜM — TR ~14 kelime, EN ~24 kelimeye kadar; "
-                    "cümleyi yarım BIRAKMA. Kartın en üstünde büyük gösterilecek. "
+                    "DİLİNDE tek TAM cümle HÜKÜM — TR en fazla "
+                    f"{PROMPT_LIMITS['headline_verdict']['tr']} kelime, EN en fazla "
+                    f"{PROMPT_LIMITS['headline_verdict']['en']} kelime; bu sınırı AŞMA, sığmıyorsa "
+                    "daha az şey söyle. Nokta ile biter. Kartın en üstünde büyük gösterilecek. "
                     "ŞU ÜÇ ŞEYİ İÇERMELİ: (a) haber akışının yönü (olumlu/olumsuz/kararsız), "
                     "(b) ne kadar güvenilir olduğu (çok/az habere dayanıyor, tutarlı mı), "
                     "(c) VARSA analist beklentisi ile haberlerin ayrışması ya da fiyatın zaten "
@@ -170,7 +172,9 @@ ENTITY_ANALYSIS_TOOL = {
             "ai_take": {
                 "type": "string",
                 "description": (
-                    "'AI ne düşünüyor?' — 3-5 cümlelik, KONUŞMA DİLİNDE, bütünsel bir "
+                    "'AI ne düşünüyor?' — 3-5 cümlelik, en fazla "
+                    f"{PROMPT_LIMITS['ai_take']} kelime (bu sınırı AŞMA, sığmıyorsa daha az şey "
+                    "söyle; son cümle tam ve noktalı), KONUŞMA DİLİNDE, bütünsel bir "
                     "yorum (istenen çıkış dilinde). Haber akışı + fiyat hareketi + analist konsensüsü + kanıt gücünü "
                     "SENTEZLE; bir arkadaşın anlatır gibi düz, istenen çıkış dilinde (jargon YOK). "
                     "BU şirketin KENDİ durumunu anlat: elindeki haberlerden çıkan somut "
@@ -204,23 +208,27 @@ ENTITY_ANALYSIS_TOOL = {
             "top_drivers": {
                 "type": "array",
                 "description": (
-                    "Tam 3 kısa etken, İSTENEN ÇIKIŞ DİLİNDE. Genel ifade DEĞİL — BU şirketin haberlerinden "
+                    "Tam 3 kısa etken, İSTENEN ÇIKIŞ DİLİNDE; her madde nokta ile biten kısa "
+                    "bir TAM cümle. Genel ifade DEĞİL — BU şirketin haberlerinden "
                     "doğan somut etken (ürün/olay/rakam/kişi adı geçsin). Başka şirkete de "
                     "uyacak genel maddeler yazma."
                 ),
                 "items": {"type": "string"},
             },
-            "summary": {"type": "string", "description": "2-3 cümle özet, istenen çıkış dilinde."},
+            "summary": {"type": "string", "description": "2-3 tam cümle özet, istenen çıkış dilinde; nokta ile biter."},
             "stance": {"type": "string", "enum": list(STANCES)},
             "conviction": {"type": "string", "enum": list(CONVICTIONS)},
             "what_to_verify": {
                 "type": "array",
-                "description": "Harekete geçmeden önce 2-4 somut kontrol, istenen çıkış dilinde.",
+                "description": (
+                    "Harekete geçmeden önce 2-4 somut kontrol, istenen çıkış dilinde; her madde "
+                    "nokta ile biten TAM bir cümle."
+                ),
                 "items": {"type": "string"},
             },
             "invalidation": {
                 "type": "string",
-                "description": "Bu görüşü çürütecek olay/haber — tek cümle, istenen çıkış dilinde.",
+                "description": "Bu görüşü çürütecek olay/haber — tek TAM cümle, istenen çıkış dilinde; nokta ile biter.",
             },
         },
         "required": [
@@ -289,28 +297,30 @@ def sanitize_article_analysis(item: dict) -> dict:
 def sanitize_entity_analysis(item: dict, language: str = "tr") -> dict:
     """Claude'dan gelen entity değerlendirmesini güvenli değerlere çeker.
 
-    language: hüküm kelime sınırı DİLE göre — İngilizce Türkçe'den uzun olduğu için
-    14 kelimede kesilince yarım kalıyordu ('...potential for'); İngilizce'de daha
-    yüksek tavan (kartta 3-4 satıra sığar)."""
+    Metin alanları ASLA cümle ortasında kesilmez: uzunluğu prompt yönetir; koddaki tavan
+    yalnızca emniyettir (text_quality.HARD_CAPS) ve aşılırsa son tam cümlede kesilir,
+    sınır içinde cümle sonu yoksa metin olduğu gibi bırakılır (bkz. clip_to_sentence)."""
+    lang = "en" if (language or "tr").lower() == "en" else "tr"
+
+    def clip(field: str, value: object) -> str:
+        return clip_to_sentence(str(value or "").strip(), hard_cap(field, lang), f"{field}/{lang}")
+
     trend = item.get("sentiment_trend")
     stance = item.get("stance")
     conviction = item.get("conviction")
-    drivers = [str(d).strip() for d in item.get("top_drivers", []) if str(d).strip()]
-    verify = [str(v).strip() for v in item.get("what_to_verify", []) if str(v).strip()]
-    # Hüküm cümlesi: dile göre kelime tavanı (TR 16 / EN 28) — cümleyi ortadan kesmesin.
-    verdict_cap = 28 if (language or "tr").lower() == "en" else 16
-    verdict = " ".join(str(item.get("headline_verdict", "")).strip().split()[:verdict_cap])
-    # Claude yorumu: 3-5 cümle; en fazla ~120 kelimeye kırp (aşırı uzamasın).
-    take = " ".join(str(item.get("ai_take", "")).strip().split()[:120])
+    drivers = [clip("top_drivers", d) for d in item.get("top_drivers", []) if str(d).strip()]
+    verify = [clip("what_to_verify", v) for v in item.get("what_to_verify", []) if str(v).strip()]
+    verdict = clip("headline_verdict", item.get("headline_verdict", ""))
+    take = clip("ai_take", item.get("ai_take", ""))
     return {
         "headline_verdict": verdict,
         "ai_take": take,
         "risk_score": int(clamp(float(item.get("risk_score", 50)), 0, 100)),
         "sentiment_trend": trend if trend in SENTIMENT_TRENDS else "stable",
         "top_drivers": drivers[:3],
-        "summary": str(item.get("summary", "")).strip(),
+        "summary": clip("summary", item.get("summary", "")),
         "stance": stance if stance in STANCES else "neutral",
         "conviction": conviction if conviction in CONVICTIONS else "low",
         "what_to_verify": verify[:4],
-        "invalidation": str(item.get("invalidation", "")).strip(),
+        "invalidation": clip("invalidation", item.get("invalidation", "")),
     }

@@ -4,12 +4,15 @@ GERÇEK API çağrısı yapar (maliyet llm_usage'a yazılır ve raporda gösteri
 KOPYASI üzerinde çalışır — geliştirme verisi değişmez.
 
 Kontroller (herhangi biri BAŞARISIZ → çıkış kodu 1):
-  1. Şablon çöküşü: tüm headline_verdict'ler yan yana; aynı açılış (ilk 3 kelime) raporlanır,
-     entity'lerin %50'sinden fazlası aynı açılışı paylaşıyorsa BAŞARISIZ. risk_score
-     dağılımı: bir dilde entity'lerin %50'sinden fazlası aynı skorsa BAŞARISIZ.
+  1. Şablon çöküşü: tüm headline_verdict'ler yan yana; aynı açılış (ilk 3 kelime) ve
+     entity'ler arasında tekrar eden 3+ kelimelik öbekler raporlanır. Entity'lerin %50'sinden
+     fazlası aynı açılışı ya da aynı öbeği paylaşıyorsa BAŞARISIZ. Yasaklı ifade
+     (text_quality.BANNED_PHRASES) herhangi bir metin alanında geçerse BAŞARISIZ. risk_score:
+     bir dilde entity'lerin %50'sinden fazlası aynı skorsa BAŞARISIZ.
   2. Yatırım tavsiyesi bariyeri: TR+EN tüm metin alanları + makale gerekçeleri taranır.
   3. Kesilme: yenileme boyunca TruncationError (log) sayısı.
   4. Türkçe karakter bozulması (mojibake / hiç ı-ş-ğ-İ olmaması).
+  5. Kesik cümle: tüm metin alanları ve liste maddeleri . ! ? ile bitmeli.
 
 Çalıştır (backend/ içinden):
   python -m evals.eval_refresh --db <kopya.db> --out evals/reports/refresh.md
@@ -69,6 +72,7 @@ def main() -> int:
     from sqlalchemy import func, select
 
     from app.analysis.advice_guard import scan_assessment, scan_text
+    from app.analysis.text_quality import banned_phrase_hits, repeated_ngrams, unterminated_fields
     from app.config import get_settings
     from app.db.database import init_db, session_scope
     from app.db.models import Article, Entity, EntityAnalysis, LlmUsage
@@ -150,6 +154,25 @@ def main() -> int:
         lines.append(f"- Aynı açılış (ilk 3 kelime): {dup or 'yok'}")
         if rows and max(openings.values()) > len(rows) / 2:
             fails.append(f"{lang}: entity'lerin yarısından fazlası aynı açılış: {dup}")
+        grams = repeated_ngrams({n: r.headline_verdict or "" for n, r in rows}, n=3)
+        lines.append(f"- Tekrar eden 3+ kelimelik öbek (hüküm): "
+                     f"{ {g: len(ns) for g, ns in grams.items()} or 'yok'}")
+        worst = max((len(ns) for ns in grams.values()), default=0)
+        if rows and worst > len(rows) / 2:
+            fails.append(f"{lang}: hükümlerin yarısından fazlası aynı öbeği paylaşıyor: "
+                         f"{[g for g, ns in grams.items() if len(ns) == worst]}")
+        take_grams = repeated_ngrams({n: r.ai_take or "" for n, r in rows}, n=3,
+                                     min_docs=max(3, len(rows) // 2 + 1))
+        lines.append(f"- ai_take'te entity'lerin yarısından fazlasında geçen öbek (bilgi): "
+                     f"{list(take_grams) or 'yok'}")
+        banned = []
+        for n, r in rows:
+            text = " ".join([r.headline_verdict or "", r.ai_take or "", r.summary or "",
+                             r.invalidation or "", *(r.top_drivers or []), *(r.what_to_verify or [])])
+            banned += [f"{n}: '{p}'" for p in banned_phrase_hits(text, lang)]
+        lines.append(f"- Yasaklı ifade: {banned or 'yok'}")
+        if banned:
+            fails.append(f"{lang}: yasaklı ifade kullanıldı: {banned}")
         scores = Counter(r.risk_score for _, r in rows)
         lines.append(f"- risk_score dağılımı: {dict(sorted(scores.items()))}")
         if rows and max(scores.values()) > len(rows) / 2:
@@ -197,6 +220,20 @@ def main() -> int:
         fails.append(f"Türkçe karakter bozulması: {moji[:5]}")
     if tr_text and not ({"ı", "ş", "ğ"} & set(tr_text)):
         fails.append("TR metinlerde hiç ı/ş/ğ yok — karakterler düzleştirilmiş olabilir")
+
+    # ---- 5. kesik cümle ----
+    lines += ["## 5. Kesik cümle (noktalama ile bitmeyen alan)", ""]
+    cut = []
+    for n, r in results.items():
+        for lang, row in r.items():
+            data = {f: getattr(row, f) for f in (
+                "headline_verdict", "ai_take", "summary", "invalidation", "top_drivers", "what_to_verify")}
+            cut += [f"{n}/{lang}/{f}: …{v[-60:]}" for f, v in unterminated_fields(data)]
+    lines.append(f"- Noktalamasız biten alan/madde: {len(cut)}")
+    lines += [f"  - {c}" for c in cut]
+    if cut:
+        fails.append(f"kesik/noktalamasız metin alanı: {len(cut)}")
+    lines.append("")
 
     # ---- maliyet ----
     lines += ["## Maliyet (bu koşu)", "", "| Model | Amaç | Çağrı | Girdi | Cache yazma | Cache okuma | Çıktı | USD |",

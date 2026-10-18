@@ -109,17 +109,18 @@ def main():
           "EN kural: risk bandı + 60'a düşme yasağı")
     check("NO TEMPLATES" in r and "pasted onto another company" in r, "EN kural: şablon yasağı + şirkete özgü")
     check("NO JARGON" in r and "ENUM" in r, "EN kural: jargon yasağı + enum")
-    check("~24 words" in r and "trail off" in r, "EN kural: hüküm tek cümle, ~24 kelime, yarım bırakma")
+    check("at most 16 words" in r and "Never stop mid-sentence" in r,
+          "EN kural: hüküm tek cümle, en fazla 16 kelime, yarım bırakma")
     rt = entity_assessment_rules("tr")
     check("YATIRIM TAVSİYESİ DEĞİL" in rt and "FARKLILAŞMALI" in rt, "TR kural bloğu da paritede (tavsiye+risk)")
 
-    print("\n== Hüküm kelime tavanı DİLE göre (İngilizce yarım kesilmesin) ==")
-    long_en = " ".join(["word"] * 26)  # 26 kelime
-    long_tr = " ".join(["kelime"] * 26)
+    print("\n== Hüküm ASLA cümle ortasında kesilmez (emniyet tavanı DİLE göre) ==")
+    long_en = " ".join(["word"] * 26) + "."  # 26 kelime < EN emniyet tavanı (30)
+    long_tr = " ".join(["kelime"] * 32)       # 32 kelime > TR tavanı (28), cümle sonu YOK
     en_v = sanitize_entity_analysis({"headline_verdict": long_en}, "en")["headline_verdict"]
     tr_v = sanitize_entity_analysis({"headline_verdict": long_tr}, "tr")["headline_verdict"]
-    check(len(en_v.split()) == 26, f"EN hüküm 26 kelime korundu (kesilmedi): {len(en_v.split())}")
-    check(len(tr_v.split()) == 16, f"TR hüküm 16 kelimeye kırpıldı: {len(tr_v.split())}")
+    check(en_v == long_en, f"EN 26 kelimelik hüküm korundu: {len(en_v.split())}")
+    check(tr_v == long_tr, f"TR hüküm cümle sonu olmadığı için KESİLMEDİ: {len(tr_v.split())}")
 
     print("\n== priority_reason KANONİK ANAHTAR (Türkçe sabit değil) ==")
     class _A: stance = "bullish"

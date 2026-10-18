@@ -38,6 +38,9 @@ def main() -> int:
     from sqlalchemy import select
 
     from app.analysis.advice_guard import scan_assessment
+    from app.analysis.text_quality import (
+        banned_phrase_hits, repeated_ngrams, unterminated_fields, word_count,
+    )
     from app.analysis.claude_client import ClaudeClient, ClaudeError
     from app.analysis.pipeline import _assess_entity_with_recovery, _read_assessment_payload
     from app.analysis.prompts import build_entity_prompt
@@ -69,16 +72,20 @@ def main() -> int:
             for m, c in clients.items():
                 before = c.total_cost_usd
                 try:
-                    data, used = _assess_entity_with_recovery(c, build, payload, f"{name}/{lang}/{m}")
+                    data, used = _assess_entity_with_recovery(c, build, payload, f"{name}/{lang}/{m}", lang)
                     clean = sanitize_entity_analysis(data, lang)
                     err = None
                 except ClaudeError as exc:
                     clean, used, err = {}, [], str(exc)
                 cost = c.total_cost_usd - before
                 costs[m].append(cost)
+                text = " ".join([clean.get("headline_verdict", ""), clean.get("ai_take", ""),
+                                 clean.get("summary", ""), clean.get("invalidation", ""),
+                                 *clean.get("top_drivers", []), *clean.get("what_to_verify", [])])
                 rows.setdefault((name, lang), {})[m] = {
                     "data": clean, "cost": cost, "usage": dict(c.last_usage or {}),
                     "articles": len(used), "error": err, "advice": scan_assessment(clean),
+                    "cut": unterminated_fields(clean), "banned": banned_phrase_hits(text, lang),
                 }
 
     now = datetime.now(timezone.utc)
@@ -95,6 +102,35 @@ def main() -> int:
         L.append(f"| `{m}` | {n} | ${sum(costs[m]):.4f} | ${(sum(costs[m]) / n if n else 0):.4f} |")
     L.append("")
 
+    # Otomatik metin kontrolleri (model başına): kesik cümle, yasaklı ifade, uzunluk, tekrar.
+    L += ["## Metin kontrolleri", "",
+          "| Model | Hata | Kesik/noktalamasız alan | Yasaklı ifade | Tavsiye ihlali | "
+          "Hüküm kelime (TR / EN, ort.) | ai_take kelime (ort.) |", "|---|---|---|---|---|---|---|"]
+    for m in MODELS:
+        rs = [(k, v[m]) for k, v in rows.items()]
+        tr_w = [word_count(r["data"].get("headline_verdict", "")) for (_, l), r in rs if l == "tr" and not r["error"]]
+        en_w = [word_count(r["data"].get("headline_verdict", "")) for (_, l), r in rs if l == "en" and not r["error"]]
+        tk_w = [word_count(r["data"].get("ai_take", "")) for _, r in rs if not r["error"]]
+        avg = lambda xs: f"{sum(xs) / len(xs):.1f}" if xs else "—"  # noqa: E731
+        L.append(f"| `{m}` | {sum(1 for _, r in rs if r['error'])} | {sum(len(r['cut']) for _, r in rs)} | "
+                 f"{sum(len(r['banned']) for _, r in rs)} | {sum(len(r['advice']) for _, r in rs)} | "
+                 f"{avg(tr_w)} / {avg(en_w)} | {avg(tk_w)} |")
+    L.append("")
+    for m in MODELS:
+        for lang in ("tr", "en"):
+            grams = repeated_ngrams({k[0]: v[m]["data"].get("headline_verdict", "")
+                                     for k, v in rows.items() if k[1] == lang}, n=3)
+            if grams:
+                L.append(f"- `{m}` {lang.upper()} hükümlerinde tekrar eden öbek: "
+                         + ", ".join(f"'{g}' ({len(ns)})" for g, ns in grams.items()))
+    problems = [(k, m, r) for k, v in rows.items() for m, r in v.items() if r["cut"] or r["banned"]]
+    for (name, lang), m, r in problems:
+        for f, v in r["cut"]:
+            L.append(f"- KESİK `{m}` {name}/{lang}/{f}: …{_cell(v[-80:])}")
+        for p_ in r["banned"]:
+            L.append(f"- YASAKLI `{m}` {name}/{lang}: '{p_}'")
+    L.append("")
+
     for (name, lang), by_model in rows.items():
         L += [f"## {name} — {lang.upper()}", "", "| | " + " | ".join(f"`{m}`" for m in MODELS) + " |",
               "|---|" + "---|" * len(MODELS)]
@@ -104,7 +140,9 @@ def main() -> int:
 
         row("Hata", lambda r: r["error"] or "—")
         row("Hüküm", lambda r: r["data"].get("headline_verdict", ""))
+        row("Hüküm kelime", lambda r: str(word_count(r["data"].get("headline_verdict", ""))))
         row("ai_take", lambda r: r["data"].get("ai_take", ""))
+        row("ai_take kelime", lambda r: str(word_count(r["data"].get("ai_take", ""))))
         row("what_to_verify", lambda r: " • ".join(r["data"].get("what_to_verify", [])))
         row("Risk skoru", lambda r: str(r["data"].get("risk_score", "")))
         row("Yön / kanaat", lambda r: f"{r['data'].get('stance', '')} / {r['data'].get('conviction', '')}")
@@ -113,6 +151,7 @@ def main() -> int:
             f"{r['usage'].get('input_tokens', 0)} / {r['usage'].get('cache_read_input_tokens', 0)} / "
             f"{r['usage'].get('output_tokens', 0)}"))
         row("Çağrı maliyeti", lambda r: f"${r['cost']:.4f}")
+        row("Kesik alan", lambda r: "yok" if not r["cut"] else ", ".join(f for f, _ in r["cut"]))
         row("Tavsiye taraması", lambda r: "temiz" if not r["advice"] else
             "; ".join(f"{f}:{lbl}" for f, lbl, _ in r["advice"]))
         L.append("")

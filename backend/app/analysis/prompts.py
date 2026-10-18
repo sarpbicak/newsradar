@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from .text_quality import BANNED_PHRASES, PROMPT_LIMITS
+
 SYSTEM_PROMPT = """\
 Sen NewsRadar'ın analiz motorusun — tek bir kişisel kullanıcı için çalışan, \
 haber akışına dayalı bir hisse/varlık risk analistisin.
@@ -312,8 +314,16 @@ def entity_assessment_rules(out_lang: str) -> str:
             "'catalyst'; use plain English a high-schooler understands.\n"
             "5) ENUM fields (stance, conviction, sentiment_trend) use ONLY the allowed enum "
             "values (English enum tokens).\n"
-            "6) headline_verdict: ONE natural English sentence, up to ~24 words, complete (do "
-            "not trail off); lowercase mid-sentence except proper nouns."
+            f"6) LENGTH: headline_verdict is ONE natural English sentence of at most "
+            f"{PROMPT_LIMITS['headline_verdict']['en']} words. ai_take is 3-5 sentences, at most "
+            f"{PROMPT_LIMITS['ai_take']} words. Do NOT exceed these limits — if it doesn't fit, "
+            "say fewer things. Lowercase mid-sentence except proper nouns.\n"
+            "7) COMPLETE SENTENCES: every text field and every list item (headline_verdict, "
+            "ai_take, summary, invalidation, each top_drivers and what_to_verify item) is a "
+            "complete sentence ending with '.', '!' or '?'. Never stop mid-sentence.\n"
+            "8) BANNED PHRASES (boilerplate that fits any company — never use them): "
+            + ", ".join(f"'{p}'" for p in BANNED_PHRASES["en"]) + ". Lead with the concrete "
+            "event instead."
         )
     return (
         "KRİTİK KURALLAR (aynen uygula):\n"
@@ -336,6 +346,14 @@ def entity_assessment_rules(out_lang: str) -> str:
         "kullanma; lise öğrencisinin anlayacağı düz Türkçe.\n"
         "5) ENUM alanları (stance, conviction, sentiment_trend) YALNIZCA izinli enum "
         "değerlerinden.\n"
-        "6) headline_verdict: tek doğal Türkçe cümle, ~14 kelimeye kadar, TAM (yarım "
-        "bırakma); cümle ortasında rastgele büyük harf yok."
+        f"6) UZUNLUK: headline_verdict tek doğal Türkçe cümle, en fazla "
+        f"{PROMPT_LIMITS['headline_verdict']['tr']} kelime. ai_take 3-5 cümle, en fazla "
+        f"{PROMPT_LIMITS['ai_take']} kelime. Bu sınırı AŞMA — sığmıyorsa daha az şey söyle. "
+        "Cümle ortasında rastgele büyük harf yok.\n"
+        "7) TAM CÜMLE: her metin alanı ve her liste maddesi (headline_verdict, ai_take, "
+        "summary, invalidation, her top_drivers ve what_to_verify maddesi) '.', '!' ya da "
+        "'?' ile biten TAM bir cümledir. Asla cümle ortasında bitirme.\n"
+        "8) YASAKLI İFADELER (her şirkete uyan kalıp — asla kullanma): "
+        + ", ".join(f"'{p}'" for p in BANNED_PHRASES["tr"]) + ". Bunun yerine somut olayla "
+        "başla."
     )
