@@ -66,6 +66,10 @@ class AnthropicProvider(LLMProvider):
         self.model = self._client.model
         self.purpose = purpose
 
+    def __getattr__(self, name: str):
+        # Sayaçlar/kullanım (call_count, total_cost_usd, last_usage, …) ClaudeClient'tan.
+        return getattr(self._client, name)
+
     def call_tool(self, *, system: str, user: str, tool: dict, max_tokens: int = 4096) -> dict:
         return self._client.call_tool(system=system, user=user, tool=tool, max_tokens=max_tokens)
 
@@ -98,6 +102,7 @@ class OpenAICompatProvider(LLMProvider):
         base_url: str | None = None,
         api_key: str | None = None,
         model: str | None = None,
+        purpose: str | None = None,
     ) -> None:
         settings = get_settings()
         base_url = base_url or settings.llm_base_url
@@ -111,6 +116,7 @@ class OpenAICompatProvider(LLMProvider):
 
         self._client = OpenAI(base_url=base_url, api_key=api_key)
         self.model = model or settings.llm_model
+        self.purpose = purpose
         self.base_url = base_url
         self.last_usage: dict | None = None  # son çağrının token kullanımı
         # Toplam token/çağrı sayacı (maliyet/ölçüm; thread-güvenli).
@@ -174,6 +180,9 @@ class OpenAICompatProvider(LLMProvider):
             ct = getattr(u, "completion_tokens", 0) or 0
             self.last_usage = {"prompt_tokens": pt, "completion_tokens": ct,
                                "total_tokens": getattr(u, "total_tokens", pt + ct)}
+            # Çağrı başına kalıcı kayıt (fiyat tablosunda yoksa maliyet 0 + tek uyarı).
+            from ..budget import record_llm_call
+            record_llm_call(self.model, self.purpose, pt, ct)
             with self._usage_lock:
                 self.total_prompt_tokens += pt
                 self.total_completion_tokens += ct
@@ -249,7 +258,7 @@ def get_llm_provider(purpose: str = "article", model: str | None = None) -> LLMP
     provider = get_settings().llm_provider
     if provider == "anthropic":
         return AnthropicProvider(model, purpose=purpose)
-    return OpenAICompatProvider(model=model)  # openrouter/nvidia/…
+    return OpenAICompatProvider(model=model, purpose=purpose)  # openrouter/nvidia/…
 
 
 def provider_name() -> str:

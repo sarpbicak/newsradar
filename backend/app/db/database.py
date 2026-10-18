@@ -66,6 +66,12 @@ def init_db() -> None:
     _ensure_column("users", "language", "VARCHAR(5) NOT NULL DEFAULT 'tr'")
     # Analiz kayıtlarının dili (tr/en); eski kayıtlar tr üretildi.
     _ensure_column("entity_analyses", "language", "VARCHAR(5) NOT NULL DEFAULT 'tr'")
+    # LLM kullanımı çağrı başına: model/amaç/cache token'ları/USD maliyet.
+    _ensure_column("llm_usage", "model", "VARCHAR(64)")
+    _ensure_column("llm_usage", "purpose", "VARCHAR(16)")
+    _ensure_column("llm_usage", "cache_creation_tokens", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column("llm_usage", "cache_read_tokens", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column("llm_usage", "cost_usd", "FLOAT NOT NULL DEFAULT 0")
 
 
 def _ensure_column(table: str, column: str, ddl_type: str) -> None:

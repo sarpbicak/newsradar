@@ -170,6 +170,7 @@ class ClaudeClient:
         self.total_prompt_tokens = 0       # input + cache write + cache read
         self.total_completion_tokens = 0
         self.call_count = 0
+        self.total_cost_usd = 0.0
         self.last_usage: dict | None = None
 
     # ------------------------------ yardımcılar ------------------------------ #
@@ -227,12 +228,17 @@ class ClaudeClient:
         cw = getattr(u, "cache_creation_input_tokens", 0) or 0
         cr = getattr(u, "cache_read_input_tokens", 0) or 0
         out = getattr(u, "output_tokens", 0) or 0
+        # Çağrı başına kalıcı kayıt (model, token kalemleri, USD) — günlük bütçe buradan.
+        from ..budget import record_llm_call
+        cost = record_llm_call(self.model, self.purpose, inp, out, cw, cr)
         self.last_usage = {"input_tokens": inp, "cache_creation_input_tokens": cw,
-                           "cache_read_input_tokens": cr, "output_tokens": out}
+                           "cache_read_input_tokens": cr, "output_tokens": out,
+                           "cost_usd": cost}
         with self._usage_lock:
             self.total_prompt_tokens += inp + cw + cr
             self.total_completion_tokens += out
             self.call_count += 1
+            self.total_cost_usd += cost
 
     # ------------------------------ tool çağrısı ------------------------------ #
     def call_tool(
@@ -307,6 +313,18 @@ class ClaudeClient:
                f"stop_reason={stop}). Model/anahtar/yanıt sorunu olabilir.")
         logger.error(msg)
         raise ClaudeError(msg)
+
+    def count_prompt_tokens(self, *, system: str, user: str, tool: dict[str, Any]) -> int:
+        """call_tool ile aynı prompt'un girdi token sayısı (count_tokens ucu, ücretsiz).
+        100k fiyat bariyeri kontrolü için. tool_choice gönderilmez (sayıyı etkilemez)."""
+        def _do():
+            return self._client.messages.count_tokens(
+                model=self.model,
+                system=system_blocks(system),
+                tools=[tool],
+                messages=[{"role": "user", "content": user}],
+            )
+        return int(self._with_retries(_do).input_tokens)
 
     # --------------------------------- sohbet --------------------------------- #
     def stream_chat(

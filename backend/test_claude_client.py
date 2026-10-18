@@ -16,6 +16,11 @@ import tempfile
 from types import SimpleNamespace
 
 _db = os.path.join(tempfile.gettempdir(), "nr_test_claude_client.db")
+for sfx in ("", "-wal", "-shm"):
+    try:
+        os.remove(_db + sfx)
+    except FileNotFoundError:
+        pass
 os.environ.update(
     NEWSRADAR_DB=_db, APP_PASSWORD="x", APP_SECRET="y", NEWSRADAR_SCHEDULER="off",
     NEWSRADAR_SEED_ON_START="off", NEWSRADAR_LLM_PROVIDER="anthropic",
@@ -30,6 +35,10 @@ from app.analysis.claude_client import (  # noqa: E402
     ClaudeClient, ClaudeError, ModelNotFoundError, ProviderQuotaError, TruncationError,
 )
 
+from app.db.database import init_db, session_scope  # noqa: E402
+from app.db.models import LlmUsage  # noqa: E402
+
+init_db()
 cc.time.sleep = lambda s: None  # testte bekleme yok
 
 PASS = FAIL = 0
@@ -140,6 +149,12 @@ print("== D: geçici hata sonra başarı ==")
 c, fm = client_with([status_err(529, "overloaded_error"), message()])
 check(call(c) == {"a": 1} and len(fm.calls) == 2, "529 → yeniden deneme → sonuç")
 check(c.call_count == 1 and c.total_prompt_tokens == 100, "kullanım yalnızca başarılı çağrıda sayıldı")
+with session_scope() as s:
+    row = s.query(LlmUsage).order_by(LlmUsage.id.desc()).first()
+    check(row is not None and row.model == "claude-haiku-5-5" and row.purpose == "article"
+          and row.prompt_tokens == 100 and row.completion_tokens == 50
+          and abs(row.cost_usd - (100 * 0.10 + 50 * 0.50) / 1e6) < 1e-12,
+          "llm_usage satırı: model, amaç, token kalemleri, USD")
 
 print("== E: tool_use yok / boş input / refusal ==")
 c, _ = client_with([message(stop="end_turn", content=[SimpleNamespace(type="text", text="hi")])])

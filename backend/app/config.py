@@ -62,15 +62,12 @@ class Settings:
         self.max_refresh_anon: int = int(_env("NEWSRADAR_MAX_REFRESH_ANON", "1"))
         self.max_refresh_registered: int = int(_env("NEWSRADAR_MAX_REFRESH_REGISTERED", "3"))
         # SİSTEM GENELİ maliyet güvencesi (asıl koruma):
-        # daily_token_budget: 24 saatte toplam LLM token tavanı (0 = sınırsız). Dolunca
-        #   yeni analiz durur, scheduler da uyar. token_unit_cost: 1M token başına USD
-        #   (kaba maliyet gösterimi için). daily_entity_add_cap: sistem geneli günlük yeni
-        #   entity ekleme sınırı (biri 500 şirket ekleyip kotayı yakmasın; 0 = sınırsız).
-        # ŞİMDİLİK KAPALI: varsayılan 0 = sınırsız (engelleme yok). Ölçme/maliyet gösterimi
-        #   AYNEN çalışır — sadece *engelleme* devre dışı. Harcama artarsa env'de tek satırda
-        #   (NEWSRADAR_DAILY_TOKEN_BUDGET=<token>) geri açılır; kod korunuyor.
-        self.daily_token_budget: int = int(_env("NEWSRADAR_DAILY_TOKEN_BUDGET", "0"))
-        self.token_unit_cost_usd: float = float(_env("NEWSRADAR_TOKEN_UNIT_COST_USD", "0.4"))
+        # daily_budget_usd: UTC gününde toplam LLM harcama tavanı (USD; 0 = sınırsız).
+        #   Maliyet çağrı başına model fiyat tablosundan hesaplanır (analysis/model_specs.py).
+        #   Dolunca yeni analiz durur (tarama ortasında da), kullanıcıya mesaj gösterilir.
+        # daily_entity_add_cap: sistem geneli günlük yeni entity ekleme sınırı (biri 500
+        #   şirket ekleyip bütçeyi yakmasın; 0 = sınırsız).
+        self.daily_budget_usd: float = float(_env("NEWSRADAR_DAILY_BUDGET_USD", "1.50"))
         self.daily_entity_add_cap: int = int(_env("NEWSRADAR_DAILY_ENTITY_ADD_CAP", "300"))
         # Anonim oturum oluşturma: IP başına saatlik sınır (cookie silip sonsuz "yeni
         # kullanıcı" üretilmesin).

@@ -199,27 +199,66 @@ export default function AdminPanel({ currentUserId }) {
         </div>
       </div>
 
-      {/* MALİYET + günlük token bütçesi (herkese açık site maliyet güvencesi) */}
+      {/* MALİYET (USD, çağrı başına model fiyatı) + günlük USD bütçesi */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {(() => {
           const over = stats.budget_exceeded;
-          const label = stats.daily_token_budget > 0
-            ? `${(stats.tokens_today / 1000).toFixed(0)}K/${(stats.daily_token_budget / 1000).toFixed(0)}K`
-            : `${(stats.tokens_today / 1000).toFixed(0)}K`;
+          const cap = stats.daily_budget_usd || 0;
+          const label = cap > 0
+            ? `$${stats.cost_today_usd.toFixed(2)}/$${cap.toFixed(2)}`
+            : `$${stats.cost_today_usd.toFixed(2)}`;
           return (
             <div className={`rounded-xl border bg-ink-800 p-4 shadow-card ${over ? "border-rose-500/50" : "border-ink-600"}`}>
-              <div className="text-[11px] uppercase tracking-wide text-slate-500">{tt("adm.tokenBudget")}</div>
+              <div className="text-[11px] uppercase tracking-wide text-slate-500">{tt("adm.costBudget")}</div>
               <div className={`mt-1 font-display text-2xl font-bold ${over ? "text-rose-400" : "text-slate-100"}`}>{label}</div>
               <div className={`mt-0.5 text-xs ${over ? "text-rose-400" : "text-slate-500"}`}>
-                {over ? tt("adm.budgetFull") : stats.daily_token_budget > 0 ? tt("adm.dailyCap") : tt("adm.unlimited")}
+                {over ? tt("adm.budgetFull") : cap > 0 ? tt("adm.dailyCap") : tt("adm.unlimited")}
+                {" · "}{tt("adm.tokenK", { n: (stats.tokens_today / 1000).toFixed(0) })}
               </div>
             </div>
           );
         })()}
-        <StatCard label={tt("adm.costToday")} value={`$${stats.cost_today_usd.toFixed(2)}`} hint={tt("adm.tokenK", { n: (stats.tokens_today / 1000).toFixed(0) })} />
         <StatCard label={tt("adm.cost7")} value={`$${(stats.cost_week_usd ?? 0).toFixed(2)}`} hint={tt("adm.tokenK", { n: ((stats.tokens_week ?? 0) / 1000).toFixed(0) })} />
         <StatCard label={tt("adm.cost30")} value={`$${stats.cost_month_usd.toFixed(2)}`} hint={tt("adm.tokenK", { n: (stats.tokens_month / 1000).toFixed(0) })} />
+        <StatCard
+          label={tt("adm.cacheHit")}
+          value={stats.cache_hit_rate_7d == null ? "—" : `${(stats.cache_hit_rate_7d * 100).toFixed(0)}%`}
+          hint={tt("adm.cacheHitHint")}
+        />
       </div>
+
+      {/* Model kırılımı (son 30 gün) */}
+      {stats.model_breakdown?.length > 0 && (
+        <div className="overflow-x-auto rounded-xl border border-ink-600 bg-ink-800 p-4">
+          <div className="mb-2 text-[11px] uppercase tracking-wide text-slate-500">{tt("adm.modelBreakdown")}</div>
+          <table className="w-full text-left text-xs">
+            <thead className="text-slate-500">
+              <tr>
+                <th className="py-1 pr-3 font-medium">{tt("adm.mbModel")}</th>
+                <th className="py-1 pr-3 text-right font-medium">{tt("adm.mbCalls")}</th>
+                <th className="py-1 pr-3 text-right font-medium">{tt("adm.mbInOut")}</th>
+                <th className="py-1 pr-3 text-right font-medium">{tt("adm.cacheHit")}</th>
+                <th className="py-1 text-right font-medium">USD</th>
+              </tr>
+            </thead>
+            <tbody className="text-slate-300">
+              {stats.model_breakdown.map((m) => (
+                <tr key={m.model} className="border-t border-ink-600">
+                  <td className="py-1 pr-3 font-mono">{m.model}</td>
+                  <td className="py-1 pr-3 text-right">{m.calls}</td>
+                  <td className="py-1 pr-3 text-right">
+                    {((m.input_tokens + m.cache_creation_tokens + m.cache_read_tokens) / 1000).toFixed(0)}K / {(m.output_tokens / 1000).toFixed(0)}K
+                  </td>
+                  <td className="py-1 pr-3 text-right">
+                    {m.cache_hit_rate == null ? "—" : `${(m.cache_hit_rate * 100).toFixed(0)}%`}
+                  </td>
+                  <td className="py-1 text-right">${m.cost_usd.toFixed(3)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Geri bildirim gelen kutusu — okunmamışlar önce, vurgulu */}
       <FeedbackInbox items={feedback} onMarkRead={markRead} />

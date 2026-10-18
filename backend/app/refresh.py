@@ -176,19 +176,23 @@ def run_refresh(
             summary.warnings.append(str(exc))
             return summary
 
-        # SİSTEM BÜTÇE TAVANI: günlük token dolduysa YENİ analiz yapma (maliyet güvencesi).
-        from .budget import is_budget_exceeded, record_llm_usage
+        # SİSTEM BÜTÇE TAVANI: günlük USD bütçesi dolduysa YENİ analiz yapma.
+        from .budget import is_budget_exceeded
         if is_budget_exceeded():
             summary.warnings.append(
                 "Günlük analiz kapasitesi doldu — yeni analiz durduruldu, yarın tekrar deneyin."
             )
-            logger.warning("[budget] Günlük token tavanı dolu — analiz atlandı.")
+            logger.warning("[budget] Günlük USD bütçesi dolu — analiz atlandı.")
             return summary
 
-        # Bu taramanın token deltasını ölçmek için başlangıç anlık değeri.
-        base_p = getattr(client, "total_prompt_tokens", 0) or 0
-        base_c = getattr(client, "total_completion_tokens", 0) or 0
-        base_calls = getattr(client, "call_count", 0) or 0
+        # Kullanım çağrı başına llm_usage'a yazılıyor (budget.record_llm_call); burada yalnızca
+        # sağlık kaydı için bu taramada başarılı çağrı olup olmadığını sayıyoruz.
+        clients = [client] if assess_client is client else [client, assess_client]
+
+        def _calls() -> int:
+            return sum(getattr(c, "call_count", 0) or 0 for c in clients)
+
+        base_calls = _calls()
 
         totals = asyncio.run(
             analyze_all_async(
@@ -203,11 +207,7 @@ def run_refresh(
         summary.warnings.extend(totals.warnings)
         summary.quota_error = totals.quota_error
 
-        # Kullanımı kaydet (maliyet takibi + günlük bütçe sayacı).
-        dp = (getattr(client, "total_prompt_tokens", 0) or 0) - base_p
-        dc = (getattr(client, "total_completion_tokens", 0) or 0) - base_c
-        calls_made = (getattr(client, "call_count", 0) or 0) - base_calls
-        record_llm_usage(dp, dc, calls_made)
+        calls_made = _calls() - base_calls
 
         # SAĞLIK: bu yenilemenin LLM sonucunu kaydet (admin paneli 'sistem sağlığı' için).
         # Kota hatası → 'quota'; en az bir başarılı çağrı olduysa → 'ok'. Hiç çağrı yoksa

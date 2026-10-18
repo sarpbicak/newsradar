@@ -242,9 +242,8 @@ def stats(db: Session = Depends(get_db)) -> AdminStatsOut:
 
     from .. import budget as _budget
     from ..health import health_snapshot
-    tok_today = _budget.daily_tokens_used()
-    tok_week = _budget.tokens_since(_start_of_today() - timedelta(days=7))
-    tok_month = _budget.tokens_since(_start_of_today() - timedelta(days=30))
+    week_ago = _start_of_today() - timedelta(days=7)
+    month_ago = _start_of_today() - timedelta(days=30)
     unread_feedback = db.scalar(
         select(func.count()).select_from(Feedback).where(Feedback.is_read.is_(False))
     ) or 0
@@ -256,14 +255,16 @@ def stats(db: Session = Depends(get_db)) -> AdminStatsOut:
         top_entities=_top_entities(db, None, limit=8),
         most_followed=most_followed,
         total_entities=total_entities,
-        tokens_today=tok_today,
-        tokens_week=tok_week,
-        tokens_month=tok_month,
-        cost_today_usd=_budget.estimated_cost_usd(tok_today),
-        cost_week_usd=_budget.estimated_cost_usd(tok_week),
-        cost_month_usd=_budget.estimated_cost_usd(tok_month),
-        daily_token_budget=get_settings().daily_token_budget,
+        tokens_today=_budget.daily_tokens_used(),
+        tokens_week=_budget.tokens_since(week_ago),
+        tokens_month=_budget.tokens_since(month_ago),
+        cost_today_usd=round(_budget.daily_cost_usd(), 4),
+        cost_week_usd=round(_budget.cost_since(week_ago), 4),
+        cost_month_usd=round(_budget.cost_since(month_ago), 4),
+        daily_budget_usd=get_settings().daily_budget_usd,
         budget_exceeded=_budget.is_budget_exceeded(),
+        cache_hit_rate_7d=_budget.cache_hit_rate(week_ago),
+        model_breakdown=_budget.usage_breakdown(month_ago),
         unread_feedback=unread_feedback,
         health=AdminHealthOut(**health_snapshot()),
     )

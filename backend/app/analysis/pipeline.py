@@ -18,6 +18,7 @@ Dayanıklılık: bir batch/entity hata verirse loglanır ve gerisi devam eder.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import unicodedata
 from dataclasses import dataclass, field
@@ -75,6 +76,47 @@ MAX_ANALYSIS_HISTORY = 100  # entity başına saklanacak en fazla değerlendirme
 SUGGESTION_TTL_DAYS = 30    # bu süreden eski + az anılan öneriler temizlenir
 
 
+# MALİYET BARİYERİ: Haiku 5.5'te prompt >100k token olursa çağrının TÜM kalemleri 5×
+# fiyattan faturalanır. Değerlendirme prompt'u (system + tool + bağlam) bu sınırın altında
+# tutulur; aşacaksa bağlam (en eski makaleler) kırpılır ve loglanır. Pay: 100k'ya 10k.
+ASSESSMENT_PROMPT_TOKEN_LIMIT = 90_000
+# Kaba tahmin: karakter / 2.5 (Türkçe + yeni tokenizer için bilinçli olarak yüksek tahmin).
+# Tahmin sınırın %60'ını geçerse kesin sayım (count_tokens, ücretsiz) yapılır.
+_CHARS_PER_TOKEN_EST = 2.5
+
+
+def _estimate_prompt_tokens(client, user: str, tool: dict) -> tuple[int, bool]:
+    """(token, kesin_mi). Ucuz tahmin; sınıra yakınsa istemcinin count_prompt_tokens'ı."""
+    chars = len(SYSTEM_PROMPT) + len(user) + len(json.dumps(tool, ensure_ascii=False))
+    est = int(chars / _CHARS_PER_TOKEN_EST)
+    if est < ASSESSMENT_PROMPT_TOKEN_LIMIT * 0.6:
+        return est, False
+    counter = getattr(client, "count_prompt_tokens", None)
+    if callable(counter):
+        try:
+            return int(counter(system=SYSTEM_PROMPT, user=user, tool=tool)), True
+        except Exception as exc:  # noqa: BLE001 — sayım başarısızsa tahmine düş
+            logger.warning("Token sayımı başarısız, tahmin kullanılıyor: %s", exc)
+    return est, False
+
+
+def _fit_assessment_context(client, build_fn, payload: list[dict], name: str) -> list[dict]:
+    """Değerlendirme prompt'u ASSESSMENT_PROMPT_TOKEN_LIMIT'i aşmayacak şekilde bağlamı
+    kırpar (payload yeniden→eskiye sıralı; en eskiler düşer). Kırpma loglanır."""
+    items = payload
+    for _ in range(6):
+        tokens, exact = _estimate_prompt_tokens(client, build_fn(items), ENTITY_ANALYSIS_TOOL)
+        if tokens <= ASSESSMENT_PROMPT_TOKEN_LIMIT or len(items) <= 1:
+            return items
+        keep = max(1, int(len(items) * ASSESSMENT_PROMPT_TOKEN_LIMIT / tokens * 0.9))
+        logger.warning("[%s] değerlendirme prompt'u ~%d token (%s) > %d sınırı → bağlam "
+                       "%d→%d makaleye kırpıldı (100k üstü 5× fiyat bariyeri).",
+                       name, tokens, "kesin" if exact else "tahmin",
+                       ASSESSMENT_PROMPT_TOKEN_LIMIT, len(items), keep)
+        items = items[:keep]
+    return items
+
+
 def _assess_entity_with_recovery(client, build_fn, payload, name):
     """Entity değerlendirmesini (TEK çağrı → batch gibi bölünemez) kesilmeye karşı
     kurtarmalı çalıştırır. (adata, kullanılan_payload) döner.
@@ -85,6 +127,7 @@ def _assess_entity_with_recovery(client, build_fn, payload, name):
     TruncationError (ClaudeError alt sınıfı) yükselir; çağıran uyarıya çevirir.
     """
     base = get_settings().max_output_tokens
+    payload = _fit_assessment_context(client, build_fn, payload, name)
     # Loglarda gerçekten hangi tavanın kullanıldığı görünsün (NEWSRADAR_MAX_OUTPUT_TOKENS
     # okunuyor mu teşhisi için — eskiden sabit 4096'ya bağlıydı).
     logger.info("[%s] değerlendirme çağrısı max_tokens=%d (%d makale bağlam)",
@@ -525,20 +568,12 @@ async def analyze_all_async(
     concurrency = max(1, settings.analysis_concurrency)
     assess_client = assess_client or client
 
-    # SİSTEM BÜTÇE TAVANI (canlı): bugün kullanılan token + bu taramanın canlı deltası
-    # tavana ulaşırsa YENİ entity analizine başlama (büyük scheduler taramasını da durdurur).
-    from ..budget import daily_tokens_used
-    _budget = settings.daily_token_budget
-    _today_start = daily_tokens_used() if _budget > 0 else 0
-    _base_p = getattr(client, "total_prompt_tokens", 0) or 0
-    _base_c = getattr(client, "total_completion_tokens", 0) or 0
+    # SİSTEM BÜTÇE TAVANI (canlı, USD): her çağrı llm_usage'a anında yazıldığı için bugünkü
+    # harcama DB'den okunur; tavana ulaşılırsa YENİ entity/değerlendirme başlatılmaz.
+    from ..budget import is_budget_exceeded
 
     def _over_budget() -> bool:
-        if _budget <= 0:
-            return False
-        live = ((getattr(client, "total_prompt_tokens", 0) or 0) - _base_p) + \
-               ((getattr(client, "total_completion_tokens", 0) or 0) - _base_c)
-        return (_today_start + live) >= _budget
+        return is_budget_exceeded()
 
     totals = AnalyzeTotals()
 
@@ -662,6 +697,17 @@ async def analyze_all_async(
 
     _budget_stopped = {"flag": False}
 
+    def _note_budget() -> None:
+        """Bütçe dolduğunda TEK uyarı (idempotent)."""
+        if not _budget_stopped["flag"]:
+            _budget_stopped["flag"] = True
+            totals.warnings.append(
+                "Günlük analiz bütçesi doldu — kalan analizler bu turda atlandı, yarın "
+                "yeniden denenecek."
+            )
+            logger.warning("[budget] Günlük USD bütçesi tarama sırasında doldu — kalan "
+                           "analizler atlanıyor.")
+
     async def _process_entity(t: dict):
         nonlocal done
         # KOTA DURDU: kalan entity'lere hiç başlama (LLM çağrısı yok), yalnızca ilerlemeyi say.
@@ -672,12 +718,7 @@ async def analyze_all_async(
             return
         # SİSTEM BÜTÇE: tavana ulaşıldıysa bu entity'nin LLM çağrılarını YAPMA (atla).
         if _over_budget():
-            if not _budget_stopped["flag"]:
-                _budget_stopped["flag"] = True
-                totals.warnings.append(
-                    "Günlük analiz kapasitesi doldu — kalan entity'ler bu turda atlandı."
-                )
-                logger.warning("[budget] Tavan tarama sırasında doldu — kalan entity'ler atlanıyor.")
+            _note_budget()
             done += 1
             if progress_cb:
                 progress_cb(done, len(entity_tasks))
@@ -730,6 +771,9 @@ async def analyze_all_async(
             for out_lang in ("tr", "en"):
                 if _quota_stopped["flag"]:
                     break  # kota durdu → dil döngüsünü de kes (yeniden deneme yok)
+                if await asyncio.to_thread(_over_budget):
+                    _note_budget()
+                    break
                 def _build(items, _ol=out_lang):
                     return build_entity_prompt(
                         t["name"], t["query"], t["type"], items,

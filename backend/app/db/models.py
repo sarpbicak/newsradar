@@ -201,8 +201,11 @@ class LoginRate(Base):
 
 
 class LlmUsage(Base):
-    """LLM token kullanımı (maliyet takibi + günlük bütçe tavanı). Her yenileme sonunda
-    o taramanın toplam token deltası bir satır olarak yazılır; günlük toplam buradan sayılır.
+    """LLM kullanımı — ÇAĞRI BAŞINA bir satır (maliyet takibi + günlük USD bütçe tavanı).
+
+    prompt_tokens = önbelleksiz girdi (API usage.input_tokens), completion_tokens = çıktı,
+    cache_* ayrı; total_tokens = hepsinin toplamı. cost_usd model_specs fiyat tablosundan
+    (fiyatı bilinmeyen model → 0). Eski satırlar (tarama-başı delta) model=None.
     """
 
     __tablename__ = "llm_usage"
@@ -213,6 +216,11 @@ class LlmUsage(Base):
     completion_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     total_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     calls: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    model: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    purpose: Mapped[str | None] = mapped_column(String(16), nullable=True)  # article/assessment/chat
+    cache_creation_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    cache_read_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    cost_usd: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
 
 
 class LlmHealthEvent(Base):

@@ -178,15 +178,20 @@ class AdminStatsOut(BaseModel):
     top_entities: list[dict]               # [{name, count}] — en popüler (view)
     most_followed: list[dict]              # [{name, type, followers}] — en çok watchlist'te
     total_entities: int                    # havuzdaki benzersiz (takip edilen) entity sayısı
-    # Maliyet takibi (LLM token → tahmini USD) + günlük bütçe durumu.
+    # Maliyet takibi (çağrı başına model fiyat tablosundan USD) + günlük USD bütçe durumu.
     tokens_today: int = 0
     tokens_week: int = 0
     tokens_month: int = 0
     cost_today_usd: float = 0.0
     cost_week_usd: float = 0.0
     cost_month_usd: float = 0.0
-    daily_token_budget: int = 0            # 0 = sınırsız
+    daily_budget_usd: float = 0.0          # 0 = sınırsız
     budget_exceeded: bool = False
+    # Önbellek isabet oranı (cache_read / tüm girdi), son 7 gün; veri yoksa None.
+    cache_hit_rate_7d: float | None = None
+    # Son 30 gün model kırılımı: [{model, calls, input_tokens, output_tokens,
+    #   cache_creation_tokens, cache_read_tokens, cost_usd, cache_hit_rate}]
+    model_breakdown: list[dict] = []
     unread_feedback: int = 0               # okunmamış geri bildirim sayısı
     # Sistem sağlığı (LLM): son çağrı sonucu + son 24s kota/hata sayısı. Sorunu
     # kullanıcıdan önce admin görsün (ör. OpenRouter kota/bakiye limiti).
@@ -415,10 +420,10 @@ class ProviderStatusOut(BaseModel):
     refresh_limit: int = 0
     refresh_used: int = 0
     refresh_is_admin: bool = False
-    # Sistem-geneli günlük token bütçesi (maliyet güvencesi).
+    # Sistem-geneli günlük USD bütçesi (maliyet güvencesi).
     budget_exceeded: bool = False          # dolduysa yeni analiz durur
-    tokens_today: int = 0
-    daily_token_budget: int = 0            # 0 = sınırsız
+    cost_today_usd: float = 0.0
+    daily_budget_usd: float = 0.0          # 0 = sınırsız
     # Kişisel entity kotası (kademeli; kartta "N/limit" göstermek için).
     entity_limit: int = 0
     entity_used: int = 0

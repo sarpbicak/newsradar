@@ -127,8 +127,8 @@ def status(
         refresh_used=r_used,
         refresh_is_admin=user.is_admin,
         budget_exceeded=budget.is_budget_exceeded(),
-        tokens_today=budget.daily_tokens_used(),
-        daily_token_budget=settings.daily_token_budget,
+        cost_today_usd=round(budget.daily_cost_usd(), 4),
+        daily_budget_usd=settings.daily_budget_usd,
         entity_limit=settings.entity_limit_for(user),
         entity_used=watchlist_count(db, user.id),
     )
