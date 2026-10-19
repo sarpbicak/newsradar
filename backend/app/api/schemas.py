@@ -349,7 +349,8 @@ class ArticleStatusOut(BaseModel):
     total: int       # entity'ye ait tüm makaleler
     analyzed: int    # analiz edilmiş (analyzed=True)
     prefiltered: int  # ön-filtrede elenmiş (Claude'a hiç gitmedi)
-    pending: int     # bekleyen (analyzed=False, prefiltered=False) — bir sonraki yenilemede işlenir
+    pending: int     # bekleyen (analyzed=False, prefiltered=False, expired=False) — sonraki yenilemede işlenir
+    expired: int = 0  # lookback dışına düştüğü için analiz edilmeyecek (LLM'e gönderilmez)
 
 
 class DashboardOut(BaseModel):
@@ -379,6 +380,7 @@ class RefreshSummaryOut(BaseModel):
     discarded: int              # LLM sonrası ilgisiz bulunup elenen
     llm_articles: int = 0       # bu taramada LLM'e gidip yanıtı alınan (kuyruktan gelenler dahil)
     queued: int = 0             # hâlâ analiz bekleyen (sonraki yenilemede)
+    expired: int = 0            # lookback dışına düştüğü için LLM'den çıkarılan
     entity_assessments: int
     assessments_skipped: int = 0
     warnings: list[MessageOut]

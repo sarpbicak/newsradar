@@ -43,7 +43,9 @@ class RefreshSummary:
     #   analyzed     — bunlardan ilgili bulunup TUTULAN; discarded — ilgisiz bulunup elenen
     #   prefiltered  — LLM'e hiç gitmeden elenen (aynı haberin kopyası / ön-filtre)
     #   queued       — tarama sonunda hâlâ analiz bekleyen (sonraki yenilemede işlenir)
+    #   expired      — lookback dışına düştüğü için bu taramada LLM'den çıkarılan
     llm_articles: int = 0
+    expired: int = 0
     queued: int = 0
     assessments_skipped: int = 0
     # Kullanıcıya giden mesajlar: app.messages.msg(...) — kod + parametre, frontend çevirir.
@@ -133,7 +135,7 @@ def _queued_count(entity_ids: set[int] | None) -> int:
     with session_scope() as s:
         q = (select(func.count()).select_from(Article).join(Entity, Entity.id == Article.entity_id)
              .where(Entity.active.is_(True), Article.analyzed.is_(False),
-                    Article.prefiltered.is_(False)))
+                    Article.prefiltered.is_(False), Article.expired.is_(False)))
         if entity_ids is not None:
             q = q.where(Article.entity_id.in_(entity_ids))
         return int(s.scalar(q) or 0)
@@ -232,6 +234,7 @@ def run_refresh(
         summary.llm_articles = totals.llm_articles
         summary.assessments_skipped = totals.assessments_skipped
         summary.queued = _queued_count(entity_ids)
+        summary.expired = totals.expired
         summary.warnings.extend(totals.warnings)
         summary.quota_error = totals.quota_error
 

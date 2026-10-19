@@ -24,7 +24,7 @@ import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from ..config import get_settings
@@ -332,6 +332,34 @@ def reconcile_prefilter() -> int:
         return result.rowcount or 0
 
 
+def expire_stale_pending(lookback_hours: int | None = None) -> int:
+    """Analiz edilmeden lookback penceresinin dışına düşen bekleyen makaleleri EXPIRED
+    işaretler (LLM'e hiç gönderilmez). Döner: işaretlenen sayı. Idempotent.
+
+    Neden: entity başına tavan (max_articles_per_entity) yüzünden kuyruk birikiyordu; yeni
+    haber azaldığında günler önceki, artık alakasız makaleler sırayla LLM'e gidip para
+    yakıyordu. Yayın tarihi yoksa çekilme tarihine bakılır."""
+    hours = lookback_hours if lookback_hours is not None else get_settings().lookback_hours
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    with session_scope() as session:
+        result = session.execute(
+            update(Article)
+            .where(
+                Article.analyzed.is_(False),
+                Article.prefiltered.is_(False),
+                Article.expired.is_(False),
+                func.coalesce(Article.published_at, Article.fetched_at) < cutoff,
+            )
+            .values(expired=True)
+            .execution_options(synchronize_session=False)
+        )
+        n = result.rowcount or 0
+    if n:
+        logger.info("[expired] %d bekleyen makale lookback (%d sa) dışında — LLM'e "
+                    "gönderilmeyecek.", n, hours)
+    return n
+
+
 def prune_stale_suggestions() -> int:
     """30 günden beri görülmemiş ve hâlâ az anılan (<3) önerileri temizler."""
     cutoff = datetime.now(timezone.utc) - timedelta(days=SUGGESTION_TTL_DAYS)
@@ -355,6 +383,7 @@ class AnalyzeTotals:
     llm_articles: int = 0       # bu taramada LLM'e gidip yanıtı alınan makale (tutulan + elenen)
     discarded: int = 0          # relevance < eşik → elenen
     entity_assessments: int = 0  # entity-başı değerlendirme üretilen
+    expired: int = 0            # lookback dışına düştüğü için LLM'e gönderilmeyecek (bu taramada işaretlenen)
     assessments_skipped: int = 0  # yeni veri olmadığı için atlanan değerlendirme (dil başına)
     returned: int = 0           # Claude'un döndürdüğü toplam analiz (teşhis)
     unmatched: int = 0          # döndürülüp bu entity'ye eşleşmeyen id (teşhis)
@@ -479,6 +508,7 @@ def _prefilter(session: Session, entity: Entity, max_articles: int) -> tuple[lis
                 Article.entity_id == entity.id,
                 Article.analyzed.is_(False),
                 Article.prefiltered.is_(False),
+                Article.expired.is_(False),
             )
             .order_by(Article.published_at.desc().nullslast())
         ).all()
@@ -731,6 +761,8 @@ async def analyze_all_async(
         return is_budget_exceeded()
 
     totals = AnalyzeTotals()
+    # Eski bekleyenler (lookback dışı) LLM'e gitmesin — seçimden ÖNCE işaretle.
+    totals.expired = await asyncio.to_thread(expire_stale_pending)
 
     # --- Aşama 1: ön-filtre + batch listesi (DB, tek thread) ---
     entity_tasks: list[dict] = []
@@ -990,6 +1022,7 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient, assess_client=None
     settings = get_settings()
     assess_client = assess_client or client
     batch_size = max(1, settings.batch_size)
+    expire_stale_pending()  # lookback dışı bekleyenler LLM'e gitmesin
     max_articles = settings.max_articles_per_entity  # 0 = sınırsız (_prefilter yorumlar)
     totals = AnalyzeTotals()
 

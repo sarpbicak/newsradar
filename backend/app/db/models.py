@@ -168,6 +168,9 @@ class Article(Base):
     # gönderilmeden elenir ve burada işaretlenir (tekrar değerlendirilmez, ayrıca
     # url_hash korunduğu için tekrar çekilmez de). Panoda gösterilmez.
     prefiltered: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # EXPIRED: analiz edilmeden lookback penceresinin (NEWSRADAR_LOOKBACK_HOURS) dışına düşen
+    # bekleyen makale — artık güncel değil, LLM'e HİÇ gönderilmez (maliyet + alaka).
+    expired: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # Bu makaleyi eleyen ön-filtre kuralının sürümü (0 = sürümsüz/eski). Güncel
     # sürümün altındaysa reconcile ile yeniden değerlendirmeye açılır.
     prefilter_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

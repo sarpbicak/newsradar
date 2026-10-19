@@ -49,7 +49,9 @@ def entity_dashboard(
         total=_count(),
         analyzed=_count(Article.analyzed.is_(True)),
         prefiltered=_count(Article.prefiltered.is_(True)),
-        pending=_count(Article.analyzed.is_(False), Article.prefiltered.is_(False)),
+        pending=_count(Article.analyzed.is_(False), Article.prefiltered.is_(False),
+                       Article.expired.is_(False)),
+        expired=_count(Article.analyzed.is_(False), Article.expired.is_(True)),
     )
 
     return DashboardOut(

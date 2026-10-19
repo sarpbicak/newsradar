@@ -138,7 +138,7 @@ with session_scope() as s:
         s.add(Article(entity_id=cid, url=f"http://c/{i}", url_hash=f"c{i}",
                       title=f"{words[i]} {words[(i + 5) % 14]}{i} headline{i * 7}",
                       source="s", description="d", provider="t", analyzed=False, prefiltered=False,
-                      published_at=datetime(2026, 10, 1) + timedelta(hours=i)))
+                      published_at=datetime.now(timezone.utc) - timedelta(hours=i + 1)))
 os.environ["NEWSRADAR_MAX_ARTICLES_PER_ENTITY"] = "10"
 from app.config import get_settings  # noqa: E402
 get_settings().max_articles_per_entity = 10

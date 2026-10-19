@@ -65,6 +65,15 @@ async def lifespan(_app: FastAPI):
         )
     except Exception:  # noqa: BLE001 — reconcile hatası açılışı çökertmesin
         _log.exception("Ön-filtre reconcile açılışta başarısız (atlandı).")
+    # Lookback dışına düşmüş bekleyen makaleleri açılışta EXPIRED işaretle (LLM'e gitmesin;
+    # kuyruk sayıları açılıştan itibaren doğru görünsün).
+    try:
+        from ..analysis.pipeline import expire_stale_pending
+
+        _log.info("Expired: %d bekleyen makale lookback dışında işaretlendi.",
+                  expire_stale_pending())
+    except Exception:  # noqa: BLE001 — açılışı çökertmesin
+        _log.exception("Expired işaretleme açılışta başarısız (atlandı).")
     # GİZLİLİK: saklama süresini aşan IP kayıtlarını açılışta da temizle (günlük iş ayrıca).
     try:
         from ..security import prune_ip_records
