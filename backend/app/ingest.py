@@ -179,16 +179,25 @@ def fetch_all(
     lookback_hours: int | None = None,
     manual: bool = False,
     entity_ids: set[int] | None = None,
+    on_entity=None,
 ) -> list[IngestResult]:
     """Aktif entity'ler için haberleri çeker (manual: elle Yenile'de akıllı davran).
 
     entity_ids verilirse yalnızca o entity'ler (kişisel elle yenileme); None → tüm aktif.
+    on_entity(entity_id, name, state): ilerleme bildirimi — state "start" | "done".
     """
     q = select(Entity).where(Entity.active.is_(True))
     if entity_ids is not None:
         q = q.where(Entity.id.in_(entity_ids))
     entities = session.scalars(q).all()
-    return [fetch_for_entity(session, e, lookback_hours, manual) for e in entities]
+    results = []
+    for e in entities:
+        if on_entity:
+            on_entity(e.id, e.name, "start")
+        results.append(fetch_for_entity(session, e, lookback_hours, manual))
+        if on_entity:
+            on_entity(e.id, e.name, "done")
+    return results
 
 
 def _utc(dt: datetime | None) -> datetime | None:

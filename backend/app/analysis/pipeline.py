@@ -736,11 +736,15 @@ async def analyze_all_async(
     entity_cb=None,
     entity_ids: set[int] | None = None,
     assess_client=None,
+    step_cb=None,
 ) -> AnalyzeTotals:
     """Aktif entity'ler için ön-filtre + paralel analiz + değerlendirme.
 
     client: makale-batch analizi; assess_client: entity değerlendirmesi (ayrı model
     olabilir — NEWSRADAR_ASSESSMENT_MODEL). Verilmezse ikisi için de `client` kullanılır.
+    step_cb(entity_id, name, step, n=None, frac=None): adım bazlı ilerleme — step:
+    "filter" | "analyze" | "assess" | "skipped" | "done"; frac: entity'nin kendi
+    diliminde 0..1 ilerleme (UI çubuğu entity içinde de ilerlesin).
 
     entity_ids verilirse yalnızca o entity'ler işlenir (kişisel elle yenileme);
     None ise tüm aktif entity'ler (scheduler). progress_cb(done, total): her entity
@@ -761,6 +765,14 @@ async def analyze_all_async(
         return is_budget_exceeded()
 
     totals = AnalyzeTotals()
+
+    def _step(eid, name, step, n=None, frac=None):
+        if step_cb:
+            try:
+                step_cb(eid, name, step, n, frac)
+            except Exception:  # noqa: BLE001 — ilerleme bildirimi analizi bozmasın
+                logger.exception("step_cb hatası (atlandı)")
+
     # Eski bekleyenler (lookback dışı) LLM'e gitmesin — seçimden ÖNCE işaretle.
     totals.expired = await asyncio.to_thread(expire_stale_pending)
 
@@ -782,6 +794,7 @@ async def analyze_all_async(
                 totals.warnings.append(msg("prefilter_error", e.name, error=exc))
                 continue
             totals.prefiltered += pre
+            _step(e.id, e.name, "filter", n=len(payload) + pre, frac=0.2)
             ebs = _effective_batch_size(batch_size, e.language)  # Türkçe → yarı batch
             batches = [payload[i : i + ebs] for i in range(0, len(payload), ebs)]
             # Entity-başı görünürlük: hangi entity kaç makaleyle analize giriyor.
@@ -892,6 +905,7 @@ async def analyze_all_async(
         # KOTA DURDU: kalan entity'lere hiç başlama (LLM çağrısı yok), yalnızca ilerlemeyi say.
         if _quota_stopped["flag"]:
             done += 1
+            _step(t["id"], t["name"], "done", frac=1.0)
             if progress_cb:
                 progress_cb(done, len(entity_tasks))
             return
@@ -899,6 +913,7 @@ async def analyze_all_async(
         if _over_budget():
             _note_budget()
             done += 1
+            _step(t["id"], t["name"], "done", frac=1.0)
             if progress_cb:
                 progress_cb(done, len(entity_tasks))
             return
@@ -909,7 +924,19 @@ async def analyze_all_async(
         # 1) Makale batch'leri — hepsi paralel (global semaphore ile sınırlı).
         #    Batch'ler hem entity içinde hem entity'ler arası eşzamanlı çalışır;
         #    aynı anda en fazla `concurrency` çağrı olur.
-        raw = await asyncio.gather(*[_run_batch(t, b) for b in t["batches"]])
+        n_batches = len(t["batches"])
+        if n_batches:
+            _step(t["id"], t["name"], "analyze", n=sum(len(b) for b in t["batches"]), frac=0.2)
+        finished = {"n": 0}
+
+        async def _run_and_count(b):
+            r = await _run_batch(t, b)
+            finished["n"] += 1
+            _step(t["id"], t["name"], "analyze", n=sum(len(x) for x in t["batches"]),
+                  frac=0.2 + 0.6 * finished["n"] / n_batches)
+            return r
+
+        raw = await asyncio.gather(*[_run_and_count(b) for b in t["batches"]])
         batch_datas: list[dict] = [d for d in raw if d]
 
         # 2) Sonuçları yaz (DB kilidi altında, sırayla).
@@ -941,6 +968,10 @@ async def analyze_all_async(
         async with db_lock:
             langs = await asyncio.to_thread(_assessment_langs, t["id"], t["name"])
         totals.assessments_skipped += 2 - len(langs)
+        if not langs and not n_batches:
+            _step(t["id"], t["name"], "skipped", frac=1.0)  # yeni veri yok — kısa not
+        elif langs:
+            _step(t["id"], t["name"], "assess", frac=0.85)
         payload = []
         if langs:
             async with db_lock:
@@ -983,6 +1014,7 @@ async def analyze_all_async(
                     totals.warnings.append(msg("assessment_failed", t["name"], lang=out_lang, error=exc))
 
         done += 1
+        _step(t["id"], t["name"], "done", frac=1.0)
         if progress_cb:
             progress_cb(done, total)
 
@@ -1000,6 +1032,7 @@ async def analyze_all_async(
             logger.exception("Entity analiz task çöktü: %s", t["name"])
             totals.warnings.append(msg("entity_error", t["name"], error=exc))
             done += 1
+            _step(t["id"], t["name"], "done", frac=1.0)
             if progress_cb:
                 progress_cb(done, total)
 

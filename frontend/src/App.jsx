@@ -18,6 +18,10 @@ import { RefreshCw, Menu, X, LogOut, ShieldCheck, LayoutDashboard, Radar, HelpCi
 // Mobil aşağı-çekip-yenile eşiği (px). Bu mesafeyi geçince bırakınca yenilenir.
 const PULL_THRESHOLD = 70;
 
+// Tarama sürerken durum yoklama aralığı — adım metni ("X için haberler çekiliyor…") ve
+// entity içi çubuk akıcı görünsün diye kısa.
+const POLL_MS = 1500;
+
 export default function App({ setLang }) {
   const { t, lang } = useI18n();
   // İlk ziyarette dil sorulur (localStorage'da seçim yoksa).
@@ -204,7 +208,7 @@ export default function App({ setLang }) {
         setLoadError(null);
         if (s.is_running) {
           setStarting(false); // sunucu çalıştığını doğruladı
-          timer = setTimeout(tick, 5000);
+          timer = setTimeout(tick, POLL_MS);
         } else {
           // Tamamlandı → çubuğun kendi içinde "Tamamlandı · N haber · N analiz" göster,
           // birkaç saniye sonra yumuşakça söndür. Uyarı/atlama varsa ayrıca not kutusu.
@@ -232,7 +236,7 @@ export default function App({ setLang }) {
       } catch (e) {
         if (!cancelled) {
           setLoadError(e.message);
-          timer = setTimeout(tick, 5000);
+          timer = setTimeout(tick, POLL_MS);
         }
       }
     }
@@ -443,6 +447,12 @@ export default function App({ setLang }) {
               className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:brightness-105 disabled:opacity-70 md:px-4"
             >
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+              {/* Mobil: yer dar — tarama sürerken yalnızca kısa sayaç (3/12) */}
+              {isRefreshing && running && status.progress_total > 0 && (
+                <span className="font-mono text-xs tabular-nums md:hidden">
+                  {status.progress_done}/{status.progress_total}
+                </span>
+              )}
               <span className="hidden md:inline">
                 {isRefreshing
                   ? running
@@ -607,6 +617,11 @@ export default function App({ setLang }) {
               isMobile={isMobile}
               phase={scanDone ? "done" : running ? "running" : "starting"}
               currentEntity={running ? status.current_entity : null}
+              step={running ? status.step : null}
+              stepEntity={running ? status.step_entity : null}
+              stepCount={running ? status.step_count : null}
+              fraction={running ? status.progress_fraction : null}
+              skippedEntity={running ? status.skipped_entity : null}
               done={running ? status.progress_done : 0}
               total={running ? status.progress_total : scanDone ? 0 : 0}
               summary={scanDone}

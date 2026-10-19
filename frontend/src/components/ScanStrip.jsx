@@ -1,14 +1,28 @@
 // Tarama ilerleme göstergesi — bilgi öncelikli, sade (parçacık/halka/nokta YOK).
-// Şu an analiz edilen şirketi ("Tesla analiz ediliyor…") + gerçek ilerleme çubuğunu
-// (done/total) + sağda mono sayacı gösterir. Kutu/çerçeve yok; kağıt zemininde durur.
-// Bitişte çubuk dolar, kısa gecikmeyle "Tamamlandı · N haber · N analiz"e döner, söner.
-// prefers-reduced-motion: parlama (shimmer) durur, çubuk kalır.
+// Backend her adımı yayınlar ({step, step_entity, step_count, progress_fraction}); metin
+// kullanıcının dilinde: "NVIDIA için haberler çekiliyor…", "… 12 yeni haber analiz
+// ediliyor…", "… değerlendirme yazılıyor…", kısa süre "Tesla atlandı, yeni veri yok".
+// Çubuk entity dilimlerinin ortalamasıyla dolar (entity içindeki adımlarla da ilerler,
+// 0'da takılmaz). Süresi belirsiz adımlarda (fiyat/haber çekme) dolu kısımda hafif
+// parlama; prefers-reduced-motion'da kapalı (index.css). Sağda done / total sayacı.
 import React, { useEffect, useState } from "react";
 import { useI18n, refreshParts } from "../i18n.jsx";
+
+const STEP_KEYS = {
+  fetch: "notice.stepFetch",
+  filter: "notice.stepFilter",
+  analyze: "notice.stepAnalyze",
+  assess: "notice.stepAssess",
+};
 
 export default function ScanStrip({
   phase = "running", // "starting" | "running" | "done"
   currentEntity = null,
+  step = null,          // prices | fetch | filter | analyze | assess
+  stepEntity = null,
+  stepCount = null,
+  fraction = null,      // 0..1 (entity dilimlerinin ortalaması)
+  skippedEntity = null, // "X atlandı" notu (~3 sn)
   done = 0,
   total = 0,
   summary = null, // { news, analyses } — done fazında
@@ -16,7 +30,13 @@ export default function ScanStrip({
   isMobile = false,
 }) {
   const { t } = useI18n();
-  const pct = phase === "done" ? 100 : total > 0 ? Math.round((done / total) * 100) : 0;
+  const pct = phase === "done"
+    ? 100
+    : fraction != null && fraction > 0
+      ? Math.round(fraction * 100)
+      : total > 0 ? Math.round((done / total) * 100) : 0;
+  // Süresi belirsiz adımlar → parlama (donmuş görünmesin).
+  const indeterminate = phase === "starting" || step === "prices" || step === "fetch";
 
   // Bitişte önce çubuk dolsun, ~300ms sonra metin "Tamamlandı…"ya dönsün.
   const [showDone, setShowDone] = useState(false);
@@ -40,6 +60,15 @@ export default function ScanStrip({
   } else if (phase === "starting") {
     label = t("notice.scanStarting");
     labelKey = "starting";
+  } else if (skippedEntity) {
+    label = t("notice.stepSkipped", { name: skippedEntity });
+    labelKey = `skip:${skippedEntity}`;
+  } else if (step === "prices") {
+    label = t("notice.stepPrices");
+    labelKey = "prices";
+  } else if (step && stepEntity && STEP_KEYS[step]) {
+    label = t(STEP_KEYS[step], { name: stepEntity, n: stepCount ?? 0 });
+    labelKey = `${step}:${stepEntity}`;
   } else if (currentEntity) {
     label = t("notice.analyzing", { name: currentEntity });
     labelKey = `e:${currentEntity}`;
@@ -72,7 +101,7 @@ export default function ScanStrip({
 
       <div className="nr-bar mt-2 bg-accent/15" aria-hidden="true">
         <div className="nr-bar__fill" style={{ width: `${pct}%` }}>
-          {phase !== "done" && <span className="nr-bar__shine" />}
+          {phase !== "done" && indeterminate && <span className="nr-bar__shine" />}
         </div>
       </div>
     </div>

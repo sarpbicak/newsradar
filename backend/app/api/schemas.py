@@ -429,6 +429,13 @@ class ProviderStatusOut(BaseModel):
     progress_done: int = 0
     progress_total: int = 0
     current_entity: str | None = None  # şu an analiz edilen şirket adı (UI: "Tesla analiz ediliyor…")
+    # Adım bazlı ilerleme: step = prices | fetch | filter | analyze | assess; frontend
+    # kullanıcının dilinde metne çevirir. progress_fraction: entity dilimlerinin ortalaması.
+    step: str | None = None
+    step_entity: str | None = None
+    step_count: int | None = None
+    progress_fraction: float = 0.0
+    skipped_entity: str | None = None  # "X atlandı, yeni veri yok" (~3 sn)
     last_completed_at: datetime | None = None
     last_summary: RefreshSummaryOut | None = None
     # Kişisel elle yenileme kotası (rolling 24s). refresh_limit=0 → sınırsız.

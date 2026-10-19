@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import threading
+import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 
@@ -64,6 +65,14 @@ class _State:
     progress_done: int = 0
     progress_total: int = 0
     current_entity: str | None = None  # şu an analiz edilen şirket adı (yaklaşık: en son başlayan)
+    # Adım bazlı ilerleme (UI: "NVIDIA için haberler çekiliyor…" + entity içinde dolan çubuk).
+    # step: "prices" | "fetch" | "filter" | "analyze" | "assess" | "skipped" | "done"
+    step: str | None = None
+    step_entity: str | None = None
+    step_count: int | None = None      # adımın makale sayısı (filter/analyze)
+    entity_progress: dict = field(default_factory=dict)  # entity_id → 0..1 (kendi dilimi)
+    skipped_entity: str | None = None  # "Tesla atlandı, yeni veri yok" — kısa süre gösterilir
+    skipped_at: float = 0.0
     last_completed_at: datetime | None = None
     last_summary: RefreshSummary | None = None
     user_id: int | None = None        # şu an çalışan taramayı başlatan kullanıcı
@@ -82,6 +91,13 @@ def get_state() -> dict:
             "progress_done": _state.progress_done,
             "progress_total": _state.progress_total,
             "current_entity": _state.current_entity,
+            "step": _state.step,
+            "step_entity": _state.step_entity,
+            "step_count": _state.step_count,
+            "progress_fraction": _fraction(),
+            # Atlama notu yalnızca ~3 sn görünür, sonra akış devam eder.
+            "skipped_entity": _state.skipped_entity
+            if time.time() - _state.skipped_at < SKIP_NOTE_SECONDS else None,
             "last_completed_at": _state.last_completed_at,
             "last_summary": asdict(_state.last_summary) if _state.last_summary else None,
             "user_id": _state.user_id,
@@ -94,7 +110,14 @@ def is_running() -> bool:
         return _state.is_running
 
 
-def _set_running(running: bool, total: int = 0, user_id: int | None = None) -> None:
+def _fraction() -> float:
+    """Genel ilerleme 0..1 = entity dilimlerinin ortalaması (kilit altında çağrılır)."""
+    p = _state.entity_progress
+    return round(sum(p.values()) / len(p), 4) if p else 0.0
+
+
+def _set_running(running: bool, total: int = 0, user_id: int | None = None,
+                 entity_ids: list[int] | None = None) -> None:
     with _state_lock:
         _state.is_running = running
         if running:
@@ -102,6 +125,33 @@ def _set_running(running: bool, total: int = 0, user_id: int | None = None) -> N
             _state.progress_total = total
             _state.current_entity = None
             _state.user_id = user_id
+            _state.step = _state.step_entity = _state.step_count = None
+            _state.entity_progress = {i: 0.0 for i in (entity_ids or [])}
+            _state.skipped_entity, _state.skipped_at = None, 0.0
+
+
+# Entity dilimi içindeki adım konumları (çubuk 0'da takılmasın; adım adım dolsun).
+_FETCH_START, _FETCH_DONE = 0.02, 0.15
+SKIP_NOTE_SECONDS = 3
+
+
+def _report_step(entity_id: int | None, name: str | None, step: str,
+                 n: int | None = None, frac: float | None = None) -> None:
+    """Adım bildirimi: metin (step/entity/count) + entity'nin kendi dilimindeki ilerleme."""
+    with _state_lock:
+        if step == "skipped":
+            _state.skipped_entity, _state.skipped_at = name, time.time()
+        elif step != "done":
+            _state.step, _state.step_entity, _state.step_count = step, name, n
+        if entity_id is not None and frac is not None:
+            cur = _state.entity_progress.get(entity_id, 0.0)
+            _state.entity_progress[entity_id] = max(cur, min(1.0, frac))
+        _state.progress_done = sum(1 for v in _state.entity_progress.values() if v >= 1.0)
+
+
+def _on_fetch(entity_id: int, name: str, state: str) -> None:
+    _report_step(entity_id, name, "fetch",
+                 frac=_FETCH_START if state == "start" else _FETCH_DONE)
 
 
 def _set_progress(done: int, total: int) -> None:
@@ -161,23 +211,24 @@ def run_refresh(
         summary.warnings.append(msg("refresh_running"))
         return summary
 
-    # İlerleme toplamı için (scoped) aktif entity sayısını baştan al (UI 0/Y gösterebilsin).
+    # İlerleme toplamı için (scoped) aktif entity'leri baştan al (UI 0/Y gösterebilsin).
     try:
         with session_scope() as session:
-            from sqlalchemy import func, select
+            from sqlalchemy import select
 
             from .db.models import Entity
 
-            q = select(func.count()).select_from(Entity).where(Entity.active.is_(True))
+            q = select(Entity.id).where(Entity.active.is_(True))
             if entity_ids is not None:
                 q = q.where(Entity.id.in_(entity_ids))
-            total = session.scalar(q) or 0
+            scoped_ids = list(session.scalars(q).all())
     except Exception:  # noqa: BLE001
-        total = 0
+        scoped_ids = []
 
-    _set_running(True, total=total, user_id=user_id)
+    _set_running(True, total=len(scoped_ids), user_id=user_id, entity_ids=scoped_ids)
     try:
         # 0) Fiyat + analist snapshot'ları (ticker entity'ler; ucuz, hata-toleranslı).
+        _report_step(None, None, "prices")
         try:
             summary.warnings.extend(refresh_prices(entity_ids))
         except Exception as exc:  # noqa: BLE001 — fiyat hatası yenilemeyi çökertmesin
@@ -189,7 +240,7 @@ def run_refresh(
 
         # 1) Çekme (Claude gerektirmez). manual: elle Yenile'de kota-akıllı davran.
         with session_scope() as session:
-            for r in fetch_all(session, lookback_hours, manual, entity_ids):
+            for r in fetch_all(session, lookback_hours, manual, entity_ids, on_entity=_on_fetch):
                 summary.fetched_new += r.new_count
                 summary.warnings.extend(with_entity(w, r.entity_name) for w in r.warnings)
                 summary.infos.extend(with_entity(i, r.entity_name) for i in r.infos)
@@ -224,7 +275,7 @@ def run_refresh(
         totals = asyncio.run(
             analyze_all_async(
                 client, progress_cb=_set_progress, entity_cb=_set_current_entity,
-                entity_ids=entity_ids, assess_client=assess_client,
+                entity_ids=entity_ids, assess_client=assess_client, step_cb=_report_step,
             )
         )
         summary.prefiltered = totals.prefiltered
