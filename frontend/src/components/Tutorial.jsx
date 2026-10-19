@@ -1,11 +1,12 @@
 // İlk giriş tutorial'ı — yeni kullanıcıya kısa, adım adım tanıtım (kapatılabilir).
 // Tamamlanınca/kapatılınca bir daha gösterilmez (backend User.tutorial_done).
 import React, { useState } from "react";
-import { X, Radar, TrendingUp, Sparkles, ShieldCheck } from "lucide-react";
+import { X, TrendingUp, Sparkles, ShieldCheck } from "lucide-react";
+import Logo from "./Logo.jsx";
 import { useI18n } from "../i18n.jsx";
 
 const STEPS = [
-  { icon: Radar, titleKey: "tut.s1.title", bodyKey: "tut.s1.body" },
+  { icon: Logo, titleKey: "tut.s1.title", bodyKey: "tut.s1.body" },
   { icon: TrendingUp, titleKey: "tut.s2.title", bodyKey: "tut.s2.body" },
   { icon: Sparkles, titleKey: "tut.s3.title", bodyKey: "tut.s3.body" },
   { icon: ShieldCheck, titleKey: "tut.note.title", bodyKey: "tut.s4.disclaimer" },

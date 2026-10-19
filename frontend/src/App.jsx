@@ -13,7 +13,8 @@ import ScanStrip from "./components/ScanStrip.jsx";
 import { LanguageModal, LanguageSwitcher } from "./components/LanguageBits.jsx";
 import { Skeleton, useIsMobile } from "./components/ui.jsx";
 import { fmtMsg, refreshParts, useI18n } from "./i18n.jsx";
-import { RefreshCw, Menu, X, LogOut, ShieldCheck, LayoutDashboard, Radar, HelpCircle, UserPlus, ArrowDown } from "lucide-react";
+import { RefreshCw, Menu, X, LogOut, ShieldCheck, LayoutDashboard, HelpCircle, UserPlus, ArrowDown } from "lucide-react";
+import Logo from "./components/Logo.jsx";
 
 // Mobil aşağı-çekip-yenile eşiği (px). Bu mesafeyi geçince bırakınca yenilenir.
 const PULL_THRESHOLD = 70;
@@ -429,7 +430,7 @@ export default function App({ setLang }) {
               aria-label="Ana sayfaya dön"
               className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg font-display text-lg font-bold tracking-tight text-slate-100 transition hover:opacity-70"
             >
-              <Radar className="h-5 w-5 text-accent" />
+              <Logo className="h-5 w-5 text-accent" />
               NewsRadar
             </button>
             <span className="hidden font-mono text-[11px] uppercase tracking-wide text-slate-500 md:inline">
