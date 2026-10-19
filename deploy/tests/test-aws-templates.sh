@@ -20,7 +20,7 @@ export REGION=eu-central-1 ACCOUNT_ID=123456789012 DOMAIN=example.com ECR_REPO=n
   SSM_KMS_KEY_ARN=arn:aws:kms:eu-central-1:123456789012:key/00000000-0000-0000-0000-000000000000 \
   CERT_ARN=arn:aws:acm:us-east-1:123456789012:certificate/00000000-0000-0000-0000-000000000000 \
   CF_FUNCTION_ARN=arn:aws:cloudfront::123456789012:function/newsradar-www-redirect \
-  REPO_URL=git@github.com:example/newsradar.git REPO_BRANCH=main
+  REPO_URL=https://github.com/example/newsradar.git REPO_BRANCH=main
 
 echo "== render"
 for f in "$DEPLOY"/iam/*.json "$DEPLOY"/aws/*.json "$DEPLOY"/aws/user-data.sh; do

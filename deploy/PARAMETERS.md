@@ -107,7 +107,5 @@ Bunlar ya `docker-compose.yml` / Dockerfile tarafından sabitlenir, ya yalnızca
 | `HEALTH_TIMEOUT` | restore.sh (host) | Restore sonrası healthy bekleme süresi (sn). | `120` |
 | `DB_IN_CONTAINER` | backup/restore (host) | Container içindeki DB yolu. Testler dışında değiştirilmez. | `/data/newsradar.db` |
 
-Ortam değişkeni olmayan bir parametre daha var: `/newsradar/bootstrap/github-deploy-key` (SecureString). Bu, repo private olduğu için EC2 user-data'nın `git clone` yaparken kullandığı salt okunur GitHub deploy key'idir. `/newsradar/prod/` altında olmadığı için `load-secrets.sh` bunu `.env`'ye yazmaz ve container'a geçmez. Ayrıntılar: [docs/DEPLOY_AWS.md](../docs/DEPLOY_AWS.md).
-
 Yerel `backend/.env` dosyasında bulunabilecek `NVIDIA_API_KEY` kodda okunmaz, bu yüzden gerekmez.
 `deploy/tests/check-parameters.py` bu listeyi kodla karşılaştırır: koddaki her değişkenin burada geçtiğini ve burada kodda olmayan bir ad kalmadığını doğrular.

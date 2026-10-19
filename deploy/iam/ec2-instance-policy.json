@@ -11,20 +11,14 @@
       ]
     },
     {
-      "Sid": "ReadGithubDeployKey",
-      "Effect": "Allow",
-      "Action": "ssm:GetParameter",
-      "Resource": "arn:aws:ssm:__REGION__:__ACCOUNT_ID__:parameter/newsradar/bootstrap/github-deploy-key"
-    },
-    {
-      "Sid": "DecryptOnlyNewsradarParametersViaSsm",
+      "Sid": "DecryptOnlyProdParametersViaSsm",
       "Effect": "Allow",
       "Action": "kms:Decrypt",
       "Resource": "__SSM_KMS_KEY_ARN__",
       "Condition": {
         "StringEquals": { "kms:ViaService": "ssm.__REGION__.amazonaws.com" },
         "StringLike": {
-          "kms:EncryptionContext:PARAMETER_ARN": "arn:aws:ssm:__REGION__:__ACCOUNT_ID__:parameter/newsradar/*"
+          "kms:EncryptionContext:PARAMETER_ARN": "arn:aws:ssm:__REGION__:__ACCOUNT_ID__:parameter/newsradar/prod/*"
         }
       }
     },

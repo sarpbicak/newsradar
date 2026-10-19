@@ -34,7 +34,7 @@ Bölge **eu-central-1**. Tek istisna ACM sertifikası: CloudFront zorunlu kıld�
 | 4 | [Image'ı ECR'a gönder](#adım-4--backend-imageını-derle-ve-ecra-gönder) | 17 | [ACM sertifikası](#adım-17--acm-sertifikası-us-east-1) |
 | 5 | [Yedek bucket'ı](#adım-5--yedek-bucketı) | 18 | [CloudFront](#adım-18--cloudfront-function-oac-ve-dağıtım) |
 | 6 | [Log grubu](#adım-6--cloudwatch-log-grubu) | 19 | [Frontend'i yükle](#adım-19--frontendi-derle-ve-yükle) |
-| 7 | [SSM parametreleri](#adım-7--ssm-parametreleri-ve-deploy-key) | 20 | [DNS geçişi](#adım-20--dns-apex--www--cloudfront-geçiş) |
+| 7 | [SSM parametreleri](#adım-7--ssm-parametreleri) | 20 | [DNS geçişi](#adım-20--dns-apex--www--cloudfront-geçiş) |
 | 8 | [KMS anahtarı](#adım-8--ssm-kms-anahtarının-arni) | 21 | [İzleme](#adım-21--health-izleme-ve-e-posta-uyarısı) |
 | 9 | [IAM rolü](#adım-9--iam-rolü-ve-instance-profile) | 22 | [Rutin: yeni sürüm](#adım-22--rutin-yeni-sürüm-yayınlama) |
 | 10 | [Security group](#adım-10--security-group) | 23 | [Teardown](#adım-23--geri-alma-ve-temizlik-teardown) |
@@ -126,7 +126,6 @@ export ECR_REPO=newsradar-api
 export ECR_URI="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${ECR_REPO}"
 export LOG_GROUP=/newsradar/prod
 export SSM_PREFIX=/newsradar/prod
-export DEPLOY_KEY_PARAM=/newsradar/bootstrap/github-deploy-key
 export ROLE_NAME=newsradar-ec2-role
 export PROFILE_NAME=newsradar-ec2-profile
 export SG_NAME=newsradar-api-sg
@@ -135,7 +134,7 @@ export CF_FUNCTION_NAME=newsradar-www-redirect
 export OAC_NAME=newsradar-frontend-oac
 export ALARM_NAME=newsradar-api-health
 export SNS_TOPIC_NAME=newsradar-alerts
-export REPO_URL="git@github.com:$(git remote get-url origin | sed -E 's#^(https://github\.com/|git@github\.com:)##')"
+export REPO_URL="https://github.com/$(git remote get-url origin | sed -E 's#^(https://github\.com/|git@github\.com:)##')"
 export REPO_BRANCH=main
 export STATE_FILE="$HOME/.newsradar-aws-state.env"
 
@@ -166,11 +165,11 @@ put_param() { # put_param AD TÜR [DEĞER] — değer verilmezse sorulur (Secure
 printf '%s\n' "$ACCOUNT_ID" "$BACKUP_BUCKET" "$FRONTEND_BUCKET" "$ECR_URI" "$REPO_URL" | sed 's/[0-9]\{12\}/<hesap>/'
 ```
 
-Beklenen çıktı: beş dolu satır. Hesap ID'si `<hesap>` olarak maskelenir, `REPO_URL` `git@github.com:<kullanıcı>/newsradar.git` biçimindedir.
+Beklenen çıktı: beş dolu satır. Hesap ID'si `<hesap>` olarak maskelenir, `REPO_URL` `https://github.com/<kullanıcı>/newsradar.git` biçimindedir.
 
 **Hata alırsam:**
 - `ACCOUNT_ID` boşsa SSO oturumunun süresi dolmuştur: `aws sso login`, sonra bloğu tekrar çalıştırın.
-- `REPO_URL` yanlışsa `git remote -v` çıktısına bakın ve değişkeni elle `export REPO_URL=git@github.com:<kullanıcı>/<repo>.git` diye verin.
+- `REPO_URL` yanlışsa `git remote -v` çıktısına bakın ve değişkeni elle `export REPO_URL=https://github.com/<kullanıcı>/<repo>.git` diye verin.
 
 ---
 
@@ -364,7 +363,7 @@ Not: 7 günlük saklama, gizlilik metnindeki "IP'ler 7 gün sonra silinir" taahh
 
 ---
 
-## Adım 7 — SSM parametreleri ve deploy key
+## Adım 7 — SSM parametreleri
 
 **Ne yapıyoruz:** [deploy/PARAMETERS.md](../deploy/PARAMETERS.md)'deki her parametreyi `/newsradar/prod/` altına yazıyoruz; değerler `read -s` ile girilir, komut satırına ve geçmişe düşmez.
 
@@ -408,20 +407,6 @@ done
 
 [PARAMETERS.md](../deploy/PARAMETERS.md) §5'teki değişkenler (`NEWSRADAR_DB`, `NEWSRADAR_TRUSTED_PROXY`, `NEWSRADAR_CADDY_IP`, `FRONTEND_URL`, `VITE_*`, host değişkenleri) bilerek SSM'e **yazılmaz**: compose bunları sabitler ya da yalnızca Render'da veya build sırasında kullanılırlar.
 
-**GitHub deploy key.** Repo private olduğu için EC2'nin `git clone` yapabilmesi gerekiyor. Bunun için yalnızca okuma izni olan, yalnızca bu repoya bağlı bir SSH anahtarı kullanıyoruz.
-
-```bash
-KEYDIR="$(mktemp -d)"
-ssh-keygen -q -t ed25519 -N "" -C "newsradar-ec2-deploy (read-only)" -f "$KEYDIR/deploy_key"
-cat "$KEYDIR/deploy_key.pub"
-# → GitHub: repo → Settings → Deploy keys → Add deploy key → yukarıdaki satırı yapıştırın,
-#   "Allow write access" KAPALI kalsın. Ekledikten sonra Enter'a basın:
-read -rp "Deploy key GitHub'a eklendi mi? (Enter) " _
-aws ssm put-parameter --region "$REGION" --name "$DEPLOY_KEY_PARAM" --type SecureString \
-  --value "file://$KEYDIR/deploy_key" --overwrite --query Version --output text
-rm -rf "$KEYDIR"                         # özel anahtar Mac'te kalmaz; yalnızca SSM'de
-```
-
 **Doğrulama:**
 
 ```bash
@@ -431,13 +416,11 @@ aws ssm get-parameters-by-path --region "$REGION" --path "$SSM_PREFIX/" --query 
   | tr '\t' '\n' | sed "s|$SSM_PREFIX/||" | sort >/tmp/newsradar-params.txt
 for r in DOMAIN APP_SECRET ANTHROPIC_API_KEY NEWSRADAR_CORS_ORIGINS BACKUP_BUCKET BACKEND_IMAGE; do
   grep -qx "$r" /tmp/newsradar-params.txt && echo "✓ $r" || echo "✗ EKSİK: $r"; done
-aws ssm get-parameter --region "$REGION" --name "$DEPLOY_KEY_PARAM" --query Parameter.Type --output text
 ```
 
 Beklenen çıktı:
 - Ad ve tür listesi. Değerler **gösterilmez**, çünkü `--with-decryption` kullanılmadı.
 - Zorunlu altı parametrenin hepsi `✓`.
-- Son satır `SecureString`.
 
 **Hata alırsam:**
 - `ParameterAlreadyExists` → `--overwrite` zaten var. Bu hata yalnızca türü değiştirmeye çalışınca çıkar (ör. String → SecureString): önce `aws ssm delete-parameter --name …`, sonra tekrar yazın.
@@ -474,7 +457,7 @@ Beklenen çıktı: `arn:aws:kms:eu-central-1:<hesap>:key/<uuid>`
 
 **Ne yapıyoruz:** EC2'nin üstleneceği rolü yalnızca gereken izinlerle oluşturuyoruz ([deploy/iam/](../deploy/iam/)); uzun ömürlü anahtar yok, instance kimliği IMDSv2'den gelir.
 
-İzinlerin tamamı: `/newsradar/prod/*` parametrelerini okuma, deploy key'i okuma, yalnızca bu parametreler için `kms:Decrypt`, yedek bucket'ında yalnızca `backups/` öneki, yalnızca `newsradar-api` reposundan image çekme, yalnızca `/newsradar/prod` log grubuna yazma, ve AWS-managed `AmazonSSMManagedInstanceCore` (Session Manager). Gereksinimden sapan iki nokta (`ecr:GetAuthorizationToken` ve log izinleri) [Ek B](#ek-b--gereksinimden-bilinçli-sapmalar)'de açıklanıyor.
+İzinlerin tamamı: `/newsradar/prod/*` parametrelerini okuma, yalnızca bu parametreler için `kms:Decrypt`, yedek bucket'ında yalnızca `backups/` öneki, yalnızca `newsradar-api` reposundan image çekme, yalnızca `/newsradar/prod` log grubuna yazma, ve AWS-managed `AmazonSSMManagedInstanceCore` (Session Manager). Gereksinimden sapan iki nokta (`ecr:GetAuthorizationToken` ve log izinleri) [Ek B](#ek-b--gereksinimden-bilinçli-sapmalar)'de açıklanıyor.
 
 **Komutlar:**
 
@@ -616,15 +599,16 @@ User-data şunları yapar:
 - compose ve buildx eklentilerini sabit sha256 doğrulamasıyla kurar.
 - aws CLI, sqlite3, gzip, curl ve python3'ü kurar.
 - Docker log'larını CloudWatch'a yönlendirir.
-- Repoyu deploy key ile `/opt/newsradar`'a klonlar.
+- Public repoyu https ile `/opt/newsradar`'a klonlar; kimlik bilgisi gerekmez.
 - systemd birimlerini kurar ve yedek timer'ını etkinleştirir.
 
-**Ön koşul:** Bu runbook'un ve `deploy/` klasörünün son hali **GitHub'a push edilmiş** olmalı (`$REPO_BRANCH`), çünkü instance repoyu oradan klonlar.
+**Ön koşul:** Repo **public** olmalı ve bu runbook'un ve `deploy/` klasörünün son hali **GitHub'a push edilmiş** olmalı (`$REPO_BRANCH`), çünkü instance repoyu oradan, kimlik bilgisi olmadan https ile klonlar.
 
 **Komutlar:**
 
 ```bash
 git fetch -q origin && git status -sb | head -1        # "ahead" görünmemeli
+curl -s -o /dev/null -w 'repo herkese açık mı: %{http_code}\n' "${REPO_URL%.git}"   # 200 olmalı (404 = private)
 render deploy/aws/user-data.sh >/tmp/newsradar-user-data.sh
 save INSTANCE_ID "$(aws ec2 run-instances --region "$REGION" \
   --image-id resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64 \
@@ -684,8 +668,8 @@ Beklenen çıktı:
   - Konsol çıktısı: `aws ec2 get-console-output --region "$REGION" --instance-id "$INSTANCE_ID" --latest --output text | tail -40`.
 - user-data log'unda `HATA: satır N` görünüyorsa:
   - `sha256 tutmadı` → indirme bozulmuştur; aşağıdaki gibi yeniden çalıştırın.
-  - `Permission denied (publickey)` → deploy key GitHub'a eklenmemiş ya da SSM'deki anahtar başka.
-  - `Host key verification failed` → `deploy/aws/user-data.sh`'deki `GITHUB_HOST_KEY` satırını docs.github.com'daki "GitHub's SSH key fingerprints" sayfasıyla karşılaştırın.
+  - `Authentication failed` / `Repository not found` → repo hâlâ private ya da `REPO_URL` yanlış. Public yapın; user-data kimlik bilgisi kullanmaz.
+  - `REPO_URL https:// ile başlamalı` → Adım 1'deki `REPO_URL` https biçiminde olmalı.
 
   Düzelttikten sonra **[instance]** `sudo bash /var/lib/cloud/instance/scripts/part-001` ile tekrar çalıştırın (yoksa `/var/lib/cloud/instance/user-data.txt`). Betik tekrar çalıştırılabilir: repo zaten varsa yeniden klonlamaz.
 - Instance'ı baştan kurmak en temiz yol olabilir: [Teardown T7](#t7--ec2-instanceı-adım-13) ile kapatıp bu adımı tekrarlayın. EIP, SG ve rol yerinde kalır.
@@ -1155,7 +1139,7 @@ Frontend için [Adım 19](#adım-19--frontendi-derle-ve-yükle)'daki komutları 
 | Route 53 hosted zone | **Asla silinmez.** Kurulumdan önce vardı. | Bırakılır, yalnızca kayıtlar geri alınır (T2, T8). |
 | `$DNS_BACKUP` dosyası (Mac) | Saklayın; geri dönüşün kaynağı bu. | Saklayın. |
 | Yedek bucket'ı | **Bırakın:** tek veri kopyası burada. | **En son** silinir, ancak yerel bir kopya indirildikten sonra (T6, T15). |
-| SSM parametreleri | Bırakın: ücretsizdir, tekrar denemede kullanılır. | Silinir (T13). GitHub'daki deploy key de kaldırılır. |
+| SSM parametreleri | Bırakın: ücretsizdir, tekrar denemede kullanılır. | Silinir (T13). |
 | ECR image'ları | Bırakın: kuruşlar tutar. | Silinir (T16). |
 | EC2 | Arızalıysa kapatıp Adım 13'ü tekrarlayın; veri S3'te. | Silinir (T7). Durdurulmuş instance da disk ve IP ücreti öder. |
 | Elastic IP | Instance yoksa **hemen bırakın**: bağlı değilken de ücretlidir. | Silinir (T9). |
@@ -1299,10 +1283,7 @@ Yapılacak bir şey yok: `aws/ssm` AWS-managed bir anahtar ve ücretsiz.
 ```bash
 aws ssm get-parameters-by-path --region "$REGION" --path "$SSM_PREFIX/" --query 'Parameters[].Name' --output text \
   | tr '\t' '\n' | xargs -n 10 aws ssm delete-parameters --region "$REGION" --query 'DeletedParameters' --output text --names
-aws ssm delete-parameter --region "$REGION" --name "$DEPLOY_KEY_PARAM"
 ```
-
-Ardından GitHub'da repo → Settings → Deploy keys → `newsradar-ec2-deploy (read-only)` → **Delete**.
 
 ### T14 — Log grubu (Adım 6)
 
@@ -1380,7 +1361,6 @@ Notlar:
 | Yedek bucket'ı | `newsradar-backups-<hesap>` (`$BACKUP_BUCKET`) | Adım 5 | 7, 9, 15, T6, T15 |
 | Log grubu | `/newsradar/prod` (`$LOG_GROUP`) | Adım 6 | 9, 13, 21, T14 |
 | SSM yolu | `/newsradar/prod/*` (`$SSM_PREFIX`) | Adım 7 | 9, 14, 22, T13 |
-| Deploy key | `/newsradar/bootstrap/github-deploy-key` (`$DEPLOY_KEY_PARAM`) | Adım 7 | 9, 13, T13 |
 | KMS anahtarı | `alias/aws/ssm` (`$SSM_KMS_KEY_ARN`) | Adım 8 | 9 |
 | IAM rolü | `newsradar-ec2-role` (`$ROLE_NAME`), inline policy `newsradar-ec2-inline` | Adım 9 | 13, T11 |
 | Instance profile | `newsradar-ec2-profile` (`$PROFILE_NAME`) | Adım 9 | 13, T11 |
@@ -1409,7 +1389,6 @@ Repo dosyaları:
 | `ecr:GetAuthorizationToken` | IAM'de `*` olmasın | Bu eylem kaynak bazlı kısıtlamayı **desteklemiyor**; AWS yalnızca `"Resource": "*"` kabul ediyor. Token tek başına bir image'a erişim vermez; çekme izinleri yalnızca `newsradar-api` reposuyla sınırlı. Politikadaki tek `*` bu. |
 | `AmazonSSMManagedInstanceCore` | İstendi | AWS-managed bir policy ve içinde `*` kaynaklar var (Session Manager'ın çalışma biçimi). Değiştirilemez; istendiği gibi eklendi. |
 | CloudWatch Logs izinleri | İzin listesinde yoktu | Gözlem gereksinimi (container log'ları CloudWatch'a) bunu zorunlu kılıyor. Yalnızca `logs:CreateLogStream` ve `logs:PutLogEvents`, yalnızca `/newsradar/prod` grubuna. |
-| Deploy key okuma | İzin listesinde yoktu | Repo private olduğu için user-data'nın klonlaması bir kimlik gerektiriyor. Yalnızca tek bir parametre (`/newsradar/bootstrap/github-deploy-key`) için `ssm:GetParameter`. Bu parametre `/newsradar/prod/` altında olmadığından `.env`'ye ve container'a girmez. **Alternatif:** repo public yapılırsa deploy key'e gerek kalmaz. `REPO_URL`'i `https://github.com/…` yapın; user-data anahtarı otomatik atlar. Politikadaki `ReadGithubDeployKey` ifadesi de silinebilir. |
 | Port 443 | "Yalnızca 80 ve 443" | 443 TCP'nin yanında 443 **UDP** de açık (HTTP/3). Kapatılabilir ([Adım 10](#adım-10--security-group)). |
 | "Yalnızca HTTPS" (CloudFront) | | `redirect-to-https`: HTTP üzerinden hiçbir içerik sunulmaz, yalnızca HTTPS'e 301 döner. `https-only` seçilirse `http://newsradarapp.com` yazan kullanıcı 403 alır. |
 | Yedek saklama | 30 gün, eski sürümler dahil | Güncel sürüm 30 gün, eski sürüm güncel olmaktan çıktıktan sonra 30 gün → en fazla 60 gün. Kesin 30 gün için `NoncurrentDays: 1` ([Adım 5](#adım-5--yedek-bucketı)). |

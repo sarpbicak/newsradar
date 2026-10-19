@@ -9,7 +9,6 @@ REGION="__REGION__"
 REPO_URL="__REPO_URL__"
 REPO_BRANCH="__REPO_BRANCH__"
 LOG_GROUP="__LOG_GROUP__"
-DEPLOY_KEY_PARAM="/newsradar/bootstrap/github-deploy-key"
 APP_DIR=/opt/newsradar
 DOCKER_MIN_MAJOR=25
 # Resmi statik Docker paketi — yalnızca dnf'teki sürüm < 25 ise (AL2023'te şu an 25.0.x).
@@ -19,8 +18,6 @@ COMPOSE_VERSION=v5.6.0
 COMPOSE_SHA256=733ec76717ceb59052a9609b9dadfb523b2df8eab57a54212872d10a58078ea2
 BUILDX_VERSION=v0.38.0
 BUILDX_SHA256=38e890e1a162bfdbf32fbe91404991dc4fc28e55b0de901b34374a061bab4d2c
-# GitHub'ın yayımlanmış SSH host anahtarı (docs.github.com → "GitHub's SSH key fingerprints").
-GITHUB_HOST_KEY="github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
 
 log() { echo "[user-data] $(date -u +%Y-%m-%dT%H:%M:%SZ) $*"; }
 trap 'log "HATA: satır $LINENO (kod $?) — ayrıntı yukarıda"' ERR
@@ -109,20 +106,10 @@ cat >/etc/docker/daemon.json <<JSON
 JSON
 systemctl restart docker
 
-# 4) Repo → /opt/newsradar (private repo: SSM'deki salt okunur deploy key ile SSH).
-if [[ "$REPO_URL" == git@* ]]; then
-  install -d -m 700 /root/.ssh
-  aws ssm get-parameter --region "$REGION" --name "$DEPLOY_KEY_PARAM" --with-decryption \
-    --query Parameter.Value --output text >/root/.ssh/newsradar_deploy_key
-  chmod 600 /root/.ssh/newsradar_deploy_key
-  grep -qxF "$GITHUB_HOST_KEY" /root/.ssh/known_hosts 2>/dev/null || echo "$GITHUB_HOST_KEY" >>/root/.ssh/known_hosts
-  cat >/root/.ssh/config <<'SSH'
-Host github.com
-  IdentityFile /root/.ssh/newsradar_deploy_key
-  IdentitiesOnly yes
-  StrictHostKeyChecking yes
-SSH
-  chmod 600 /root/.ssh/config
+# 4) Repo → /opt/newsradar (public repo, https; kimlik bilgisi gerekmez ve saklanmaz).
+if [[ "$REPO_URL" != https://* ]]; then
+  log "HATA: REPO_URL https:// ile başlamalı (public repo): $REPO_URL"
+  exit 1
 fi
 if [[ ! -d "$APP_DIR/.git" ]]; then
   git clone --branch "$REPO_BRANCH" "$REPO_URL" "$APP_DIR"
