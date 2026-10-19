@@ -125,9 +125,9 @@ async def _security_headers(request: Request, call_next):
     return resp
 
 
-# CORS: yerel Vite + FRONTEND_URL. Anonim cihaz cookie'si (HttpOnly) cross-origin
-# gönderileceği için allow_credentials=True + KESİN origin listesi (credentials ile '*'
-# tarayıcıda geçersiz). Deploy'da FRONTEND_URL'i tam frontend origin'ine ayarlayın.
+# CORS: yerel Vite + NEWSRADAR_CORS_ORIGINS / FRONTEND_URL. Anonim cihaz cookie'si (HttpOnly)
+# cross-origin gönderileceği için allow_credentials=True + KESİN origin listesi (credentials
+# ile '*' tarayıcıda geçersiz). Deploy'da tam frontend origin'lerini verin.
 _origins = get_settings().cors_origins
 if "*" in _origins:
     # '*' + credentials geçersiz → yalnızca yerel dev origin'lerine düş (cookie çalışsın).

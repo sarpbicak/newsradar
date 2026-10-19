@@ -45,12 +45,24 @@ class Settings:
         self.app_secret: str = os.getenv("APP_SECRET", "").strip() or self.app_password
         # Token geçerlilik süresi (gün). Süresi geçmiş token 401 döner.
         self.token_ttl_days: int = int(_env("NEWSRADAR_TOKEN_TTL_DAYS", "30"))
-        # ANONİM CİHAZ OTURUMU cookie'si (HttpOnly). Frontend+backend Render'da farklı
-        # subdomain (cross-origin) → cookie'nin fetch'te gitmesi için SameSite=None+Secure
-        # gerekir (aynı-origin'de "lax" yeter). Yerelde (http) Secure kapatılabilir.
+        # ANONİM CİHAZ OTURUMU cookie'si (HttpOnly).
+        #   Render: frontend+backend farklı *.onrender.com alt alan adları = FARKLI site
+        #     (onrender.com public suffix) → fetch'te gitmesi için SameSite=None+Secure.
+        #   AWS: newsradarapp.com + api.newsradarapp.com AYNI site → SameSite=Lax+Secure yeter;
+        #     NEWSRADAR_COOKIE_DOMAIN=.newsradarapp.com ile tüm alt alan adlarında geçerli.
+        # Domain boşsa cookie yalnızca API host'una yazılır (host-only; Render'daki davranış).
+        # Yerelde (http) Secure kapatılabilir.
         self.session_cookie_name: str = _env("NEWSRADAR_SESSION_COOKIE", "nr_device")
         self.cookie_samesite: str = _env("NEWSRADAR_COOKIE_SAMESITE", "none").lower()
         self.cookie_secure: bool = _env("NEWSRADAR_COOKIE_SECURE", "on").lower() == "on"
+        self.cookie_domain: str | None = _env("NEWSRADAR_COOKIE_DOMAIN", "") or None
+        if self.cookie_samesite not in ("lax", "strict", "none"):
+            raise ValueError(
+                f"NEWSRADAR_COOKIE_SAMESITE geçersiz: {self.cookie_samesite!r} (lax | strict | none)"
+            )
+        if self.cookie_samesite == "none" and not self.cookie_secure:
+            # Tarayıcılar Secure olmayan SameSite=None cookie'yi reddeder → oturum sessizce kaybolur.
+            raise ValueError("NEWSRADAR_COOKIE_SAMESITE=none için NEWSRADAR_COOKIE_SECURE=on gerekir")
         self.session_cookie_days: int = int(_env("NEWSRADAR_SESSION_COOKIE_DAYS", "365"))
         # Kayıt sınırı: en fazla bu kadar hesap (anonim dahil). 0 = sınırsız.
         # Herkese açık: yüksek ama sonlu (kötüye kullanım + maliyet tavanı).
@@ -140,9 +152,12 @@ class Settings:
                 f"NEWSRADAR_TRUSTED_PROXY geçersiz: {self.trusted_proxy!r} (render | caddy)"
             )
 
-        # Deploy: frontend'in domain'i (CORS). Virgülle birden fazla verilebilir.
-        # Boşsa yalnızca yerel Vite (localhost:5173) izinli. "*" = tümüne izin.
+        # Deploy: CORS izinli frontend origin'leri (virgülle ayrılmış, tam origin:
+        # https://newsradarapp.com,https://www.newsradarapp.com). NEWSRADAR_CORS_ORIGINS ve
+        # FRONTEND_URL (Render'daki eski ad) birleştirilir. İkisi de boşsa yalnızca yerel
+        # Vite (localhost:5173) izinli. "*" = tümüne izin.
         self.frontend_url: str = _env("FRONTEND_URL", "")
+        self.cors_origins_env: str = _env("NEWSRADAR_CORS_ORIGINS", "")
         # Deploy: açılışta varsayılan izleme listesini otomatik ekle (idempotent).
         # Kalıcı olmayan diskte (Render bedava katman) DB boş başlamasın diye faydalı.
         self.seed_on_start: bool = _env("NEWSRADAR_SEED_ON_START", "off").lower() == "on"
@@ -156,14 +171,13 @@ class Settings:
 
     @property
     def cors_origins(self) -> list[str]:
-        """CORS izinli origin listesi: yerel dev + FRONTEND_URL (varsa)."""
+        """CORS izinli origin listesi: yerel dev + NEWSRADAR_CORS_ORIGINS + FRONTEND_URL."""
         dev = ["http://localhost:5173", "http://127.0.0.1:5173"]
-        if not self.frontend_url:
-            return dev
-        extra = [o.strip().rstrip("/") for o in self.frontend_url.split(",") if o.strip()]
+        raw = ",".join(v for v in (self.cors_origins_env, self.frontend_url) if v)
+        extra = [o.strip().rstrip("/") for o in raw.split(",") if o.strip()]
         if "*" in extra:
             return ["*"]  # esnek kaçış: tüm origin'lere izin
-        return dev + extra
+        return dev + [o for o in dict.fromkeys(extra) if o not in dev]
 
     # --- Sağlayıcı erişilebilirliği (anahtar var mı?) ---
     @property

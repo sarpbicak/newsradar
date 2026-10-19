@@ -38,7 +38,8 @@ def _set_device_cookie(response: Response, device_id: str) -> None:
         max_age=s.session_cookie_days * 86400,
         httponly=True,               # JS okuyamaz (XSS'e karşı)
         secure=s.cookie_secure,      # yalnızca HTTPS
-        samesite=s.cookie_samesite,  # cross-origin (Render subdomain) için "none"
+        samesite=s.cookie_samesite,  # Render (farklı site): "none" · AWS (aynı site): "lax"
+        domain=s.cookie_domain,      # AWS: .newsradarapp.com · boş: yalnızca API host'u
         path="/",
     )
 
