@@ -31,7 +31,7 @@ done
 [[ "$PREFIX" == /*/ ]] || die "--prefix '/' ile başlayıp bitmeli (ör. /newsradar/prod/)"
 
 # Zorunlu parametreler (eksikse .env YAZILMAZ) ve SecureString olması gerekenler.
-REQUIRED="DOMAIN APP_SECRET ANTHROPIC_API_KEY NEWSRADAR_CORS_ORIGINS BACKUP_BUCKET"
+REQUIRED="DOMAIN APP_SECRET ANTHROPIC_API_KEY NEWSRADAR_CORS_ORIGINS BACKUP_BUCKET BACKEND_IMAGE"
 SECRETS="APP_SECRET APP_PASSWORD ANTHROPIC_API_KEY FINNHUB_API_KEY NEWSAPI_KEY FMP_API_KEY NEWSRADAR_LLM_API_KEY"
 # docker-compose.yml'nin sabitlediği değerler (SSM'de olsalar bile compose ezer → uyarı).
 COMPOSE_FIXED="NEWSRADAR_DB NEWSRADAR_TRUSTED_PROXY NEWSRADAR_CADDY_IP"

@@ -16,12 +16,7 @@ aws ssm put-parameter --region eu-central-1 --name /newsradar/prod/APP_SECRET \
   --type SecureString --value "$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')"
 ```
 
-EC2 instance rolünün ihtiyaç duyduğu izinler:
-- `ssm:GetParametersByPath`: `arn:aws:ssm:eu-central-1:<hesap>:parameter/newsradar/prod`
-- `kms:Decrypt`: SSM'in kullandığı anahtar (varsayılan `alias/aws/ssm`)
-- Yedekler için:
-  - `s3:PutObject` ve `s3:GetObject`: `arn:aws:s3:::<bucket>/backups/*`
-  - `s3:ListBucket`: `arn:aws:s3:::<bucket>`
+EC2 instance rolünün ihtiyaç duyduğu izinlerin tam ve en dar hali `deploy/iam/ec2-instance-policy.json` dosyasında.
 
 ## 1. Zorunlu
 
@@ -34,6 +29,7 @@ Bunlardan biri eksik ya da boşsa `load-secrets.sh` durur ve mevcut `.env`'ye do
 | `ANTHROPIC_API_KEY` | Claude API anahtarı. Analiz ve sohbet bununla çalışır. | SecureString | `sk-ant-api03-…` |
 | `NEWSRADAR_CORS_ORIGINS` | İzinli frontend origin'leri (virgülle ayrılmış, tam origin). | String | `https://newsradarapp.com,https://www.newsradarapp.com` |
 | `BACKUP_BUCKET` | Gece yedeğinin S3 bucket'ı (`backup.sh`, `restore.sh`). Uygulama bunu okumaz. | String | `newsradar-backups-<hesap>` |
+| `BACKEND_IMAGE` | Backend image'ı. `docker-compose.yml` bunu okur; yoksa image EC2'de yerel olarak build edilir. | String | `<hesap>.dkr.ecr.eu-central-1.amazonaws.com/newsradar-api:prod` |
 
 ## 2. Sırlar (isteğe bağlı)
 
@@ -110,6 +106,8 @@ Bunlar ya `docker-compose.yml` / Dockerfile tarafından sabitlenir, ya yalnızca
 | `SAFETY_DIR` | restore.sh (host) | Restore öncesi DB kopyalarının klasörü. | `deploy/local-backups/pre-restore` |
 | `HEALTH_TIMEOUT` | restore.sh (host) | Restore sonrası healthy bekleme süresi (sn). | `120` |
 | `DB_IN_CONTAINER` | backup/restore (host) | Container içindeki DB yolu. Testler dışında değiştirilmez. | `/data/newsradar.db` |
+
+Ortam değişkeni olmayan bir parametre daha var: `/newsradar/bootstrap/github-deploy-key` (SecureString). Bu, repo private olduğu için EC2 user-data'nın `git clone` yaparken kullandığı salt okunur GitHub deploy key'idir. `/newsradar/prod/` altında olmadığı için `load-secrets.sh` bunu `.env`'ye yazmaz ve container'a geçmez. Ayrıntılar: [docs/DEPLOY_AWS.md](../docs/DEPLOY_AWS.md).
 
 Yerel `backend/.env` dosyasında bulunabilecek `NVIDIA_API_KEY` kodda okunmaz, bu yüzden gerekmez.
 `deploy/tests/check-parameters.py` bu listeyi kodla karşılaştırır: koddaki her değişkenin burada geçtiğini ve burada kodda olmayan bir ad kalmadığını doğrular.

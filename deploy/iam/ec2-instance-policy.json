@@ -1,0 +1,63 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadProdParameters",
+      "Effect": "Allow",
+      "Action": ["ssm:GetParametersByPath", "ssm:GetParameters", "ssm:GetParameter"],
+      "Resource": [
+        "arn:aws:ssm:__REGION__:__ACCOUNT_ID__:parameter/newsradar/prod",
+        "arn:aws:ssm:__REGION__:__ACCOUNT_ID__:parameter/newsradar/prod/*"
+      ]
+    },
+    {
+      "Sid": "ReadGithubDeployKey",
+      "Effect": "Allow",
+      "Action": "ssm:GetParameter",
+      "Resource": "arn:aws:ssm:__REGION__:__ACCOUNT_ID__:parameter/newsradar/bootstrap/github-deploy-key"
+    },
+    {
+      "Sid": "DecryptOnlyNewsradarParametersViaSsm",
+      "Effect": "Allow",
+      "Action": "kms:Decrypt",
+      "Resource": "__SSM_KMS_KEY_ARN__",
+      "Condition": {
+        "StringEquals": { "kms:ViaService": "ssm.__REGION__.amazonaws.com" },
+        "StringLike": {
+          "kms:EncryptionContext:PARAMETER_ARN": "arn:aws:ssm:__REGION__:__ACCOUNT_ID__:parameter/newsradar/*"
+        }
+      }
+    },
+    {
+      "Sid": "BackupObjectsReadWrite",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject"],
+      "Resource": "arn:aws:s3:::__BACKUP_BUCKET__/backups/*"
+    },
+    {
+      "Sid": "BackupPrefixList",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::__BACKUP_BUCKET__",
+      "Condition": { "StringLike": { "s3:prefix": "backups/*" } }
+    },
+    {
+      "Sid": "PullBackendImage",
+      "Effect": "Allow",
+      "Action": ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer", "ecr:BatchCheckLayerAvailability"],
+      "Resource": "arn:aws:ecr:__REGION__:__ACCOUNT_ID__:repository/__ECR_REPO__"
+    },
+    {
+      "Sid": "EcrLoginTokenNoResourceLevelSupport",
+      "Effect": "Allow",
+      "Action": "ecr:GetAuthorizationToken",
+      "Resource": "*"
+    },
+    {
+      "Sid": "ContainerLogsToCloudWatch",
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+      "Resource": "arn:aws:logs:__REGION__:__ACCOUNT_ID__:log-group:__LOG_GROUP__:*"
+    }
+  ]
+}

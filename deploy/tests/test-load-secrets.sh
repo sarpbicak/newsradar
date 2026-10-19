@@ -28,6 +28,7 @@ vals = {
     "NEWSRADAR_CORS_ORIGINS": ("String", "https://newsradarapp.com,https://www.newsradarapp.com"),
     "NEWSRADAR_CONTACT_EMAIL": ("String", "privacy@example.com"),
     "BACKUP_BUCKET": ("String", "newsradar-backups-example"),
+    "BACKEND_IMAGE": ("String", "123456789012.dkr.ecr.eu-central-1.amazonaws.com/newsradar-api:prod"),
     "NEWSRADAR_HOSTING_PROVIDER": ("String", "AWS (Frankfurt) — şifreli ✓"),
 }
 json.dump({"Parameters": [{"Name": P + k, "Type": t, "Value": v} for k, (t, v) in vals.items()]},

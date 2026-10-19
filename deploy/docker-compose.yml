@@ -10,7 +10,8 @@ services:
   backend:
     build:
       context: ../backend
-    image: newsradar-api:local
+    # EC2: ECR'daki image (BACKEND_IMAGE, SSM'den .env'ye); yerelde ../backend'den build edilir.
+    image: ${BACKEND_IMAGE:-newsradar-api:local}
     env_file:
       - .env
     environment:
