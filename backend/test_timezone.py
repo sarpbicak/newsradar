@@ -5,6 +5,7 @@ Doğrular:
   (B) API zaman damgalarını '+00:00' ekiyle serileştirir (tarayıcı yerel saat sanmaz)
   (C) 'son başarılı çağrı' az önce kaydedildiyse ~0 sn önce (eskiden Berlin'de 2 sa)
   (D) mevcut naive satırlar (eski veri) da UTC olarak okunur; karşılaştırmalar aware
+  (E) admin model kırılımında legacy satırın adı
 Çalıştır: python test_timezone.py
 """
 import os
@@ -66,6 +67,11 @@ with session_scope() as s:
     s.add(LlmUsage(model=None, prompt_tokens=10, completion_tokens=5, total_tokens=15, calls=1,
                    created_at=datetime.now(timezone.utc) - timedelta(hours=1)))
 check(budget.daily_tokens_used() >= 0, "günlük sayaç aware karşılaştırmayla çalışıyor")
+
+print("== E: legacy etiketi (admin model kırılımı) ==")
+rows = budget.usage_breakdown(datetime.now(timezone.utc) - timedelta(days=1))
+check(any(r["model"] == "openrouter (legacy, cost not tracked)" for r in rows),
+      f"legacy satır adı ({[r['model'] for r in rows]})")
 
 print("=" * 50)
 print(f"SONUÇ: {PASS} geçti, {FAIL} başarısız")

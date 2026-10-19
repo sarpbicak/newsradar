@@ -22,10 +22,12 @@ from .db.models import LlmUsage
 logger = logging.getLogger("newsradar.budget")
 
 _unpriced_warned: set[str] = set()
+# Çağrı başına kayıttan ÖNCEKİ satırlar (model=None) — OpenRouter dönemi, maliyet izlenmedi.
+LEGACY_LABEL = "openrouter (legacy, cost not tracked)"
 
 
 def _start_of_today_utc() -> datetime:
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(timezone.utc)
     return now.replace(hour=0, minute=0, second=0, microsecond=0)
 
 
@@ -111,7 +113,8 @@ def is_budget_exceeded() -> bool:
 
 def usage_breakdown(dt: datetime) -> list[dict]:
     """dt'den beri model başına kırılım (çağrı, token'lar, USD) — admin paneli.
-    Eski tarama-başı satırlar (model=None) 'eski kayıt' olarak gruplanır."""
+    Eski tarama-başı satırlar (model=None; OpenRouter dönemi, maliyet çağrı başına
+    izlenmiyordu) LEGACY_LABEL altında gruplanır."""
     with session_scope() as s:
         rows = s.execute(
             select(
@@ -130,7 +133,7 @@ def usage_breakdown(dt: datetime) -> list[dict]:
     out = []
     for model, calls, inp, outp, cw, cr, cost in rows:
         out.append({
-            "model": model or "legacy", "calls": int(calls),
+            "model": model or LEGACY_LABEL, "calls": int(calls),
             "input_tokens": int(inp), "output_tokens": int(outp),
             "cache_creation_tokens": int(cw), "cache_read_tokens": int(cr),
             "cost_usd": round(float(cost), 4),
