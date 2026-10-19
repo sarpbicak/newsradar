@@ -45,6 +45,7 @@ export default function PrivacyModal({ onClose }) {
               <li>{t("privacy.cIp", vars)}</li>
               <li>{t("privacy.c2")}</li>
               <li>{t("privacy.c3")}</li>
+              <li>{t("privacy.cFeedback")}</li>
             </ul>
           </div>
           <div>
