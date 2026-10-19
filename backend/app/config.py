@@ -130,6 +130,16 @@ class Settings:
         # tavan (model bağlamı geniş, çıktı tavanı maliyeti artırmaz — yalnızca kesilmeyi önler).
         self.max_output_tokens: int = int(_env("NEWSRADAR_MAX_OUTPUT_TOKENS", "16384"))
 
+        # İstemci IP'sinin kaynağı (hız sınırı, kötüye kullanım kayıtları) — security.get_client_ip:
+        #   render (varsayılan): Render kenarının kurduğu X-Forwarded-For'un İLK adresi.
+        #   caddy: Docker/EC2 — yalnızca Caddy'den gelen bağlantının başlığına güvenilir
+        #          (uvicorn --forwarded-allow-ips=<Caddy IP>); istemcinin XFF'i yok sayılır.
+        self.trusted_proxy: str = _env("NEWSRADAR_TRUSTED_PROXY", "render").lower()
+        if self.trusted_proxy not in ("render", "caddy"):
+            raise ValueError(
+                f"NEWSRADAR_TRUSTED_PROXY geçersiz: {self.trusted_proxy!r} (render | caddy)"
+            )
+
         # Deploy: frontend'in domain'i (CORS). Virgülle birden fazla verilebilir.
         # Boşsa yalnızca yerel Vite (localhost:5173) izinli. "*" = tümüne izin.
         self.frontend_url: str = _env("FRONTEND_URL", "")

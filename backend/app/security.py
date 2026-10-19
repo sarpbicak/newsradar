@@ -4,7 +4,7 @@
   ve çıplak sağlayıcı anahtarlarını (sk-ant-*, sk-or-v1-*, nvapi-*) ***'la maskeler.
 - install_log_masking: tüm log kayıtlarını mask_secrets'ten geçiren filtre (kök handler'lara).
 - LoginRateLimiter: IP başına başarısız giriş denemesini sınırlar (kaba kuvvet).
-- get_client_ip: proxy (Render) arkasında gerçek IP (X-Forwarded-For).
+- get_client_ip: proxy arkasında gerçek IP (NEWSRADAR_TRUSTED_PROXY=render|caddy).
 - prune_ip_records: kötüye kullanım önleme kayıtlarındaki IP'leri N gün sonra siler.
 """
 
@@ -75,21 +75,28 @@ def install_log_masking() -> None:
 
 
 def get_client_ip(request) -> str:
-    """İstemci IP'si — Render/proxy arkasında X-Forwarded-For'un İLK (en sol) adresi.
+    """İstemci IP'si — NEWSRADAR_TRUSTED_PROXY'ye göre (render | caddy).
 
-    RENDER: gerçek istemci IP'si XFF'in İLK adresidir (Render access log'unda da bunu
-    gösterir). SON (en sağ) adresi almak Render'ın DEĞİŞEN iç proxy IP'sini verir → her
-    istek 'yeni IP' sayılır ve hız sayacı hiç birikmez (canlıda yaşanan boşluk buydu).
+    render (varsayılan): X-Forwarded-For'un İLK (en sol) adresi. Render kenarı XFF'i kendi
+    belirlediği istemci IP'siyle kurar ve gerçek IP İLK adrestir (Render access log'u da
+    bunu gösterir). SON adres Render'ın DEĞİŞEN iç proxy IP'sidir → her istek 'yeni IP'
+    sayılır ve hız sayacı hiç birikmez (canlıda yaşanan boşluk buydu).
 
-    NOT (spoofing): teoride istemci kendi X-Forwarded-For'unu yollayıp ilk adresi
-    değiştirebilir; ancak Render kenarı XFF'i kendi belirlediği istemci IP'siyle kurar.
-    Çok katmanlı/güvenilmez proxy senaryosunda güvenilir-proxy derinliği ayarlanmalı.
+    caddy (Docker/EC2): istek başlıkları HİÇ okunmaz; uvicorn'un çözdüğü bağlantı adresi
+    (request.client.host) kullanılır. uvicorn --proxy-headers --forwarded-allow-ips=<Caddy
+    container IP'si> ile çalışır → X-Forwarded-For YALNIZCA bağlantı Caddy'den geliyorsa
+    dikkate alınır. Caddy de istemcinin yolladığı XFF'i atıp kendi gördüğü adresi yazar
+    (deploy/Caddyfile: header_up X-Forwarded-For {remote_host}). Sonuç: istemcinin
+    gönderdiği sahte XFF ne Caddy'den geçer ne de Caddy dışından gelen istekte kabul edilir.
     """
-    xff = request.headers.get("x-forwarded-for")
-    if xff:
-        parts = [p.strip() for p in xff.split(",") if p.strip()]
-        if parts:
-            return parts[0]
+    from .config import get_settings
+
+    if get_settings().trusted_proxy == "render":
+        xff = request.headers.get("x-forwarded-for")
+        if xff:
+            parts = [p.strip() for p in xff.split(",") if p.strip()]
+            if parts:
+                return parts[0]
     return request.client.host if request.client else "unknown"
 
 

@@ -166,12 +166,19 @@ def main():
             has_row = db.get(LoginRate, "9.8.7.6") is not None
         check(has_row, "login_rate satırı DB'de KALICI")
 
-        print("\n== XFF: İLK (en sol) adres = Render istemci IP'si ==")
+        from app.config import get_settings
         from app.security import get_client_ip
+        class _Peer:
+            host = "172.28.0.10"
         class _Req:
-            def __init__(self, xff): self.headers = {"x-forwarded-for": xff}; self.client = None
+            def __init__(self, xff): self.headers = {"x-forwarded-for": xff}; self.client = _Peer()
         ip = get_client_ip(_Req("31.206.162.84, 10.0.0.5, 10.0.0.9"))
-        check(ip == "31.206.162.84", f"XFF'in İLK adresi (Render istemci IP'si) alınır: {ip}")
+        if get_settings().trusted_proxy == "render":
+            print("\n== XFF (render): İLK (en sol) adres = Render istemci IP'si ==")
+            check(ip == "31.206.162.84", f"XFF'in İLK adresi (Render istemci IP'si) alınır: {ip}")
+        else:
+            print("\n== XFF (caddy): istek başlığı yok sayılır, uvicorn'un çözdüğü adres ==")
+            check(ip == "172.28.0.10", f"sahte XFF yok sayıldı, bağlantı adresi alındı: {ip}")
 
         print("\n== login_failed kullanıcı adıyla kaydediliyor ==")
         _ll2.reset_all()

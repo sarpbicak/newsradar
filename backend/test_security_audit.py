@@ -5,6 +5,7 @@ kabul edilmez. Bölümler: A kimlik/oturum, B yetki, C kota/kaynak, D girdi/enje
 E sır sızıntısı, F iş mantığı.
 
 Çalıştır:  python test_security_audit.py
+           NEWSRADAR_TRUSTED_PROXY=caddy python test_security_audit.py  (Docker/Caddy modu)
 Çıkış kodu 0 = bloklayıcı (Kritik/Önemli) bulgu yok.
 """
 from __future__ import annotations
@@ -44,7 +45,7 @@ from app.api.routes_auth import _sign  # noqa: E402
 from app.config import get_settings  # noqa: E402
 from app.db.database import session_scope  # noqa: E402
 from app.db.models import User  # noqa: E402
-from app.security import LoginRateLimiter  # noqa: E402
+from app.security import LoginRateLimiter, login_limiter  # noqa: E402
 
 # --- Log yakalama (Bölüm E: sır sızıntısı) ---
 LOGS: list[str] = []
@@ -272,6 +273,30 @@ def run_tests():
           f"C16 XFF spoof ile hesap brute-force ENGELLENDİ (hesap-bazlı kilit; 429 var={429 in spoof_codes})",
           "Kritik")
 
+    # C16b (yalnızca caddy modu) Caddy'yi ATLAYAN istek: bağlantı güvenilen proxy'den değil →
+    # sahte XFF yok sayılır, hız sınırı GERÇEK bağlantı adresini sayar (her istekte farklı
+    # sahte IP yollamak kilidi atlatmaz). Ayrı sunucu: forwarded_allow_ips Caddy'nin IP'si,
+    # test istemcisi (127.0.0.1) değil.
+    if get_settings().trusted_proxy == "caddy":
+        srv2 = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=PORT + 1, log_level="warning",
+                                             log_config=None, server_header=False,
+                                             proxy_headers=True, forwarded_allow_ips="172.28.0.10"))
+        threading.Thread(target=srv2.run, daemon=True).start()
+        for _ in range(100):
+            if srv2.started:
+                break
+            time.sleep(0.05)
+        with httpx.Client(base_url=f"http://127.0.0.1:{PORT + 1}", timeout=30) as c2:
+            direct = [c2.post("/users/login", headers={"X-Forwarded-For": f"9.9.{i}.{i}"},
+                              json={"username": "nouser2", "password": "x"}).status_code for i in range(7)]
+        peer_locked = LoginRateLimiter().locked_seconds("127.0.0.1") > 0
+        spoof_seen = any(LoginRateLimiter().locked_seconds(f"9.9.{i}.{i}") > 0 for i in range(7))
+        check(429 in direct and peer_locked and not spoof_seen,
+              f"C16b caddy: güvenilmeyen bağlantının sahte XFF'i yok sayıldı, kilit gerçek IP'de ({direct})",
+              "Kritik")
+        login_limiter.record_success("127.0.0.1")  # sonraki testler aynı adresten gelir
+        srv2.should_exit = True
+
     # C17 büyük girdi (DoS) → 422, çökme yok
     big_name = "x" * (10 * 1024 * 1024)
     r1 = c.post("/entities", headers=bearer(b_tok), json={"name": big_name, "type": "keyword", "query": "y"})
@@ -432,8 +457,12 @@ def summarize():
 
 def main():
     # server_header=False → üretimdeki --no-server-header ile aynı (Server sızıntısı yok).
+    # proxy_headers + forwarded_allow_ips: üretimdeki uvicorn bayraklarıyla aynı. Test istemcisi
+    # (127.0.0.1) burada GÜVENİLEN PROXY rolünde (render: Render kenarı, caddy: Caddy) →
+    # X-Forwarded-For ile istemci IP'si simüle edilir.
     config = uvicorn.Config(app, host="127.0.0.1", port=PORT, log_level="warning",
-                            log_config=None, server_header=False)
+                            log_config=None, server_header=False,
+                            proxy_headers=True, forwarded_allow_ips="127.0.0.1")
     server = uvicorn.Server(config)
     th = threading.Thread(target=server.run, daemon=True)
     th.start()
