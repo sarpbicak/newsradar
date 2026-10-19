@@ -26,6 +26,7 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.types import TypeDecorator
 
 # İzin verilen değerler (uygulama seviyesinde doğrulama; SQLite enum zorlamaz).
 ENTITY_TYPES = ("ticker", "keyword")
@@ -56,7 +57,30 @@ SENTIMENT_TRENDS = ("improving", "stable", "deteriorating")
 
 
 def utcnow() -> datetime:
+    """Şimdiki zaman — DAİMA UTC-aware. Uygulamadaki tüm "şimdi" bunu kullanır."""
     return datetime.now(timezone.utc)
+
+
+class UTCDateTime(TypeDecorator):
+    """UTC zaman damgası: DB'ye naive UTC yazılır (SQLite saat dilimi tutmaz; mevcut veriyle
+    uyumlu), okunurken DAİMA UTC-aware döner. Naive girdi UTC kabul edilir.
+
+    Neden: SQLAlchemy'nin SQLite DateTime'ı tz'yi sessizce atıp naive döndürüyordu; API
+    "2026-10-19T00:12:00" (eksiz) gönderiyor, tarayıcı bunu YEREL saat sanıyordu → Berlin'de
+    tam 2 saat fark ("son başarılı çağrı: 2 sa önce"). Aware değer "+00:00" ile serileşir."""
+
+    impl = DateTime
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None and value.tzinfo is not None:
+            value = value.astimezone(timezone.utc).replace(tzinfo=None)
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is not None and value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value
 
 
 def url_hash(url: str) -> str:
@@ -81,7 +105,7 @@ class Entity(Base):
     # Haber arama dili (özellikle keyword/NewsAPI için). Varsayılan 'en'.
     language: Mapped[str] = mapped_column(String(5), default="en", nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
 
     articles: Mapped[list["Article"]] = relationship(
         back_populates="entity", cascade="all, delete-orphan"
@@ -112,7 +136,7 @@ class UserWatchlist(Base):
     entity_id: Mapped[int] = mapped_column(
         ForeignKey("entities.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    added_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    added_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
 
     __table_args__ = (
         UniqueConstraint("user_id", "entity_id", name="uq_user_watchlist"),
@@ -136,9 +160,9 @@ class Article(Base):
     source: Mapped[str] = mapped_column(String(200), default="", nullable=False)
     description: Mapped[str] = mapped_column(Text, default="", nullable=False)
     image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
-    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     provider: Mapped[str] = mapped_column(String(40), default="", nullable=False)
-    fetched_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    fetched_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
 
     # Ön-filtre: entity adı/ticker'ı başlık+açıklamada hiç geçmiyorsa Claude'a
     # gönderilmeden elenir ve burada işaretlenir (tekrar değerlendirilmez, ayrıca
@@ -154,7 +178,7 @@ class Article(Base):
 
     # Makale-başı analiz (Claude doldurur; analiz edilene kadar analyzed=False)
     analyzed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    analyzed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    analyzed_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     sentiment: Mapped[float | None] = mapped_column(Float, nullable=True)      # -1..1
     event_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
     risk_flags: Mapped[list | None] = mapped_column(JSON, nullable=True)       # list[str]
@@ -181,7 +205,7 @@ class ApiCall(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     provider: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
-    called_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False, index=True)
+    called_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False, index=True)
 
 
 class LoginRate(Base):
@@ -197,7 +221,7 @@ class LoginRate(Base):
     ip: Mapped[str] = mapped_column(String(64), primary_key=True)
     attempts: Mapped[str] = mapped_column(Text, default="[]", nullable=False)  # JSON list[float]
     locked_until: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
 
 
 class LlmUsage(Base):
@@ -211,7 +235,7 @@ class LlmUsage(Base):
     __tablename__ = "llm_usage"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False, index=True)
     prompt_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     completion_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     total_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -233,10 +257,10 @@ class ProviderSkip(Base):
     __tablename__ = "provider_skips"
 
     key: Mapped[str] = mapped_column(String(120), primary_key=True)
-    until: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    until: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, index=True)
     code: Mapped[str] = mapped_column(String(40), nullable=False)   # messages kodu
     status: Mapped[int | None] = mapped_column(Integer, nullable=True)  # HTTP durumu
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
 
 
 class LlmHealthEvent(Base):
@@ -249,7 +273,7 @@ class LlmHealthEvent(Base):
     __tablename__ = "llm_health_events"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False, index=True)
     kind: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
     status_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
     detail: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -274,7 +298,7 @@ class Feedback(Base):
     user_agent: Mapped[str | None] = mapped_column(String(300), nullable=True)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=utcnow, nullable=False, index=True
+        UTCDateTime, default=utcnow, nullable=False, index=True
     )
 
 
@@ -305,8 +329,8 @@ class Suggestion(Base):
     # ÖNERİLEN şirketin neden gündemde olduğu (şirket-özel, tek cümle). Eski
     # kayıtlarda NULL → kartta hiç gösterilmez.
     why_relevant: Mapped[str | None] = mapped_column(Text, nullable=True)
-    first_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
-    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    first_seen_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
     dismissed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     __table_args__ = (UniqueConstraint("norm_key", name="uq_suggestion_norm"),)
@@ -328,7 +352,7 @@ class SuggestionDismissal(Base):
     suggestion_id: Mapped[int] = mapped_column(
         ForeignKey("suggestions.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    dismissed_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    dismissed_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
 
     __table_args__ = (
         UniqueConstraint("user_id", "suggestion_id", name="uq_suggestion_dismissal"),
@@ -352,7 +376,7 @@ class PriceSnapshot(Base):
     previous_close: Mapped[float | None] = mapped_column(Float, nullable=True)
     day_high: Mapped[float | None] = mapped_column(Float, nullable=True)
     day_low: Mapped[float | None] = mapped_column(Float, nullable=True)
-    fetched_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    fetched_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
 
 
 class AnalystSnapshot(Base):
@@ -382,7 +406,7 @@ class AnalystSnapshot(Base):
     sell: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     strong_sell: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     period: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    fetched_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    fetched_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
 
 
 # İzin verilen kullanım eylemi tipleri (usage_events.event_type).
@@ -406,11 +430,11 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(50), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(200), nullable=False)  # bcrypt
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
-    last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+    last_login_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     # Son aktiflik: HER kimlik-doğrulanmış istekte (get_current_user) tazelenir —
     # login gibi belirli eylemler değil, sadece siteyi gezmek de sayılır (throttle'lı).
-    last_active_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_active_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     # "NewsRadar ne yapar?" açıklama kutusu kapatıldı mı (kullanıcı tercihi; kalıcı).
     guide_dismissed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # İlk giriş tutorial'ı tamamlandı/kapatıldı mı (bir daha gösterilmez; kalıcı).
@@ -446,7 +470,7 @@ class UsageEvent(Base):
     event_type: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
     detail: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=utcnow, nullable=False, index=True
+        UTCDateTime, default=utcnow, nullable=False, index=True
     )
 
 
@@ -459,7 +483,7 @@ class EntityAnalysis(Base):
     entity_id: Mapped[int] = mapped_column(
         ForeignKey("entities.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
     # Bu değerlendirmenin dili ("tr" | "en"). Aynı taramada her iki dilde birer satır
     # üretilir; kullanıcı diline göre ilgili satır gösterilir. Eski kayıtlar "tr".
     language: Mapped[str] = mapped_column(String(5), default="tr", nullable=False, index=True)

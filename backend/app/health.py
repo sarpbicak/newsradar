@@ -38,7 +38,7 @@ def record_llm_health(kind: str, detail: str | None = None, status_code: int | N
 def health_snapshot() -> dict:
     """Admin paneli için: son olay (kind/at) + son 24 saatteki kota hatası sayısı +
     en son başarılı çağrı zamanı. Hiç olay yoksa alanlar None/0."""
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(timezone.utc)
     since_24h = now - timedelta(hours=24)
     with session_scope() as s:
         last = s.scalars(

@@ -19,7 +19,7 @@ WARN_RATIO = 0.8
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(timezone.utc)
 
 
 def record_call(session: Session, provider: str = "newsapi") -> None:

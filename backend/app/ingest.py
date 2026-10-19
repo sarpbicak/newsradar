@@ -57,7 +57,7 @@ def _recently_fetched(session: Session, entity: Entity, hours: int) -> bool:
     )
     if latest is None:
         return False
-    return latest >= datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)
+    return latest >= datetime.now(timezone.utc) - timedelta(hours=hours)
 
 
 def fetch_for_entity(
@@ -143,7 +143,7 @@ def fetch_for_entity(
             source=fa.source,
             description=fa.description,
             image_url=fa.image_url,
-            published_at=_naive_utc(fa.published_at),
+            published_at=_utc(fa.published_at),
             provider=outcome.provider,
         )
         session.add(article)
@@ -191,10 +191,10 @@ def fetch_all(
     return [fetch_for_entity(session, e, lookback_hours, manual) for e in entities]
 
 
-def _naive_utc(dt: datetime | None) -> datetime | None:
-    """SQLite DateTime kolonu için timezone'suz UTC datetime'a çevirir."""
+def _utc(dt: datetime | None) -> datetime | None:
+    """UTC-aware datetime'a çevirir (naive girdi UTC kabul edilir; DB tipi UTCDateTime)."""
     if dt is None:
         return None
-    if dt.tzinfo is not None:
-        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
-    return dt
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)

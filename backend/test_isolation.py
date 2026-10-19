@@ -163,7 +163,7 @@ def main():
             uid = db.query(User).filter(User.username == "userd").first().id
             for _ in range(5):
                 db.add(UsageEvent(user_id=uid, event_type="refresh",
-                                  created_at=datetime.now(timezone.utc).replace(tzinfo=None)))
+                                  created_at=datetime.now(timezone.utc)))
         r = client.post("/refresh", headers=D)
         check(r.status_code == 429, f"6. yenileme reddedildi 429 (alınan: {r.status_code})")
         check("5/5" in r.json().get("detail", ""), f"Mesaj limiti belirtir: {r.json().get('detail')}")
@@ -174,7 +174,7 @@ def main():
             check(adm_u.is_admin is True, "theadmin gerçekten admin")
             for _ in range(10):
                 db.add(UsageEvent(user_id=adm_u.id, event_type="refresh",
-                                  created_at=datetime.now(timezone.utc).replace(tzinfo=None)))
+                                  created_at=datetime.now(timezone.utc)))
             db.flush()
             ok, _lim, _used = _refresh_quota(db, adm_u)
             check(ok is True, "Admin 10 olaydan sonra bile kota muaf (_refresh_quota ok=True)")
@@ -265,7 +265,7 @@ def main():
         client.get("/entities", headers=H)
         with session_scope() as db:
             after = db.get(User, hid).last_active_at
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = datetime.now(timezone.utc)
         check(after is not None, "GET /entities sonrası last_active_at DOLU (siteyi gezmek sayılıyor)")
         check(after is not None and (now - after).total_seconds() < 10,
               f"last_active_at gerçek zamanlı (fark: {None if after is None else round((now-after).total_seconds(),1)}s)")

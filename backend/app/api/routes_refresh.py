@@ -31,7 +31,7 @@ def _refresh_quota(db: Session, user: User) -> tuple[bool, int, int]:
     limit = get_settings().refresh_limit_for(user)
     if limit <= 0:  # 0 = sınırsız (admin)
         return True, limit, 0
-    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=24)
+    since = datetime.now(timezone.utc) - timedelta(hours=24)
     used = db.scalar(
         select(func.count()).select_from(UsageEvent).where(
             UsageEvent.user_id == user.id,

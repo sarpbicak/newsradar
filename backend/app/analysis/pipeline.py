@@ -63,6 +63,8 @@ def _effective_batch_size(batch_size: int, language: str | None) -> int:
     return batch_size
 
 
+_EPOCH = datetime.min.replace(tzinfo=timezone.utc)  # tarihsiz makaleler sıralamada sona
+
 AGGREGATE_LOOKBACK = 200  # entity değerlendirmesinde kaç son makale bağlam olarak verilir
 # (tavanla uyumlu: değerlendirme son 40'a değil, birikmiş son ~200 analiz edilmiş
 #  makaleye bakar; _read_assessment_payload lookback = max(AGGREGATE_LOOKBACK, cap)).
@@ -271,7 +273,7 @@ def _accumulate_suggestions(
     Gerekçe olarak her şirketin KENDİ `why_relevant`'ı kullanılır (makale-alaka
     gerekçesi DEĞİL — o iç not kullanıcıya sızmasın).
     """
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(timezone.utc)
     for c in co_list:
         why = c.get("why_relevant")
         key = _suggestion_key(c["name"], c["ticker"])
@@ -332,7 +334,7 @@ def reconcile_prefilter() -> int:
 
 def prune_stale_suggestions() -> int:
     """30 günden beri görülmemiş ve hâlâ az anılan (<3) önerileri temizler."""
-    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=SUGGESTION_TTL_DAYS)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=SUGGESTION_TTL_DAYS)
     with session_scope() as session:
         stale = session.scalars(
             select(Suggestion.id).where(
@@ -452,7 +454,7 @@ def _dedup_by_title(articles: list[Article]) -> tuple[list[Article], int]:
                 a.prefilter_version = PREFILTER_VERSION
                 duplicates += 1
     # En yeni önce, tarihsizler sona (tavan uygulanınca güncel haberler öncelikli).
-    reps.sort(key=lambda a: a.published_at or datetime.min, reverse=True)
+    reps.sort(key=lambda a: a.published_at or _EPOCH, reverse=True)
     return reps, duplicates
 
 
@@ -530,7 +532,7 @@ def _apply_article_results(entity_id: int, batch_datas: list[dict]) -> dict:
     returned = 0    # Claude'un döndürdüğü toplam analiz sayısı
     unmatched = 0   # döndürülen ama bu entity'nin makalesine eşleşmeyen id (Claude id uydurmuş/karıştırmış)
     invalid = 0     # sanitize edilemeyen (bozuk şema) analiz
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(timezone.utc)
     with session_scope() as session:
         source_entity = session.get(Entity, entity_id)
         source_language = source_entity.language if source_entity else "en"
@@ -604,7 +606,7 @@ def _read_assessment_payload(entity_id: int) -> list[dict]:
 
 def _assessment_due(entity_id: int, language: str) -> str | None:
     """Bu dilde yeni değerlendirme gerekiyorsa SEBEBİNİ, gerekmiyorsa None döndürür."""
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(timezone.utc)
     with session_scope() as session:
         last_at = session.scalar(
             select(EntityAnalysis.created_at)

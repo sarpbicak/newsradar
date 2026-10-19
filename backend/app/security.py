@@ -136,7 +136,7 @@ class LoginRateLimiter:
                 prev = []
             prev.append(now)
             n = len(prev)
-            row.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+            row.updated_at = datetime.now(timezone.utc)
             if n >= self.max_fails:
                 row.locked_until = now + self.lock_s
                 row.attempts = "[]"  # sıfırla; kilit süresi işliyor
@@ -208,7 +208,7 @@ def prune_ip_records(days: int | None = None) -> dict:
     from .db.models import LoginRate, UsageEvent
 
     days = days if days is not None else get_settings().ip_retention_days
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(timezone.utc)
     cutoff = now - timedelta(days=days)
     with session_scope() as s:
         res = s.execute(

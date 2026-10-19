@@ -22,7 +22,7 @@ SKIP_HOURS = 24
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(timezone.utc)
 
 
 def _key(provider: str, symbol: str) -> str:

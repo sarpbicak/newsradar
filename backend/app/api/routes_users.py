@@ -135,7 +135,7 @@ def register(payload: RegisterIn, request: Request, db: Session = Depends(get_db
             _record_register_failed("duplicate", username, request)
             raise HTTPException(status_code=409, detail="Bu kullanıcı adı zaten alınmış.")
 
-        user.last_login_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        user.last_login_at = datetime.now(timezone.utc)
         record_event(db, user.id, "login", {"via": "register"})
         # KİLİT İÇİNDE commit: satır kalıcı olsun ki bir sonraki eşzamanlı kayıt onu saysın.
         db.commit()
@@ -181,7 +181,7 @@ def login(payload: UserLoginIn, request: Request, db: Session = Depends(get_db))
         raise HTTPException(status_code=401, detail="Kullanıcı adı veya şifre hatalı.")
     login_limiter.record_success(ip)
     account_limiter.record_success(akey)  # başarılı giriş → hesap kilidini temizle
-    user.last_login_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    user.last_login_at = datetime.now(timezone.utc)
     record_event(db, user.id, "login", None)
     return UserTokenOut(token=make_user_token(user), user=_user_out(user))
 
@@ -212,7 +212,7 @@ def upgrade(payload: RegisterIn, user: User = Depends(get_current_user),
     user.username = username
     user.password_hash = hash_password(payload.password)
     user.is_anonymous = False
-    user.last_login_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    user.last_login_at = datetime.now(timezone.utc)
     record_event(db, user.id, "login", {"via": "upgrade"})
     db.flush()
     return UserTokenOut(token=make_user_token(user), user=_user_out(user))

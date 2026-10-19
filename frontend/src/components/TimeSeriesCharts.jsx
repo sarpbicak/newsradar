@@ -19,7 +19,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { tt } from "../i18n.jsx";
+import { tt, parseUtc } from "../i18n.jsx";
 
 const DAY = 86400000;
 const NAVY = "#1E3A5F";   // vurgu — grafik ana çizgisi
@@ -29,7 +29,7 @@ const MUTED = "#8A867E";  // eksen etiketi / haber havası
 const RANGES = [["chart.r7", 7], ["chart.r30", 30], ["chart.r90", 90], ["chart.rangeAll", Infinity]];
 
 function dayKey(iso) {
-  const d = new Date(iso);
+  const d = parseUtc(iso);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 function fmtLabel(ts) {

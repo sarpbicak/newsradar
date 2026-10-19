@@ -68,7 +68,7 @@ class FakeClient:
 
 
 def now():
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(timezone.utc)
 
 
 init_db()

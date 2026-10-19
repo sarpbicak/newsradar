@@ -103,7 +103,7 @@ def get_current_user(
     # Son aktiflik: HER kimlik-doğrulanmış istekte tazele (dashboard, status polling
     # dahil). Yazma amplifikasyonunu önlemek için hafif throttle — son güncellemeden
     # bu kadar saniye geçmediyse yazma (görüntü zaten dakika/"az önce" hassasiyetinde).
-    now_dt = datetime.now(timezone.utc).replace(tzinfo=None)
+    now_dt = datetime.now(timezone.utc)
     la = user.last_active_at
     if la is None or (now_dt - la).total_seconds() >= _ACTIVE_THROTTLE_S:
         user.last_active_at = now_dt  # get_db istek sonunda commit eder

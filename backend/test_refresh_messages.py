@@ -101,12 +101,12 @@ check(w1 == [], f"beklenen 403 → kullanıcıya uyarı YOK ({w1})")
 with session_scope() as s:
     row = s.get(ProviderSkip, "fmp-target:AAPL")
     check(row is not None and row.code == "http_error" and row.status == 403
-          and row.until > datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=23),
+          and row.until > datetime.now(timezone.utc) + timedelta(hours=23),
           "provider_skips: 403 kaydı ~24 saat")
 analyst_mod.refresh_analyst({apple_id})
 check(tgt.calls == 1 and rec.calls == 2, f"24 saat içinde FMP'ye tekrar gidilmedi (fmp={tgt.calls}, finnhub={rec.calls})")
 with session_scope() as s:
-    s.get(ProviderSkip, "fmp-target:AAPL").until = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=1)
+    s.get(ProviderSkip, "fmp-target:AAPL").until = datetime.now(timezone.utc) - timedelta(minutes=1)
 analyst_mod.refresh_analyst({apple_id})
 check(tgt.calls == 2, "süre dolunca yeniden denendi")
 tgt.result = AnalystResult(provider="fmp-target",

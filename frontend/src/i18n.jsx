@@ -517,19 +517,28 @@ export function fmtMsg(m, t) {
   return m.entity ? `[${m.entity}] ${s}` : s;
 }
 
+// API zaman damgası → Date. Backend UTC-aware ("+00:00") gönderir; eski/ekisiz bir değer
+// gelirse UTC KABUL EDİLİR (tarayıcı ekisiz ISO'yu yerel saat sanıyordu → Berlin'de 2 sa fark).
+export function parseUtc(v) {
+  if (v == null || v instanceof Date || typeof v === "number") return new Date(v);
+  const s = String(v);
+  const hasTz = /([zZ]|[+-]\d{2}:?\d{2})$/.test(s);
+  return new Date(hasTz || !s.includes("T") ? s : `${s}Z`);
+}
+
 // Dil-farkında tarih/zaman yardımcıları (locale'e göre biçim).
 const LOCALE = () => (_lang === "tr" ? "tr-TR" : "en-US");
 export function fmtDate(iso) {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString(LOCALE(), { day: "2-digit", month: "short" });
+  return parseUtc(iso).toLocaleDateString(LOCALE(), { day: "2-digit", month: "short" });
 }
 export function fmtDateTime(iso) {
   if (!iso) return "—";
-  return new Date(iso).toLocaleString(LOCALE());
+  return parseUtc(iso).toLocaleString(LOCALE());
 }
 export function timeAgo(iso) {
   if (!iso) return _lang === "tr" ? "hiç" : "never";
-  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  const diff = (Date.now() - parseUtc(iso).getTime()) / 1000;
   const tr = _lang === "tr";
   if (diff < 60) return tr ? "az önce" : "just now";
   if (diff < 3600) return `${Math.floor(diff / 60)}${tr ? " dk önce" : "m ago"}`;

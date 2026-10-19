@@ -40,7 +40,7 @@ router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(requir
 
 
 def _start_of_today() -> datetime:
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(timezone.utc)
     return now.replace(hour=0, minute=0, second=0, microsecond=0)
 
 

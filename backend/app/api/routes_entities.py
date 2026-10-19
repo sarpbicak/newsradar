@@ -54,7 +54,7 @@ def _daily_new_entity_ok(db: Session, user: User) -> bool:
     cap = get_settings().daily_entity_add_cap
     if cap <= 0 or getattr(user, "is_admin", False):
         return True
-    since = datetime.now(timezone.utc).replace(tzinfo=None).replace(
+    since = datetime.now(timezone.utc).replace(
         hour=0, minute=0, second=0, microsecond=0)
     n = db.scalar(
         select(func.count()).select_from(Entity).where(Entity.created_at >= since)
@@ -85,7 +85,7 @@ def list_entities(
     # Eşitlikte en son güncellenen öne geçer. Kalanlar tier=2 (sıkışık liste).
     candidates = [c for c in cards if c.priority_score >= TIER1_MIN_SCORE]
     candidates.sort(
-        key=lambda c: (c.priority_score, c.last_updated or datetime.min),
+        key=lambda c: (c.priority_score, c.last_updated or datetime.min.replace(tzinfo=timezone.utc)),
         reverse=True,
     )
     for c in candidates[:TIER1_MAX_CARDS]:

@@ -38,7 +38,7 @@ def refresh_prices(entity_ids: set[int] | None = None) -> list[dict]:
     if not provider.is_available():
         return warnings  # anahtar yoksa sessizce atla (haber tarafı zaten uyarıyor)
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(timezone.utc)
     with session_scope() as session:
         q = select(Entity).where(Entity.active.is_(True), Entity.type == "ticker")
         if entity_ids is not None:
@@ -105,7 +105,7 @@ def price_context_for(entity_id: int) -> dict | None:
         if latest is None:
             return None
         ctx: dict = {"price": latest.price, "change_percent": latest.change_percent}
-        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=WEEK_WINDOW_DAYS)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=WEEK_WINDOW_DAYS)
         old = session.scalar(
             select(PriceSnapshot)
             .where(PriceSnapshot.entity_id == entity_id, PriceSnapshot.fetched_at >= cutoff)
