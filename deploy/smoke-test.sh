@@ -16,16 +16,18 @@ fi
 FAILS=0
 ok()   { echo "  ✓ $1"; }
 bad()  { echo "  ✗ $1"; FAILS=$((FAILS + 1)); }
-expect() { [[ "$2" == "$3" ]] && ok "$1 ($2)" || bad "$1: beklenen $3, gelen $2"; }
+# report <önceki komutun kodu> <başarı mesajı> <hata mesajı>
+report() { if (($1 == 0)); then ok "$2"; else bad "$3"; fi; }
+expect() { if [[ "$2" == "$3" ]]; then ok "$1 ($2)"; else bad "$1: beklenen $3, gelen $2"; fi; }
 
 echo "== $HOST"
 expect "/health" "$("${CURL[@]}" -o /dev/null -w '%{http_code}' "https://$HOST/health")" 200
 
-HDRS="$("${CURL[@]}" -o /dev/null -D - "https://$HOST/health" | tr -d '\r' | tr 'A-Z' 'a-z')"
+HDRS="$("${CURL[@]}" -o /dev/null -D - "https://$HOST/health" | tr -d '\r' | tr '[:upper:]' '[:lower:]')"
 for h in "strict-transport-security: max-age=31536000" "x-content-type-options: nosniff" "referrer-policy: no-referrer"; do
-  grep -q "^$h" <<<"$HDRS" && ok "başlık: $h" || bad "başlık eksik: $h"
+  grep -q "^$h" <<<"$HDRS"; report $? "başlık: $h" "başlık eksik: $h"
 done
-grep -qE "^(server|via):" <<<"$HDRS" && bad "Server/Via başlığı sızıyor" || ok "Server/Via başlığı yok"
+! grep -qE "^(server|via):" <<<"$HDRS"; report $? "Server/Via başlığı yok" "Server/Via başlığı sızıyor"
 
 expect "http → https" "$("${CURL[@]}" -o /dev/null -w '%{http_code}' "http://$HOST/health")" 308
 
@@ -36,7 +38,7 @@ rm -f "$BIG"
 
 if [[ "$HOST" == *localhost ]]; then
   code="$(curl -s --max-time 3 -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/health)"
-  [[ "$code" == "000" ]] && ok "backend portu dışarıya kapalı" || bad "backend 8000 dışarıdan erişilebilir ($code)"
+  if [[ "$code" == "000" ]]; then ok "backend portu dışarıya kapalı"; else bad "backend 8000 dışarıdan erişilebilir ($code)"; fi
 fi
 
 if [[ "$IP_TEST" == "--ip-test" ]]; then
@@ -45,10 +47,10 @@ if [[ "$IP_TEST" == "--ip-test" ]]; then
     codes+=" $("${CURL[@]}" -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
       -H "X-Forwarded-For: 6.6.6.$i" -d "{\"username\":\"$user\",\"password\":\"x\"}" "https://$HOST/users/login")"
   done
-  [[ "$codes" == *429 ]] && ok "sahte XFF'e rağmen IP kilidi (kodlar:$codes)" || bad "IP kilidi yok (kodlar:$codes)"
+  if [[ "$codes" == *429 ]]; then ok "sahte XFF'e rağmen IP kilidi (kodlar:$codes)"; else bad "IP kilidi yok (kodlar:$codes)"; fi
   if command -v docker >/dev/null && docker compose ps -q backend >/dev/null 2>&1; then
-    docker compose logs backend 2>/dev/null | grep -q "6\.6\.6\." && bad "sahte adres backend'e ulaştı" \
-      || ok "backend sahte adresi hiç görmedi"
+    ! docker compose logs backend 2>/dev/null | grep -q "6\.6\.6\."
+    report $? "backend sahte adresi hiç görmedi" "sahte adres backend'e ulaştı"
   fi
 fi
 
