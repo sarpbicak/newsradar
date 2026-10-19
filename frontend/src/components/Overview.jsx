@@ -1,5 +1,5 @@
 // Genel görünüm: Katman 1 (bugün önemli — büyük kartlar) + Katman 2 (liste — satırlar).
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { useIsMobile } from "./ui.jsx";
 import { tt } from "../i18n.jsx";
@@ -18,7 +18,7 @@ const STARTERS = [
 ];
 
 // Boş durum: yeni kullanıcı için açıklama + popüler şirketlerle hızlı başlangıç.
-function EmptyState({ onCreate }) {
+function EmptyState({ onCreate, onHowItWorks }) {
   const [adding, setAdding] = useState(null);
   const [err, setErr] = useState(null);
   async function add(s) {
@@ -40,6 +40,14 @@ function EmptyState({ onCreate }) {
       <p className="mx-auto mt-2 max-w-md text-[15px] leading-relaxed text-slate-400">
         {tt("ov.emptyBody")}
       </p>
+      {onHowItWorks && (
+        <button
+          onClick={onHowItWorks}
+          className="mt-3 text-sm font-medium text-accent underline underline-offset-2 hover:text-accent-hover"
+        >
+          {tt("hiw.link")}
+        </button>
+      )}
       <div className="mt-5 flex flex-wrap justify-center gap-2">
         {STARTERS.map((s) => (
           <button
@@ -82,6 +90,8 @@ export default function Overview({
   onAddSuggestion,
   onDismissSuggestion,
   scanning = false,
+  onHowItWorks,
+  focusAdd = 0,
 }) {
   const [sort, setSort] = useState("risk");
   const isMobile = useIsMobile();
@@ -125,7 +135,7 @@ export default function Overview({
   return (
     <div className="space-y-6">
       {cards.length === 0 ? (
-        <EmptyState onCreate={onCreate} />
+        <EmptyState onCreate={onCreate} onHowItWorks={onHowItWorks} />
       ) : fewMode ? (
         /* ── AZ ŞİRKET — büyük kart(lar), nötr başlık ─────────────── */
         <section className="space-y-3">
@@ -205,15 +215,19 @@ export default function Overview({
       )}
 
       {/* İzleme listesi — katlanabilir, varsayılan kapalı */}
-      <Collapsible title={tt("ov.watchlist", { n: cards.length })}>
-        <WatchlistManager cards={cards} onCreate={onCreate} onDelete={onDelete} embedded />
+      <Collapsible title={tt("ov.watchlist", { n: cards.length })} openSignal={focusAdd}>
+        <WatchlistManager cards={cards} onCreate={onCreate} onDelete={onDelete} embedded focusSignal={focusAdd} />
       </Collapsible>
     </div>
   );
 }
 
-function Collapsible({ title, children }) {
+// openSignal değişince (ör. "Kendi şirketlerinle dene") kendiliğinden açılır.
+function Collapsible({ title, children, openSignal = 0 }) {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (openSignal) setOpen(true);
+  }, [openSignal]);
   return (
     <div className="rounded-xl border border-ink-600 bg-ink-800/60">
       <button

@@ -23,6 +23,7 @@ from . import (
     routes_dashboard,
     routes_entities,
     routes_feedback,
+    routes_how,
     routes_refresh,
     routes_session,
     routes_suggestions,
@@ -161,6 +162,7 @@ app.include_router(routes_refresh.router, dependencies=_user)
 app.include_router(routes_chat.router, dependencies=_user)
 app.include_router(routes_suggestions.router, dependencies=_user)
 app.include_router(routes_symbols.router, dependencies=_user)
+app.include_router(routes_how.router, dependencies=_user)
 
 # Admin paneli — yalnızca is_admin (router içinde require_admin).
 app.include_router(routes_admin.router)

@@ -7,7 +7,7 @@ import EntityDetail from "./components/EntityDetail.jsx";
 import AccountModal from "./components/AccountModal.jsx";
 import PrivacyModal from "./components/PrivacyModal.jsx";
 import AdminPanel from "./components/AdminPanel.jsx";
-import Tutorial from "./components/Tutorial.jsx";
+import HowItWorks from "./components/HowItWorks.jsx";
 import FeedbackWidget from "./components/FeedbackWidget.jsx";
 import ScanStrip from "./components/ScanStrip.jsx";
 import { LanguageModal, LanguageSwitcher } from "./components/LanguageBits.jsx";
@@ -34,8 +34,8 @@ export default function App({ setLang }) {
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [view, setView] = useState("dashboard");     // "dashboard" | "admin"
   const [menuOpen, setMenuOpen] = useState(false);   // mobil header menüsü
-  const [showTutorial, setShowTutorial] = useState(false); // ilk giriş tutorial'ı
-  const tutorialAutoRef = useRef(false);
+  const [showHow, setShowHow] = useState(false); // "Nasıl çalışır?" anlatımı
+  const [focusAdd, setFocusAdd] = useState(0); // "Kendi şirketlerinle dene" → ekleme alanı
   const isMobile = useIsMobile();
   const [pull, setPull] = useState(0);          // mobil aşağı-çek mesafesi (px)
   const pullStart = useRef(null);
@@ -73,25 +73,14 @@ export default function App({ setLang }) {
     });
   }, []);
 
-  // Yeni kullanıcı: ilk girişte tutorial'ı otomatik aç (oturumda bir kez).
-  // "Nasıl çalışır?" ile de istendiğinde tekrar açılır (aşağıdaki header butonu).
-  useEffect(() => {
-    if (user && !user.tutorial_done && !tutorialAutoRef.current) {
-      tutorialAutoRef.current = true;
-      setShowTutorial(true);
-    }
-  }, [user]);
-
-  // Tutorial'ı kapat/bitir: kalıcı işaretle (bir daha OTOMATİK gösterilmez; "Nasıl
-  // çalışır?" ile elle yine açılabilir).
-  const closeTutorial = useCallback(async () => {
-    setShowTutorial(false);
-    try {
-      const u = await api.finishTutorial();
-      setUser(u);
-    } catch {
-      /* yazılamadıysa yoksay — UI zaten kapandı */
-    }
+  // "Nasıl çalışır?" ilk girişte OTOMATİK açılmaz — header'daki buton ya da boş ekrandaki
+  // "Nasıl çalışır? (30 sn)" bağlantısıyla açılır.
+  const closeHow = useCallback(() => setShowHow(false), []);
+  // Son adım: modalı kapat, genel görünüme dön, şirket ekleme alanına odaklan.
+  const tryOwnCompanies = useCallback(() => {
+    setShowHow(false);
+    setSelected(null);
+    setFocusAdd((n) => n + 1);
   }, []);
 
   // Açılış: token varsa doğrula; yoksa/geçersizse ANONİM cihaz oturumu başlat.
@@ -467,7 +456,7 @@ export default function App({ setLang }) {
 
             {/* Nasıl çalışır — masaüstünde görünür; mobilde "…" menüsüne toplanır */}
             <button
-              onClick={() => setShowTutorial(true)}
+              onClick={() => setShowHow(true)}
               title={t("header.howItWorks")}
               aria-label={t("header.howItWorks")}
               className="hidden min-h-[44px] items-center gap-1.5 rounded-lg px-2.5 text-sm text-slate-500 transition hover:bg-ink-700 hover:text-slate-200 md:inline-flex"
@@ -549,7 +538,7 @@ export default function App({ setLang }) {
                     </div>
                     {/* Nasıl çalışır — tutorial'ı tekrar aç */}
                     <button
-                      onClick={() => { setShowTutorial(true); setMenuOpen(false); }}
+                      onClick={() => { setShowHow(true); setMenuOpen(false); }}
                       className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-slate-300 hover:bg-ink-700"
                     >
                       <HelpCircle className="h-4 w-4" /> {t("header.howItWorks")}
@@ -724,6 +713,8 @@ export default function App({ setLang }) {
             onAddSuggestion={handleAddSuggestion}
             onDismissSuggestion={handleDismissSuggestion}
             scanning={isRefreshing}
+            onHowItWorks={() => setShowHow(true)}
+            focusAdd={focusAdd}
           />
         ) : (
           <EntityDetail entityId={selected} lang={lang} isAdmin={!!user?.is_admin} onBack={() => setSelected(null)} />
@@ -732,7 +723,7 @@ export default function App({ setLang }) {
         )}
       </main>
 
-      {showTutorial && <Tutorial onClose={closeTutorial} />}
+      {showHow && <HowItWorks onClose={closeHow} onTry={tryOwnCompanies} />}
       {account && (
         <AccountModal
           mode={account}

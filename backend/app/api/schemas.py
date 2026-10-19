@@ -449,3 +449,22 @@ class ProviderStatusOut(BaseModel):
     # Kişisel entity kotası (kademeli; kartta "N/limit" göstermek için).
     entity_limit: int = 0
     entity_used: int = 0
+
+
+class HowHeadlineOut(BaseModel):
+    """'Nasıl çalışır?' — gerçek bir haber başlığı + AI etiketi."""
+
+    title: str
+    source: str | None = None
+    label: str                      # positive | negative | neutral | irrelevant
+    published_at: datetime | None = None
+
+
+class HowItWorksOut(BaseModel):
+    """'Nasıl çalışır?' anlatımının gerçek örnek verisi (uydurma yok)."""
+
+    available: bool = False         # uygun örnek (güncel analizli seed şirket) yoksa False
+    entity: EntityCardOut | None = None
+    headlines: list[HowHeadlineOut] = []
+    articles_week: int = 0          # son 7 günde toplanan (elenenler dahil)
+    providers: list[str] = []       # gerçek kaynak adları (Finnhub, NewsAPI…)

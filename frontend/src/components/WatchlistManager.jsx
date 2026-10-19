@@ -12,8 +12,18 @@ const LANGUAGES = [
   { code: "fr", tkey: "lang.fr" },
 ];
 
-export default function WatchlistManager({ cards, onCreate, onDelete, embedded = false }) {
+export default function WatchlistManager({ cards, onCreate, onDelete, embedded = false, focusSignal = 0 }) {
   const { t } = useI18n();
+  const nameInputRef = useRef(null);
+  // "Kendi şirketlerinle dene" → ad alanına odaklan ve görünür kaydır.
+  useEffect(() => {
+    if (!focusSignal) return;
+    const id = setTimeout(() => {
+      nameInputRef.current?.focus();
+      nameInputRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 60);
+    return () => clearTimeout(id);
+  }, [focusSignal]);
   const [name, setName] = useState("");
   const [type, setType] = useState("ticker");
   const [query, setQuery] = useState(""); // sembol (yalnızca ticker)
@@ -147,6 +157,7 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
             {type === "ticker" ? t("wl.nameSearch") : t("wl.nameTerm")}
           </label>
           <input
+            ref={nameInputRef}
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={type === "ticker" ? "Tesla" : "Aselsan"}

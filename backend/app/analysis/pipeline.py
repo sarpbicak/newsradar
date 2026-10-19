@@ -31,7 +31,8 @@ from ..config import get_settings
 from ..messages import msg
 from ..db.database import session_scope
 from ..db.models import (
-    PREFILTER_VERSION, Article, Entity, EntityAnalysis, PriceSnapshot, Suggestion,
+    PREFILTER_VERSION, Article, DiscardedArticle, Entity, EntityAnalysis, PriceSnapshot,
+    Suggestion,
 )
 from ..analyst import analyst_context_for
 from ..prices import price_context_for
@@ -81,6 +82,7 @@ _MAX_SPLIT_DEPTH = 6
 # okunacak analiz edilmiş makale üst sınırı (makale-başı analiz yine sınırsız).
 ASSESSMENT_READ_CAP = 200
 MAX_ANALYSIS_HISTORY = 100  # entity başına saklanacak en fazla değerlendirme kaydı
+MAX_DISCARDED_PER_ENTITY = 50  # entity başına saklanan elenen-makale kaydı
 # GEREKSİZ DEĞERLENDİRMEYİ ATLA (en büyük maliyet kazancı): entity değerlendirmesi (dil
 # başına) yalnızca (a) son değerlendirmeden sonra yeni analiz edilmiş makale varsa, (b) fiyat
 # o zamandan beri ≥ |%3| oynadıysa ya da (c) son değerlendirme 24 saatten eskiyse yapılır.
@@ -581,7 +583,14 @@ def _apply_article_results(entity_id: int, batch_datas: list[dict]) -> dict:
                     unmatched += 1
                     continue
                 if clean["relevance"] < RELEVANCE_THRESHOLD:
-                    session.delete(article)  # alakasız → panelde gürültü tutma
+                    # alakasız → panelde gürültü tutma; kısa kaydı kalsın ("Nasıl çalışır?"
+                    # gerçek bir elenen örnek gösterebilsin, haftalık sayıya girsin).
+                    session.add(DiscardedArticle(
+                        entity_id=entity_id, title=article.title, source=article.source,
+                        provider=article.provider, relevance=clean["relevance"],
+                        published_at=article.published_at, fetched_at=article.fetched_at,
+                    ))
+                    session.delete(article)
                     discarded += 1
                     continue
                 article.sentiment = clean["sentiment"]
@@ -598,6 +607,15 @@ def _apply_article_results(entity_id: int, batch_datas: list[dict]) -> dict:
                     _accumulate_suggestions(
                         session, entity_id, source_language, clean["co_mentioned"]
                     )
+        if discarded:
+            stale = session.scalars(
+                select(DiscardedArticle.id)
+                .where(DiscardedArticle.entity_id == entity_id)
+                .order_by(DiscardedArticle.created_at.desc())
+                .offset(MAX_DISCARDED_PER_ENTITY)
+            ).all()
+            if stale:
+                session.execute(delete(DiscardedArticle).where(DiscardedArticle.id.in_(stale)))
     return {
         "analyzed": analyzed, "discarded": discarded,
         "returned": returned, "unmatched": unmatched, "invalid": invalid,

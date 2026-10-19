@@ -135,6 +135,26 @@ body {
 /* Tamamlanınca birkaç saniye sonra yumuşak sönme. */
 .nr-strip--fade { animation: nr-strip-fade 0.5s ease forwards; }
 @keyframes nr-strip-fade { to { opacity: 0; } }
+/* "Nasıl çalışır?" — kısa (≤400ms) adım animasyonları. fill-mode both: son hal kalıcı;
+   prefers-reduced-motion'da (aşağıdaki genel kural) süre ~0 → animasyonsuz son hal. */
+.hiw-in { animation: hiw-in 0.3s ease both; }
+@keyframes hiw-in { from { opacity: 0; transform: translateX(14px); } }
+.hiw-pop { animation: hiw-pop 0.25s ease both; }
+@keyframes hiw-pop { from { opacity: 0; transform: scale(0.8); } }
+.hiw-drop { animation: hiw-drop 0.35s ease both; }
+@keyframes hiw-drop { to { opacity: 0.35; transform: translateY(6px); } }
+.hiw-merge { animation: hiw-merge 0.3s ease both; }
+@keyframes hiw-merge { to { opacity: 0; transform: translateY(18px) scale(0.7); } }
+.hiw-card-in { animation: hiw-card-in 0.3s ease 0.15s both; }
+@keyframes hiw-card-in { from { opacity: 0; transform: scale(0.96) translateY(-6px); } }
+/* reduced-motion: animasyon YOK, gecikme YOK — doğrudan son hal (statik görsel). Genel
+   kural süreyi sıfırlasa da satır içi animation-delay son hali geciktiriyordu. */
+@media (prefers-reduced-motion: reduce) {
+  .hiw-in, .hiw-pop, .hiw-drop, .hiw-merge, .hiw-card-in { animation: none !important; }
+  .hiw-drop { opacity: 0.35; transform: translateY(6px); }
+  .hiw-merge { display: none; }
+}
+
 /* reduced-motion: parlama ve geçişler dursun, çubuk kalsın. */
 @media (prefers-reduced-motion: reduce) {
   .nr-bar__shine { display: none; }

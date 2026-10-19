@@ -266,6 +266,29 @@ class ProviderSkip(Base):
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
 
 
+class DiscardedArticle(Base):
+    """LLM'in ALAKASIZ bulup elediği makalenin kısa kaydı (makalenin kendisi silinir).
+
+    "Nasıl çalışır?" anlatımı gerçek bir 'alakasız' örneği gösterebilsin ve haftalık
+    makale sayısı elenenleri de kapsasın diye tutulur. Entity başına son
+    MAX_DISCARDED_PER_ENTITY kayıt saklanır (pipeline._apply_article_results).
+    """
+
+    __tablename__ = "discarded_articles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    entity_id: Mapped[int] = mapped_column(
+        ForeignKey("entities.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    source: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    provider: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    relevance: Mapped[float] = mapped_column(Float, nullable=False)
+    published_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    fetched_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False, index=True)
+
+
 class LlmHealthEvent(Base):
     """LLM sağlık olayı — her yenileme sonunda bir satır: sağlayıcı çağrıları başarılı
     mıydı yoksa kalıcı kota/hata mı aldı. Admin paneli 'sistem sağlığı' göstergesi bunu

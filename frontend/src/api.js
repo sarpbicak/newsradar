@@ -126,11 +126,12 @@ export function logoutAll() {
 
 export const api = {
   me: () => req("/users/me"),
-  finishTutorial: () => req("/users/me/tutorial-done", { method: "POST" }),
   setLanguage: (language) => req("/users/me/language", { method: "POST", body: JSON.stringify({ language }) }),
   // Gizlilik metni için gerçek değerler (herkese açık): LLM/barındırma sağlayıcısı,
   // iletişim adresi, IP saklama süresi — hepsi backend config'inden.
   privacyInfo: () => req("/privacy-info"),
+  // "Nasıl çalışır?" anlatımının GERÇEK örnek verisi (seed şirket, son başlıklar, kart).
+  howItWorks: () => req("/how-it-works"),
   // Geri bildirim (herkese açık — anon da gönderebilir)
   sendFeedback: (message, contact) =>
     req("/feedback", { method: "POST", body: JSON.stringify({ message, contact }) }),
