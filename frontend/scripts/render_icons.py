@@ -1,4 +1,8 @@
-"""public/favicon.svg → favicon.ico (32×32 + 16×16) ve apple-touch-icon.png (180×180, opak).
+"""public/favicon.svg → favicon.ico (32×32 tam çizim + 16×16 SADE) ve apple-touch-icon.png
+(180×180, opak, tam çizim).
+
+16×16 katman: SVG'deki iç ayrıntılar (class="d") gizlenip çizgi kalınlaştırılarak (svg'nin
+kendi küçük-boyut media query'siyle aynı kural) render edilir.
 
 favicon.svg logo kaynağından (src/brand/logo.js) `node scripts/build-icons.mjs` ile üretilir;
 bu betik raster dosyaları AYNI SVG'den üretir (tek çizim). `npm run icons` ikisini sırayla
@@ -10,6 +14,7 @@ Render 512 px'te yapılır, PIL ile küçültülür (16/32 px'te temiz kenar yum
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -40,15 +45,27 @@ def chrome() -> str:
     sys.exit("Chrome bulunamadı — CHROME ortam değişkeniyle yolu verin.")
 
 
-def render_master(tmp: Path) -> Image.Image:
-    html = tmp / "icon.html"
+def small_variant(tmp: Path) -> Path:
+    """favicon.svg'nin 16 px kuralını (@media max-width) büyük render için zorunlu kılar."""
+    src = SVG.read_text(encoding="utf-8")
+    m = re.search(r"@media \(max-width: \d+px\) \{ (.*) \}\s*$", src, re.M)
+    if not m:
+        sys.exit("favicon.svg'de küçük-boyut media query bulunamadı (npm run icons).")
+    forced = src.replace("</style>", f"    {m.group(1).strip()}\n  </style>", 1)
+    out = tmp / "favicon-small.svg"
+    out.write_text(forced, encoding="utf-8")
+    return out
+
+
+def render_master(tmp: Path, svg: Path = SVG, name: str = "master") -> Image.Image:
+    html = tmp / f"{name}.html"
     html.write_text(
         f"<html><body style='margin:0;background:transparent'>"
-        f"<img src='{SVG.as_uri()}' style='width:{MASTER}px;height:{MASTER}px;display:block'>"
+        f"<img src='{svg.as_uri()}' style='width:{MASTER}px;height:{MASTER}px;display:block'>"
         f"</body></html>",
         encoding="utf-8",
     )
-    out = tmp / "master.png"
+    out = tmp / f"{name}.png"
     subprocess.run(
         [chrome(), "--headless=new", "--disable-gpu", "--hide-scrollbars",
          "--allow-file-access-from-files", "--default-background-color=00000000",
@@ -60,11 +77,13 @@ def render_master(tmp: Path) -> Image.Image:
 
 def main() -> None:
     with tempfile.TemporaryDirectory() as d:
-        master = render_master(Path(d))
-    if master.getbbox() is None:
+        tmp = Path(d)
+        master = render_master(tmp)
+        small = render_master(tmp, small_variant(tmp), "small")
+    if master.getbbox() is None or small.getbbox() is None:
         sys.exit("Render boş çıktı — SVG yolu/Chrome sürümünü kontrol edin.")
     i32 = master.resize((32, 32), Image.LANCZOS)
-    i16 = master.resize((16, 16), Image.LANCZOS)
+    i16 = small.resize((16, 16), Image.LANCZOS)  # SADE sürüm
     i32.save(PUBLIC / "favicon.ico", format="ICO", sizes=[(32, 32), (16, 16)], append_images=[i16])
     # apple-touch-icon: 180×180 OPAK krem zemin, ~%16 kenar boşluğu (iOS köşeleri kendisi yuvarlar).
     inner = 124

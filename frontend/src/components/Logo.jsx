@@ -14,7 +14,7 @@ export default function Logo({ className = "h-5 w-5 text-accent", strokeWidth = 
       className={className}
       aria-hidden="true"
     >
-      {LOGO_ELEMENTS.map(({ tag: Tag, ...attrs }, i) => (
+      {LOGO_ELEMENTS.map(({ tag: Tag, detail, ...attrs }, i) => (
         <Tag key={i} {...attrs} />
       ))}
     </svg>
