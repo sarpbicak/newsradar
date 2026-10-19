@@ -4,7 +4,7 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../api.js";
 import { timeAgo } from "./ui.jsx";
-import { tt, fmtDate, fmtDateTime } from "../i18n.jsx";
+import { tt, fmtDate, fmtDateTime, fmtPct } from "../i18n.jsx";
 
 function eventLabel(t) {
   const s = tt(`ev.${t}`);
@@ -222,7 +222,7 @@ export default function AdminPanel({ currentUserId }) {
         <StatCard label={tt("adm.cost30")} value={`$${stats.cost_month_usd.toFixed(2)}`} hint={tt("adm.tokenK", { n: (stats.tokens_month / 1000).toFixed(0) })} />
         <StatCard
           label={tt("adm.cacheHit")}
-          value={stats.cache_hit_rate_7d == null ? "—" : `${(stats.cache_hit_rate_7d * 100).toFixed(0)}%`}
+          value={stats.cache_hit_rate_7d == null ? "—" : fmtPct(stats.cache_hit_rate_7d * 100, { signed: false })}
           hint={tt("adm.cacheHitHint")}
         />
       </div>
@@ -250,7 +250,7 @@ export default function AdminPanel({ currentUserId }) {
                     {((m.input_tokens + m.cache_creation_tokens + m.cache_read_tokens) / 1000).toFixed(0)}K / {(m.output_tokens / 1000).toFixed(0)}K
                   </td>
                   <td className="py-1 pr-3 text-right">
-                    {m.cache_hit_rate == null ? "—" : `${(m.cache_hit_rate * 100).toFixed(0)}%`}
+                    {m.cache_hit_rate == null ? "—" : fmtPct(m.cache_hit_rate * 100, { signed: false })}
                   </td>
                   <td className="py-1 text-right">${m.cost_usd.toFixed(3)}</td>
                 </tr>

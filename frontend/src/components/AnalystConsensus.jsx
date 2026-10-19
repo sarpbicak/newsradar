@@ -3,7 +3,7 @@
 // olmadığını düz Türkçe açıklayan bir not gösterilir (özel şirket / desteklenmeyen borsa).
 // compact=true: kart için kısa gösterim. false: detay için tam gösterim + hedef aralık barı.
 import React from "react";
-import { tt } from "../i18n.jsx";
+import { fmtPct, tt } from "../i18n.jsx";
 
 // Veri yokken gösterilecek açıklama (boşluk bir eksiklik değil, bir açıklama gibi görünsün).
 function noDataNote(type, hasPrice) {
@@ -82,7 +82,7 @@ function TargetRangeBar({ low, high, mean, price }) {
   );
 }
 
-// Hedef fiyat tek satırı: $319 → hedef $412 · +%29 (yüzde pozitif yeşil, negatif kırmızı).
+// Hedef fiyat tek satırı (yalnızca KART): $319 → hedef $412 · +%29 (dile göre yüzde).
 function TargetLine({ price, mean, upside, compact }) {
   if (mean == null) return null;
   const up = upside != null ? upside : price ? ((mean - price) / price) * 100 : null;
@@ -96,7 +96,7 @@ function TargetLine({ price, mean, upside, compact }) {
       <span className="font-semibold tabular-nums text-slate-100">${mean.toFixed(compact ? 0 : 2)}</span>
       {up != null && (
         <span className={`font-semibold tabular-nums ${pctColor}`}>
-          · {up >= 0 ? "+" : "−"}%{Math.abs(Math.round(up))}
+          · {fmtPct(up)}
         </span>
       )}
     </div>
@@ -146,7 +146,8 @@ export default function AnalystConsensus({ analyst, price, type, compact = false
     );
   }
 
-  // ---- DETAY (full): hedef satırı + aralık barı + tavsiye dağılımı + kaynak ----
+  // ---- DETAY (full): aralık barı + tavsiye dağılımı + kaynak. Fiyat → hedef satırı YOK —
+  // detay başlığında zaten gösteriliyor (bilgi tek yerde). ----
   return (
     <div className="rounded-xl border border-ink-600 bg-ink-800 p-4">
       <div className="mb-2 flex items-baseline justify-between">
@@ -158,19 +159,14 @@ export default function AnalystConsensus({ analyst, price, type, compact = false
         )}
       </div>
 
-      {/* GERÇEK hedef fiyat (FMP) */}
+      {/* GERÇEK hedef fiyat aralığı (FMP): düşük / ortalama / yüksek */}
       {hasTarget && (
-        <>
-          <div className="mb-2">
-            <TargetLine price={curPrice} mean={analyst.target_mean} upside={analyst.upside_percent} />
-          </div>
-          <TargetRangeBar
-            low={analyst.target_low}
-            high={analyst.target_high}
-            mean={analyst.target_mean}
-            price={curPrice}
-          />
-        </>
+        <TargetRangeBar
+          low={analyst.target_low}
+          high={analyst.target_high}
+          mean={analyst.target_mean}
+          price={curPrice}
+        />
       )}
 
       {/* Tavsiye dağılımı (Finnhub) */}

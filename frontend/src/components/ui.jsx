@@ -1,6 +1,6 @@
 // Paylaşılan UI atomları: rozetler, göstergeler, çipler.
 import React, { useEffect, useRef, useState } from "react";
-import { getLang, tt, timeAgo as _timeAgo } from "../i18n.jsx";
+import { fmtPct, getLang, tt, timeAgo as _timeAgo } from "../i18n.jsx";
 
 // timeAgo dil-farkında sürümü i18n'de; geriye uyum için buradan da dışa aç.
 export const timeAgo = _timeAgo;
@@ -220,6 +220,23 @@ export function SignalPill({ stance, evidence }) {
   );
 }
 
+// TEK durum etiketi: yön · güç ("BULLISH · Medium"). Güç YALNIZCA evidence_strength'ten
+// (kanaat + haber sayısı + tutarlılıktan türetilen kanonik alan; genel bakış kartıyla aynı)
+// — conviction ayrıca gösterilmez, çelişki olmaz. Renk overallSignal ile aynı.
+export function StatusTag({ stance, evidence }) {
+  const sig = overallSignal(stance, evidence);
+  const st = PILL_STYLE[String(sig.key)] || PILL_STYLE["0"];
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold tracking-wide"
+      style={{ background: st.bg, color: st.color }}
+    >
+      <span className="uppercase">{stanceLabel(stance)}</span>
+      {evidence && <span className="font-semibold opacity-80">· {evidenceLabel(evidence)}</span>}
+    </span>
+  );
+}
+
 export function SignalBand({ stance, evidence, showLabel = true, minimal = false }) {
   const sig = overallSignal(stance, evidence);
   // -2..2 → %0..100 konum (olumsuz sol, olumlu sağ).
@@ -270,8 +287,7 @@ export function PriceDisplay({ price, changePercent, updatedAt, showTime = true 
       </span>
       {changePercent != null && (
         <span className={`font-mono text-xs font-medium ${up ? "text-emerald-400" : "text-rose-400"}`}>
-          {up ? "+" : ""}
-          {changePercent.toFixed(2)}%
+          {fmtPct(changePercent, { digits: 2 })}
         </span>
       )}
       {showTime && updatedAt && (

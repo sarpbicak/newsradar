@@ -52,10 +52,13 @@ BANNED_PHRASES = {
     "tr": [
         "ağırlıklı olarak olumlu/olumsuz", "ağırlıkla/ağırlıkta olumlu/olumsuz",
         "çoğunlukla olumlu/olumsuz", "büyük ölçüde olumlu/olumsuz",
-        "genel olarak olumlu/olumsuz", "haberler karışık", "haber akışı karışık",
+        "genel olarak olumlu/olumsuz",
+        "ağırlıklı olarak/çoğunlukla/büyük ölçüde/genel olarak iyimser/kötümser",
+        "haberler karışık", "haber akışı karışık",
     ],
     "en": [
-        "largely/mostly/predominantly/broadly/generally positive/negative/bullish/bearish",
+        "largely/mostly/predominantly/broadly/generally positive/negative/bullish/bearish/"
+        "upbeat/downbeat/optimistic/pessimistic",
         "news flow leans positive/negative", "news flow is mixed",
     ],
 }
@@ -63,13 +66,14 @@ _GAP = r"(?:\s+[^\W\d_]+)?\s+"  # en fazla bir ara kelime
 BANNED_PATTERNS = {
     "tr": [
         re.compile(r"\b(?:ağırlık\w*|çoğunlukla|büyük\s+ölçüde|genel\s+olarak)" + _GAP
-                   + r"(?:olumlu|olumsuz)\w*", re.IGNORECASE),
+                   + r"(?:olumlu|olumsuz|iyimser|kötümser)\w*", re.IGNORECASE),
         re.compile(r"\bhaberler" + _GAP + r"karışık\w*", re.IGNORECASE),
         re.compile(r"\bhaber\s+akışı" + _GAP + r"karışık\w*", re.IGNORECASE),
     ],
     "en": [
         re.compile(r"\b(?:largely|mostly|predominantly|broadly|generally)" + _GAP
-                   + r"(?:positive|negative|bullish|bearish)\b", re.IGNORECASE),
+                   + r"(?:positive|negative|bullish|bearish|upbeat|downbeat|optimistic|pessimistic)\b",
+                   re.IGNORECASE),
         re.compile(r"\bnews\s+flow\s+leans" + _GAP + r"(?:positive|negative)\b", re.IGNORECASE),
         re.compile(r"\bnews\s+flow\s+is" + _GAP + r"mixed\b", re.IGNORECASE),
     ],

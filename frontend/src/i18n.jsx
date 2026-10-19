@@ -232,6 +232,21 @@ const STR = {
   "msg.assessment_failed": { tr: "Değerlendirme üretilemedi ({lang}).", en: "Couldn't generate the assessment ({lang})." },
   "msg.entity_error": { tr: "Analiz sırasında beklenmeyen hata, bu şirket atlandı.", en: "Unexpected error during analysis, this company was skipped." },
 
+  // ---- Detay başlığı + sohbet yan paneli ----
+  "detail.targetAsOf": { tr: "analist hedefi, {date}", en: "analyst target, {date}" },
+  "detail.metaHorizon": { tr: "{h} vade", en: "{h} horizon" },
+  "detail.metaArticles": { tr: "{count} haber analiz edildi", en: "{count} articles analyzed" },
+  "detail.metaArticles_one": { tr: "1 haber analiz edildi", en: "1 article analyzed" },
+  "detail.pipelineAdmin": { tr: "Hat (yalnızca admin)", en: "Pipeline (admin only)" },
+  "detail.expiredN": { tr: "{n} süresi geçmiş", en: "{n} expired" },
+  "chat.askAi": { tr: "AI'ya sor", en: "Ask AI" },
+  "chat.open": { tr: "Sohbeti aç", en: "Open chat" },
+  "chat.hide": { tr: "Sohbeti gizle", en: "Hide chat" },
+  "chat.qWhy": { tr: "{name} için hüküm neden {stance}?", en: "Why is the verdict on {name} {stance}?" },
+  "chat.qGap": { tr: "Analist hedefi ile haberler neden ayrışıyor?", en: "Why do analyst targets and the news disagree?" },
+  "chat.qRisk": { tr: "{name} için en büyük risk ne?", en: "What's the biggest risk for {name}?" },
+  "chat.qWatch": { tr: "Önümüzdeki haftalarda neyi takip etmeliyim?", en: "What should I watch in the coming weeks?" },
+
   // ---- Footer / gizlilik ----
   "footer.disclaimer": { tr: "Haber akışı bazlı sinyal — değerleme veya fiyat tahmini değil. Analist hedefleri Finnhub konsensüs verisidir. Kararlar size aittir.", en: "News-based signal — not a valuation or price forecast. Analyst targets are Finnhub consensus data. Decisions are yours." },
   "footer.privacy": { tr: "Gizlilik", en: "Privacy" },
@@ -525,6 +540,22 @@ export function parseUtc(v) {
   const s = String(v);
   const hasTz = /([zZ]|[+-]\d{2}:?\d{2})$/.test(s);
   return new Date(hasTz || !s.includes("T") ? s : `${s}Z`);
+}
+
+// Yüzde — DİLE göre, Intl.NumberFormat ile (EN "+58%", TR "+%58"). value yüzde puanıdır
+// (58 → %58). signed: işaret her zaman (sıfır hariç). Tüm uygulama bunu kullanır.
+export function fmtPct(value, { digits = 0, signed = true } = {}) {
+  if (value == null || Number.isNaN(value)) return "—";
+  return new Intl.NumberFormat(LOCALE(), {
+    style: "percent",
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+    signDisplay: signed ? "exceptZero" : "auto",
+  }).format(value / 100);
+}
+// Tam sayı — dile göre binlik ayırıcı (EN 1,158 · TR 1.158).
+export function fmtInt(value) {
+  return value == null ? "—" : new Intl.NumberFormat(LOCALE()).format(value);
 }
 
 // Dil-farkında tarih/zaman yardımcıları (locale'e göre biçim).

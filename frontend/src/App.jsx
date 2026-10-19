@@ -710,7 +710,7 @@ export default function App({ setLang }) {
             scanning={isRefreshing}
           />
         ) : (
-          <EntityDetail entityId={selected} lang={lang} onBack={() => setSelected(null)} />
+          <EntityDetail entityId={selected} lang={lang} isAdmin={!!user?.is_admin} onBack={() => setSelected(null)} />
         )}
         </>
         )}

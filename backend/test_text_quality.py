@@ -108,6 +108,8 @@ for t, exp in [
     ("GENEL OLARAK OLUMSUZ.", ["genel olarak olumsuz"]),
     ("Bu hafta haberler karışık.", ["haberler karışık"]),
     ("Haber akışı oldukça karışık.", ["haber akışı oldukça karışık"]),
+    ("Yatırımcılar genel olarak iyimser.", ["genel olarak iyimser"]),
+    ("Piyasa büyük ölçüde kötümserdi.", ["büyük ölçüde kötümserdi"]),
 ]:
     check(hits(t, "tr") == exp, f"TR yakalandı: {t!r} → {hits(t, 'tr')}")
 # EN: (largely|mostly|predominantly|broadly|generally) (+ ara kelime) (positive|negative|bullish|bearish)
@@ -120,6 +122,10 @@ for t, exp in [
     ("Tesla's news flow leans negative.", ["news flow leans negative"]),
     ("The news flow is mixed.", ["news flow is mixed"]),
     ("Mostly positive, mostly positive.", ["mostly positive"]),
+    ("Nvidia news is mostly upbeat.", ["mostly upbeat"]),
+    ("Coverage stays largely downbeat.", ["largely downbeat"]),
+    ("Analysts are broadly optimistic.", ["broadly optimistic"]),
+    ("Tone is generally pessimistic.", ["generally pessimistic"]),
 ]:
     check(hits(t, "en") == exp, f"EN yakalandı: {t!r} → {hits(t, 'en')}")
 for t, lang in [
@@ -128,6 +134,8 @@ for t, lang in [
     ("Marjlar olumlu yönde ağırlıklı bir rol oynadı ama kâr düştü.", "tr"),
     ("Olumlu bir çeyrek: Azure yüzde 43 büyüdü.", "tr"),
     ("Generally, positive cash flow returned.", "en"),
+    ("Management sounded optimistic about Q4 deliveries.", "en"),
+    ("Yönetim iyimser bir tablo çizdi.", "tr"),
 ]:
     check(hits(t, lang) == [], f"temiz: {t!r} → {hits(t, lang)}")
 grams = repeated_ngrams({
@@ -221,7 +229,8 @@ for lang, needles in {
     "tr": ["en fazla 14 kelime", "en fazla 100 kelime", "daha az şey söyle", "TAM CÜMLE",
            "ağırlıklı olarak olumlu/olumsuz", "genel olarak olumlu/olumsuz"],
     "en": ["at most 16 words", "at most 100 words", "say fewer things", "COMPLETE SENTENCES",
-           "largely/mostly/predominantly/broadly/generally positive/negative/bullish/bearish"],
+           "largely/mostly/predominantly/broadly/generally positive/negative/bullish/bearish/"
+           "upbeat/downbeat/optimistic/pessimistic"],
 }.items():
     r = entity_assessment_rules(lang)
     missing = [n for n in needles if n not in r]

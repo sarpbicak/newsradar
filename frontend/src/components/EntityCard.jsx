@@ -7,7 +7,7 @@
 import React from "react";
 import { ArrowRight, Lock } from "lucide-react";
 import { SignalPill, overallSignal, AnimatedNumber, horizonLabel } from "./ui.jsx";
-import { tt } from "../i18n.jsx";
+import { tt, fmtPct } from "../i18n.jsx";
 
 // Kompakt analist barı — al/tut/sat segmentleri + baskın görüş + analist sayısı.
 const ANALYST_SEG = [
@@ -81,7 +81,7 @@ function CompactPriceLine({ card }) {
       <span className="font-semibold text-slate-100">${price.toFixed(2)}</span>
       {chg != null && (
         <span className={chg >= 0 ? "text-emerald-400" : "text-rose-400"}>
-          {chg >= 0 ? "+" : "−"}%{Math.abs(chg).toFixed(1)}
+          {fmtPct(chg, { digits: 1 })}
         </span>
       )}
       {target != null && (
@@ -140,7 +140,7 @@ function PriceBox({ card }) {
                 ${target.toFixed(0)}
                 {upside != null && (
                   <span className={`ml-1 ${upside >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                    {upside >= 0 ? "+" : "−"}%{Math.abs(Math.round(upside))}
+                    {fmtPct(upside)}
                   </span>
                 )}
               </>
