@@ -114,6 +114,14 @@ npm run dev                 # http://localhost:5173
 
 If the backend runs elsewhere, set `VITE_API_URL` in `frontend/.env` (see `frontend/.env.example`).
 
+### Docker (API + Caddy)
+
+```bash
+cd deploy && cp .env.example .env && docker compose up -d --build
+```
+
+Details, ARM build and the Render vs. AWS settings: [deploy/README.md](deploy/README.md).
+
 ## How it was built
 
 I built NewsRadar as a personal project with AI-assisted development (Claude). I defined the product and its features, worked through the architecture and trade-offs, and tested and debugged it in production. I'm a Business Information Systems (Wirtschaftsinformatik) student at Hochschule Furtwangen University.
