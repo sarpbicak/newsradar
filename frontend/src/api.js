@@ -138,6 +138,7 @@ export const api = {
   adminUsers: () => req("/admin/users"),
   adminFeedback: () => req("/admin/feedback"),
   adminMarkFeedbackRead: (id) => req(`/admin/feedback/${id}/read`, { method: "POST" }),
+  adminDeleteFeedback: (id) => req(`/admin/feedback/${id}`, { method: "DELETE" }),
   adminUserDetail: (id) => req(`/admin/users/${id}`),
   adminDeleteUser: (id) => req(`/admin/users/${id}`, { method: "DELETE" }),
   adminResetPassword: (id) => req(`/admin/users/${id}/reset-password`, { method: "POST" }),

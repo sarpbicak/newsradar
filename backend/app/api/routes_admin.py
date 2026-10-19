@@ -299,6 +299,24 @@ def list_feedback(db: Session = Depends(get_db)) -> list[AdminFeedbackOut]:
     return out
 
 
+@router.delete("/feedback/{feedback_id}", status_code=204)
+def delete_feedback(
+    feedback_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+) -> None:
+    """Bir geri bildirimi KALICI olarak siler (yalnızca admin; arayüz onay sorar).
+
+    Gizlilik metni 'istenince silinir' der — talep gelince admin buradan siler. Denetim
+    için admin'in usage_events'ine 'delete_feedback' yazılır; mesaj/iletişim içeriği
+    kayda GEÇMEZ (yalnızca id)."""
+    fb = db.get(Feedback, feedback_id)
+    if fb is None:
+        raise HTTPException(status_code=404, detail="Geri bildirim bulunamadı.")
+    db.delete(fb)
+    record_event(db, admin.id, "delete_feedback", {"feedback_id": feedback_id})
+
+
 @router.post("/feedback/{feedback_id}/read", status_code=204)
 def mark_feedback_read(feedback_id: int, db: Session = Depends(get_db)) -> None:
     """Bir geri bildirimi okundu işaretle (idempotent)."""

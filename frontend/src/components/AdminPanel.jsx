@@ -2,6 +2,7 @@
 // Genel istatistik + kullanıcı tablosu + tıklanınca kullanıcı detayı (eylem dökümü,
 // en çok baktığı şirketler, zaman çizelgesi). Veri ORTAK; bu sadece 'kim ne yaptı'.
 import React, { useEffect, useState } from "react";
+import { Trash2 } from "lucide-react";
 import { api } from "../api.js";
 import { timeAgo } from "./ui.jsx";
 import { tt, fmtDate, fmtDateTime, fmtPct } from "../i18n.jsx";
@@ -104,6 +105,21 @@ export default function AdminPanel({ currentUserId }) {
       await api.adminMarkFeedbackRead(id);
     } catch (err) {
       window.alert(tt("adm.markFail", { m: err.message }));
+      reload().catch(() => {});
+    }
+  }
+
+  async function deleteFeedback(f) {
+    // Kalıcı silme → önce onay. İyimser: listeden çıkar (okunmamışsa rozeti düşür).
+    if (!window.confirm(tt("adm.deleteFbConfirm"))) return;
+    setFeedback((prev) => prev.filter((x) => x.id !== f.id));
+    if (!f.is_read) {
+      setStats((prev) => (prev ? { ...prev, unread_feedback: Math.max(0, prev.unread_feedback - 1) } : prev));
+    }
+    try {
+      await api.adminDeleteFeedback(f.id);
+    } catch (err) {
+      window.alert(tt("adm.deleteFbFail", { m: err.message }));
       reload().catch(() => {});
     }
   }
@@ -261,7 +277,7 @@ export default function AdminPanel({ currentUserId }) {
       )}
 
       {/* Geri bildirim gelen kutusu — okunmamışlar önce, vurgulu */}
-      <FeedbackInbox items={feedback} onMarkRead={markRead} />
+      <FeedbackInbox items={feedback} onMarkRead={markRead} onDelete={deleteFeedback} />
 
       {/* En çok TAKİP EDİLEN şirketler (kaç kullanıcının listesinde) + toplam benzersiz */}
       <div className="rounded-xl border border-ink-600 bg-ink-800 p-4">
@@ -388,7 +404,7 @@ export default function AdminPanel({ currentUserId }) {
 }
 
 // Geri bildirim gelen kutusu — okunmamışlar önce (backend sıralar), vurgulu.
-function FeedbackInbox({ items, onMarkRead }) {
+function FeedbackInbox({ items, onMarkRead, onDelete }) {
   const unread = items.filter((f) => !f.is_read).length;
   return (
     <div className="rounded-xl border border-ink-600 bg-ink-800 p-4">
@@ -423,14 +439,24 @@ function FeedbackInbox({ items, onMarkRead }) {
                 >
                   {f.message}
                 </p>
-                {!f.is_read ? (
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {!f.is_read ? (
+                    <button
+                      onClick={() => onMarkRead(f.id)}
+                      className="rounded-md border border-ink-500 px-2 py-1 text-[11px] font-medium text-slate-400 transition hover:bg-ink-700 hover:text-slate-200"
+                    >{tt("adm.read")}</button>
+                  ) : (
+                    <span className="text-[10px] uppercase tracking-wide text-slate-600">{tt("adm.readMark")}</span>
+                  )}
                   <button
-                    onClick={() => onMarkRead(f.id)}
-                    className="shrink-0 rounded-md border border-ink-500 px-2 py-1 text-[11px] font-medium text-slate-400 transition hover:bg-ink-700 hover:text-slate-200"
-                  >{tt("adm.read")}</button>
-                ) : (
-                  <span className="shrink-0 text-[10px] uppercase tracking-wide text-slate-600">{tt("adm.readMark")}</span>
-                )}
+                    onClick={() => onDelete(f)}
+                    aria-label={tt("adm.deleteFb")}
+                    title={tt("adm.deleteFb")}
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition hover:bg-rose-500/10 hover:text-rose-400"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
 
               <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
@@ -459,6 +485,21 @@ function FeedbackInbox({ items, onMarkRead }) {
 function UserDetail({ userId, onClose }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+
+  async function deleteFeedback(f) {
+    // Kalıcı silme → önce onay. İyimser: listeden çıkar (okunmamışsa rozeti düşür).
+    if (!window.confirm(tt("adm.deleteFbConfirm"))) return;
+    setFeedback((prev) => prev.filter((x) => x.id !== f.id));
+    if (!f.is_read) {
+      setStats((prev) => (prev ? { ...prev, unread_feedback: Math.max(0, prev.unread_feedback - 1) } : prev));
+    }
+    try {
+      await api.adminDeleteFeedback(f.id);
+    } catch (err) {
+      window.alert(tt("adm.deleteFbFail", { m: err.message }));
+      reload().catch(() => {});
+    }
+  }
 
   useEffect(() => {
     let alive = true;

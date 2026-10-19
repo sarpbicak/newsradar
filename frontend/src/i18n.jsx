@@ -437,6 +437,9 @@ const STR = {
   "adm.anon": { tr: "anonim", en: "anonymous" },
   "adm.read": { tr: "Okundu", en: "Read" },
   "adm.readMark": { tr: "okundu", en: "read" },
+  "adm.deleteFb": { tr: "Geri bildirimi sil", en: "Delete feedback" },
+  "adm.deleteFbConfirm": { tr: "Bu geri bildirim kalıcı olarak silinsin mi? Bu işlem geri alınamaz.", en: "Delete this feedback permanently? This can't be undone." },
+  "adm.deleteFbFail": { tr: "Silinemedi: {m}", en: "Couldn't delete: {m}" },
   "adm.eventBreakdown": { tr: "Eylem dökümü", en: "Action breakdown" },
   "adm.noActions": { tr: "Henüz eylem yok.", en: "No actions yet." },
   "adm.topViewed": { tr: "En çok baktığı şirketler", en: "Most viewed companies" },
@@ -468,6 +471,7 @@ const STR = {
   "ev.delete_user": { tr: "kullanıcı silme", en: "delete user" },
   "ev.password_reset": { tr: "şifre sıfırlama", en: "password reset" },
   "ev.feedback_sent": { tr: "geri bildirim", en: "feedback" },
+  "ev.delete_feedback": { tr: "geri bildirim silme", en: "delete feedback" },
 };
 
 const Ctx = createContext({ lang: "tr", t: (k) => k, setLang: () => {} });

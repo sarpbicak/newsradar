@@ -116,6 +116,27 @@ def main():
         r = client.post("/admin/feedback/999999/read", headers=admin_h)
         check(r.status_code == 404, f"olmayan feedback 404: {r.status_code}")
 
+        print("\n== Silme (yalnızca admin, kalıcı, denetim kaydı içeriksiz) ==")
+        before = client.get("/admin/feedback", headers=admin_h).json()
+        victim = before[0]["id"]
+        r = client.delete(f"/admin/feedback/{victim}", headers=u_h)
+        check(r.status_code == 403, f"normal kullanıcı silemez 403: {r.status_code}")
+        r = client.delete(f"/admin/feedback/{victim}", headers=A)
+        check(r.status_code == 403, f"anon silemez 403: {r.status_code}")
+        r = client.delete(f"/admin/feedback/{victim}", headers=admin_h)
+        check(r.status_code == 204, f"admin siler 204: {r.status_code}")
+        after = client.get("/admin/feedback", headers=admin_h).json()
+        check(len(after) == len(before) - 1 and all(f["id"] != victim for f in after),
+              f"silinen listeden kalktı ({len(before)} → {len(after)})")
+        r = client.delete(f"/admin/feedback/{victim}", headers=admin_h)
+        check(r.status_code == 404, f"ikinci silme 404: {r.status_code}")
+        from app.db.database import session_scope
+        from app.db.models import UsageEvent
+        with session_scope() as s:
+            ev = s.query(UsageEvent).filter(UsageEvent.event_type == "delete_feedback").all()
+            check(len(ev) == 1 and ev[0].detail == {"feedback_id": victim},
+                  f"denetim kaydı yalnızca id içeriyor ({[e.detail for e in ev]})")
+
     print(f"\n{'='*50}\nSONUÇ: {PASS} geçti, {FAIL} başarısız")
     return FAIL == 0
 
