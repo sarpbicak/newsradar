@@ -1,0 +1,26 @@
+# NewsRadar API önü — otomatik HTTPS (gerçek alan adında Let's Encrypt; DOMAIN=localhost'ta
+# Caddy'nin yerel CA'sı). DOMAIN docker-compose.yml'den gelir.
+# Global trusted_proxies YOK → istemcinin yolladığı X-Forwarded-For* başlıklarına güvenilmez.
+
+api.{$DOMAIN} {
+	# İstek gövdesi tavanı: en büyük meşru istek (50 mesajlık sohbet) bunun çok altında.
+	request_body {
+		max_size 1MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+		-Via
+	}
+
+	reverse_proxy backend:8000 {
+		# İstemcinin gönderdiği XFF atılır; yerine Caddy'nin GÖRDÜĞÜ bağlantı adresi yazılır.
+		# Backend (uvicorn --forwarded-allow-ips=<Caddy IP>) yalnızca bu başlığa güvenir.
+		header_up X-Forwarded-For {remote_host}
+	}
+
+	log
+}
