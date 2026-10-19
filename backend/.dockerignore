@@ -1,0 +1,7 @@
+# Image'a yalnızca requirements.txt + app/ girer. Sırlar ve yerel veri ASLA girmez.
+*
+!requirements.txt
+!app/
+**/__pycache__
+**/*.pyc
+**/.DS_Store
