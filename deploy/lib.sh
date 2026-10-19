@@ -74,7 +74,8 @@ snapshot_to_stdout() {
 # Host'taki bir SQLite dosyasını PRAGMA integrity_check ile doğrular ("ok" dışı = hata).
 sqlite_ok() {
   local out
-  out="$(sqlite3 "$1" 'PRAGMA integrity_check;' 2>&1)" || {
+  # `|| exit` (alt kabukta): set -E'li çağıranın ERR trap'i burada ikinci kez tetiklenmesin.
+  out="$(sqlite3 "$1" 'PRAGMA integrity_check;' 2>&1 || exit $?)" || {
     log "integrity_check çalışmadı ($1): ${out:0:300}"
     return 1
   }
@@ -88,7 +89,7 @@ sqlite_ok() {
 schema_ok() {
   local n
   n="$(sqlite3 "$1" "SELECT count(*) FROM sqlite_master WHERE type='table'
-    AND name IN ('users','entities','articles','entity_analyses');" 2>/dev/null)" || n=0
+    AND name IN ('users','entities','articles','entity_analyses');" 2>/dev/null || exit $?)" || n=0
   [[ "$n" == 4 ]] || { log "beklenen tablolar yok ($1): NewsRadar veritabanı değil"; return 1; }
 }
 

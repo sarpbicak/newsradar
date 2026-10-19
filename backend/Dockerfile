@@ -43,7 +43,7 @@ USER newsradar
 EXPOSE 8000
 
 # slim'de curl yok → Python ile /health.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --start-interval=2s --retries=3 \
   CMD ["python", "-c", "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4).status == 200 else 1)"]
 
 # --workers 1: APScheduler ve SQLite tek süreç ister (birden fazla worker = çift zamanlayıcı).
