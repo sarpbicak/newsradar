@@ -22,7 +22,7 @@ P = "/newsradar/prod/"
 vals = {
     "DOMAIN": ("String", "newsradarapp.com"),
     "APP_SECRET": ("SecureString", "FAKE-secret-it's \"q\" $HOME ${X} \\n #x"),
-    "ANTHROPIC_API_KEY": ("SecureString", "sk-ant-api03-FAKEFAKEFAKEFAKEFAKE"),
+    "ANTHROPIC_API_KEY": ("SecureString", "test-anthropic-key-not-real"),
     "APP_PASSWORD": ("SecureString", "FAKE pass # not comment"),
     "FINNHUB_API_KEY": ("String", "FAKE-finnhub-plain"),
     "NEWSRADAR_CORS_ORIGINS": ("String", "https://newsradarapp.com,https://www.newsradarapp.com"),
@@ -45,7 +45,7 @@ perm="$(stat -f %Lp "$T/proj/.env" 2>/dev/null || stat -c %a "$T/proj/.env")"
 leak=0
 while IFS= read -r v; do
   [[ ${#v} -ge 6 ]] && grep -qF -- "$v" "$T/out.log" "$T/aws.log" && leak=1
-done < <(python3 -c 'import json,sys; [print(v) for v in json.load(open(sys.argv[1])).values() if v.startswith(("FAKE", "sk-ant"))]' "$FAKE_SSM_JSON.expected")
+done < <(python3 -c 'import json,sys; [print(v) for v in json.load(open(sys.argv[1])).values() if v.startswith(("FAKE", "test-"))]' "$FAKE_SSM_JSON.expected")
 ((leak == 0)) && ok "sır değerleri log'da yok" || bad "SIR LOG'A SIZDI"
 grep -q "FINNHUB_API_KEY SecureString değil" "$T/out.log" && ok "String tipli sır için uyarı" || bad "String sır uyarısı yok"
 
