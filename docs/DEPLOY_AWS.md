@@ -12,7 +12,7 @@ Hedef mimari:
                                              └─ log'lar: CloudWatch Logs /newsradar/prod (7 gün)
 ```
 
-Bölge **eu-central-1**. Tek istisna ACM sertifikası: CloudFront zorunlu kıldığı için **us-east-1**'de alınır. Health check alarmı da Route 53 metrikleri yalnızca orada yayımlandığı için **us-east-1**'de kurulur. API'nin TLS sertifikasını Caddy kendisi alır (Let's Encrypt); ACM gerekmez.
+Bölge **eu-central-1**. Tek istisna ACM sertifikası: CloudFront zorunlu kıldığı için **us-east-1**'de alınır. API'nin TLS sertifikasını Caddy kendisi alır (Let's Encrypt); ACM gerekmez.
 
 ## Nasıl kullanılır
 
@@ -35,7 +35,7 @@ Bölge **eu-central-1**. Tek istisna ACM sertifikası: CloudFront zorunlu kıld�
 | 5 | [Yedek bucket'ı](#adım-5--yedek-bucketı) | 18 | [CloudFront](#adım-18--cloudfront-function-oac-ve-dağıtım) |
 | 6 | [Log grubu](#adım-6--cloudwatch-log-grubu) | 19 | [Frontend'i yükle](#adım-19--frontendi-derle-ve-yükle) |
 | 7 | [SSM parametreleri](#adım-7--ssm-parametreleri) | 20 | [DNS geçişi](#adım-20--dns-apex--www--cloudfront-geçiş) |
-| 8 | [KMS anahtarı](#adım-8--ssm-kms-anahtarının-arni) | 21 | [İzleme](#adım-21--health-izleme-ve-e-posta-uyarısı) |
+| 8 | [KMS anahtarı](#adım-8--ssm-kms-anahtarının-arni) | 21 | [Log'lar ve izleme](#adım-21--loglar-ve-health-izleme-uptimerobot) |
 | 9 | [IAM rolü](#adım-9--iam-rolü-ve-instance-profile) | 22 | [Rutin: yeni sürüm](#adım-22--rutin-yeni-sürüm-yayınlama) |
 | 10 | [Security group](#adım-10--security-group) | 23 | [Teardown](#adım-23--geri-alma-ve-temizlik-teardown) |
 | 11 | [Elastic IP](#adım-11--elastic-ip) | 24 | [Maliyet](#adım-24--aylık-maliyet-tahmini) |
@@ -132,8 +132,6 @@ export SG_NAME=newsradar-api-sg
 export INSTANCE_NAME=newsradar-api
 export CF_FUNCTION_NAME=newsradar-www-redirect
 export OAC_NAME=newsradar-frontend-oac
-export ALARM_NAME=newsradar-api-health
-export SNS_TOPIC_NAME=newsradar-alerts
 export REPO_URL="https://github.com/$(git remote get-url origin | sed -E 's#^(https://github\.com/|git@github\.com:)##')"
 export REPO_BRANCH=main
 export STATE_FILE="$HOME/.newsradar-aws-state.env"
@@ -1026,68 +1024,42 @@ aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --cha
 
 ---
 
-## Adım 21 — Health izleme ve e-posta uyarısı
+## Adım 21 — Log'lar ve /health izleme (UptimeRobot)
 
-**Ne yapıyoruz:** `https://api.newsradarapp.com/health`'i dışarıdan kontrol eden bir Route 53 health check ve düşünce e-posta gönderen bir CloudWatch alarmı kuruyoruz. Log'ların CloudWatch'a geldiğini de doğruluyoruz.
-
-**Maliyet uyarısı:** HTTPS health check **ücretsiz katmanda değildir**. Ayda yaklaşık 1,50–2,75 USD tutar ([Adım 24](#adım-24--aylık-maliyet-tahmini)). Alarm (ilk 10 alarm ücretsiz) ve e-posta bildirimi (ayda ilk 1000 ücretsiz) ek ücret getirmez.
+**Ne yapıyoruz:** Container log'larının CloudWatch'a geldiğini doğruluyor, `/health`'i dışarıdan izlemek için de ücretsiz UptimeRobot'u kuruyoruz. AWS tarafında ücretli bir izleme kaynağı oluşturulmuyor.
 
 **Komutlar:**
 
 ```bash
-read -rp "Uyarı e-posta adresi: " ALERT_EMAIL         # komut satırına/geçmişe yazılmaz
-cat >/tmp/newsradar-hc.json <<EOF
-{"Type": "HTTPS", "FullyQualifiedDomainName": "api.${DOMAIN}", "Port": 443, "ResourcePath": "/health",
- "RequestInterval": 30, "FailureThreshold": 3, "EnableSNI": true,
- "Regions": ["eu-west-1", "us-east-1", "ap-southeast-1"]}
-EOF
-save HEALTH_CHECK_ID "$(aws route53 create-health-check --caller-reference "newsradar-api-$(date +%s)" \
-  --health-check-config file:///tmp/newsradar-hc.json --query HealthCheck.Id --output text)"
-aws route53 change-tags-for-resource --resource-type healthcheck --resource-id "$HEALTH_CHECK_ID" \
-  --add-tags Key=Name,Value=newsradar-api-health Key=Project,Value=newsradar
-
-# Route 53 health check metrikleri yalnızca us-east-1'de → konu ve alarm da orada.
-save TOPIC_ARN "$(aws sns create-topic --region us-east-1 --name "$SNS_TOPIC_NAME" --query TopicArn --output text)"
-aws sns subscribe --region us-east-1 --topic-arn "$TOPIC_ARN" --protocol email \
-  --notification-endpoint "$ALERT_EMAIL" --query SubscriptionArn --output text
-unset ALERT_EMAIL
-aws cloudwatch put-metric-alarm --region us-east-1 --alarm-name "$ALARM_NAME" \
-  --alarm-description "api /health 3 dakika boyunca basarisiz" \
-  --namespace AWS/Route53 --metric-name HealthCheckStatus --dimensions Name=HealthCheckId,Value="$HEALTH_CHECK_ID" \
-  --statistic Minimum --period 60 --evaluation-periods 3 --threshold 1 --comparison-operator LessThanThreshold \
-  --treat-missing-data breaching --alarm-actions "$TOPIC_ARN" --ok-actions "$TOPIC_ARN"
+aws logs tail "$LOG_GROUP" --region "$REGION" --since 10m | tail -5
+aws logs describe-log-streams --region "$REGION" --log-group-name "$LOG_GROUP" \
+  --query 'logStreams[].logStreamName' --output text
 ```
 
-Gelen kutunuzdaki **"AWS Notification - Subscription Confirmation"** e-postasındaki bağlantıya tıklayın.
+**UptimeRobot** (web, AWS dışı, ücretsiz plan) kurulumu:
+1. uptimerobot.com'da hesap açın.
+2. *New monitor* → tür **HTTP(s)**. İsterseniz **Keyword** türünü seçip anahtar kelimeye `ok` yazın; böylece yalnızca 200'ü değil yanıt gövdesini de kontrol eder.
+3. URL: `https://api.newsradarapp.com/health`. Aralık: ücretsiz planda en sık 5 dakika.
+4. *Alert contacts*: e-posta adresiniz. Adres UptimeRobot'ta kalır; komutlara ve repoya girmez.
+5. Kaydedin.
+
+Ücretsiz planın koşullarını (izleme sayısı, aralık, ticari kullanım) kayıt olurken kontrol edin. Plan koşulları zamanla değişebiliyor.
 
 **Doğrulama:**
-
-```bash
-aws route53 get-health-check-status --health-check-id "$HEALTH_CHECK_ID" \
-  --query 'HealthCheckObservations[].StatusReport.Status' --output text | tr '\t' '\n' | sort | uniq -c
-aws sns list-subscriptions-by-topic --region us-east-1 --topic-arn "$TOPIC_ARN" --query 'Subscriptions[0].SubscriptionArn' --output text | cut -c1-24
-aws cloudwatch describe-alarms --region us-east-1 --alarm-names "$ALARM_NAME" --query 'MetricAlarms[0].StateValue' --output text
-# Uyarı zinciri testi (e-posta gelmeli; bir sonraki ölçümde alarm kendiliğinden OK'a döner):
-aws cloudwatch set-alarm-state --region us-east-1 --alarm-name "$ALARM_NAME" --state-value ALARM --state-reason "runbook testi"
-# Log'lar:
-aws logs tail "$LOG_GROUP" --region "$REGION" --since 10m | tail -5
-```
-
-Beklenen çıktı:
-- Birkaç dakika içinde tüm gözlemciler `Success: HTTP Status Code 200, OK`.
-- Abonelik onaylandıysa `arn:aws:sns:us-east-1:` ile başlayan bir değer. `PendingConfirmation` görünüyorsa e-postayı onaylamamışsınız demektir.
-- Alarm durumu ilk dakikalarda `INSUFFICIENT_DATA`, sonra `OK`.
-- Test komutundan sonra bir ALARM e-postası, ardından OK e-postası.
-- `newsradar-backend-1` / `newsradar-caddy-1` kaynaklı log satırları.
+- `aws logs tail`: `newsradar-backend-1` ve `newsradar-caddy-1` kaynaklı log satırları.
+- `describe-log-streams`: her container için bir akış.
+- UptimeRobot panelinde monitor birkaç dakika içinde **Up** (yeşil) olur.
+- Uyarı zincirini denemek için **[instance]** `docker compose stop backend` deyin. 5–10 dakika içinde "Down" e-postası gelir. `docker compose start backend` sonrası "Up" e-postası gelir. Bu test API'yi birkaç dakika kapatır; trafiğin az olduğu bir saatte yapın.
 
 **Hata alırsam:**
-- Health check `Failure: … SSL` → `EnableSNI` açık olmalı; sertifikanın Let's Encrypt'ten alındığını Adım 14'te doğrulayın.
-- Health check `Failure: … timed out` → Route 53 denetleyicileri 443'e ulaşamıyor. SG'de `0.0.0.0/0` 443 kuralı olmalı (Adım 10).
 - `aws logs tail` boş dönüyorsa:
   - **[instance]** `cat /etc/docker/daemon.json` → `awslogs` görünmeli.
   - Container'lar daemon.json'dan **önce** oluşturulduysa log'lar CloudWatch'a gitmez. `docker compose up -d --force-recreate` ile yeniden yaratın.
+- UptimeRobot "Down" diyor ama Mac'teki `curl -sS "https://api.${DOMAIN}/health"` çalışıyorsa:
+  - Keyword monitor'de anahtar kelimeyi kontrol edin: `ok`, büyük/küçük harf duyarlı.
+  - TLS hatası görünüyorsa sertifikanın Let's Encrypt'ten alındığını [Adım 14](#adım-14--servisi-ilk-kez-başlat-session-manager)'te doğrulayın.
 
-Not: Route 53 denetleyicileri 3 bölgeden yaklaşık her 30 saniyede bir istek atar. Bu istekler Caddy ve uvicorn'un erişim log'larına girer; ayda yüzlerce MB eder, CloudWatch'ın 5 GB'lık ücretsiz kotasının içinde kalır.
+Not: UptimeRobot 5 dakikada bir istek atar. Bu istekler Caddy ve uvicorn erişim log'larında görünür, ama hacmi ihmal edilebilir. `/health` hız sınırına dahil değildir.
 
 ---
 
@@ -1144,20 +1116,14 @@ Frontend için [Adım 19](#adım-19--frontendi-derle-ve-yükle)'daki komutları 
 | EC2 | Arızalıysa kapatıp Adım 13'ü tekrarlayın; veri S3'te. | Silinir (T7). Durdurulmuş instance da disk ve IP ücreti öder. |
 | Elastic IP | Instance yoksa **hemen bırakın**: bağlı değilken de ücretlidir. | Silinir (T9). |
 | CloudFront, ACM, OAC, Function | Devre dışı dağıtım ücretsizdir; acele etmeyin. | Silinir (T3, T4). |
-| Health check | Ücretlidir; uzun süre arızalıysa silin. | Silinir (T1). |
+| UptimeRobot monitor'ü | Ücretsiz; bırakılabilir. | Panelden silinir (T1). |
 | IAM rol/profil, SG, log grubu | Ücretsiz (log saklama ihmal edilebilir). | Silinir (T10, T11, T14). |
 
 Komutlar `NotFound` hatası verirse kaynak zaten silinmiştir; sonraki adıma geçin. Önce Adım 1'deki bloğu çalıştırın: kimlikler `$STATE_FILE`'dan gelir.
 
-### T1 — Health izleme (Adım 21)
+### T1 — UptimeRobot (Adım 21)
 
-```bash
-aws cloudwatch delete-alarms --region us-east-1 --alarm-names "$ALARM_NAME"
-aws sns delete-topic --region us-east-1 --topic-arn "$TOPIC_ARN"
-aws route53 delete-health-check --health-check-id "$HEALTH_CHECK_ID"
-```
-
-Doğrulama: `aws route53 list-health-checks --query "HealthChecks[?Id=='$HEALTH_CHECK_ID']" --output text` → boş.
+AWS'de silinecek bir şey yok. UptimeRobot panelinde monitor'ü **Delete** ile silin. Silmezseniz API kapandıktan sonra "Down" e-postaları gelmeye devam eder.
 
 ### T2 — DNS: apex + www (Adım 20)
 
@@ -1333,19 +1299,18 @@ eu-central-1, ayda yaklaşık 730 saat, bu uygulamanın ölçeği (günde birka�
 | S3 | yedekler <100 MB, frontend birkaç MB, az istek | <0,10 |
 | CloudFront | Her zaman ücretsiz katman: 1 TB çıkış ve 10 M istek/ay; Function'lar 2 M/ay ücretsiz | 0,00 |
 | Route 53 | hosted zone 0,50 (zaten ödüyorsunuz); CloudFront ALIAS sorguları ücretsiz | 0,50 (mevcut) |
-| Route 53 health check | HTTPS (temel + HTTPS seçeneği); AWS dışı uç sayılırsa üst sınır | ~1,50–2,75 |
 | ECR | ~0,10 $/GB-ay; 10 image, ortak katmanlar → <1 GB; aynı bölgede çekme ücretsiz | ~0,05–0,10 |
-| CloudWatch | Logs: ~0,5–1 GB/ay alım, 5 GB ücretsiz kotada; 7 gün saklama; 1 alarm (10 ücretsiz) | ~0,00 |
+| CloudWatch | Logs: ~0,1–0,5 GB/ay alım, 5 GB ücretsiz kotada; 7 gün saklama | ~0,00 |
+| /health izleme | UptimeRobot ücretsiz planı (AWS dışı) | 0,00 |
 | Diğer | ACM, SSM Parameter Store (standart), Session Manager, `aws/ssm` KMS: ücretsiz; 100 GB'a kadar internet çıkışı ücretsiz | 0,00 |
-| **Toplam** | | **~21–23 / ay** (mevcut hosted zone hariç ~20,5–22,5) |
+| **Toplam** | | **~20 / ay** (mevcut hosted zone hariç ~19,6–19,8) |
 
 Notlar:
-- **Ücretsiz katmana güvenmeyin.** EC2, EBS, genel IPv4 ve health check bu kurulumda ücretli kabul edildi. Hesabınız yeni ve kredili "Free plan"daysa bu tutar kredilerden düşer. Kredi bitince fatura başlar.
+- **Ücretsiz katmana güvenmeyin.** EC2, EBS ve genel IPv4 bu kurulumda ücretli kabul edildi. Hesabınız yeni ve kredili "Free plan"daysa bu tutar kredilerden düşer. Kredi bitince fatura başlar.
 - Tasarruf seçenekleri:
   - 1 yıllık Compute Savings Plan EC2 kalemini ~%30–35 düşürür.
-  - Health check yerine yalnızca ücretsiz EC2 `StatusCheckFailed` alarmı kullanılabilir. Bu alarm instance'ın düştüğünü yakalar ama uygulamanın düştüğünü yakalamaz.
   - UDP 443'ü (HTTP/3) kapatmanın maliyete etkisi yoktur.
-- Beklenmedik maliyet riski: t4g'nin "unlimited" CPU kredisi (bu kurulumda kapalı), bağlı olmayan EIP'ler, silinmeyen health check, ve CloudWatch Logs'ta beklenmedik log hacmi (ör. bir hata döngüsü). Billing → **Budgets**'ta aylık 30 USD'lik bir bütçe uyarısı önerilir (ilk 2 bütçe ücretsiz).
+- Beklenmedik maliyet riski: t4g'nin "unlimited" CPU kredisi (bu kurulumda kapalı), bağlı olmayan EIP'ler ve CloudWatch Logs'ta beklenmedik log hacmi (ör. bir hata döngüsü). Billing → **Budgets**'ta aylık 30 USD'lik bir bütçe uyarısı önerilir (ilk 2 bütçe ücretsiz).
 
 ---
 
@@ -1373,9 +1338,6 @@ Notlar:
 | CloudFront Function | `newsradar-www-redirect` (`$CF_FUNCTION_NAME`, `$CF_FUNCTION_ARN`) | Adım 18 | T3 |
 | OAC | `newsradar-frontend-oac` (`$OAC_NAME`, `$OAC_ID`) | Adım 18 | T3 |
 | CloudFront dağıtımı | `$DISTRIBUTION_ID`, `$CF_DOMAIN` | Adım 18 | 19, 20, T2, T3 |
-| Health check | etiket `newsradar-api-health` (`$HEALTH_CHECK_ID`) | Adım 21 | T1 |
-| SNS konusu | `newsradar-alerts` (us-east-1, `$TOPIC_ARN`) | Adım 21 | T1 |
-| Alarm | `newsradar-api-health` (us-east-1, `$ALARM_NAME`) | Adım 21 | T1 |
 
 Repo dosyaları:
 - [deploy/iam/](../deploy/iam/): trust policy, instance policy, frontend bucket policy
