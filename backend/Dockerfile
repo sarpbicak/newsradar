@@ -23,6 +23,12 @@ ENV PATH=/opt/venv/bin:$PATH \
     NEWSRADAR_TRUSTED_PROXY=caddy \
     NEWSRADAR_CADDY_IP=172.28.0.10
 
+# sqlite3 CLI: deploy/backup.sh ve restore.sh canlı DB'yi container İÇİNDE `.backup` ile alır
+# (çalışan WAL veritabanını dosya kopyalamak tutarsız yedek üretebilir).
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends sqlite3 \
+ && rm -rf /var/lib/apt/lists/*
+
 # Root olmayan kullanıcı. /data bu kullanıcıya ait → yeni named volume bu sahipliği devralır.
 RUN groupadd --system --gid 10001 newsradar \
  && useradd --system --uid 10001 --gid newsradar --no-create-home --shell /usr/sbin/nologin newsradar \

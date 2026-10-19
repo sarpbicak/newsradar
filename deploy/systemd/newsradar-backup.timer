@@ -1,0 +1,13 @@
+# Her gece 03:15 UTC (trafik en düşük). Persistent: makine kapalıyken kaçan çalıştırma
+# açılışta telafi edilir.
+[Unit]
+Description=NewsRadar gece yedeği
+
+[Timer]
+OnCalendar=*-*-* 03:15:00 UTC
+RandomizedDelaySec=10min
+Persistent=true
+Unit=newsradar-backup.service
+
+[Install]
+WantedBy=timers.target

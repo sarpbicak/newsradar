@@ -24,3 +24,6 @@ dist/
 
 # Editör çalışma alanı dosyaları
 *.code-workspace
+
+# deploy betiklerinin yerel çıktıları (dry-run yedekleri, restore öncesi kopyalar)
+deploy/local-backups/

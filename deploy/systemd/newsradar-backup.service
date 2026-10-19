@@ -1,0 +1,26 @@
+# NewsRadar gece yedeği (deploy/backup.sh → S3). Tetikleyen: newsradar-backup.timer.
+# Kurulum (EC2, repo /opt/newsradar):
+#   sudo cp /opt/newsradar/deploy/systemd/newsradar-backup.* /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now newsradar-backup.timer
+# Elle çalıştırma / log:  sudo systemctl start newsradar-backup && journalctl -u newsradar-backup
+[Unit]
+Description=NewsRadar SQLite yedeği (S3)
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/newsradar/deploy
+ExecStart=/opt/newsradar/deploy/backup.sh
+Environment=AWS_REGION=eu-central-1
+Environment=LOG_FILE=/var/log/newsradar/backup.log
+LogsDirectory=newsradar
+# S3 kimliği: instance rolü (IMDS). Erişim anahtarı dosyada TUTULMAZ.
+TimeoutStartSec=15min
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=yes
