@@ -388,10 +388,11 @@ def run_tests():
     check("uvicorn" not in server_hdr and "x-powered-by" not in {k.lower() for k in h.keys()},
           f"E26 Server/X-Powered-By versiyon sızdırmıyor (server={server_hdr!r})", "İyileştirme")
 
-    # E27 git geçmişi — gerçek anahtar / izlenmiş .env yok
+    # E27 git geçmişi — gerçek anahtar / izlenmiş .env yok. Adında FAKE geçen eşleşmeler
+    # test yer tutucusudur (ör. eski bir fixture'daki sk-ant-api03-FAKE…), gerçek anahtar değil.
     env_tracked = subprocess.run(["git", "-C", "..", "log", "--all", "--oneline", "--", "backend/.env", ".env"],
                                  capture_output=True, text=True).stdout.strip()
-    keyshapes = subprocess.run("git -C .. log --all -p | grep -oE '(sk-ant-[A-Za-z0-9_-]{20,}|nvapi-[A-Za-z0-9_-]{20,}|sk-or-v1-[A-Za-z0-9_-]{20,})' | sort -u",
+    keyshapes = subprocess.run("git -C .. log --all -p | grep -oE '(sk-ant-[A-Za-z0-9_-]{20,}|nvapi-[A-Za-z0-9_-]{20,}|sk-or-v1-[A-Za-z0-9_-]{20,})' | grep -v FAKE | sort -u",
                                shell=True, capture_output=True, text=True).stdout.strip()
     check(not env_tracked and not keyshapes,
           f"E27 git geçmişinde izlenmiş .env / gerçek anahtar YOK (env='{env_tracked[:30]}', key='{keyshapes[:30]}')",
