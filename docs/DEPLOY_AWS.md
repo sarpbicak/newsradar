@@ -39,7 +39,8 @@ Bölge **eu-central-1**. Tek istisna ACM sertifikası: CloudFront zorunlu kıld�
 | 9 | [IAM rolü](#adım-9--iam-rolü-ve-instance-profile) | 22 | [Rutin: yeni sürüm](#adım-22--rutin-yeni-sürüm-yayınlama) |
 | 10 | [Security group](#adım-10--security-group) | 23 | [Teardown](#adım-23--geri-alma-ve-temizlik-teardown) |
 | 11 | [Elastic IP](#adım-11--elastic-ip) | 24 | [Maliyet](#adım-24--aylık-maliyet-tahmini) |
-| 12 | [DNS: api](#adım-12--dns-api--elastic-ip) | Ek | [Kaynak adları](#ek-a--kaynak-adları) · [Gereksinimden sapmalar](#ek-b--gereksinimden-bilinçli-sapmalar) |
+| 12 | [DNS: api](#adım-12--dns-api--elastic-ip) | 25 | [GitHub Actions (OIDC)](#adım-25--github-actions-ile-otomatik-deploy-oidc) |
+|  |  | Ek | [Kaynak adları](#ek-a--kaynak-adları) · [Gereksinimden sapmalar](#ek-b--gereksinimden-bilinçli-sapmalar) |
 
 ---
 
@@ -1133,25 +1134,34 @@ docker buildx build --platform linux/arm64 --provenance=false --sbom=false \
 **[instance]** (`sudo -i; export AWS_REGION=eu-central-1; cd /opt/newsradar/deploy`):
 
 ```bash
-git -C /opt/newsradar pull --ff-only                 # deploy/ dosyaları değiştiyse
-./load-secrets.sh                                    # SSM'de değer değiştiyse
-set -a; . <(grep -E '^(DOMAIN|BACKEND_IMAGE)=' .env); set +a
-aws ecr get-login-password | docker login --username AWS --password-stdin "${BACKEND_IMAGE%%/*}"
-docker compose pull backend && docker compose up -d --no-build
-./smoke-test.sh "api.${DOMAIN}"
+git -C /opt/newsradar pull --ff-only && ./deploy.sh
 ```
+
+[deploy/deploy.sh](../deploy/deploy.sh) sırayla şunları yapar: `load-secrets.sh` → ECR girişi → `compose pull backend` → `up -d --no-build` → healthcheck + `smoke-test.sh`.
+
+Yeni sürüm sağlıksızsa makinedeki **önceki image'a kendisi döner**. Çıkış kodları:
+
+| Kod | Anlamı |
+|---|---|
+| `0` | Yeni sürüm ayakta. |
+| `1` | Yeni sürüm reddedildi; önceki sürüm ayakta. |
+| `2` | Geri dönüş de başarısız; elle müdahale gerekir. |
+| `3` | Deploy başlamadan durdu (secrets/ECR/pull hatası); servis değişmedi. |
+
+[Adım 25](#adım-25--github-actions-ile-otomatik-deploy-oidc) kuruluysa bu adımlara gerek yok: `main`'e push edildiğinde aynı akış otomatik çalışır.
 
 Frontend için [Adım 19](#adım-19--frontendi-derle-ve-yükle)'daki komutları tekrarlayın.
 
 **Önceki image'a dönüş:** ECR son 10 image'ı tutar.
 - Mac'te `aws ecr describe-images --region "$REGION" --repository-name "$ECR_REPO" --query 'sort_by(imageDetails,&imagePushedAt)[].imageTags' --output text` ile etiketleri listeleyin.
 - `put_param BACKEND_IMAGE String "$ECR_URI:<eski-etiket>"` (`put_param` `~/newsradar-env.sh`'te tanımlı).
-- Instance'ta yukarıdaki bloğu çalıştırın.
+- Instance'ta `./deploy.sh` çalıştırın.
 
 **Doğrulama:** `smoke-test.sh` → `== TAMAM`. Mac'te `curl -sS "https://api.${DOMAIN}/health"` → `{"status":"ok"}`.
 
 **Hata alırsam:**
-- `smoke-test` başarısızsa önceki image'a dönün (yukarıda).
+- `deploy.sh` 1 döndüyse yeni sürüm zaten geri alınmıştır: log'daki healthcheck/smoke çıktısına bakın. ECR'daki `prod` etiketini de önceki image'a almak için yukarıdaki "önceki image'a dönüş" adımlarını izleyin.
+- `deploy.sh` 2 döndüyse: `docker compose logs backend --tail 100`. Gerekirse `./restore.sh` (veri) ya da bilinen iyi bir etiketle `put_param BACKEND_IMAGE …` + `./deploy.sh`.
 - Veri bozulduysa **[instance]** `./restore.sh` en son gece yedeğini geri yükler. Onay sorar; işlemden önce mevcut DB'nin kopyasını alır.
 
 ---
@@ -1162,6 +1172,7 @@ Frontend için [Adım 19](#adım-19--frontendi-derle-ve-yükle)'daki komutları 
 
 | Kaynak | Bir şey ters giderse | Tamamen vazgeçersem |
 |---|---|---|
+| GitHub Actions rolleri ve değişkenleri | Ücretsiz; bırakılabilir. İş akışlarını durdurmak için `gh workflow disable`. | Silinir (T0). |
 | Route 53 hosted zone | **Asla silinmez.** Kurulumdan önce vardı. | Bırakılır, yalnızca kayıtlar geri alınır (T2, T8). |
 | `$DNS_BACKUP` dosyası (Mac) | Saklayın; geri dönüşün kaynağı bu. | Saklayın. |
 | Yedek bucket'ı | **Bırakın:** tek veri kopyası burada. | **En son** silinir, ancak yerel bir kopya indirildikten sonra (T6, T15). |
@@ -1174,6 +1185,22 @@ Frontend için [Adım 19](#adım-19--frontendi-derle-ve-yükle)'daki komutları 
 | IAM rol/profil, SG, log grubu | Ücretsiz (log saklama ihmal edilebilir). | Silinir (T10, T11, T14). |
 
 Komutlar `NotFound` hatası verirse kaynak zaten silinmiştir; sonraki adıma geçin. Önce `source ~/newsradar-env.sh` ([Adım 1](#adım-1--değişkenler-ve-durum-dosyası)): kimlikler `$STATE_FILE`'dan gelir.
+
+### T0 — GitHub Actions (Adım 25)
+
+```bash
+gh workflow disable deploy-backend.yml --repo "$GITHUB_REPO"; gh workflow disable deploy-frontend.yml --repo "$GITHUB_REPO"
+for v in AWS_REGION AWS_BACKEND_ROLE_ARN AWS_FRONTEND_ROLE_ARN EC2_INSTANCE_ID ECR_REPOSITORY FRONTEND_BUCKET \
+  CLOUDFRONT_DISTRIBUTION_ID API_URL; do gh variable delete "$v" --repo "$GITHUB_REPO"; done
+aws iam delete-role-policy --role-name "$GH_BACKEND_ROLE" --policy-name newsradar-github-backend-inline
+aws iam delete-role --role-name "$GH_BACKEND_ROLE"
+aws iam delete-role-policy --role-name "$GH_FRONTEND_ROLE" --policy-name newsradar-github-frontend-inline
+aws iam delete-role --role-name "$GH_FRONTEND_ROLE"
+# Sağlayıcıyı yalnızca hesapta onu kullanan başka rol yoksa silin:
+aws iam delete-open-id-connect-provider --open-id-connect-provider-arn "$GITHUB_OIDC_ARN"
+```
+
+Doğrulama: `aws iam list-roles --query "Roles[?starts_with(RoleName,'newsradar-github')].RoleName" --output text` → boş.
 
 ### T1 — UptimeRobot (Adım 21)
 
@@ -1356,6 +1383,7 @@ eu-central-1, ayda yaklaşık 730 saat, bu uygulamanın ölçeği (günde birka�
 | ECR | ~0,10 $/GB-ay; 10 image, ortak katmanlar → <1 GB; aynı bölgede çekme ücretsiz | ~0,05–0,10 |
 | CloudWatch | Logs: ~0,1–0,5 GB/ay alım, 5 GB ücretsiz kotada; 7 gün saklama | ~0,00 |
 | /health izleme | UptimeRobot ücretsiz planı (AWS dışı) | 0,00 |
+| GitHub Actions | Public repo: standart runner'lar (`ubuntu-24.04-arm` dahil) ücretsiz; OIDC sağlayıcısı ve IAM rolleri ücretsiz | 0,00 |
 | Diğer | ACM, SSM Parameter Store (standart), Session Manager, `aws/ssm` KMS: ücretsiz; 100 GB'a kadar internet çıkışı ücretsiz | 0,00 |
 | **Toplam** | | **~20 / ay** (mevcut hosted zone hariç ~19,6–19,8) |
 
@@ -1365,6 +1393,135 @@ Notlar:
   - 1 yıllık Compute Savings Plan EC2 kalemini ~%30–35 düşürür.
   - UDP 443'ü (HTTP/3) kapatmanın maliyete etkisi yoktur.
 - Beklenmedik maliyet riski: t4g'nin "unlimited" CPU kredisi (bu kurulumda kapalı), bağlı olmayan EIP'ler ve CloudWatch Logs'ta beklenmedik log hacmi (ör. bir hata döngüsü). Billing → **Budgets**'ta aylık 30 USD'lik bir bütçe uyarısı önerilir (ilk 2 bütçe ücretsiz).
+
+---
+
+## Adım 25 — GitHub Actions ile otomatik deploy (OIDC)
+
+**Ne yapıyoruz:** `main`'e push edildiğinde backend'i ve frontend'i GitHub Actions'ın yayına almasını sağlıyoruz. AWS kimliği **OIDC** ile alınır: repoda ya da GitHub secret'larında hiçbir AWS anahtarı yoktur. İki ayrı rol var ve ikisini de yalnızca bu reponun `main` dalındaki iş akışları üstlenebilir.
+
+İş akışları:
+- [.github/workflows/deploy-backend.yml](../.github/workflows/deploy-backend.yml). Tetikleyici: `backend/**`, `deploy/**` (ya da elle). Akış:
+  1. Testler: backend'in 24 suite'i, deploy betiklerinin shellcheck'i ve yerel testleri.
+  2. arm64 image (`ubuntu-24.04-arm`, `--provenance=false`) yalnızca commit SHA etiketiyle ECR'a gönderilir.
+  3. Tarama beklenir; **CRITICAL varsa durur**.
+  4. `prod` etiketi yeni image'a taşınır.
+  5. SSM Run Command ile EC2'de `git pull --ff-only && deploy/deploy.sh` çalışır (load-secrets, ECR login, pull, up, smoke-test).
+  6. Başarısızsa EC2 önceki image'a döner, `prod` etiketi de önceki image'a geri alınır ve workflow **fail** olur. Mantık [deploy/ci/release-backend.sh](../deploy/ci/release-backend.sh)'te.
+- [.github/workflows/deploy-frontend.yml](../.github/workflows/deploy-frontend.yml). Tetikleyici: `frontend/**`. Akış: `npm ci && npm run build` (`VITE_API_URL`) → [Adım 19](#adım-19--frontendi-derle-ve-yükle)'daki sırayla S3 → CloudFront invalidation.
+
+**Ön koşul:**
+- Adım 13 ve 18 tamamlanmış olmalı: `INSTANCE_ID`, `DISTRIBUTION_ID` ve `FRONTEND_BUCKET` durum dosyasında.
+- Repo public olmalı.
+- **Rolleri ve değişkenleri, workflow dosyalarını push etmeden önce kurun.** İlk push iş akışlarını tetikler.
+
+**Komutlar:**
+
+```bash
+# 1) GitHub OIDC sağlayıcısı (hesapta bir kez; GitHub'ın kök sertifikasına AWS kendisi güvenir)
+save GITHUB_OIDC_ARN "$(aws iam create-open-id-connect-provider \
+  --url https://token.actions.githubusercontent.com --client-id-list sts.amazonaws.com \
+  --tags Key=Project,Value=newsradar --query OpenIDConnectProviderArn --output text)"
+
+# 2) Ortak trust policy: yalnızca repo:<repo>:ref:refs/heads/main
+render deploy/iam/github-oidc-trust-policy.json >/tmp/newsradar-gh-trust.json
+render deploy/iam/github-backend-policy.json   >/tmp/newsradar-gh-backend.json
+render deploy/iam/github-frontend-policy.json  >/tmp/newsradar-gh-frontend.json
+jq -r '.Statement[0].Condition.StringEquals["token.actions.githubusercontent.com:sub"]' /tmp/newsradar-gh-trust.json
+
+# 3) Backend rolü: tek ECR reposu + yalnızca bu instance'a AWS-RunShellScript + komut sonucu
+save GH_BACKEND_ROLE_ARN "$(aws iam create-role --role-name "$GH_BACKEND_ROLE" \
+  --assume-role-policy-document file:///tmp/newsradar-gh-trust.json \
+  --description "NewsRadar GitHub Actions: backend deploy" --tags Key=Project,Value=newsradar \
+  --query Role.Arn --output text)"
+aws iam put-role-policy --role-name "$GH_BACKEND_ROLE" --policy-name newsradar-github-backend-inline \
+  --policy-document file:///tmp/newsradar-gh-backend.json
+
+# 4) Frontend rolü: yalnızca frontend bucket'ına yazma + bu dağıtımda invalidation
+save GH_FRONTEND_ROLE_ARN "$(aws iam create-role --role-name "$GH_FRONTEND_ROLE" \
+  --assume-role-policy-document file:///tmp/newsradar-gh-trust.json \
+  --description "NewsRadar GitHub Actions: frontend deploy" --tags Key=Project,Value=newsradar \
+  --query Role.Arn --output text)"
+aws iam put-role-policy --role-name "$GH_FRONTEND_ROLE" --policy-name newsradar-github-frontend-inline \
+  --policy-document file:///tmp/newsradar-gh-frontend.json
+```
+
+**GitHub repo değişkenleri.** Bunlar *Variables*'tır, *Secrets* değildir; hiçbiri sır değil. Rol ARN'leri tek başına bir şey yapmaz, çünkü trust policy yalnızca bu reponun `main` dalına izin veriyor.
+
+| Değişken | Değer | Kullanan |
+|---|---|---|
+| `AWS_REGION` | `$REGION` (`eu-central-1`) | ikisi |
+| `AWS_BACKEND_ROLE_ARN` | `$GH_BACKEND_ROLE_ARN` | backend |
+| `AWS_FRONTEND_ROLE_ARN` | `$GH_FRONTEND_ROLE_ARN` | frontend |
+| `EC2_INSTANCE_ID` | `$INSTANCE_ID` | backend |
+| `ECR_REPOSITORY` | `$ECR_REPO` (`newsradar-api`) | backend |
+| `FRONTEND_BUCKET` | `$FRONTEND_BUCKET` | frontend |
+| `CLOUDFRONT_DISTRIBUTION_ID` | `$DISTRIBUTION_ID` | frontend |
+| `API_URL` | `https://api.$DOMAIN` | frontend (`VITE_API_URL`) |
+
+Eklemenin iki yolu var:
+- **Web:** repo → *Settings* → *Secrets and variables* → *Actions* → **Variables** sekmesi → *New repository variable*. Her satır için adı ve değeri girin; değerleri `echo "$GH_BACKEND_ROLE_ARN"` gibi komutlarla görebilirsiniz.
+- **gh CLI:**
+
+```bash
+brew install gh && gh auth login                      # bir kez
+for kv in "AWS_REGION=$REGION" "AWS_BACKEND_ROLE_ARN=$GH_BACKEND_ROLE_ARN" "AWS_FRONTEND_ROLE_ARN=$GH_FRONTEND_ROLE_ARN" \
+  "EC2_INSTANCE_ID=$INSTANCE_ID" "ECR_REPOSITORY=$ECR_REPO" "FRONTEND_BUCKET=$FRONTEND_BUCKET" \
+  "CLOUDFRONT_DISTRIBUTION_ID=$DISTRIBUTION_ID" "API_URL=https://api.$DOMAIN"; do
+  gh variable set "${kv%%=*}" --repo "$GITHUB_REPO" --body "${kv#*=}"
+done
+```
+
+Ardından workflow dosyalarını push edin (`git push`) ya da elle başlatın:
+
+```bash
+gh workflow run deploy-backend.yml --repo "$GITHUB_REPO" --ref main
+gh workflow run deploy-frontend.yml --repo "$GITHUB_REPO" --ref main
+gh run list --repo "$GITHUB_REPO" --limit 4
+```
+
+**Doğrulama:**
+
+```bash
+gh variable list --repo "$GITHUB_REPO"
+aws iam get-role --role-name "$GH_BACKEND_ROLE" --query 'Role.AssumeRolePolicyDocument.Statement[0].Condition' --output json | jq -c
+aws accessanalyzer validate-policy --region "$REGION" --policy-type IDENTITY_POLICY \
+  --policy-document file:///tmp/newsradar-gh-backend.json --query 'findings[].[findingType,issueCode]' --output text
+gh run watch --repo "$GITHUB_REPO" "$(gh run list --repo "$GITHUB_REPO" --workflow deploy-backend.yml --limit 1 --json databaseId --jq '.[0].databaseId')"
+aws ecr describe-images --region "$REGION" --repository-name "$ECR_REPO" --image-ids imageTag=prod \
+  --query 'imageDetails[0].imageTags' --output text
+curl -sS "https://api.${DOMAIN}/health"; echo
+aws cloudfront list-invalidations --distribution-id "$DISTRIBUTION_ID" --query 'InvalidationList.Items[0].[Status,CreateTime]' --output text
+```
+
+Beklenen çıktı:
+- 8 değişken.
+- Trust koşulu `{"StringEquals":{"token.actions.githubusercontent.com:aud":"sts.amazonaws.com","token.actions.githubusercontent.com:sub":"repo:<repo>:ref:refs/heads/main"}}`.
+- Access Analyzer: `ERROR` yok. `ecr:GetAuthorizationToken` ve `ssm:GetCommandInvocation`'ın `*` kaynağıyla ilgili bir uyarı çıkabilir ([Ek B](#ek-b--gereksinimden-bilinçli-sapmalar)).
+- `deploy-backend` çalışmasında `test` → `build` → `deploy` yeşil. *deploy* adımının log'unda "EC2 çıktısı" grubu ve `[release] tamam: <sha> yayında`.
+- `prod` etiketinin yanında son commit'in tam SHA'sı.
+- `{"status":"ok"}`.
+- Son invalidation `Completed` ya da `InProgress`.
+- Public loglarda hesap ID'si `***` olarak maskelenir (`mask-aws-account-id`).
+
+**Hata alırsam:**
+- `Not authorized to perform sts:AssumeRoleWithWebIdentity` → token'daki `sub` trust policy'deki `sub` ile tutmuyor. Olası nedenler:
+  - İş akışı `main` dışındaki bir daldan çalıştırılmıştır (beklenen ret).
+  - Job'a `environment:` eklenmiştir; bu `sub`'ı `repo:…:environment:<ad>` yapar.
+  - Repo adı değişmiştir.
+  - `GITHUB_OIDC_ARN` başka bir hesaptadır.
+- `Could not load credentials` / `id-token` → job'da `permissions: id-token: write` eksiktir.
+- `build` job'ında `denied` → `ECR_REPOSITORY` değişkeni yanlıştır ya da backend politikası farklı bir repo adıyla render edilmiştir.
+- `CRITICAL bulgu — yayına alınmıyor` → `prod`'a dokunulmamıştır; image yalnızca SHA etiketiyle ECR'da durur. Bulguları `aws ecr describe-image-scan-findings --image-id imageTag=<sha>` ile görün ve temel image'ı (`backend/Dockerfile`) ya da bağımlılığı güncelleyin.
+- `InvalidInstanceId` / komut `Undeliverable` → SSM agent çevrimdışı (Adım 13 doğrulaması) ya da `EC2_INSTANCE_ID` yanlış. **Instance yeniden kurulduysa** (Teardown T7 + Adım 13) kimlik değişir: GitHub değişkenini güncelleyin ve backend politikasını yeni `INSTANCE_ID` ile yeniden render edip `put-role-policy`'yi tekrarlayın.
+- `deploy.sh` kodları [Adım 22](#adım-22--rutin-yeni-sürüm-yayınlama)'deki gibi:
+  - `1`: EC2 önceki sürümle ayakta, `prod` etiketi geri alındı.
+  - `2`: elle müdahale gerekir.
+  - `3`: deploy başlamadı.
+
+  Ayrıntı *deploy* log'undaki "EC2 çıktısı" grubunda.
+- Frontend: `AccessDenied … PutObject/DeleteObject` → `FRONTEND_BUCKET` yanlış. `… CreateInvalidation` → `CLOUDFRONT_DISTRIBUTION_ID` yanlış. `API_URL repo değişkeni tanımlı değil` → değişkeni ekleyin.
+- `create-open-id-connect-provider` `EntityAlreadyExists` verirse sağlayıcı zaten vardır: `save GITHUB_OIDC_ARN "arn:aws:iam::${ACCOUNT_ID}:oidc-provider/token.actions.githubusercontent.com"`. Thumbprint istenirse (eski API davranışı) komuta `--thumbprint-list` ekleyin; değer için GitHub'ın OIDC belgelerine bakın.
 
 ---
 
@@ -1393,16 +1550,22 @@ Notlar:
 | OAC | `newsradar-frontend-oac` (`$OAC_NAME`, `$OAC_ID`) | Adım 18 | T3 |
 | CloudFront dağıtımı | `$DISTRIBUTION_ID`, `$CF_DOMAIN` | Adım 18 | 19, 20, T2, T3 |
 
+| GitHub OIDC sağlayıcısı | `token.actions.githubusercontent.com` (`$GITHUB_OIDC_ARN`) | Adım 25 | T0 |
+| GitHub backend rolü | `newsradar-github-backend` (`$GH_BACKEND_ROLE`), inline `newsradar-github-backend-inline` | Adım 25 | T0 |
+| GitHub frontend rolü | `newsradar-github-frontend` (`$GH_FRONTEND_ROLE`), inline `newsradar-github-frontend-inline` | Adım 25 | T0 |
+| GitHub repo değişkenleri | `AWS_REGION`, `AWS_*_ROLE_ARN`, `EC2_INSTANCE_ID`, `ECR_REPOSITORY`, `FRONTEND_BUCKET`, `CLOUDFRONT_DISTRIBUTION_ID`, `API_URL` | Adım 25 | T0 |
 Repo dosyaları:
 - [deploy/iam/](../deploy/iam/): trust policy, instance policy, frontend bucket policy
 - [deploy/aws/](../deploy/aws/): user-data, CloudFront dağıtımı ve Function'ı, S3 ve ECR lifecycle kuralları, `render.py`
 - [deploy/tests/test-aws-templates.sh](../deploy/tests/test-aws-templates.sh): şablonların yerel testi
+- [.github/workflows/](../.github/workflows/), [deploy/ci/release-backend.sh](../deploy/ci/release-backend.sh), [deploy/deploy.sh](../deploy/deploy.sh): otomatik deploy (Adım 25)
 
 ## Ek B — Gereksinimden bilinçli sapmalar
 
 | Konu | İstenen | Yapılan ve neden |
 |---|---|---|
 | `ecr:GetAuthorizationToken` | IAM'de `*` olmasın | Bu eylem kaynak bazlı kısıtlamayı **desteklemiyor**; AWS yalnızca `"Resource": "*"` kabul ediyor. Token tek başına bir image'a erişim vermez; çekme izinleri yalnızca `newsradar-api` reposuyla sınırlı. Politikadaki tek `*` bu. |
+| `ssm:GetCommandInvocation` (GitHub backend rolü) | IAM'de `*` olmasın | Komut sonucunu okumak için gerekli. AWS'nin Service Authorization Reference'ına göre bu eylem kaynak bazlı kısıtlamayı **desteklemiyor**. Komutu gönderme izni (`ssm:SendCommand`) ise yalnızca tek instance ve `AWS-RunShellScript` ile sınırlı; okuma izni hiçbir komutu çalıştıramaz. |
 | `AmazonSSMManagedInstanceCore` | İstendi | AWS-managed bir policy ve içinde `*` kaynaklar var (Session Manager'ın çalışma biçimi). Değiştirilemez; istendiği gibi eklendi. |
 | CloudWatch Logs izinleri | İzin listesinde yoktu | Gözlem gereksinimi (container log'ları CloudWatch'a) bunu zorunlu kılıyor. Yalnızca `logs:CreateLogStream` ve `logs:PutLogEvents`, yalnızca `/newsradar/prod` grubuna. |
 | Port 443 | "Yalnızca 80 ve 443" | 443 TCP'nin yanında 443 **UDP** de açık (HTTP/3). Kapatılabilir ([Adım 10](#adım-10--security-group)). |

@@ -105,6 +105,7 @@ Bunlar ya `docker-compose.yml` / Dockerfile tarafından sabitlenir, ya yalnızca
 | `LOG_FILE` | backup/restore (host) | Log'un ayrıca yazıldığı dosya. systemd birimi bunu ayarlar. | `/var/log/newsradar/backup.log` |
 | `SAFETY_DIR` | restore.sh (host) | Restore öncesi DB kopyalarının klasörü. | `deploy/local-backups/pre-restore` |
 | `HEALTH_TIMEOUT` | restore.sh (host) | Restore sonrası healthy bekleme süresi (sn). | `120` |
+| `DEPLOY_SKIP_SECRETS` | deploy.sh (host) | `1` ise `load-secrets.sh` atlanır. Yalnızca yerel test için: yerel `deploy/.env`'yi ezmemek. | boş |
 | `DB_IN_CONTAINER` | backup/restore (host) | Container içindeki DB yolu. Testler dışında değiştirilmez. | `/data/newsradar.db` |
 
 Yerel `backend/.env` dosyasında bulunabilecek `NVIDIA_API_KEY` kodda okunmaz, bu yüzden gerekmez.

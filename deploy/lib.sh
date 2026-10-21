@@ -1,10 +1,11 @@
 # shellcheck shell=bash
-# backup.sh / restore.sh / load-secrets.sh ortak yardımcıları (doğrudan çalıştırılmaz).
+# backup.sh / restore.sh / load-secrets.sh / deploy.sh ortak yardımcıları (doğrudan çalıştırılmaz).
 # Çağıran betik DEPLOY_DIR ve LOG_TAG'i tanımlar.
 
 AWS_REGION="${AWS_REGION:-eu-central-1}"
 SERVICE=backend
 DB_IN_CONTAINER="${DB_IN_CONTAINER:-/data/newsradar.db}"
+HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-120}"
 # Yedek adı: newsradar-YYYYMMDD-HHMM.db.gz (UTC). Başka her ad reddedilir (yol enjeksiyonu yok).
 # shellcheck disable=SC2034  # restore.sh kullanır
 BACKUP_NAME_RE='^newsradar-[0-9]{8}-[0-9]{4}\.db\.gz$'
@@ -59,6 +60,19 @@ in_backend() {
   else
     dc run --rm -T --no-deps "$SERVICE" "$@"
   fi
+}
+
+# Container sağlığı (Dockerfile HEALTHCHECK) → "healthy" olana dek bekler.
+wait_healthy() {
+  local i id status
+  for ((i = 0; i < HEALTH_TIMEOUT; i += 2)); do
+    id="$(dc ps -q "$SERVICE")"
+    status="$(docker inspect -f '{{.State.Health.Status}}' "$id" 2>/dev/null || echo none)"
+    [[ "$status" == healthy ]] && return 0
+    sleep 2
+  done
+  log "backend $HEALTH_TIMEOUT sn içinde healthy olmadı (son durum: ${status:-?})"
+  return 1
 }
 
 # Canlı DB'nin tutarlı anlık görüntüsünü (sqlite3 .backup — çevrimiçi yedek API'si) stdout'a yazar.

@@ -1,0 +1,112 @@
+# Backend: test → arm64 image → ECR (commit SHA) → tarama (CRITICAL varsa dur) → prod etiketi →
+# SSM ile EC2'de deploy/deploy.sh (smoke-test) → başarısızsa önceki image'a geri dön, fail.
+# AWS kimliği OIDC ile (repoda anahtar yok). Kurulum: docs/DEPLOY_AWS.md, Adım 25.
+name: deploy-backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "deploy/**"
+      - "frontend/src/i18n.jsx"   # test_refresh_messages.py okuyor
+      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+jobs:
+  test:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Bağımlılıklar
+        run: pip install -r backend/requirements.txt
+      - name: Backend test suite'leri
+        working-directory: backend
+        run: |
+          failed=""
+          for t in test_*.py; do
+            echo "::group::$t"
+            if ! python "$t"; then failed="$failed $t"; fi
+            echo "::endgroup::"
+          done
+          if [ -n "$failed" ]; then
+            echo "::error::Başarısız suite'ler:$failed"
+            exit 1
+          fi
+      - name: Deploy betikleri (shellcheck + yerel testler)
+        run: |
+          docker run --rm -e LANG=C.UTF-8 -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:v0.11.0 \
+            -x -S style deploy/*.sh deploy/ci/*.sh deploy/aws/*.sh deploy/tests/aws deploy/tests/*.sh
+          python3 deploy/tests/check-parameters.py
+          deploy/tests/test-aws-templates.sh
+          deploy/tests/test-load-secrets.sh
+          deploy/tests/test-release-backend.sh
+
+  build:
+    needs: test
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_BACKEND_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: deploy-backend-build-${{ github.run_id }}
+          mask-aws-account-id: true
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: arm64 image → ECR (yalnızca commit etiketi; prod etiketi taramadan sonra)
+        env:
+          IMAGE: ${{ steps.ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ github.sha }}
+        # --provenance/--sbom kapalı: aksi halde ECR'a image index gider, temel tarama çalışmaz.
+        run: |
+          docker buildx build --platform linux/arm64 --provenance=false --sbom=false \
+            -t "$IMAGE" --push backend
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_BACKEND_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: deploy-backend-release-${{ github.run_id }}
+          mask-aws-account-id: true
+      - name: Tarama → prod etiketi → EC2 deploy (başarısızsa geri dönüş)
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+          INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: deploy/ci/release-backend.sh

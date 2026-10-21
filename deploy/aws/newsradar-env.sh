@@ -33,6 +33,11 @@ export OAC_NAME=newsradar-frontend-oac
 REPO_URL="https://github.com/$(git remote get-url origin | sed -E 's#^(https://github\.com/|git@github\.com:)##')"
 export REPO_URL
 export REPO_BRANCH=main
+# GitHub Actions (Adım 25): OIDC rolleri yalnızca bu reponun main dalına güvenir.
+GITHUB_REPO="$(git remote get-url origin | sed -E 's#^(https://github\.com/|git@github\.com:)##; s#\.git$##')"
+export GITHUB_REPO
+export GH_BACKEND_ROLE=newsradar-github-backend
+export GH_FRONTEND_ROLE=newsradar-github-frontend
 export STATE_FILE="$HOME/.newsradar-aws-state.env"
 
 # Durum dosyası: adımların ürettiği kimlikler (sır yok). Yeni terminalde geri yüklenir.

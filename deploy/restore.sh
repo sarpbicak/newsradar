@@ -34,7 +34,6 @@ while (($#)); do
 done
 
 SAFETY_DIR="${SAFETY_DIR:-$DEPLOY_DIR/local-backups/pre-restore}"
-HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-120}"
 need docker sqlite3 gzip curl
 BUCKET=""
 if [[ -z "$DRY_DIR" ]]; then
@@ -50,19 +49,6 @@ list_names() {
     aws s3api list-objects-v2 --bucket "$BUCKET" --prefix backups/newsradar- --region "$AWS_REGION" \
       --query 'Contents[].Key' --output text | tr '\t' '\n' | sed 's|^backups/||'
   fi
-}
-
-# Container sağlığı (Dockerfile HEALTHCHECK) → "healthy" olana dek bekler.
-wait_healthy() {
-  local i id status
-  for ((i = 0; i < HEALTH_TIMEOUT; i += 2)); do
-    id="$(dc ps -q "$SERVICE")"
-    status="$(docker inspect -f '{{.State.Health.Status}}' "$id" 2>/dev/null || echo none)"
-    [[ "$status" == healthy ]] && return 0
-    sleep 2
-  done
-  log "backend $HEALTH_TIMEOUT sn içinde healthy olmadı (son durum: ${status:-?})"
-  return 1
 }
 
 # Dışarıdan, Caddy üzerinden /health (DOMAIN: ortam ya da deploy/.env).

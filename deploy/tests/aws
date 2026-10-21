@@ -3,6 +3,10 @@
 # Gerçek AWS'ye hiçbir istek atılmaz:
 #   ssm get-parameters-by-path → $FAKE_SSM_JSON dosyasının içeriği
 #   s3 cp / s3api head-object / s3api list-objects-v2 → $FAKE_S3_DIR/<bucket>/<key>
+#   ecr (tarama, describe-images, batch-get-image, put-image) → $FAKE_ECR_DIR:
+#     tags/<etiket> = digest · manifests/<digest> = manifest · scan/<digest> = "DURUM CRITICAL HIGH"
+#   ssm send-command / get-command-invocation → $FAKE_SSM_STATUS + $FAKE_SSM_CODE (parametreler
+#     $FAKE_ECR_DIR/ssm-params.json'a yazılır)
 # Her çağrı (argümanlar; değer içermez) $FAKE_AWS_LOG'a eklenir.
 set -euo pipefail
 [[ -n "${FAKE_AWS_LOG:-}" ]] && printf '%s\n' "$*" >>"$FAKE_AWS_LOG"
@@ -11,6 +15,14 @@ opt() { # --ad değer
   local name="$1"; shift
   while (($#)); do [[ "$1" == "$name" ]] && { printf '%s' "$2"; return; }; shift; done
 }
+# Global --region <değer> herhangi bir konumda olabilir (aws ecr --region X describe-images …): ayıkla.
+args=()
+while (($#)); do
+  if [[ "$1" == --region ]]; then shift 2; continue; fi
+  args+=("$1"); shift
+done
+set -- "${args[@]}"
+
 s3path() { local u="${1#s3://}"; printf '%s/%s' "${FAKE_S3_DIR:?}" "$u"; }
 
 case "$1 $2" in
@@ -30,5 +42,37 @@ case "$1 $2" in
     b="$FAKE_S3_DIR/$(opt --bucket "$@")" p="$(opt --prefix "$@")"
     keys="$(cd "$b" 2>/dev/null && find . -type f | sed 's|^\./||' | awk -v p="$p" 'index($0, p) == 1' | sort | paste -sd '\t' - || true)"
     printf '%s\n' "${keys:-None}" ;;
+  "ecr wait")
+    d="$(cat "$FAKE_ECR_DIR/tags/$(opt --image-id "$@" | sed 's/^imageTag=//')" 2>/dev/null)" || { echo "Waiter failed: ImageNotFound" >&2; exit 255; }
+    [[ -f "$FAKE_ECR_DIR/scan/$d" ]] || { echo "Waiter ImageScanComplete failed" >&2; exit 255; } ;;
+  "ecr describe-image-scan-findings")
+    d="$(cat "$FAKE_ECR_DIR/tags/$(opt --image-id "$@" | sed 's/^imageTag=//')")"
+    read -r st cr hi <"$FAKE_ECR_DIR/scan/$d"
+    printf '%s\t%s\t%s\n' "$st" "$cr" "$hi" ;;
+  "ecr describe-images")
+    t="$(opt --image-ids "$@" | sed 's/^imageTag=//')"
+    if [[ -f "$FAKE_ECR_DIR/tags/$t" ]]; then cat "$FAKE_ECR_DIR/tags/$t"; else
+      echo "An error occurred (ImageNotFoundException) when calling the DescribeImages operation" >&2; exit 254; fi ;;
+  "ecr batch-get-image")
+    d="$(opt --image-ids "$@" | sed 's/^imageDigest=//')"
+    case "$(opt --query "$@")" in
+      *imageManifestMediaType*) echo "application/vnd.oci.image.manifest.v1+json" ;;
+      *) cat "$FAKE_ECR_DIR/manifests/$d" ;;
+    esac ;;
+  "ecr put-image")
+    m="$(opt --image-manifest "$@")" tag="$(opt --image-tag "$@")" d=""
+    for f in "$FAKE_ECR_DIR"/manifests/*; do [[ "$(cat "$f")" == "$m" ]] && d="$(basename "$f")"; done
+    [[ -n "$d" ]] || { echo "fake aws: manifest bilinmiyor" >&2; exit 2; }
+    if [[ "$(cat "$FAKE_ECR_DIR/tags/$tag" 2>/dev/null)" == "$d" ]]; then
+      echo "An error occurred (ImageAlreadyExistsException) when calling the PutImage operation" >&2; exit 254; fi
+    echo "$d" >"$FAKE_ECR_DIR/tags/$tag" ;;
+  "ssm send-command")
+    cp "$(opt --parameters "$@" | sed 's|^file://||')" "$FAKE_ECR_DIR/ssm-params.json"
+    echo "cmd-0001" ;;
+  "ssm get-command-invocation")
+    case "$(opt --query "$@")" in
+      *Status*) printf '%s\t%s\n' "${FAKE_SSM_STATUS:-Success}" "${FAKE_SSM_CODE:-0}" ;;
+      *) printf 'deploy.sh çıktısı (sahte)\t\n' ;;
+    esac ;;
   *) echo "fake aws: desteklenmeyen komut: $*" >&2; exit 2 ;;
 esac

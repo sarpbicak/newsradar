@@ -12,7 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 # Betik içi yardımcılar: dışarıdan verilmez, dokümana girmez.
-INTERNAL = {"LOG_TAG"}
+INTERNAL = {"LOG_TAG", "PREV_ID"}  # PREV_ID: deploy.sh log'unda ${PREV_ID:-yok}
 # Dokümanda "kullanılmaz" diye anılan adlar (kodda bilerek yok).
 DOCUMENTED_UNUSED = {"NVIDIA_API_KEY"}
 # Docker image'ının Python çalışma ortamı (uygulama ayarı değil).

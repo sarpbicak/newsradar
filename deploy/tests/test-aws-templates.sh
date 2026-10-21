@@ -20,7 +20,8 @@ export REGION=eu-central-1 ACCOUNT_ID=123456789012 DOMAIN=example.com ECR_REPO=n
   SSM_KMS_KEY_ARN=arn:aws:kms:eu-central-1:123456789012:key/00000000-0000-0000-0000-000000000000 \
   CERT_ARN=arn:aws:acm:us-east-1:123456789012:certificate/00000000-0000-0000-0000-000000000000 \
   CF_FUNCTION_ARN=arn:aws:cloudfront::123456789012:function/newsradar-www-redirect \
-  REPO_URL=https://github.com/example/newsradar.git REPO_BRANCH=main
+  REPO_URL=https://github.com/example/newsradar.git REPO_BRANCH=main \
+  INSTANCE_ID=i-0123456789abcdef0 GITHUB_REPO=example/newsradar
 
 echo "== render"
 for f in "$DEPLOY"/iam/*.json "$DEPLOY"/aws/*.json "$DEPLOY"/aws/user-data.sh; do
@@ -38,7 +39,8 @@ else
 fi
 
 echo "== IAM en az yetki"
-python3 - "$T/ec2-instance-policy.json" "$T/frontend-bucket-policy.json" <<'PY' && ok "'*' yalnızca ecr:GetAuthorizationToken'da; joker eylem yok" || bad "IAM'de beklenmeyen joker"
+python3 - "$T/ec2-instance-policy.json" "$T/frontend-bucket-policy.json" "$T/github-backend-policy.json" \
+  "$T/github-frontend-policy.json" <<'PY' && ok "'*' yalnızca kaynak kısıtlaması desteklemeyen 2 eylemde; joker eylem yok" || bad "IAM'de beklenmeyen joker"
 import json, sys
 bad = []
 for path in sys.argv[1:]:
@@ -48,11 +50,21 @@ for path in sys.argv[1:]:
         res = res if isinstance(res, list) else [res]
         if any("*" in a for a in acts):
             bad.append(f"{st['Sid']}: joker eylem {acts}")
-        if "*" in res and acts != ["ecr:GetAuthorizationToken"]:
+        if "*" in res and acts not in (["ecr:GetAuthorizationToken"], ["ssm:GetCommandInvocation"]):
             bad.append(f"{st['Sid']}: Resource '*'")
 for b in bad:
     print("    " + b)
 sys.exit(1 if bad else 0)
+PY
+
+python3 - "$T/github-oidc-trust-policy.json" <<'PY' && ok "OIDC trust: yalnızca repo:…:ref:refs/heads/main (StringEquals, joker yok)" || bad "OIDC trust koşulu"
+import json, sys
+st = json.load(open(sys.argv[1]))["Statement"]
+assert len(st) == 1 and st[0]["Action"] == "sts:AssumeRoleWithWebIdentity"
+c = st[0]["Condition"]
+assert set(c) == {"StringEquals"}, c
+assert c["StringEquals"]["token.actions.githubusercontent.com:sub"] == "repo:example/newsradar:ref:refs/heads/main"
+assert c["StringEquals"]["token.actions.githubusercontent.com:aud"] == "sts.amazonaws.com"
 PY
 
 echo "== CloudFront Function (www → apex)"

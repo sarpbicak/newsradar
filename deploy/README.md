@@ -1,6 +1,7 @@
 # Docker deployment (API)
 
 Step-by-step AWS setup (IAM, EC2, S3, CloudFront, DNS, monitoring, teardown, cost): [docs/DEPLOY_AWS.md](../docs/DEPLOY_AWS.md).
+Automatic deploys on push to `main` (GitHub Actions + OIDC, no AWS keys in the repo): [.github/workflows/](../.github/workflows/), set up in step 25 of the runbook. Manual deploy on the instance: `git -C /opt/newsradar pull --ff-only && deploy/deploy.sh`.
 
 Target: the API at `api.newsradarapp.com`, served by Docker on an ARM (t4g) EC2 instance. The frontend (`newsradarapp.com`, with `www` redirecting to it) is a static build on CloudFront and is not part of this stack.
 
