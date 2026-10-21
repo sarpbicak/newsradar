@@ -19,7 +19,7 @@ Bölge **eu-central-1**. Tek istisna ACM sertifikası: CloudFront zorunlu kıld�
 - Adımlar **sırayla** çalıştırılır. Her adım dört bölümden oluşur: ne yapıyoruz → komutlar → doğrulama (beklenen çıktıyla) → hata alırsam.
 - Komutlar **bash** içindir. macOS'ta varsayılan kabuk zsh olduğu için her yeni terminalde önce `bash` yazın.
 - Komutlar **repo kökünden** çalıştırılır (`cd ~/Desktop/newsradar`). Instance üzerinde çalışanlar ayrıca **[instance]** diye işaretlidir.
-- [Adım 1](#adım-1--değişkenler-ve-durum-dosyası)'deki blok, her yeni terminalde **ilk iş olarak** yeniden çalıştırılır. Oluşan kaynak kimlikleri (instance ID, dağıtım ID…) `~/.newsradar-aws-state.env` dosyasına kaydedilir ve bu blokla geri yüklenir. Bu dosyada sır yoktur, yalnızca kimlikler vardır.
+- Her yeni terminalde **ilk iş olarak** `bash` ve `source ~/newsradar-env.sh` ([Adım 1](#adım-1--değişkenler-ve-durum-dosyası)) çalıştırılır. Oluşan kaynak kimlikleri (instance ID, dağıtım ID…) `~/.newsradar-aws-state.env` dosyasına kaydedilir ve `source` ile geri yüklenir. Bu dosyada sır yoktur, yalnızca kimlikler vardır.
 - Hiçbir komutta hesap ID'si, sır ya da e-posta yazılı değildir; hepsi değişkenlerden gelir. Sırlar `read -s` ile girilir: ekranda görünmez, shell geçmişine ve process listesine düşmez.
 - Bir adım yarıda kalırsa önce o adımın **Doğrulama** komutunu çalıştırın. Kaynak zaten oluşmuşsa "already exists" hatası zararsızdır ve bir sonraki komuttan devam edebilirsiniz.
 
@@ -107,55 +107,25 @@ Beklenen çıktı:
 
 ## Adım 1 — Değişkenler ve durum dosyası
 
-**Ne yapıyoruz:** Tüm adımların kullandığı sabitleri ve yardımcı fonksiyonları tek yerde tanımlıyoruz. **Her yeni terminalde bu bloğu ilk iş olarak yeniden çalıştırın.**
+**Ne yapıyoruz:** Tüm adımların kullandığı sabitleri ve yardımcı fonksiyonları, repodaki [deploy/aws/newsradar-env.sh](../deploy/aws/newsradar-env.sh) dosyasından yüklüyoruz. Uzun bir bloğu terminale yapıştırmak yerine bu dosya bir kez kopyalanır ve **her yeni terminalde `source` edilir**.
 
 **Komutlar:**
 
 ```bash
-bash                                   # zsh'den bash'e geçin (komutlar bash içindir)
-cd "$(git -C ~/Desktop/newsradar rev-parse --show-toplevel)"
-
-export AWS_PROFILE=newsradar
-export REGION=eu-central-1
-export AWS_REGION="$REGION"
-export DOMAIN=newsradarapp.com
-export ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
-export BACKUP_BUCKET="newsradar-backups-${ACCOUNT_ID}"
-export FRONTEND_BUCKET="newsradar-frontend-${ACCOUNT_ID}"
-export ECR_REPO=newsradar-api
-export ECR_URI="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${ECR_REPO}"
-export LOG_GROUP=/newsradar/prod
-export SSM_PREFIX=/newsradar/prod
-export ROLE_NAME=newsradar-ec2-role
-export PROFILE_NAME=newsradar-ec2-profile
-export SG_NAME=newsradar-api-sg
-export INSTANCE_NAME=newsradar-api
-export CF_FUNCTION_NAME=newsradar-www-redirect
-export OAC_NAME=newsradar-frontend-oac
-export REPO_URL="https://github.com/$(git remote get-url origin | sed -E 's#^(https://github\.com/|git@github\.com:)##')"
-export REPO_BRANCH=main
-export STATE_FILE="$HOME/.newsradar-aws-state.env"
-
-# Durum dosyası: adımların ürettiği kimlikler (sır yok). Yeni terminalde geri yüklenir.
-touch "$STATE_FILE" && chmod 600 "$STATE_FILE" && . "$STATE_FILE"
-save() { # save AD DEĞER → bu oturuma export + durum dosyasına yaz
-  export "$1=$2"
-  { grep -v "^export $1=" "$STATE_FILE" || true; printf 'export %s=%q\n' "$1" "$2"; } >"$STATE_FILE.tmp"
-  mv "$STATE_FILE.tmp" "$STATE_FILE" && chmod 600 "$STATE_FILE"
-}
-render() { python3 deploy/aws/render.py "$@"; }   # __AD__ yer tutucularını değişkenlerle doldurur
-put_param() { # put_param AD TÜR [DEĞER] — değer verilmezse sorulur (SecureString gizli); boş = atla
-  local name="$1" type="$2" value="${3-}"
-  if [ $# -lt 3 ]; then
-    if [ "$type" = SecureString ]; then read -rsp "  $name (gizli; boş = atla): " value; echo
-    else read -rp "  $name (boş = atla): " value; fi
-  fi
-  if [ -z "$value" ]; then echo "  - $name atlandı (uygulama varsayılanı kullanılır)"; return 0; fi
-  # Değer stdin'den gider: argv'de (ps) ve shell geçmişinde görünmez.
-  printf '%s' "$value" | aws ssm put-parameter --region "$REGION" --name "$SSM_PREFIX/$name" --type "$type" \
-    --value file:///dev/stdin --overwrite --query Version --output text >/dev/null && echo "  ✓ $name ($type)"
-}
+bash                                                         # zsh'den bash'e geçin (komutlar bash içindir)
+cp ~/Desktop/newsradar/deploy/aws/newsradar-env.sh ~/newsradar-env.sh   # yalnızca bir kez
+source ~/newsradar-env.sh                                    # her yeni terminalde
 ```
+
+Dosya şunları tanımlar:
+- Sabitler: `REGION=eu-central-1`, `DOMAIN=newsradarapp.com`, `ACCOUNT_ID` (o anki SSO kimliğinden), bucket adları, ECR deposu, log grubu, SSM yolu, IAM/SG/CloudFront kaynak adları ([Ek A](#ek-a--kaynak-adları)), `REPO_URL` (git remote'tan, https).
+- `STATE_FILE`: adımların ürettiği kimliklerin tutulduğu dosya (`~/.newsradar-aws-state.env`); her `source`'ta geri yüklenir.
+- Yardımcılar:
+  - `save AD DEĞER`: değişkeni export eder ve durum dosyasına yazar.
+  - `render ŞABLON`: `__AD__` yer tutucularını doldurur.
+  - `put_param AD TÜR [DEĞER]`: SSM'e yazar; değer stdin'den gider, argv'de ve geçmişte görünmez.
+
+Dosyada sır yoktur. Repo `~/Desktop/newsradar` dışındaysa `NEWSRADAR_REPO=/yol/newsradar source ~/newsradar-env.sh` deyin. Yerel kopyayı düzenleyebilirsiniz; repo değişmez. Repodaki dosya güncellenirse `cp` satırını tekrarlayın.
 
 **Doğrulama:**
 
@@ -166,7 +136,7 @@ printf '%s\n' "$ACCOUNT_ID" "$BACKUP_BUCKET" "$FRONTEND_BUCKET" "$ECR_URI" "$REP
 Beklenen çıktı: beş dolu satır. Hesap ID'si `<hesap>` olarak maskelenir, `REPO_URL` `https://github.com/<kullanıcı>/newsradar.git` biçimindedir.
 
 **Hata alırsam:**
-- `ACCOUNT_ID` boşsa SSO oturumunun süresi dolmuştur: `aws sso login`, sonra bloğu tekrar çalıştırın.
+- `ACCOUNT_ID` boşsa SSO oturumunun süresi dolmuştur: `aws sso login`, sonra `source ~/newsradar-env.sh`.
 - `REPO_URL` yanlışsa `git remote -v` çıktısına bakın ve değişkeni elle `export REPO_URL=https://github.com/<kullanıcı>/<repo>.git` diye verin.
 
 ---
@@ -261,7 +231,8 @@ Beklenen çıktı:
 git status --short                      # boş olmalı: etiket = commit
 aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "${ECR_URI%%/*}"
 save IMAGE_TAG "$(git rev-parse --short HEAD)"
-docker buildx build --platform linux/arm64 -t "$ECR_URI:$IMAGE_TAG" -t "$ECR_URI:prod" --push backend
+docker buildx build --platform linux/arm64 --provenance=false --sbom=false \
+  -t "$ECR_URI:$IMAGE_TAG" -t "$ECR_URI:prod" --push backend
 save BACKEND_IMAGE "$ECR_URI:prod"
 aws ecr wait image-scan-complete --region "$REGION" --repository-name "$ECR_REPO" --image-id imageTag=prod
 ```
@@ -277,9 +248,12 @@ aws ecr describe-image-scan-findings --region "$REGION" --repository-name "$ECR_
 
 Beklenen çıktı:
 - `[["<commit>","prod"],"COMPLETE"]` (etiketlerin sırası değişebilir)
-- `{}` ya da önem derecesine göre sayılar. `CRITICAL` varsa ayrıntısını `describe-image-scan-findings` ile görün; yayına almadan önce temel image'ı güncelleyin (`docker buildx build --pull …`).
+- `{}` ya da önem derecesine göre sayılar. `CRITICAL` varsa ayrıntısını `describe-image-scan-findings` ile görün; yayına almadan önce temel image'ı güncelleyin (`docker buildx build --pull --provenance=false --sbom=false …`).
+
+`--provenance=false --sbom=false` zorunlu. Bu bayraklar olmadan buildx, image'ın yanına attestation ekleyip ECR'a tek image yerine bir **image index** gönderir. ECR'ın temel taraması index'i taramaz: `wait image-scan-complete` ve `describe-image-scan-findings` `ScanNotFoundException` verir.
 
 **Hata alırsam:**
+- `ScanNotFoundException` → image bayraklar olmadan gönderilmiştir. Build satırını bayraklarla tekrarlayın.
 - `no basic auth credentials` / `denied` → giriş token'ı 12 saatte bir yenilenir; `docker login` satırını tekrarlayın.
 - `docker exporter does not currently support exporting manifest lists` → `docker buildx create --name newsradar --use`, sonra build satırını tekrarlayın.
 - `git status` boş değilse önce commit'leyin. Etiket commit'i göstermeli ki geri dönüş (Adım 22) anlamlı olsun.
@@ -368,7 +342,7 @@ Not: 7 günlük saklama, gizlilik metnindeki "IP'ler 7 gün sonra silinir" taahh
 **Komutlar:**
 
 ```bash
-# put_param: Adım 1'de tanımlı (değer stdin'den gider; argv'de ve geçmişte görünmez).
+# put_param: ~/newsradar-env.sh'te tanımlı (değer stdin'den gider; argv'de ve geçmişte görünmez).
 # --- 1. Zorunlu ---
 put_param DOMAIN String "$DOMAIN"
 # APP_SECRET üretilir, hiç ekrana basılmaz. Zaten varsa DOKUNULMAZ (değişirse tüm oturumlar düşer).
@@ -388,6 +362,9 @@ put_param NEWSRADAR_COOKIE_SECURE String on
 put_param NEWSRADAR_COOKIE_DOMAIN String ".${DOMAIN}"
 put_param NEWSRADAR_HOSTING_PROVIDER String "AWS (${REGION})"
 put_param NEWSRADAR_SEED_ON_START String on
+# Geçiş sırasında OFF: Render da çalışırken iki ortam aynı anda refresh yapmasın (çift LLM
+# harcaması + Render'a yazılan veri taşınmaz). Render kapatılınca ON (Adım 20, "Geçişi tamamla").
+put_param NEWSRADAR_SCHEDULER String off
 put_param NEWSRADAR_CONTACT_EMAIL String          # sorulur (gizlilik metnindeki adres)
 put_param ADMIN_USERNAME String                   # sorulur
 
@@ -397,7 +374,7 @@ for n in NEWSRADAR_LLM_PROVIDER NEWSRADAR_ARTICLE_MODEL NEWSRADAR_ASSESSMENT_MOD
   NEWSRADAR_MAX_USERS NEWSRADAR_MAX_ENTITIES_ANON NEWSRADAR_MAX_ENTITIES_REGISTERED NEWSRADAR_MAX_REFRESH_ANON \
   NEWSRADAR_MAX_REFRESH_REGISTERED NEWSRADAR_ANON_SESSIONS_PER_IP_HOUR NEWSRADAR_FEEDBACK_PER_IP_HOUR \
   NEWSRADAR_IP_RETENTION_DAYS NEWSRADAR_TOKEN_TTL_DAYS NEWSRADAR_SESSION_COOKIE NEWSRADAR_SESSION_COOKIE_DAYS \
-  NEWSRADAR_SCHEDULER NEWSRADAR_SCHEDULER_HOURS NEWSRADAR_LOOKBACK_HOURS NEWSAPI_DAILY_LIMIT NEWSRADAR_BATCH_SIZE \
+  NEWSRADAR_SCHEDULER_HOURS NEWSRADAR_LOOKBACK_HOURS NEWSAPI_DAILY_LIMIT NEWSRADAR_BATCH_SIZE \
   NEWSRADAR_MAX_ARTICLES_PER_ENTITY NEWSRADAR_ANALYSIS_CONCURRENCY NEWSRADAR_MAX_OUTPUT_TOKENS; do
   put_param "$n" String
 done
@@ -727,11 +704,72 @@ Beklenen çıktı:
   **Sürekli yeniden başlatmayın:** Let's Encrypt'in başarısız deneme sınırı vardır (saatte 5). Sorunu düzeltip bir kez `docker compose restart caddy` deyin.
 - `smoke-test.sh` `/health` için 502 dönüyorsa backend henüz healthy değildir: `docker compose logs backend --tail 50`.
 
-İsteğe bağlı: eski verinizi taşımak isterseniz yerel bir yedeği S3'e koyup geri yükleyebilirsiniz:
-- Mac: `aws s3 cp <yedek>.db.gz "s3://$BACKUP_BUCKET/backups/newsradar-YYYYMMDD-HHMM.db.gz"`
-- **[instance]**: `./restore.sh newsradar-YYYYMMDD-HHMM.db.gz`
+### Render'daki veriyi taşıma
 
-Render'ın ücretsiz katmanındaki DB kalıcı olmadığı için varsayılan olarak boş bir DB ile başlanır (seed açık).
+Bu kurulumda Render **Starter planı ve kalıcı disk** kullanıyordu, yani canlı veri Render'daydı. Veri şu yolla taşındı:
+
+1. Render'da çevrimiçi yedek alındı.
+2. Mac'te yalnızca o nesneye yazabilen, süreli bir S3 URL'i (presigned PUT) üretildi.
+3. Render'dan bu URL'e yüklendi.
+4. EC2'de `restore.sh` ile geri yüklendi.
+
+Yedekten sonra Render'a yazılan veri taşınmaz. Bu yüzden taşımayı DNS geçişine ([Adım 20](#adım-20--dns-apex--www--cloudfront-geçiş)) yakın yapın; scheduler EC2'de bu sırada kapalıdır ([Adım 7](#adım-7--ssm-parametreleri)).
+
+**a) Render Shell** (Dashboard → servis → *Shell*, backend kökü). Python `sqlite3.backup` ile tutarlı yedek alınır, dosya kopyalanmaz:
+
+```bash
+python3 - <<'PY'
+import gzip, shutil, sqlite3, time
+from app.config import get_settings
+src = sqlite3.connect(get_settings().db_path)
+dst = sqlite3.connect("/tmp/nr.db")
+src.backup(dst)                                   # çevrimiçi yedek API'si (çalışan DB'de güvenli)
+assert dst.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+dst.close(); src.close()
+name = time.strftime("newsradar-%Y%m%d-%H%M.db.gz", time.gmtime())   # restore.sh'in beklediği ad
+with open("/tmp/nr.db", "rb") as f, gzip.open("/tmp/" + name, "wb", 9) as g:
+    shutil.copyfileobj(f, g)
+print(name)
+PY
+```
+
+**b) Mac:** Presigned PUT URL'i üretin. AWS CLI'ın `aws s3 presign` komutu yalnızca GET üretir, bu yüzden boto3 kullanılıyor. URL'i satır satır yapıştırılacak parçalar halinde yazdırın:
+
+```bash
+python3 -m pip install --user --quiet boto3          # yoksa
+read -rp "Render'ın yazdırdığı ad (newsradar-YYYYMMDD-HHMM.db.gz): " NAME
+python3 - "$REGION" "$BACKUP_BUCKET" "backups/$NAME" <<'PY'
+import sys, boto3
+from botocore.config import Config
+region, bucket, key = sys.argv[1:4]
+s3 = boto3.session.Session().client(
+    "s3", region_name=region, endpoint_url=f"https://s3.{region}.amazonaws.com",   # bölgesel endpoint
+    config=Config(signature_version="s3v4", s3={"addressing_style": "virtual"}))
+url = s3.generate_presigned_url("put_object", Params={"Bucket": bucket, "Key": key}, ExpiresIn=3600)
+print(f"# {len(url)} karakter — Render Shell'e satır satır yapıştırın:")
+print("U=''")
+for i in range(0, len(url), 200):
+    print("U=\"$U\"'" + url[i:i + 200] + "'")
+PY
+```
+
+**c) Render Shell:** Yazdırılan `U=…` satırlarını **tek tek** yapıştırın. Render web shell uzun yapıştırmaları kesiyor, URL bu yüzden parçalı. Sonra yükleyin ve temizleyin:
+
+```bash
+printf '%s' "$U" | wc -c                             # Mac'teki karakter sayısıyla aynı olmalı
+curl -fsS -X PUT --upload-file "/tmp/<ad>" "$U" && echo yüklendi
+rm -f /tmp/nr.db /tmp/newsradar-*.db.gz; unset U
+```
+
+**d) EC2 [instance]:** `./restore.sh <ad>`. Komut onay sorar, mevcut (seed) DB'nin kopyasını alır, yedeği doğrular ve geri yükler.
+
+Notlar:
+- **Bölgesel endpoint şart.** Yeni oluşturulan bucket'larda global endpoint (`<bucket>.s3.amazonaws.com`) bir süre **307 TemporaryRedirect** döner. Presigned URL'in imzası yönlendirmeden sonra geçersiz kalır. Bu yüzden `s3.<bölge>.amazonaws.com`, virtual addressing ve `s3v4` kullanılıyor.
+- **URL bir kimlik bilgisidir.** URL, SSO oturumunun geçici token'ını taşır ve yalnızca o tek nesneye yazma izni verir. En geç 1 saatte ya da SSO oturumu bitince geçersizleşir. Başka bir yere yapıştırmayın.
+- **Doğrulama:** Mac'te `aws s3 ls "s3://$BACKUP_BUCKET/backups/$NAME"` dosyayı göstermeli. restore.sh'in log'unda `yedek doğrulandı: integrity_check=ok, users=… entities=…` görünmeli ve sayılar Render'dakilerle aynı olmalı.
+- **Hata:**
+  - `SignatureDoesNotMatch` → URL bozuk yapıştırılmıştır (karakter sayısını karşılaştırın) ya da süresi dolmuştur.
+  - `AccessDenied` → SSO oturumu düşmüştür; `aws sso login` deyip URL'i yeniden üretin.
 
 ---
 
@@ -1007,6 +1045,21 @@ Beklenen çıktı:
 
 Son olarak tarayıcıda siteyi açın ve bir şirket ekleyip yenileyin. DevTools → Application → Cookies'te `nr_device` çerezi `Domain=.newsradarapp.com`, `Secure`, `SameSite=Lax` görünmeli.
 
+**Geçişi tamamla:** Site doğrulandıktan sonra Render servislerini durdurun (Dashboard → *Suspend*). Ardından EC2'de otomatik yenilemeyi açın:
+
+```bash
+put_param NEWSRADAR_SCHEDULER String on                       # Mac
+```
+
+**[instance]** (`sudo -i; export AWS_REGION=eu-central-1; cd /opt/newsradar/deploy`):
+
+```bash
+./load-secrets.sh && docker compose up -d --no-build          # env değişti → backend yeniden yaratılır
+docker compose logs backend --since 2m | grep -i 'zamanlayıcı'
+```
+
+Beklenen çıktı: `Zamanlayıcı başladı (aktif=True, her 6 saatte)`. Render kapanmadan scheduler'ı açmayın, yoksa iki ortam aynı anda refresh yapar.
+
 **Hata alırsam:**
 - `InvalidChangeBatch … conflicting RRSet` → apex ya da www'de başka türde bir kayıt var. `jq` çıktısına bakın ve o kaydı `DELETE` olarak ekleyin.
 - **Geri dönüş (site çalışmıyorsa):** CloudFront ALIAS'larını silip yedekteki eski apex/www kayıtlarını aynı değişiklikte geri yazın:
@@ -1073,7 +1126,8 @@ Not: UptimeRobot 5 dakikada bir istek atar. Bu istekler Caddy ve uvicorn erişim
 # Backend — Mac:
 aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "${ECR_URI%%/*}"
 save IMAGE_TAG "$(git rev-parse --short HEAD)"
-docker buildx build --platform linux/arm64 -t "$ECR_URI:$IMAGE_TAG" -t "$ECR_URI:prod" --push backend
+docker buildx build --platform linux/arm64 --provenance=false --sbom=false \
+  -t "$ECR_URI:$IMAGE_TAG" -t "$ECR_URI:prod" --push backend
 ```
 
 **[instance]** (`sudo -i; export AWS_REGION=eu-central-1; cd /opt/newsradar/deploy`):
@@ -1091,7 +1145,7 @@ Frontend için [Adım 19](#adım-19--frontendi-derle-ve-yükle)'daki komutları 
 
 **Önceki image'a dönüş:** ECR son 10 image'ı tutar.
 - Mac'te `aws ecr describe-images --region "$REGION" --repository-name "$ECR_REPO" --query 'sort_by(imageDetails,&imagePushedAt)[].imageTags' --output text` ile etiketleri listeleyin.
-- `put_param BACKEND_IMAGE String "$ECR_URI:<eski-etiket>"` (`put_param` [Adım 1](#adım-1--değişkenler-ve-durum-dosyası)'deki blokta tanımlı).
+- `put_param BACKEND_IMAGE String "$ECR_URI:<eski-etiket>"` (`put_param` `~/newsradar-env.sh`'te tanımlı).
 - Instance'ta yukarıdaki bloğu çalıştırın.
 
 **Doğrulama:** `smoke-test.sh` → `== TAMAM`. Mac'te `curl -sS "https://api.${DOMAIN}/health"` → `{"status":"ok"}`.
@@ -1119,7 +1173,7 @@ Frontend için [Adım 19](#adım-19--frontendi-derle-ve-yükle)'daki komutları 
 | UptimeRobot monitor'ü | Ücretsiz; bırakılabilir. | Panelden silinir (T1). |
 | IAM rol/profil, SG, log grubu | Ücretsiz (log saklama ihmal edilebilir). | Silinir (T10, T11, T14). |
 
-Komutlar `NotFound` hatası verirse kaynak zaten silinmiştir; sonraki adıma geçin. Önce Adım 1'deki bloğu çalıştırın: kimlikler `$STATE_FILE`'dan gelir.
+Komutlar `NotFound` hatası verirse kaynak zaten silinmiştir; sonraki adıma geçin. Önce `source ~/newsradar-env.sh` ([Adım 1](#adım-1--değişkenler-ve-durum-dosyası)): kimlikler `$STATE_FILE`'dan gelir.
 
 ### T1 — UptimeRobot (Adım 21)
 
