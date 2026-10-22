@@ -191,7 +191,7 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
                       </span>
                     </div>
                     {!r.us_supported && (
-                      <div className="mt-0.5 text-[10px] text-amber-400/80">
+                      <div className="mt-0.5 text-[10px] text-amber-400">
                         ⚠ {r.exchange_name} — haber/fiyat yok, keyword önerilir
                       </div>
                     )}
@@ -241,7 +241,7 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
         <button
           disabled={!canSubmit}
           title={missing.length ? t("wl.missing", { fields: missing.join(", ") }) : ""}
-          className="min-h-[44px] w-full rounded-md bg-accent px-3 py-2 text-sm font-medium text-white disabled:opacity-50 md:w-auto"
+          className="min-h-[44px] w-full rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-fg disabled:opacity-50 md:w-auto"
         >
           {busy ? t("wl.adding") : t("wl.add")}
         </button>

@@ -18,9 +18,10 @@ export const LOGO_ELEMENTS = [
   { tag: "path", d: "m13.41 10.59 5.66-5.66" },                     // tarama çizgisi
 ];
 
-// Renk: sitenin ana rengi (tailwind accent). Koyu sekme çubuğu için açık ton.
+// Renk: sitenin vurgu rengi — açık tema --accent, koyu tema --accent (src/index.css ile AYNI;
+// header logosu currentColor ile bu değişkeni izler, favicon statik olduğu için değer burada).
 export const LOGO_COLOR = "#1E3A5F";
-export const LOGO_COLOR_DARK = "#9DB8DC";
+export const LOGO_COLOR_DARK = "#8FB4E3";
 // Header'daki çizgi kalınlığı; favicon'da 16px'te okunsun diye daha kalın (şekil aynı).
 export const LOGO_STROKE = 2;
 export const FAVICON_STROKE = 2.75;

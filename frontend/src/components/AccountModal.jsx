@@ -70,7 +70,7 @@ export default function AccountModal({ mode: initialMode, onClose, onDone }) {
           {err && <p className="text-xs text-rose-400">{err}</p>}
           <button
             disabled={busy}
-            className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:brightness-105 disabled:opacity-60"
+            className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-fg transition hover:brightness-105 disabled:opacity-60"
           >
             {busy ? t("acc.working") : isUpgrade ? t("acc.submitUpgrade") : t("acc.submitLogin")}
           </button>

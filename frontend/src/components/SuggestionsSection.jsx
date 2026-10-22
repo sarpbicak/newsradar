@@ -74,7 +74,7 @@ export default function SuggestionsSection({ suggestions, onAdd, onDismiss, embe
                 <button
                   onClick={() => handle(onAdd, s.id)}
                   disabled={busy}
-                  className="rounded-md bg-accent px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
+                  className="rounded-md bg-accent px-3 py-1 text-xs font-medium text-accent-fg disabled:opacity-50"
                 >
                   {busy ? "…" : t("sug.add")}
                 </button>

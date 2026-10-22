@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import { I18nProvider } from "./i18n.jsx";
+import { ThemeProvider } from "./theme.js";
 import "./index.css";
 
 // Dil durumu en üstte tutulur (I18nProvider sağlar); App onu okur/değiştirir.
@@ -12,9 +13,11 @@ function Root() {
     return (navigator.language || "").toLowerCase().startsWith("tr") ? "tr" : "en";
   });
   return (
-    <I18nProvider lang={lang} setLang={setLang}>
-      <App lang={lang} setLang={setLang} />
-    </I18nProvider>
+    <ThemeProvider>
+      <I18nProvider lang={lang} setLang={setLang}>
+        <App lang={lang} setLang={setLang} />
+      </I18nProvider>
+    </ThemeProvider>
   );
 }
 

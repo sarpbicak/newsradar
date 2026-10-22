@@ -23,6 +23,12 @@ const STR = {
   "header.guest": { tr: "Misafir", en: "Guest" },
   "header.menu": { tr: "menü", en: "menu" },
   "header.home": { tr: "Ana sayfaya dön", en: "Go to home" },
+  // ---- Tema ----
+  "theme.title": { tr: "Tema", en: "Theme" },
+  "theme.label": { tr: "Tema: {name}", en: "Theme: {name}" },
+  "theme.system": { tr: "Sistem", en: "System" },
+  "theme.light": { tr: "Açık", en: "Light" },
+  "theme.dark": { tr: "Koyu", en: "Dark" },
 
   // ---- Pano / genel görünüm ----
   "ov.todayImportant": { tr: "Bugün önemli", en: "Today's highlights" },
@@ -242,6 +248,7 @@ const STR = {
 
   // ---- Detay başlığı + sohbet yan paneli ----
   "detail.targetAsOf": { tr: "analist hedefi, {date}", en: "analyst target, {date}" },
+  "detail.targetStale": { tr: "Analist hedefi 30 günden eski", en: "Analyst target is older than 30 days" },
   "detail.metaHorizon": { tr: "{h} vade", en: "{h} horizon" },
   "detail.metaArticles": { tr: "{count} haber analiz edildi", en: "{count} articles analyzed" },
   "detail.metaArticles_one": { tr: "1 haber analiz edildi", en: "1 article analyzed" },

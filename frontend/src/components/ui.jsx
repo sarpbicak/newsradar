@@ -1,6 +1,7 @@
 // Paylaşılan UI atomları: rozetler, göstergeler, çipler.
 import React, { useEffect, useRef, useState } from "react";
 import { fmtPct, getLang, tt, timeAgo as _timeAgo } from "../i18n.jsx";
+import { C, cssColor } from "../theme.js";
 
 // timeAgo dil-farkında sürümü i18n'de; geriye uyum için buradan da dışa aç.
 export const timeAgo = _timeAgo;
@@ -102,7 +103,7 @@ export function stanceLabel(stance) {
 }
 
 // Yön/vade/kanıt için renk + etiket yardımcıları. Koyu zeminde parlak sinyal tonları.
-const STANCE_COLOR = { bullish: "#0F8A4C", neutral: "#7A7770", bearish: "#C62828" };
+const STANCE_COLOR = { bullish: C.pos, neutral: C.neutral, bearish: C.neg };
 export function stanceColor(stance) {
   return STANCE_COLOR[stance] || STANCE_COLOR.neutral;
 }
@@ -113,7 +114,7 @@ export function evidenceLabel(e) {
   return ["strong", "medium", "weak"].includes(e) ? tt(`evidence.${e}`) : "—";
 }
 export function evidenceColor(e) {
-  return { strong: "#0F8A4C", medium: "#B45309", weak: "#C62828" }[e] || "#7A7770";
+  return { strong: C.pos, medium: C.warn, weak: C.neg }[e] || C.neutral;
 }
 
 // --- Düz Türkçe terim açıklamaları (tooltip metinleri; jargon yok) ---
@@ -177,15 +178,15 @@ export function InfoTip({ text, className = "" }) {
 // --- Genel sinyal: yön + kanıt gücünü 5 kademeli tek ölçeğe indirger ---
 // Sol (güçlü olumsuz, kırmızı) → sağ (güçlü olumlu, yeşil). Fiyat tahmini DEĞİL.
 const SIGNAL_LEVELS = [
-  { key: -2, tkey: "sig.strongNeg", color: "#A81E1E" },
-  { key: -1, tkey: "sig.neg", color: "#C62828" },
-  { key: 0, tkey: "sig.neutral", color: "#7A7770" },
-  { key: 1, tkey: "sig.pos", color: "#0F8A4C" },
-  { key: 2, tkey: "sig.strongPos", color: "#0B7A42" },
+  { key: -2, tkey: "sig.strongNeg", color: C.negStrong },
+  { key: -1, tkey: "sig.neg", color: C.neg },
+  { key: 0, tkey: "sig.neutral", color: C.neutral },
+  { key: 1, tkey: "sig.pos", color: C.pos },
+  { key: 2, tkey: "sig.strongPos", color: C.posStrong },
 ];
 
 // Beş durumun renk eşlemesi tek yerde. Beklenmedik stance/evidence (büyük-küçük harf,
-// boş) → NÖTR (gri #7A7770). ASLA koyu/siyaha düşmez. label dile göre çevrilir.
+// boş) → NÖTR (gri). ASLA koyu/siyaha düşmez. label dile göre çevrilir.
 const NEUTRAL = SIGNAL_LEVELS.find((l) => l.key === 0);
 export function overallSignal(stance, evidence) {
   const s = String(stance || "").toLowerCase();
@@ -196,13 +197,14 @@ export function overallSignal(stance, evidence) {
   return { ...lvl, label: tt(lvl.tkey) };
 }
 
-// Durum "pill" stili: güçlü uçlar dolu+beyaz metin; ortalar soluk dolgu+renkli metin.
+// Durum "pill" stili: güçlü uçlar dolu (zıt metin); ortalar soluk dolgu+renkli metin. Kontrast
+// iki temada AA (≥4.5:1) — renkler src/index.css'te.
 const PILL_STYLE = {
-  "2": { bg: "#0B7A42", color: "#FFFFFF" },              // GÜÇLÜ OLUMLU (dolu)
-  "1": { bg: "rgba(15,138,76,0.12)", color: "#0F8A4C" }, // OLUMLU (soluk dolgu)
-  "0": { bg: "rgba(122,119,112,0.14)", color: "#6B6862" }, // NÖTR
-  "-1": { bg: "rgba(198,40,40,0.10)", color: "#C62828" }, // OLUMSUZ (soluk dolgu)
-  "-2": { bg: "#A81E1E", color: "#FFFFFF" },             // GÜÇLÜ OLUMSUZ (dolu)
+  "2": { bg: C.posStrong, color: C.onStrong },               // GÜÇLÜ OLUMLU (dolu)
+  "1": { bg: cssColor("pos", 0.12), color: C.pos },           // OLUMLU (soluk dolgu)
+  "0": { bg: cssColor("neutral", 0.14), color: C.neutral },   // NÖTR
+  "-1": { bg: cssColor("neg", 0.10), color: C.neg },          // OLUMSUZ (soluk dolgu)
+  "-2": { bg: C.negStrong, color: C.onStrong },               // GÜÇLÜ OLUMSUZ (dolu)
 };
 
 // Büyük, dolgulu, uzaktan okunan DURUM etiketi (kartın en dikkat çekici öğesi).
@@ -232,7 +234,7 @@ export function StatusTag({ stance, evidence }) {
       style={{ background: st.bg, color: st.color }}
     >
       <span className="uppercase">{stanceLabel(stance)}</span>
-      {evidence && <span className="font-semibold opacity-80">· {evidenceLabel(evidence)}</span>}
+      {evidence && <span className="font-semibold">· {evidenceLabel(evidence)}</span>}
     </span>
   );
 }
@@ -256,18 +258,18 @@ export function SignalBand({ stance, evidence, showLabel = true, minimal = false
           </span>
         </div>
       )}
-      {/* Yumuşak spektrum (olumsuz→nötr(gri)→olumlu) + konum işaretçisi. Koyu zemin. */}
+      {/* Yumuşak spektrum (olumsuz→nötr(gri)→olumlu) + konum işaretçisi. Renkler temaya bağlı. */}
       <div
         className="relative h-2 rounded-full"
         style={{
           background:
-            "linear-gradient(90deg, rgba(198,40,40,0.55) 0%, rgba(198,40,40,0.22) 28%, rgba(122,119,112,0.20) 50%, rgba(15,138,76,0.22) 72%, rgba(15,138,76,0.55) 100%)",
+            `linear-gradient(90deg, ${cssColor("neg", 0.55)} 0%, ${cssColor("neg", 0.22)} 28%, ${cssColor("neutral", 0.2)} 50%, ${cssColor("pos", 0.22)} 72%, ${cssColor("pos", 0.55)} 100%)`,
         }}
         aria-label={`Genel sinyal: ${sig.label}`}
       >
         <span
           className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-ink-800 transition-all duration-300"
-          style={{ left: `${pos}%`, background: sig.color, boxShadow: `0 0 0 1px rgba(0,0,0,0.06)` }}
+          style={{ left: `${pos}%`, background: sig.color, boxShadow: `0 0 0 1px ${cssColor("slate-100", 0.08)}` }}
           title={sig.label}
         />
       </div>
@@ -321,7 +323,7 @@ export function StanceBadge({ stance, conviction }) {
     <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-semibold ${s.cls}`}>
       {stanceLabel(stance)}
       {conviction && (
-        <span className="opacity-70 font-normal">
+        <span className="font-normal">
           · {tt(`conviction.${["low", "medium", "high"].includes(conviction) ? conviction : "medium"}`)} {tt("conviction.suffix")}
         </span>
       )}
@@ -331,10 +333,10 @@ export function StanceBadge({ stance, conviction }) {
 
 // --- Risk skoru rengi (0 yeşil → 100 kırmızı) ---
 export function riskColor(score) {
-  if (score == null) return "#7A7770";
-  if (score < 34) return "#0F8A4C";
-  if (score < 67) return "#B45309";
-  return "#C62828";
+  if (score == null) return C.neutral;
+  if (score < 34) return C.pos;
+  if (score < 67) return C.warn;
+  return C.neg;
 }
 
 export function RiskScore({ score }) {
@@ -343,7 +345,7 @@ export function RiskScore({ score }) {
     <div className="flex items-center gap-2">
       <div className="relative h-9 w-9 shrink-0">
         <svg viewBox="0 0 36 36" className="h-9 w-9 -rotate-90">
-          <circle cx="18" cy="18" r="15" fill="none" stroke="#E7E3DA" strokeWidth="4" />
+          <circle cx="18" cy="18" r="15" fill="none" stroke={cssColor("ink-600")} strokeWidth="4" />
           <circle
             cx="18" cy="18" r="15" fill="none" stroke={color} strokeWidth="4"
             strokeDasharray={`${(2 * Math.PI * 15 * (score ?? 0)) / 100} ${2 * Math.PI * 15}`}
@@ -366,7 +368,7 @@ export function RiskScore({ score }) {
 export function SentimentGauge({ value }) {
   const v = value ?? 0;
   const pct = ((v + 1) / 2) * 100; // -1..1 -> 0..100
-  const color = v > 0.15 ? "#0F8A4C" : v < -0.15 ? "#C62828" : "#7A7770";
+  const color = v > 0.15 ? C.pos : v < -0.15 ? C.neg : C.neutral;
   return (
     <div className="w-full">
       <div className="flex justify-between text-[10px] text-slate-500 mb-1">
@@ -377,7 +379,7 @@ export function SentimentGauge({ value }) {
         <span>+</span>
       </div>
       <div className="relative h-1.5 w-full rounded-full bg-ink-600">
-        <div className="absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full border-2 border-white"
+        <div className="absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full border-2 border-ink-800"
              style={{ left: `calc(${pct}% - 6px)`, background: color }} />
       </div>
     </div>

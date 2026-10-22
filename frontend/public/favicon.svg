@@ -5,7 +5,7 @@
        Açık temada sitenin ana rengi, koyu sekme çubuğunda açık ton. -->
   <style>
     .r { stroke: #1E3A5F; stroke-width: 2.75; }
-    @media (prefers-color-scheme: dark) { .r { stroke: #9DB8DC; } }
+    @media (prefers-color-scheme: dark) { .r { stroke: #8FB4E3; } }
     @media (max-width: 24px) { .d { display: none; } .r { stroke-width: 3; } }
   </style>
   <g class="r">

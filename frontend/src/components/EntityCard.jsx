@@ -8,21 +8,22 @@ import React from "react";
 import { ArrowRight, Lock } from "lucide-react";
 import { SignalPill, overallSignal, AnimatedNumber, horizonLabel } from "./ui.jsx";
 import { tt, fmtPct } from "../i18n.jsx";
+import { C } from "../theme.js";
 
 // Kompakt analist barı — al/tut/sat segmentleri + baskın görüş + analist sayısı.
 const ANALYST_SEG = [
-  { key: "strong_buy", color: "#0B7A42" },
-  { key: "buy", color: "#0F8A4C" },
-  { key: "hold", color: "#A8A49B" },
-  { key: "sell", color: "#C62828" },
-  { key: "strong_sell", color: "#A81E1E" },
+  { key: "strong_buy", color: C.posStrong },
+  { key: "buy", color: C.pos },
+  { key: "hold", color: C.subtle },
+  { key: "sell", color: C.neg },
+  { key: "strong_sell", color: C.negStrong },
 ];
 function analystLean(a) {
   const buyish = a.strong_buy + a.buy;
   const sellish = a.sell + a.strong_sell;
-  if (buyish > a.hold && buyish >= sellish) return { text: tt("card.buyLean"), color: "#0F8A4C" };
-  if (sellish > a.hold && sellish > buyish) return { text: tt("card.sellLean"), color: "#C62828" };
-  return { text: tt("card.holdLean"), color: "#7A7770" };
+  if (buyish > a.hold && buyish >= sellish) return { text: tt("card.buyLean"), color: C.pos };
+  if (sellish > a.hold && sellish > buyish) return { text: tt("card.sellLean"), color: C.neg };
+  return { text: tt("card.holdLean"), color: C.neutral };
 }
 function AnalystMiniBar({ a }) {
   const total = a.total || 1;
@@ -160,8 +161,8 @@ function PriceBox({ card }) {
 export default function EntityCard({ card, onOpen, big = false }) {
   const a = card.analysis;
   // Sol şerit rengi: analiz varsa duruma göre (5 durum + nötr gri); YOKSA açık gri.
-  // ASLA koyu/siyah — eski #3A4152 fallback'i kağıt temada siyah görünüyordu.
-  const stripColor = a ? overallSignal(a.stance, card.evidence_strength).color : "#D8D3C7";
+  // ASLA koyu/siyah — eski koyu fallback kağıt temada siyah görünüyordu.
+  const stripColor = a ? overallSignal(a.stance, card.evidence_strength).color : C.subtle;
   const changed = a && card.delta?.stance_changed;
 
   function open() {
@@ -264,7 +265,7 @@ export default function EntityCard({ card, onOpen, big = false }) {
 // Katman 2 — sıkışık tek satır (~48px). Sol şerit + ad + ticker + hüküm (kısaltılmış) + risk.
 export function EntityRow({ card, onOpen }) {
   const a = card.analysis;
-  const stripColor = a ? overallSignal(a.stance, card.evidence_strength).color : "#D8D3C7";
+  const stripColor = a ? overallSignal(a.stance, card.evidence_strength).color : C.subtle;
   const changed = a && card.delta?.stance_changed;
   return (
     <button

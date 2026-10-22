@@ -1,43 +1,31 @@
 /** @type {import('tailwindcss').Config} */
-// SICAK KAĞIT TEMA + LACİVERT VURGU. Saf siyah/beyaz YOK; zemin krem, metin sıcak siyah.
-//  - ink-*  = yüzeyler/kenarlıklar (900 = krem sayfa → 800 = beyaz kart → açık kenarlık)
-//  - slate-* = metin. DİKKAT: ölçek TERS ÇEVRİLİ. Tailwind'de normalde slate küçük
-//    numara = açık renktir; burada kağıt zemine göre küçük numara = KOYU/önemli metin,
-//    büyük numara = SOLUK metin. (900→100'e geçerken kod aynı kalsın diye ölçek
-//    yeniden eşlendi; yani text-slate-100 = en koyu, text-slate-700 = en soluk.)
-//  - accent = KOYU MÜREKKEP LACİVERT (yalnızca vurgu; editöryel/finans hissi, sıcak
-//    kağıtla uyumlu). Sinyal renkleri (emerald/rose) sabit — vurgu rengiyle karışmaz.
+// RENKLER TEK YERDEN: src/index.css'teki CSS değişkenleri (açık: :root, koyu: [data-theme="dark"]).
+// Burada yalnızca adlar değişkenlere bağlanır; <alpha-value> sayesinde bg-rose-500/10 gibi
+// saydamlık sınıfları iki temada da çalışır. Kontrast: iki temada WCAG AA (metin ≥4.5:1).
+//  - ink-*   = yüzeyler/kenarlıklar (900 = sayfa → 800 = kart → 700 hover → 600/500 kenarlık)
+//  - slate-* = metin. DİKKAT: ölçek TERS — küçük numara = KOYU/önemli metin (açık temada),
+//    büyük numara = soluk. Koyu temada da aynı anlam: 100 = en belirgin metin.
+//  - accent  = vurgu (açıkta koyu lacivert, koyuda açık lacivert); accent-fg = vurgu üstü metin.
+//  - emerald/rose/amber/sky = sinyal tonları (pos/neg/warn/info); 500-600 "güçlü" tonlar.
+const v = (name) => `rgb(var(--${name}) / <alpha-value>)`;
 export default {
   content: ["./index.html", "./src/**/*.{js,jsx}"],
   theme: {
     extend: {
       colors: {
-        // SICAK KAĞIT: 900 = kağıt zemini (krem), 800 = kart (beyaz), 700 = hover,
-        // 600/500 = sıcak açık kenarlıklar.
-        ink: {
-          900: "#F7F5F1", // sayfa zemini (sıcak kağıt tonu)
-          800: "#FFFFFF", // kart yüzeyi (saf beyaz)
-          700: "#F1EEE8", // yükseltilmiş/hover/divide (sıcak açık)
-          600: "#E7E3DA", // ince kenarlık (~rgba(0,0,0,0.08) sıcak)
-          500: "#D8D3C7", // güçlü kenarlık/input
-        },
-        accent: "#1E3A5F",          // koyu mürekkep lacivert (birincil vurgu)
-        "accent-hover": "#2C5282",  // hover/aktif için biraz açığı
-        // Metin (kağıt zeminde): küçük numara = koyu/önemli, büyük = soluk.
+        ink: { 900: v("ink-900"), 800: v("ink-800"), 700: v("ink-700"), 600: v("ink-600"), 500: v("ink-500") },
+        accent: v("accent"),
+        "accent-hover": v("accent-hover"),
+        "accent-fg": v("accent-fg"),
+        "on-strong": v("on-strong"),
         slate: {
-          100: "#1A1A18", // birincil metin (sıcak siyah — tam siyah değil)
-          200: "#2A2A26",
-          300: "#45423C", // ikincil koyu
-          400: "#6B6862", // muted gövde metni (sıcak gri)
-          500: "#8A867E", // etiket/zaman damgası
-          600: "#A8A49B", // daha soluk
-          700: "#C4C0B6", // en soluk
+          100: v("slate-100"), 200: v("slate-200"), 300: v("slate-300"), 400: v("slate-400"),
+          500: v("slate-500"), 600: v("slate-600"), 700: v("slate-700"),
         },
-        // Yön/durum tonları — kağıt zeminde okunaklı, DOYGUN. (Lacivert vurguyla karışmaz.)
-        emerald: { 200: "#0F8A4C", 300: "#0F8A4C", 400: "#0F8A4C", 500: "#0B7A42", 600: "#0B7A42" },
-        rose: { 200: "#C62828", 300: "#C62828", 400: "#C62828", 500: "#A81E1E", 600: "#A81E1E" },
-        amber: { 200: "#B45309", 300: "#B45309", 400: "#C77700", 500: "#B45309", 600: "#B45309" },
-        sky: { 400: "#2563EB", 500: "#1D4ED8" },
+        emerald: { 200: v("pos"), 300: v("pos"), 400: v("pos"), 500: v("pos-strong"), 600: v("pos-strong") },
+        rose: { 200: v("neg"), 300: v("neg"), 400: v("neg"), 500: v("neg-strong"), 600: v("neg-strong") },
+        amber: { 200: v("warn"), 300: v("warn"), 400: v("warn"), 500: v("warn"), 600: v("warn") },
+        sky: { 400: v("info"), 500: v("info-strong") },
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"],
@@ -48,8 +36,8 @@ export default {
       },
       boxShadow: {
         // Kağıt tema: çok yumuşak, dağınık, hafif gölge (üstte duran kart hissi).
-        card: "0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.04)",
-        "card-hover": "0 2px 6px rgba(0,0,0,0.06), 0 14px 32px rgba(30,58,95,0.10)",
+        card: "var(--shadow-card)",
+        "card-hover": "var(--shadow-card-hover)",
       },
       keyframes: {
         "card-in": {
@@ -61,7 +49,7 @@ export default {
           "100%": { transform: "translateX(300%)" },
         },
         flash: {
-          "0%": { background: "rgba(30,58,95,0.14)" },
+          "0%": { background: "rgb(var(--accent) / 0.14)" },
           "100%": { background: "transparent" },
         },
       },

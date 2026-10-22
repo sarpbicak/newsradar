@@ -3,7 +3,7 @@
 import React from "react";
 import { useI18n } from "../i18n.jsx";
 
-const flagWrap = "inline-block overflow-hidden rounded-[3px] ring-1 ring-black/10";
+const flagWrap = "inline-block overflow-hidden rounded-[3px] ring-1 ring-slate-500/30";
 
 // Türkiye bayrağı — kırmızı zemin + beyaz hilal + yıldız.
 export function FlagTR({ className = "h-4 w-6" }) {

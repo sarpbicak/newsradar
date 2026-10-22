@@ -120,7 +120,7 @@ export default function ChatPanel({ entityId, entityName, suggestions = [], onCl
         />
         <button
           disabled={streaming || !input.trim()}
-          className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-fg disabled:opacity-50"
         >
           {streaming ? "…" : t("chat.send")}
         </button>

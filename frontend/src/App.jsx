@@ -15,6 +15,7 @@ import { Skeleton, useIsMobile } from "./components/ui.jsx";
 import { fmtMsg, refreshParts, useI18n } from "./i18n.jsx";
 import { RefreshCw, Menu, X, LogOut, ShieldCheck, LayoutDashboard, HelpCircle, UserPlus, ArrowDown } from "lucide-react";
 import Logo from "./components/Logo.jsx";
+import { ThemeMenu, ThemeSegmented } from "./components/ThemeToggle.jsx";
 
 // Mobil aşağı-çekip-yenile eşiği (px). Bu mesafeyi geçince bırakınca yenilenir.
 const PULL_THRESHOLD = 70;
@@ -429,12 +430,17 @@ export default function App({ setLang }) {
           <div className="flex items-center gap-2">
             {/* Dil değiştirici (masaüstü + mobilde görünür, küçük) */}
             <LanguageSwitcher lang={lang} onChange={applyLang} />
+            {/* Tema (Sistem/Açık/Koyu) — masaüstünde ikon menüsü; mobilde "…" menüsünde */}
+            <div className="hidden md:block">
+              <ThemeMenu />
+            </div>
 
             {/* Yenile — her zaman görünür (mobilde ikon, masaüstünde metin) */}
             <button
               onClick={handleRefresh}
               disabled={isRefreshing}
-              className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:brightness-105 disabled:opacity-70 md:px-4"
+              aria-label={t("header.refresh")}
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-accent-fg shadow-sm transition hover:brightness-105 disabled:opacity-70 md:px-4"
             >
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
               {/* Mobil: yer dar — tarama sürerken yalnızca kısa sayaç (3/12) */}
@@ -485,7 +491,7 @@ export default function App({ setLang }) {
                 <>
                   <button
                     onClick={() => setAccount("upgrade")}
-                    className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg bg-accent px-3 text-sm font-medium text-white transition hover:brightness-105"
+                    className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg bg-accent px-3 text-sm font-medium text-accent-fg transition hover:brightness-105"
                   >
                     <UserPlus className="h-4 w-4" /> {t("header.createAccount")}
                   </button>
@@ -536,6 +542,7 @@ export default function App({ setLang }) {
                         <span className="rounded bg-ink-700 px-1.5 text-[10px] font-semibold text-slate-500">admin</span>
                       )}
                     </div>
+                    <ThemeSegmented />
                     {/* Nasıl çalışır — tutorial'ı tekrar aç */}
                     <button
                       onClick={() => { setShowHow(true); setMenuOpen(false); }}
@@ -674,7 +681,7 @@ export default function App({ setLang }) {
                 (notice.details?.length ? t("notice.warnings", { n: notice.details.length }) : "")
               : notice.text}
             {notice.details?.length > 0 && (
-              <ul className="mt-1 list-disc pl-5 text-xs opacity-80">
+              <ul className="mt-1 list-disc pl-5 text-xs">
                 {notice.details.slice(0, 6).map((d, i) => (
                   <li key={i}>{fmtMsg(d, t)}</li>
                 ))}
@@ -682,7 +689,7 @@ export default function App({ setLang }) {
             )}
             {/* Normal atlamalar (tazelik/kota) — çok soluk, küçük not (hata değil) */}
             {notice.infos?.length > 0 && (
-              <div className="mt-1.5 text-[11px] opacity-50">
+              <div className="mt-1.5 text-[11px] text-slate-500">
                 {t("notice.infos", { n: notice.infos.length })}:{" "}
                 {notice.infos.slice(0, 2).map((m) => fmtMsg(m, t)).join(" · ")}
                 {notice.infos.length > 2 ? " …" : ""}

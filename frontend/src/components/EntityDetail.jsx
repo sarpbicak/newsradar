@@ -46,7 +46,8 @@ function chatSuggestions(entity) {
 }
 
 // Tek fiyat bloğu: $214.13 −1.43% → hedef $339.17 +58% · "analist hedefi, 1 Eyl" (küçük).
-// Hedef verisi 30 günden eskiyse tarih ve hedef soluk.
+// Hedef verisi 30 günden eskiyse hedef satırı SOLUK TONDA (slate-500 — AA'yı geçer; opacity
+// ile soluklaştırmak kontrastı 4.5'in altına düşürüyordu) + açıklayıcı title.
 function PriceBlock({ entity }) {
   const an = entity.analyst;
   const hasTarget = an?.target_mean != null;
@@ -57,11 +58,11 @@ function PriceBlock({ entity }) {
     <div className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
       <PriceDisplay price={entity.price} changePercent={entity.change_percent} showTime={false} />
       {hasTarget && (
-        <span className={`inline-flex flex-wrap items-baseline gap-x-1.5 ${stale ? "opacity-50" : ""}`}>
+        <span className="inline-flex flex-wrap items-baseline gap-x-1.5" title={stale ? tt("detail.targetStale") : undefined}>
           <span className="text-slate-500">→ {tt("detail.target")}</span>
-          <span className="font-mono font-semibold text-slate-100">${an.target_mean.toFixed(2)}</span>
+          <span className={`font-mono font-semibold ${stale ? "text-slate-500" : "text-slate-100"}`}>${an.target_mean.toFixed(2)}</span>
           {up != null && (
-            <span className={`font-mono text-xs font-semibold ${up >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+            <span className={`font-mono text-xs font-semibold ${stale ? "text-slate-500" : up >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
               {fmtPct(up)}
             </span>
           )}
@@ -183,7 +184,7 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
 
         {/* Hat sayaçları (teşhis) — YALNIZCA admin */}
         {isAdmin && st && (
-          <p className="mt-1 font-mono text-[10px] text-slate-500/70" title={tt("detail.pipelineAdmin")}>
+          <p className="mt-1 font-mono text-[10px] text-slate-500" title={tt("detail.pipelineAdmin")}>
             {tt("detail.pipelineAdmin")}: {tt("detail.articlesN", { n: st.total })} · {tt("detail.analyzedN", { n: st.analyzed })} ·{" "}
             {tt("detail.prefilteredN", { n: st.prefiltered })} · {tt("detail.pendingN", { n: st.pending })} ·{" "}
             {tt("detail.expiredN", { n: st.expired ?? 0 })}
@@ -200,7 +201,7 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
           {/* ---- SEKME ÇUBUĞU ----
               MOBİL: ekranın ALTINDA sabit (başparmakla tek elle erişim).
               MASAÜSTÜ: içeriğin üstünde normal akışta. */}
-          <div className="fixed inset-x-0 bottom-0 z-30 flex gap-1 border-t border-ink-500 bg-ink-800/95 p-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.06)] backdrop-blur-md md:static md:rounded-xl md:border md:border-ink-600 md:pb-1 md:shadow-none md:backdrop-blur-none">
+          <div className="fixed inset-x-0 bottom-0 z-30 flex gap-1 border-t border-ink-500 bg-ink-800/95 p-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgb(var(--slate-100)/0.06)] backdrop-blur-md md:static md:rounded-xl md:border md:border-ink-600 md:pb-1 md:shadow-none md:backdrop-blur-none">
             {tabs.map((t) => {
               const Icon = t.icon;
               const on = activeTab === t.key;
@@ -255,7 +256,7 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
       {a && isDesktop && !chatOpen && (
         <button
           onClick={() => toggleChat(true)}
-          className="fixed bottom-24 right-6 z-40 flex min-h-[44px] items-center gap-2 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-card transition hover:bg-accent-hover"
+          className="fixed bottom-24 right-6 z-40 flex min-h-[44px] items-center gap-2 rounded-full bg-accent px-4 text-sm font-semibold text-accent-fg shadow-card transition hover:bg-accent-hover"
           title={tt("chat.open")}
         >
           <MessageSquare className="h-4 w-4" /> {tt("chat.askAi")}
@@ -265,7 +266,7 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
         <>
           <button
             onClick={() => setSheetOpen(true)}
-            className="fixed bottom-[124px] right-4 z-40 flex min-h-[44px] items-center gap-2 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-card md:bottom-20 md:right-6"
+            className="fixed bottom-[124px] right-4 z-40 flex min-h-[44px] items-center gap-2 rounded-full bg-accent px-4 text-sm font-semibold text-accent-fg shadow-card md:bottom-20 md:right-6"
           >
             <MessageSquare className="h-4 w-4" /> {tt("chat.askAi")}
           </button>

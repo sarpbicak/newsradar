@@ -4,13 +4,14 @@ import React, { useMemo, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { FlagChip, eventLabel, flagLabel } from "./ui.jsx";
 import { tt, useI18n, fmtDate, fmtDateTime } from "../i18n.jsx";
+import { C } from "../theme.js";
 
 const RISK_FLAGS = ["regulatory","competition","financial","legal","product","supply_chain","macro","reputation"];
 const EVENT_TYPES = ["earnings","product","regulation","lawsuit","partnership","funding","macro","leadership","other"];
 
 function sentimentColor(v) {
-  if (v == null) return "#7A7770";
-  return v > 0.15 ? "#0F8A4C" : v < -0.15 ? "#C62828" : "#7A7770";
+  if (v == null) return C.neutral;
+  return v > 0.15 ? C.pos : v < -0.15 ? C.neg : C.neutral;
 }
 function sentimentLabel(v) {
   if (v == null) return "—";
@@ -27,7 +28,7 @@ function SentimentBadge({ value }) {
     >
       <span className="h-1.5 w-1.5 rounded-full" style={{ background: c }} />
       {sentimentLabel(value)}
-      {value != null && <span className="font-mono text-[10px] opacity-70">{value.toFixed(2)}</span>}
+      {value != null && <span className="font-mono text-[10px] font-normal">{value.toFixed(2)}</span>}
     </span>
   );
 }

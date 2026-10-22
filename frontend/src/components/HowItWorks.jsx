@@ -241,14 +241,14 @@ export default function HowItWorks({ onClose, onTry }) {
           {last || !ready ? (
             <button
               onClick={onTry}
-              className="min-h-[44px] rounded-lg bg-accent px-4 text-sm font-semibold text-white transition hover:brightness-105"
+              className="min-h-[44px] rounded-lg bg-accent px-4 text-sm font-semibold text-accent-fg transition hover:brightness-105"
             >
               {t("hiw.try")}
             </button>
           ) : (
             <button
               onClick={() => setStep((s) => s + 1)}
-              className="min-h-[44px] rounded-lg bg-accent px-5 text-sm font-semibold text-white transition hover:brightness-105"
+              className="min-h-[44px] rounded-lg bg-accent px-5 text-sm font-semibold text-accent-fg transition hover:brightness-105"
             >
               {t("tut.next")}
             </button>

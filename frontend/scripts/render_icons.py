@@ -1,6 +1,10 @@
 """public/favicon.svg → favicon.ico (32×32 tam çizim + 16×16 SADE) ve apple-touch-icon.png
 (180×180, opak, tam çizim).
 
+ICO, SVG favicon desteklemeyen eski tarayıcılar içindir ve tarayıcının açık/koyu temasını
+bilemez: bu yüzden çizim krem, yuvarlak köşeli bir zemin (apple-touch-icon ile aynı) üstüne
+konur — koyu sekme çubuğunda da görünür. SVG favicon ise kendi içinde temaya uyar.
+
 16×16 katman: SVG'deki iç ayrıntılar (class="d") gizlenip çizgi kalınlaştırılarak (svg'nin
 kendi küçük-boyut media query'siyle aynı kural) render edilir.
 
@@ -75,6 +79,17 @@ def render_master(tmp: Path, svg: Path = SVG, name: str = "master") -> Image.Ima
     return Image.open(out).convert("RGBA").crop((0, 0, MASTER, MASTER))
 
 
+def on_tile(glyph: Image.Image, size: int) -> Image.Image:
+    """Krem, yuvarlak köşeli opak zemin + ortalanmış çizim (iki temada da görünür ICO)."""
+    from PIL import ImageDraw
+    big = size * 8                                   # yüksek çözünürlükte çiz, sonra küçült
+    tile = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+    ImageDraw.Draw(tile).rounded_rectangle((0, 0, big - 1, big - 1), radius=big // 5, fill=CREAM + (255,))
+    inner = round(big * 0.80)
+    tile.alpha_composite(glyph.resize((inner, inner), Image.LANCZOS), ((big - inner) // 2, (big - inner) // 2))
+    return tile.resize((size, size), Image.LANCZOS)
+
+
 def main() -> None:
     with tempfile.TemporaryDirectory() as d:
         tmp = Path(d)
@@ -82,8 +97,8 @@ def main() -> None:
         small = render_master(tmp, small_variant(tmp), "small")
     if master.getbbox() is None or small.getbbox() is None:
         sys.exit("Render boş çıktı — SVG yolu/Chrome sürümünü kontrol edin.")
-    i32 = master.resize((32, 32), Image.LANCZOS)
-    i16 = small.resize((16, 16), Image.LANCZOS)  # SADE sürüm
+    i32 = on_tile(master, 32)
+    i16 = on_tile(small, 16)  # SADE sürüm
     i32.save(PUBLIC / "favicon.ico", format="ICO", sizes=[(32, 32), (16, 16)], append_images=[i16])
     # apple-touch-icon: 180×180 OPAK krem zemin, ~%16 kenar boşluğu (iOS köşeleri kendisi yuvarlar).
     inner = 124

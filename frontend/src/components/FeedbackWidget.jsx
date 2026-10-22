@@ -210,7 +210,7 @@ export default function FeedbackWidget({ raised = false }) {
                   <button
                     type="submit"
                     disabled={busy || !message.trim()}
-                    className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-medium text-white transition hover:brightness-105 disabled:opacity-50"
+                    className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-medium text-accent-fg transition hover:brightness-105 disabled:opacity-50"
                   >
                     <Send className="h-4 w-4" />
                     {busy ? t("fb.sending") : t("fb.send")}

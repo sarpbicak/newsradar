@@ -13,7 +13,19 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
-    <meta name="theme-color" content="#1E3A5F" />
+    <meta name="theme-color" content="#F7F5F1" />
+    <!-- Tema, ilk boyamadan ÖNCE (CSS ve React'ten önce) uygulanır → yanlış tema flaşı yok.
+         Mantık src/theme.js ile aynı (anahtar nr_theme: system | light | dark). -->
+    <script>
+      (function () {
+        try {
+          var p = localStorage.getItem("nr_theme");
+          var dark = p === "dark" || (p !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+          document.querySelector('meta[name="theme-color"]').setAttribute("content", dark ? "#141412" : "#F7F5F1");
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

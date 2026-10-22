@@ -15,8 +15,108 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── TEMA: renklerin TEK kaynağı ────────────────────────────────────────────
+   Değerler "R G B" (Tailwind: rgb(var(--x) / <alpha-value>); JS: src/theme.js → rgb(var(--x))).
+   Açık tema :root'ta; koyu tema [data-theme="dark"]'ta. data-theme'i index.html'deki satır içi
+   betik React'ten ÖNCE koyar (yanlış tema flaşı yok); JS kapalıysa @media yedeği devrede.
+   Kontrast: iki temada metin/zemin çiftleri WCAG AA (≥4.5:1), grafik çizgileri ≥3:1. */
 :root {
   color-scheme: light;
+  --ink-900: 247 245 241;       /* #F7F5F1 */
+  --ink-800: 255 255 255;       /* #FFFFFF */
+  --ink-700: 241 238 232;       /* #F1EEE8 */
+  --ink-600: 231 227 218;       /* #E7E3DA */
+  --ink-500: 216 211 199;       /* #D8D3C7 */
+  --slate-100: 26 26 24;     /* #1A1A18 */
+  --slate-200: 42 42 38;     /* #2A2A26 */
+  --slate-300: 69 66 60;     /* #45423C */
+  --slate-400: 92 89 83;     /* #5C5953 */
+  --slate-500: 110 107 101;     /* #6E6B65 */
+  --slate-600: 111 108 102;     /* #6F6C66 */
+  --slate-700: 196 192 182;     /* #C4C0B6 */
+  --accent: 30 58 95;        /* #1E3A5F */
+  --accent-hover: 44 82 130;  /* #2C5282 */
+  --accent-fg: 255 255 255;     /* #FFFFFF */
+  --pos: 13 116 64;           /* #0D7440 */
+  --pos-strong: 10 97 54;    /* #0A6136 */
+  --neg: 184 37 37;           /* #B82525 */
+  --neg-strong: 154 28 28;    /* #9A1C1C */
+  --on-strong: 255 255 255;     /* #FFFFFF */
+  --warn: 167 77 8;          /* #A74D08 */
+  --info: 37 98 233;          /* #2562E9 */
+  --info-strong: 29 78 216;   /* #1D4ED8 */
+  --neutral: 102 100 94;       /* #66645E */
+  --chart-grid: 237 234 227;    /* #EDEAE3 */
+  --brush-stroke: 203 198 187;  /* #CBC6BB */
+  --brush-fill: 250 248 244;    /* #FAF8F4 */
+  --shadow-card: 0 1px 3px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.04);
+  --shadow-card-hover: 0 2px 6px rgb(0 0 0 / 0.06), 0 14px 32px rgb(var(--accent) / 0.10);
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ink-900: 20 20 18;       /* #141412 */
+  --ink-800: 28 28 26;       /* #1C1C1A */
+  --ink-700: 38 37 34;       /* #262522 */
+  --ink-600: 48 47 43;       /* #302F2B */
+  --ink-500: 64 62 57;       /* #403E39 */
+  --slate-100: 242 240 235;     /* #F2F0EB */
+  --slate-200: 228 225 218;     /* #E4E1DA */
+  --slate-300: 207 203 194;     /* #CFCBC2 */
+  --slate-400: 179 175 166;     /* #B3AFA6 */
+  --slate-500: 160 156 147;     /* #A09C93 */
+  --slate-600: 143 139 131;     /* #8F8B83 */
+  --slate-700: 94 91 85;     /* #5E5B55 */
+  --accent: 143 180 227;        /* #8FB4E3 */
+  --accent-hover: 169 198 236;  /* #A9C6EC */
+  --accent-fg: 15 27 45;     /* #0F1B2D */
+  --pos: 74 222 128;           /* #4ADE80 */
+  --pos-strong: 52 211 153;    /* #34D399 */
+  --neg: 248 113 113;           /* #F87171 */
+  --neg-strong: 251 113 133;    /* #FB7185 */
+  --on-strong: 17 17 16;     /* #111110 */
+  --warn: 251 191 36;          /* #FBBF24 */
+  --info: 96 165 250;          /* #60A5FA */
+  --info-strong: 147 197 253;   /* #93C5FD */
+  --neutral: 168 164 155;       /* #A8A49B */
+  --chart-grid: 43 42 39;    /* #2B2A27 */
+  --brush-stroke: 74 72 67;  /* #4A4843 */
+  --brush-fill: 34 34 31;    /* #22221F */
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.45), 0 8px 24px rgb(0 0 0 / 0.30);
+  --shadow-card-hover: 0 2px 6px rgb(0 0 0 / 0.50), 0 14px 32px rgb(var(--accent) / 0.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --ink-900: 20 20 18;       /* #141412 */
+    --ink-800: 28 28 26;       /* #1C1C1A */
+    --ink-700: 38 37 34;       /* #262522 */
+    --ink-600: 48 47 43;       /* #302F2B */
+    --ink-500: 64 62 57;       /* #403E39 */
+    --slate-100: 242 240 235;     /* #F2F0EB */
+    --slate-200: 228 225 218;     /* #E4E1DA */
+    --slate-300: 207 203 194;     /* #CFCBC2 */
+    --slate-400: 179 175 166;     /* #B3AFA6 */
+    --slate-500: 160 156 147;     /* #A09C93 */
+    --slate-600: 143 139 131;     /* #8F8B83 */
+    --slate-700: 94 91 85;     /* #5E5B55 */
+    --accent: 143 180 227;        /* #8FB4E3 */
+    --accent-hover: 169 198 236;  /* #A9C6EC */
+    --accent-fg: 15 27 45;     /* #0F1B2D */
+    --pos: 74 222 128;           /* #4ADE80 */
+    --pos-strong: 52 211 153;    /* #34D399 */
+    --neg: 248 113 113;           /* #F87171 */
+    --neg-strong: 251 113 133;    /* #FB7185 */
+    --on-strong: 17 17 16;     /* #111110 */
+    --warn: 251 191 36;          /* #FBBF24 */
+    --info: 96 165 250;          /* #60A5FA */
+    --info-strong: 147 197 253;   /* #93C5FD */
+    --neutral: 168 164 155;       /* #A8A49B */
+    --chart-grid: 43 42 39;    /* #2B2A27 */
+    --brush-stroke: 74 72 67;  /* #4A4843 */
+    --brush-fill: 34 34 31;    /* #22221F */
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.45), 0 8px 24px rgb(0 0 0 / 0.30);
+    --shadow-card-hover: 0 2px 6px rgb(0 0 0 / 0.50), 0 14px 32px rgb(var(--accent) / 0.12);
+  }
 }
 
 html,
@@ -27,11 +127,11 @@ body,
 
 body {
   margin: 0;
-  color: #1a1a18;
+  color: rgb(var(--slate-100));
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   /* Sıcak kağıt zemini + hafif gazete grain'i. (Mor glow KALDIRILDI — kağıt zeminde
      görünmüyordu ve boşuna repaint üretiyordu; editöryel his için düz kağıt yeter.) */
-  background-color: #f7f5f1;
+  background-color: rgb(var(--ink-900));
   background-image:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
   background-size: 140px 140px;
@@ -63,11 +163,11 @@ body {
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d8d3c7;
+  background: rgb(var(--ink-500));
   border-radius: 6px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #c4c0b6;
+  background: rgb(var(--slate-700));
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -103,7 +203,7 @@ body {
   position: absolute;
   inset: 0 auto 0 0;
   width: 40%;
-  background: linear-gradient(90deg, transparent, rgba(30, 58, 95, 0.08), transparent);
+  background: linear-gradient(90deg, transparent, rgb(var(--accent) / 0.08), transparent);
   animation: scan 1.4s ease-in-out infinite;
   pointer-events: none;
 }
@@ -113,7 +213,7 @@ body {
    lacivert çubuk; üzerinde çok hafif bir parlama (shimmer) soldan sağa geçer. */
 .nr-bar { position: relative; height: 4px; border-radius: 9999px; overflow: hidden; }
 .nr-bar__fill {
-  position: relative; height: 100%; border-radius: 9999px; background: #1E3A5F;
+  position: relative; height: 100%; border-radius: 9999px; background: rgb(var(--accent));
   overflow: hidden; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); will-change: width;
 }
 /* "Çalışıyor" hissi: fill üzerinde soldan sağa süzülen hafif ışık şeridi. */
@@ -164,7 +264,7 @@ body {
 
 /* Skeleton (iskelet) — layout zıplamasın */
 .skeleton {
-  background: linear-gradient(90deg, #f1eee8 25%, #e7e3da 37%, #f1eee8 63%);
+  background: linear-gradient(90deg, rgb(var(--ink-700)) 25%, rgb(var(--ink-600)) 37%, rgb(var(--ink-700)) 63%);
   background-size: 400% 100%;
   animation: skel 1.4s ease infinite;
   border-radius: 6px;

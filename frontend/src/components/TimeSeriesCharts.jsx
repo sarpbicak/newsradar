@@ -20,12 +20,14 @@ import {
   YAxis,
 } from "recharts";
 import { tt, parseUtc } from "../i18n.jsx";
+import { C } from "../theme.js";
 
 const DAY = 86400000;
-const NAVY = "#1E3A5F";   // vurgu — grafik ana çizgisi
-const GRID = "#EDEAE3";   // çok soluk yatay ızgara
-const ZERO = "#D8D3C7";   // sentiment sıfır çizgisi
-const MUTED = "#8A867E";  // eksen etiketi / haber havası
+// Renkler temaya bağlı CSS değişkenleri (src/index.css) — iki temada okunur.
+const NAVY = C.accent;    // vurgu — grafik ana çizgisi
+const GRID = C.grid;      // çok soluk yatay ızgara
+const ZERO = C.subtle;    // sentiment sıfır çizgisi
+const MUTED = C.muted;    // eksen etiketi / haber havası
 const RANGES = [["chart.r7", 7], ["chart.r30", 30], ["chart.r90", 90], ["chart.rangeAll", Infinity]];
 
 function dayKey(iso) {
@@ -172,7 +174,7 @@ function RiskSentimentChart({ data, isMobile }) {
                   dot={isolatedDot(data, "sentiment", MUTED)} />
             <Line yAxisId="risk" type="monotone" dataKey="risk" stroke={NAVY} strokeWidth={2}
                   dot={isolatedDot(data, "risk", NAVY)} connectNulls={false} isAnimationActive={false} />
-            <Brush dataKey="label" height={16} stroke="#CBC6BB" fill="#FAF8F4" travellerWidth={8}
+            <Brush dataKey="label" height={16} stroke={C.brushStroke} fill={C.brushFill} travellerWidth={8}
                    startIndex={range.s} endIndex={range.e}
                    onChange={(r) => setRange({ s: r.startIndex, e: r.endIndex })}
                    tickFormatter={() => ""} />
@@ -208,7 +210,7 @@ function PriceChart({ data, updatedNote }) {
               <ReferenceDot x={lastPt.label} y={lastPt.price} r={3} fill={NAVY} stroke="none"
                             label={{ value: `$${lastPt.price.toFixed(2)}`, position: "right", fill: NAVY, fontSize: 11, fontWeight: 600 }} />
             )}
-            <Brush dataKey="label" height={16} stroke="#CBC6BB" fill="#FAF8F4" travellerWidth={8}
+            <Brush dataKey="label" height={16} stroke={C.brushStroke} fill={C.brushFill} travellerWidth={8}
                    startIndex={range.s} endIndex={range.e}
                    onChange={(r) => setRange({ s: r.startIndex, e: r.endIndex })}
                    tickFormatter={() => ""} />
@@ -253,7 +255,7 @@ export default function TimeSeriesCharts({ riskHistory, priceHistory, articles, 
             key={label}
             onClick={() => setRangeDays(days)}
             className={`min-h-[32px] rounded-md px-2.5 text-[12px] font-medium transition ${
-              on ? "bg-accent text-white" : "text-slate-500 hover:bg-ink-700 hover:text-slate-300"
+              on ? "bg-accent text-accent-fg" : "text-slate-500 hover:bg-ink-700 hover:text-slate-300"
             }`}
           >
             {tt(label)}

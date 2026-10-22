@@ -4,6 +4,7 @@
 // compact=true: kart için kısa gösterim. false: detay için tam gösterim + hedef aralık barı.
 import React from "react";
 import { fmtPct, tt } from "../i18n.jsx";
+import { C, cssColor } from "../theme.js";
 
 // Veri yokken gösterilecek açıklama (boşluk bir eksiklik değil, bir açıklama gibi görünsün).
 function noDataNote(type, hasPrice) {
@@ -13,19 +14,19 @@ function noDataNote(type, hasPrice) {
 }
 
 const SEGMENTS = [
-  { key: "strong_buy", tkey: "an.segStrongBuy", color: "#0B7A42" },
-  { key: "buy", tkey: "an.segBuy", color: "#0F8A4C" },
-  { key: "hold", tkey: "an.segHold", color: "#7A7770" },
-  { key: "sell", tkey: "an.segSell", color: "#C62828" },
-  { key: "strong_sell", tkey: "an.segStrongSell", color: "#A81E1E" },
+  { key: "strong_buy", tkey: "an.segStrongBuy", color: C.posStrong },
+  { key: "buy", tkey: "an.segBuy", color: C.pos },
+  { key: "hold", tkey: "an.segHold", color: C.neutral },
+  { key: "sell", tkey: "an.segSell", color: C.neg },
+  { key: "strong_sell", tkey: "an.segStrongSell", color: C.negStrong },
 ];
 
 function consensusLabel(a) {
   const buyish = a.strong_buy + a.buy;
   const sellish = a.sell + a.strong_sell;
-  if (buyish > a.hold && buyish >= sellish) return { text: tt("card.buyLean"), color: "#0F8A4C" };
-  if (sellish > a.hold && sellish > buyish) return { text: tt("card.sellLean"), color: "#C62828" };
-  return { text: tt("card.holdLean"), color: "#7A7770" };
+  if (buyish > a.hold && buyish >= sellish) return { text: tt("card.buyLean"), color: C.pos };
+  if (sellish > a.hold && sellish > buyish) return { text: tt("card.sellLean"), color: C.neg };
+  return { text: tt("card.holdLean"), color: C.neutral };
 }
 
 function Bar({ analyst }) {
@@ -56,7 +57,7 @@ function TargetRangeBar({ low, high, mean, price }) {
         {/* düşük–yüksek analist aralığı */}
         <div
           className="absolute top-0 h-2 rounded-full"
-          style={{ left: pos(low), width: `${((high - low) / span) * 100}%`, background: "rgba(30,58,95,0.30)" }}
+          style={{ left: pos(low), width: `${((high - low) / span) * 100}%`, background: cssColor("accent", 0.3) }}
         />
         {/* güncel fiyat işareti (dikey çizgi) */}
         {price != null && (
@@ -69,7 +70,7 @@ function TargetRangeBar({ low, high, mean, price }) {
         {/* ortalama hedef işareti (nokta) */}
         <div
           className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-ink-800"
-          style={{ left: pos(mean), background: "#1E3A5F" }}
+          style={{ left: pos(mean), background: C.accent }}
           title={`${tt("an.avgTarget")} $${mean.toFixed(2)}`}
         />
       </div>
