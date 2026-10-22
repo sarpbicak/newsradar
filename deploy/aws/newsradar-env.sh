@@ -36,6 +36,10 @@ export REPO_BRANCH=main
 # GitHub Actions (Adım 25): OIDC rolleri yalnızca bu reponun main dalına güvenir.
 GITHUB_REPO="$(git remote get-url origin | sed -E 's#^(https://github\.com/|git@github\.com:)##; s#\.git$##')"
 export GITHUB_REPO
+# OIDC sub'ı değişmeyen ID'leri de içerir: repo:<sahip>@<sahip-id>/<repo>@<repo-id>:ref:refs/heads/main.
+# Adlar buradan türetilir; ID'ler Adım 25'te GitHub API'den alınıp durum dosyasına kaydedilir.
+export GITHUB_OWNER="${GITHUB_REPO%%/*}"
+export GITHUB_REPO_NAME="${GITHUB_REPO#*/}"
 export GH_BACKEND_ROLE=newsradar-github-backend
 export GH_FRONTEND_ROLE=newsradar-github-frontend
 export STATE_FILE="$HOME/.newsradar-aws-state.env"

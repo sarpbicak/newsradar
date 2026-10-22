@@ -21,7 +21,8 @@ export REGION=eu-central-1 ACCOUNT_ID=123456789012 DOMAIN=example.com ECR_REPO=n
   CERT_ARN=arn:aws:acm:us-east-1:123456789012:certificate/00000000-0000-0000-0000-000000000000 \
   CF_FUNCTION_ARN=arn:aws:cloudfront::123456789012:function/newsradar-www-redirect \
   REPO_URL=https://github.com/example/newsradar.git REPO_BRANCH=main \
-  INSTANCE_ID=i-0123456789abcdef0 GITHUB_REPO=example/newsradar
+  INSTANCE_ID=i-0123456789abcdef0 GITHUB_REPO=example/newsradar \
+  GITHUB_OWNER=example GITHUB_OWNER_ID=1001 GITHUB_REPO_NAME=newsradar GITHUB_REPO_ID=2002
 
 echo "== render"
 for f in "$DEPLOY"/iam/*.json "$DEPLOY"/aws/*.json "$DEPLOY"/aws/user-data.sh; do
@@ -37,6 +38,14 @@ if (unset ACCOUNT_ID; python3 "$DEPLOY/aws/render.py" "$DEPLOY/iam/ec2-instance-
 else
   ok "eksik değişken → hata ($(cut -c1-70 "$T/err"))"
 fi
+
+for bad_env in "GITHUB_REPO_ID=12ab" "GITHUB_OWNER_ID=" "GITHUB_OWNER=-bad"; do
+  if (export "${bad_env?}"; python3 "$DEPLOY/aws/render.py" "$DEPLOY/iam/github-oidc-trust-policy.json" >/dev/null 2>"$T/err"); then
+    bad "geçersiz değer kabul edildi: $bad_env"
+  else
+    ok "geçersiz değer → hata ($bad_env)"
+  fi
+done
 
 echo "== IAM en az yetki"
 python3 - "$T/ec2-instance-policy.json" "$T/frontend-bucket-policy.json" "$T/github-backend-policy.json" \
@@ -57,13 +66,13 @@ for b in bad:
 sys.exit(1 if bad else 0)
 PY
 
-python3 - "$T/github-oidc-trust-policy.json" <<'PY' && ok "OIDC trust: yalnızca repo:…:ref:refs/heads/main (StringEquals, joker yok)" || bad "OIDC trust koşulu"
+python3 - "$T/github-oidc-trust-policy.json" <<'PY' && ok "OIDC trust: yalnızca repo:<sahip>@<id>/<repo>@<id>:ref:refs/heads/main (StringEquals, joker yok)" || bad "OIDC trust koşulu"
 import json, sys
 st = json.load(open(sys.argv[1]))["Statement"]
 assert len(st) == 1 and st[0]["Action"] == "sts:AssumeRoleWithWebIdentity"
 c = st[0]["Condition"]
 assert set(c) == {"StringEquals"}, c
-assert c["StringEquals"]["token.actions.githubusercontent.com:sub"] == "repo:example/newsradar:ref:refs/heads/main"
+assert c["StringEquals"]["token.actions.githubusercontent.com:sub"] == "repo:example@1001/newsradar@2002:ref:refs/heads/main"
 assert c["StringEquals"]["token.actions.githubusercontent.com:aud"] == "sts.amazonaws.com"
 PY
 

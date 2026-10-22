@@ -1423,13 +1423,17 @@ save GITHUB_OIDC_ARN "$(aws iam create-open-id-connect-provider \
   --url https://token.actions.githubusercontent.com --client-id-list sts.amazonaws.com \
   --tags Key=Project,Value=newsradar --query OpenIDConnectProviderArn --output text)"
 
-# 2) Ortak trust policy: yalnızca repo:<repo>:ref:refs/heads/main
+# 2) Sahip ve repo ID'leri (değişmez; OIDC sub'ında adların yanında yer alır — aşağıdaki not)
+read -r owner_id repo_id < <(curl -fsSL "https://api.github.com/repos/$GITHUB_REPO" | jq -r '"\(.owner.id) \(.id)"')
+save GITHUB_OWNER_ID "$owner_id"; save GITHUB_REPO_ID "$repo_id"
+
+# 3) Ortak trust policy: yalnızca repo:<sahip>@<sahip-id>/<repo>@<repo-id>:ref:refs/heads/main
 render deploy/iam/github-oidc-trust-policy.json >/tmp/newsradar-gh-trust.json
 render deploy/iam/github-backend-policy.json   >/tmp/newsradar-gh-backend.json
 render deploy/iam/github-frontend-policy.json  >/tmp/newsradar-gh-frontend.json
 jq -r '.Statement[0].Condition.StringEquals["token.actions.githubusercontent.com:sub"]' /tmp/newsradar-gh-trust.json
 
-# 3) Backend rolü: tek ECR reposu + yalnızca bu instance'a AWS-RunShellScript + komut sonucu
+# 4) Backend rolü: tek ECR reposu + yalnızca bu instance'a AWS-RunShellScript + komut sonucu
 save GH_BACKEND_ROLE_ARN "$(aws iam create-role --role-name "$GH_BACKEND_ROLE" \
   --assume-role-policy-document file:///tmp/newsradar-gh-trust.json \
   --description "NewsRadar GitHub Actions: backend deploy" --tags Key=Project,Value=newsradar \
@@ -1437,7 +1441,7 @@ save GH_BACKEND_ROLE_ARN "$(aws iam create-role --role-name "$GH_BACKEND_ROLE" \
 aws iam put-role-policy --role-name "$GH_BACKEND_ROLE" --policy-name newsradar-github-backend-inline \
   --policy-document file:///tmp/newsradar-gh-backend.json
 
-# 4) Frontend rolü: yalnızca frontend bucket'ına yazma + bu dağıtımda invalidation
+# 5) Frontend rolü: yalnızca frontend bucket'ına yazma + bu dağıtımda invalidation
 save GH_FRONTEND_ROLE_ARN "$(aws iam create-role --role-name "$GH_FRONTEND_ROLE" \
   --assume-role-policy-document file:///tmp/newsradar-gh-trust.json \
   --description "NewsRadar GitHub Actions: frontend deploy" --tags Key=Project,Value=newsradar \
@@ -1445,6 +1449,48 @@ save GH_FRONTEND_ROLE_ARN "$(aws iam create-role --role-name "$GH_FRONTEND_ROLE"
 aws iam put-role-policy --role-name "$GH_FRONTEND_ROLE" --policy-name newsradar-github-frontend-inline \
   --policy-document file:///tmp/newsradar-gh-frontend.json
 ```
+
+**OIDC `sub` biçimi.** GitHub'ın token'ındaki `sub` yalnızca adları değil, **değişmeyen sayısal ID'leri** de içerir:
+
+```
+repo:<sahip>@<sahip-id>/<repo>@<repo-id>:ref:refs/heads/main
+repo:sarpbicak@291517568/newsradar@1309021751:ref:refs/heads/main      ← bu repo (CloudTrail'den doğrulandı)
+```
+
+Trust policy bu değeri `StringEquals` ile birebir karşılaştırır. ID'ler sayesinde, aynı adla yeniden oluşturulan ya da el değiştiren bir hesap veya repo rolü üstlenemez.
+- Şablon: [deploy/iam/github-oidc-trust-policy.json](../deploy/iam/github-oidc-trust-policy.json).
+- Değişkenler: `GITHUB_OWNER`, `GITHUB_REPO_NAME` (env dosyasında git remote'tan) ve `GITHUB_OWNER_ID`, `GITHUB_REPO_ID` (yukarıda API'den).
+- `render.py` ID'lerin yalnızca rakam, adların GitHub karakter kümesinde olduğunu doğrular. Bozuk bir değer trust policy'ye girmez, render durur.
+- Repo ya da hesap **adı** değişirse `sub` değişir. ID'ler aynı kalsa bile trust policy'yi yenilemek gerekir (aşağıdaki "mevcut rolleri güncelle").
+
+**Mevcut rolleri güncelle** (roller zaten varsa, ör. `sub` biçimi değiştiğinde):
+
+```bash
+render deploy/iam/github-oidc-trust-policy.json >/tmp/newsradar-gh-trust.json
+for r in "$GH_BACKEND_ROLE" "$GH_FRONTEND_ROLE"; do
+  aws iam update-assume-role-policy --role-name "$r" --policy-document file:///tmp/newsradar-gh-trust.json
+done
+```
+
+**`sub`'ı CloudTrail ile doğrulama.** Her `AssumeRoleWithWebIdentity` denemesi CloudTrail'e düşer. Reddedilen denemeler de dahildir ve kayıtta GitHub'ın **gerçekte gönderdiği** `sub` görünür. Bir workflow çalıştırdıktan sonra (kayıtların görünmesi 5–15 dakika sürebilir):
+
+```bash
+for r in "$REGION" us-east-1; do                 # bölgesel STS → $REGION; global endpoint → us-east-1
+  aws cloudtrail lookup-events --region "$r" --max-results 20 \
+    --lookup-attributes AttributeKey=EventName,AttributeValue=AssumeRoleWithWebIdentity \
+    --query 'Events[].CloudTrailEvent' --output json \
+  | jq -r --arg r "$r" '.[] | fromjson | [$r, .eventTime, (.errorCode // "OK"),
+      (.requestParameters.roleArn // "" | split("/") | last), .userIdentity.userName] | @tsv'
+done
+jq -r '.Statement[0].Condition.StringEquals["token.actions.githubusercontent.com:sub"]' /tmp/newsradar-gh-trust.json
+```
+
+Beklenen çıktı:
+- Her deneme için bir satır: `eu-central-1  <zaman>  OK  newsradar-github-backend  repo:sarpbicak@291517568/newsradar@1309021751:ref:refs/heads/main`.
+- Son satırdaki trust değeri, `OK` satırlarındaki `sub` ile **birebir** aynı olmalı.
+- `AccessDenied` satırındaki `sub` trust değerinden farklıysa sebep odur. Örneğin ID'siz eski biçim, başka bir dal ya da `environment:`. Trust'ı gerçek değere göre düzeltin ("mevcut rolleri güncelle").
+
+`lookup-events`, CloudTrail'in ücretsiz 90 günlük olay geçmişini okur; ayrıca trail kurmak gerekmez.
 
 **GitHub repo değişkenleri.** Bunlar *Variables*'tır, *Secrets* değildir; hiçbiri sır değil. Rol ARN'leri tek başına bir şey yapmaz, çünkü trust policy yalnızca bu reponun `main` dalına izin veriyor.
 
@@ -1496,7 +1542,7 @@ aws cloudfront list-invalidations --distribution-id "$DISTRIBUTION_ID" --query '
 
 Beklenen çıktı:
 - 8 değişken.
-- Trust koşulu `{"StringEquals":{"token.actions.githubusercontent.com:aud":"sts.amazonaws.com","token.actions.githubusercontent.com:sub":"repo:<repo>:ref:refs/heads/main"}}`.
+- Trust koşulu `{"StringEquals":{"token.actions.githubusercontent.com:aud":"sts.amazonaws.com","token.actions.githubusercontent.com:sub":"repo:<sahip>@<sahip-id>/<repo>@<repo-id>:ref:refs/heads/main"}}`.
 - Access Analyzer: `ERROR` yok. `ecr:GetAuthorizationToken` ve `ssm:GetCommandInvocation`'ın `*` kaynağıyla ilgili bir uyarı çıkabilir ([Ek B](#ek-b--gereksinimden-bilinçli-sapmalar)).
 - `deploy-backend` çalışmasında `test` → `build` → `deploy` yeşil. *deploy* adımının log'unda "EC2 çıktısı" grubu ve `[release] tamam: <sha> yayında`.
 - `prod` etiketinin yanında son commit'in tam SHA'sı.
@@ -1505,7 +1551,9 @@ Beklenen çıktı:
 - Public loglarda hesap ID'si `***` olarak maskelenir (`mask-aws-account-id`).
 
 **Hata alırsam:**
-- `Not authorized to perform sts:AssumeRoleWithWebIdentity` → token'daki `sub` trust policy'deki `sub` ile tutmuyor. Olası nedenler:
+- `Not authorized to perform sts:AssumeRoleWithWebIdentity` → token'daki `sub` trust policy'deki `sub` ile tutmuyor. Önce yukarıdaki **CloudTrail sorgusuyla** reddedilen denemenin gerçek `sub`'ını görün ve trust değeriyle karşılaştırın. Olası nedenler:
+  - Trust policy ID'siz eski biçimde (`repo:<sahip>/<repo>:…`): rolleri yeni biçimle güncelleyin.
+  - `GITHUB_OWNER_ID` / `GITHUB_REPO_ID` yanlış: API'den yeniden alın (komut 2).
   - İş akışı `main` dışındaki bir daldan çalıştırılmıştır (beklenen ret).
   - Job'a `environment:` eklenmiştir; bu `sub`'ı `repo:…:environment:<ad>` yapar.
   - Repo adı değişmiştir.
