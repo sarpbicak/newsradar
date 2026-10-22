@@ -4,11 +4,13 @@
 // Uygun örnek yoksa uydurma yapılmaz; kısa bir not gösterilir.
 // Animasyonlar ≤400ms; prefers-reduced-motion'da animasyonsuz son hal (index.css).
 // Mobilde tam ekran. İlk girişte OTOMATİK açılmaz (header / boş ekran bağlantısıyla açılır).
+// Landing'deki "Nasıl çalışır" bölümüne bağlanır; HeadlineCards/MiniCard hero döngüsünde de kullanılır.
 import React, { useEffect, useState } from "react";
 import { MessageSquare, X } from "lucide-react";
 import { api } from "../api.js";
 import { useI18n, fmtInt, fmtPct } from "../i18n.jsx";
 import { StatusTag, stanceLabel } from "./ui.jsx";
+import { navigate } from "../router.js";
 
 const STEPS = 4;
 const LABEL_STYLE = {
@@ -18,7 +20,7 @@ const LABEL_STYLE = {
   irrelevant: "bg-ink-700 text-slate-500",
 };
 
-function HeadlineCards({ headlines, withLabels, t }) {
+export function HeadlineCards({ headlines, withLabels, t }) {
   return (
     <div className="space-y-2">
       {headlines.map((h, i) => {
@@ -50,7 +52,7 @@ function HeadlineCards({ headlines, withLabels, t }) {
   );
 }
 
-function MiniCard({ entity, t, animate }) {
+export function MiniCard({ entity, t, animate }) {
   const a = entity.analysis;
   const an = entity.analyst;
   return (
@@ -211,6 +213,14 @@ export default function HowItWorks({ onClose, onTry }) {
         </p>
 
         <div className="mt-1 min-h-0 flex-1 overflow-y-auto">
+          {/* Landing'deki ayrıntılı anlatıma (gerçek ekran görüntüleriyle 4 adım) bağlantı */}
+          <a
+            href="/#how-it-works"
+            onClick={(e) => { e.preventDefault(); onClose(); navigate("/#how-it-works"); }}
+            className="mb-2 inline-block text-[12px] text-accent underline-offset-2 hover:underline"
+          >
+            {t("hiw.more")}
+          </a>
           {!data && !failed && <p className="py-10 text-center text-sm text-slate-500">{t("hiw.loading")}</p>}
           {(failed || (data && !ready)) && (
             <p className="py-10 text-center text-sm leading-relaxed text-slate-400">{t("hiw.noData")}</p>

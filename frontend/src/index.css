@@ -157,6 +157,12 @@ body {
    Kalan animasyonlar olay-kapsamlı: .stagger (bir kez), .scan-host (yalnızca
    yenileme sırasında), .skeleton (yalnızca yükleme), .tab-fade (bir kez). */
 
+/* Landing ekran görüntüleri: yalnızca etkin temanın varyantı görünür (diğeri lazy → indirilmez). */
+:root[data-theme="dark"] .shot-light,
+:root:not([data-theme="dark"]) .shot-dark {
+  display: none;
+}
+
 /* İnce açık kaydırma çubuğu */
 ::-webkit-scrollbar {
   width: 10px;
@@ -173,23 +179,31 @@ body {
   background: transparent;
 }
 
-/* Kart giriş animasyonu — grid içinde sırayla (stagger) belirsin */
-.stagger > * {
-  animation: card-in 0.4s ease-out both;
+/* ── HAREKET KURALI: uygulamada yalnızca mikro hareket — sayfa/görünüm geçişi ≤250ms,
+   kart hover, iskelet ekran, rakamlarda kısa sayma. prefers-reduced-motion'da hepsi kapalı
+   (dosya sonundaki genel kural). Sayfa geçişi YALNIZCA opaklık: transform, içindeki
+   position:fixed öğeleri (geri bildirim butonu, mobil sekme çubuğu, modallar) sarmalayıcıya
+   bağlayıp kaydırırdı. */
+.page-in {
+  animation: page-in 0.2s ease-out both;
 }
-.stagger > *:nth-child(1) { animation-delay: 0.02s; }
-.stagger > *:nth-child(2) { animation-delay: 0.06s; }
-.stagger > *:nth-child(3) { animation-delay: 0.10s; }
-.stagger > *:nth-child(4) { animation-delay: 0.14s; }
-.stagger > *:nth-child(5) { animation-delay: 0.18s; }
-.stagger > *:nth-child(6) { animation-delay: 0.22s; }
-.stagger > *:nth-child(7) { animation-delay: 0.26s; }
-.stagger > *:nth-child(8) { animation-delay: 0.30s; }
-.stagger > *:nth-child(n + 9) { animation-delay: 0.34s; }
+@keyframes page-in {
+  from { opacity: 0; }
+}
+
+/* Kart girişi — grid içinde kısa sırayla (toplam ≤ ~0.35s) */
+.stagger > * {
+  animation: card-in 0.22s ease-out both;
+}
+.stagger > *:nth-child(1) { animation-delay: 0s; }
+.stagger > *:nth-child(2) { animation-delay: 0.03s; }
+.stagger > *:nth-child(3) { animation-delay: 0.06s; }
+.stagger > *:nth-child(4) { animation-delay: 0.09s; }
+.stagger > *:nth-child(n + 5) { animation-delay: 0.12s; }
 
 /* Sekme değişiminde yumuşak geçiş */
 .tab-fade {
-  animation: tab-fade 0.28s ease-out both;
+  animation: tab-fade 0.2s ease-out both;
 }
 @keyframes tab-fade {
   from { opacity: 0; transform: translateY(4px); }

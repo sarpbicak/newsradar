@@ -24,6 +24,7 @@ from . import (
     routes_entities,
     routes_feedback,
     routes_how,
+    routes_public,
     routes_refresh,
     routes_session,
     routes_suggestions,
@@ -166,6 +167,9 @@ app.include_router(routes_how.router, dependencies=_user)
 
 # Admin paneli — yalnızca is_admin (router içinde require_admin).
 app.include_router(routes_admin.router)
+
+# Landing sayfası (/) — oturumsuz, yalnızca toplamlar + seed örneği (routes_public).
+app.include_router(routes_public.router)
 
 
 @app.get("/health", tags=["health"])

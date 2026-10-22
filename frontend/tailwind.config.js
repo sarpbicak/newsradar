@@ -54,7 +54,7 @@ export default {
         },
       },
       animation: {
-        "card-in": "card-in 0.4s ease-out both",
+        "card-in": "card-in 0.22s ease-out both",
         scan: "scan 1.4s ease-in-out infinite",
         flash: "flash 0.9s ease-out",
       },

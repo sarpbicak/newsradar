@@ -1,4 +1,5 @@
-"""'Nasıl çalışır?' anlatımı için GERÇEK örnek veri: GET /how-it-works.
+"""'Nasıl çalışır?' anlatımı için GERÇEK örnek veri: GET /how-it-works (oturumlu) ve
+GET /public/how-it-works (landing, oturumsuz — routes_public).
 
 Uydurma veri yok — örnek şirketin son haber başlıkları, AI etiketleri (makale duygusu /
 LLM'in elediği alakasızlar), haftalık makale sayısı, kaynaklar ve gerçek kartı DB'den gelir.
@@ -54,7 +55,12 @@ def _pick_entity(db: Session, language: str) -> Entity | None:
 
 @router.get("/how-it-works", response_model=HowItWorksOut)
 def how_it_works(db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> HowItWorksOut:
-    lang = getattr(user, "language", "tr") or "tr"
+    return build_how_it_works(db, getattr(user, "language", "tr") or "tr")
+
+
+def build_how_it_works(db: Session, lang: str) -> HowItWorksOut:
+    """Kullanıcıdan bağımsız: yalnızca dil. Landing sayfası da (oturumsuz) bunu kullanır —
+    örnek şirket seed listesinden seçildiği için kimsenin özel verisi görünmez."""
     entity = _pick_entity(db, lang)
     if entity is None:
         return HowItWorksOut(available=False)

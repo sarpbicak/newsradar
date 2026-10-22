@@ -52,9 +52,12 @@ export function useVisualViewport() {
 }
 
 // Sayısal değerleri animasyonlu sayaçla gösterir (reduced-motion'da anında).
-export function AnimatedNumber({ value, decimals = 0, prefix = "", suffix = "" }) {
-  const [display, setDisplay] = useState(value ?? 0);
-  const fromRef = useRef(value ?? 0);
+// from: ilk gösterimde sayılmaya başlanacak değer (ör. 0 → landing rakamları kısa bir sayma
+// animasyonuyla gelir). Verilmezse ilk değer doğrudan gösterilir, yalnızca DEĞİŞİMLER sayılır.
+// format: görüntüleme biçimi (varsayılan toFixed). prefers-reduced-motion → animasyonsuz.
+export function AnimatedNumber({ value, decimals = 0, prefix = "", suffix = "", from, format }) {
+  const [display, setDisplay] = useState(from ?? value ?? 0);
+  const fromRef = useRef(from ?? value ?? 0);
   useEffect(() => {
     const to = value ?? 0;
     if (REDUCED_MOTION || fromRef.current === to) {
@@ -79,7 +82,7 @@ export function AnimatedNumber({ value, decimals = 0, prefix = "", suffix = "" }
   return (
     <span className="tabular-nums">
       {prefix}
-      {display.toFixed(decimals)}
+      {format ? format(display) : display.toFixed(decimals)}
       {suffix}
     </span>
   );

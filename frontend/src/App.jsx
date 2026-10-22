@@ -16,6 +16,7 @@ import { fmtMsg, refreshParts, useI18n } from "./i18n.jsx";
 import { RefreshCw, Menu, X, LogOut, ShieldCheck, LayoutDashboard, HelpCircle, UserPlus, ArrowDown } from "lucide-react";
 import Logo from "./components/Logo.jsx";
 import { ThemeMenu, ThemeSegmented } from "./components/ThemeToggle.jsx";
+import { navigate } from "./router.js";
 
 // Mobil aşağı-çekip-yenile eşiği (px). Bu mesafeyi geçince bırakınca yenilenir.
 const PULL_THRESHOLD = 70;
@@ -73,6 +74,11 @@ export default function App({ setLang }) {
       }
     });
   }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = lang;
+    document.title = `NewsRadar — ${t("app.subtitle")}`;
+  }, [lang, t]);
 
   // "Nasıl çalışır?" ilk girişte OTOMATİK açılmaz — header'daki buton ya da boş ekrandaki
   // "Nasıl çalışır? (30 sn)" bağlantısıyla açılır.
@@ -289,7 +295,7 @@ export default function App({ setLang }) {
   }
 
   // Oturum hazırlanıyor (token doğrulama / anon bootstrap) — flaş önlemek için boş bekle.
-  if (checkingSession) return <div className="min-h-screen" />;
+  if (checkingSession) return <main className="min-h-screen" aria-busy="true" />;
   // Bootstrap tümden başarısız olduysa (nadir) küçük bir hata göster.
   if (!authed)
     return (
@@ -597,7 +603,10 @@ export default function App({ setLang }) {
         </div>
       </header>
 
-      <main className={`mx-auto max-w-7xl px-4 py-6 transition-opacity duration-200 sm:px-6 ${switchingLang ? "opacity-40" : "opacity-100"}`}>
+      {/* min-h: içerik yüklenirken footer görünür alanda başlayıp sonra aşağı itilmesin (CLS). */}
+      <main className={`mx-auto min-h-[calc(100vh-7rem)] max-w-7xl px-4 py-6 transition-opacity duration-200 sm:px-6 ${switchingLang ? "opacity-40" : "opacity-100"}`}>
+        {/* Görünüm geçişi (pano ↔ detay ↔ admin): kısa fade — key değişince yeniden oynar. */}
+        <div key={view === "admin" ? "admin" : selected == null ? "overview" : `detail-${selected}`} className="page-in">
         {view === "admin" && user?.is_admin ? (
           <AdminPanel currentUserId={user?.id} />
         ) : (
@@ -728,6 +737,7 @@ export default function App({ setLang }) {
         )}
         </>
         )}
+        </div>
       </main>
 
       {showHow && <HowItWorks onClose={closeHow} onTry={tryOwnCompanies} />}
@@ -748,6 +758,14 @@ export default function App({ setLang }) {
         <button onClick={() => setShowPrivacy(true)} className="ml-1 underline hover:text-slate-300">
           {t("footer.privacy")}
         </button>
+        {" · "}
+        <a
+          href="/?welcome"
+          onClick={(e) => { e.preventDefault(); navigate("/?welcome"); }}
+          className="underline hover:text-slate-300"
+        >
+          {t("app.about")}
+        </a>
       </footer>
 
       {/* Sağ altta sabit geri bildirim butonu (kurucu imzası panel içinde).

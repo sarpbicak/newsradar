@@ -71,6 +71,12 @@ async function req(path, options = {}) {
   return res.json();
 }
 
+async function publicGet(path) {
+  const res = await fetch(`${API_BASE}${path}`, { credentials: "omit" });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
 // ANONİM cihaz oturumu: şifresiz. Cookie ile aynı cihazda kalıcı; token'ı saklar.
 export async function bootstrapSession() {
   const res = await fetch(`${API_BASE}/session/bootstrap`, {
@@ -132,6 +138,10 @@ export const api = {
   privacyInfo: () => req("/privacy-info"),
   // "Nasıl çalışır?" anlatımının GERÇEK örnek verisi (seed şirket, son başlıklar, kart).
   howItWorks: () => req("/how-it-works"),
+  // Landing (oturumsuz): yalnızca toplamlar + seed örneği. Çerez/token GÖNDERİLMEZ —
+  // ziyaretçi için oturum açılmaz (kullanıcı kotası tüketilmez).
+  publicStats: () => publicGet("/public/stats"),
+  publicHowItWorks: (lang) => publicGet(`/public/how-it-works?lang=${encodeURIComponent(lang)}`),
   // Geri bildirim (herkese açık — anon da gönderebilir)
   sendFeedback: (message, contact) =>
     req("/feedback", { method: "POST", body: JSON.stringify({ message, contact }) }),

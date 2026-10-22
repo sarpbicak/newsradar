@@ -1,21 +1,39 @@
-import React, { useState } from "react";
+import React, { Suspense, lazy, useState } from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App.jsx";
+import Landing from "./components/landing/Landing.jsx";
 import { I18nProvider } from "./i18n.jsx";
 import { ThemeProvider } from "./theme.js";
+import { isAppPath, shouldSkipLanding, usePath } from "./router.js";
 import "./index.css";
 
-// Dil durumu en üstte tutulur (I18nProvider sağlar); App onu okur/değiştirir.
+// Pano (Recharts dahil) AYRI pakette: landing'in ilk yüklemesi küçük kalsın.
+const App = lazy(() => import("./App.jsx"));
+
+// Daha önce gelmiş ziyaretçi "/"'ı açarsa ilk render'dan ÖNCE panoya (landing flaşı yok).
+if (shouldSkipLanding()) window.history.replaceState(null, "", "/app");
+
+// Dil durumu en üstte tutulur (I18nProvider sağlar); landing ve App onu okur/değiştirir.
 function Root() {
   const [lang, setLang] = useState(() => {
     const saved = localStorage.getItem("nr_lang");
     if (saved === "tr" || saved === "en") return saved;
     return (navigator.language || "").toLowerCase().startsWith("tr") ? "tr" : "en";
   });
+  const path = usePath();
+  const inApp = isAppPath(path);
   return (
     <ThemeProvider>
       <I18nProvider lang={lang} setLang={setLang}>
-        <App lang={lang} setLang={setLang} />
+        {/* Sayfa geçişi: kısa (≤250ms) fade/slide — key değişince yeniden oynar. */}
+        <div key={inApp ? "app" : "landing"} className="page-in">
+          {inApp ? (
+            <Suspense fallback={<main className="min-h-screen" aria-busy="true" />}>
+              <App lang={lang} setLang={setLang} />
+            </Suspense>
+          ) : (
+            <Landing lang={lang} setLang={setLang} />
+          )}
+        </div>
       </I18nProvider>
     </ThemeProvider>
   );

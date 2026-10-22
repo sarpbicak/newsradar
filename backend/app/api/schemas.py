@@ -460,6 +460,14 @@ class HowHeadlineOut(BaseModel):
     published_at: datetime | None = None
 
 
+class PublicStatsOut(BaseModel):
+    """Landing sayfasındaki gerçek rakamlar (yalnızca toplamlar)."""
+
+    articles_analyzed: int        # AI'ın analiz ettiği haber (DB'deki analyzed=True)
+    companies_tracked: int        # en az bir kişinin izleme listesindeki aktif şirket
+    languages: list[str]          # arayüz + AI değerlendirmesi dilleri
+
+
 class HowItWorksOut(BaseModel):
     """'Nasıl çalışır?' anlatımının gerçek örnek verisi (uydurma yok)."""
 

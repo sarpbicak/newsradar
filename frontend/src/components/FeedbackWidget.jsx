@@ -5,67 +5,12 @@ import { MessageSquare, X, Send } from "lucide-react";
 import { api } from "../api.js";
 import { useVisualViewport } from "./ui.jsx";
 import { useI18n } from "../i18n.jsx";
+import { INSTAGRAM_URL, InstagramIcon, LINKEDIN_URL, LinkedInIcon, SocialIcon } from "./Social.jsx";
 
 // Odaklanınca alanı görünür alanın ortasına kaydır (klavye açılınca kaybolmasın).
 function scrollFocusIntoView(e) {
   const el = e.target;
   setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 100);
-}
-
-// Marka ikonları (lucide bu sürümde brand glyph'lerini içermiyor) — küçük inline SVG.
-// İkisi de AYNI stil: 24'lük viewBox, fill="none" + 2px stroke, h-4 w-4, kendi margin/
-// padding'i yok. Şekiller viewBox'ta ortalı (LinkedIn 2..22 × 2.5..21.5) — eski dolgulu
-// LinkedIn glifi 0..22 × 1..22.5 aralığındaydı, butonda sola/yukarı kaymış duruyordu.
-const ICON_PROPS = {
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 2,
-  strokeLinecap: "round",
-  strokeLinejoin: "round",
-  className: "block h-4 w-4 shrink-0",
-  "aria-hidden": true,
-};
-function LinkedInIcon() {
-  return (
-    <svg {...ICON_PROPS}>
-      <g transform="translate(0 0.5)">
-        <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z" />
-        <rect x="2" y="9" width="4" height="12" />
-        <circle cx="4" cy="4" r="2" />
-      </g>
-    </svg>
-  );
-}
-function InstagramIcon() {
-  return (
-    <svg {...ICON_PROPS}>
-      <rect x="2" y="2" width="20" height="20" rx="5" />
-      <circle cx="12" cy="12" r="4" />
-      <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-// ── DEĞİŞTİR (Sarp): kendi hesap adreslerinle güncelle ──────────────────────
-// Bu iki sabit tek düzenleme noktasıdır; başka yeri değiştirmen gerekmez.
-const LINKEDIN_URL = "https://www.linkedin.com/in/sarp-b%C4%B1%C3%A7ak-b5607037b/";
-const INSTAGRAM_URL = "https://www.instagram.com/sarpbicak24/";
-// ────────────────────────────────────────────────────────────────────────────
-
-function SocialIcon({ href, label, children }) {
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      aria-label={label}
-      title={label}
-      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-ink-500 text-slate-500 transition hover:border-accent/60 hover:text-accent"
-    >
-      {children}
-    </a>
-  );
 }
 
 // Kurucu imzası + sosyal hesaplar (panel altında ve boş butonun temsili).
