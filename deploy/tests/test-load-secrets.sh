@@ -40,7 +40,9 @@ echo "== normal çalıştırma"
 mkdir -p "$T/proj"
 cp "$DEPLOY/docker-compose.yml" "$T/proj/"
 "$DEPLOY/load-secrets.sh" --output "$T/proj/.env" >"$T/out.log" 2>&1 && ok "çıkış kodu 0" || { bad "çıkış kodu ≠ 0"; cat "$T/out.log"; }
-perm="$(stat -f %Lp "$T/proj/.env" 2>/dev/null || stat -c %a "$T/proj/.env")"
+# Önce GNU (Linux/CI), sonra BSD (macOS). Sıra önemli: GNU'da `stat -f` dosya SİSTEMİ bilgisini
+# basıp BAŞARIYLA döner, bu yüzden BSD biçimi önce denenirse Linux'ta yanlış değer okunur.
+perm="$(stat -c %a "$T/proj/.env" 2>/dev/null || stat -f %Lp "$T/proj/.env")"
 [[ "$perm" == 600 ]] && ok "izin 600" || bad "izin $perm"
 leak=0
 while IFS= read -r v; do
@@ -77,7 +79,9 @@ if command -v docker >/dev/null 2>&1; then
   echo "== Python 3.9 (Amazon Linux 2023'teki python3) ile aynı çıktı"
   python3 -c 'import json,sys; d={"Parameters":[{"Name":"/newsradar/prod/"+k,"Type":"SecureString","Value":v} for k,v in json.load(open(sys.argv[1])).items()]}; json.dump(d, open(sys.argv[2],"w"))' "$FAKE_SSM_JSON.expected" "$T/ssm39.json"
   FAKE_SSM_JSON="$T/ssm39.json" "$DEPLOY/load-secrets.sh" --output "$T/host.env" >/dev/null 2>&1
-  docker run --rm -v "$DEPLOY:/d:ro" -v "$T:/t" -e PATH=/d/tests:/usr/local/bin:/usr/bin:/bin \
+  # --user: dosyayı test eden kullanıcı yazsın. Aksi halde container root'u 600 izinli dosyayı
+  # root sahipliğinde bırakır ve CI'daki root olmayan runner (uid 1001) onu okuyamaz.
+  docker run --rm --user "$(id -u):$(id -g)" -v "$DEPLOY:/d:ro" -v "$T:/t" -e PATH=/d/tests:/usr/local/bin:/usr/bin:/bin \
     -e FAKE_SSM_JSON=/t/ssm39.json python:3.9-slim bash /d/load-secrets.sh --output /t/py39.env >"$T/out4.log" 2>&1 \
     && diff <(tail -n +2 "$T/host.env") <(tail -n +2 "$T/py39.env") >/dev/null \
     && ok "python 3.9 çıktısı aynı" || { bad "python 3.9 farklı/başarısız"; cat "$T/out4.log"; }
