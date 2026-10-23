@@ -3,10 +3,11 @@
 // İlkeler: az çizgi, az kutu — ayrım yüzey tonu, boşluk ve tipografiyle. Tek vurgu (sinyal yeşili)
 // yalnızca birincil aksiyon ve aktif durumda. Odak halkası global (:focus-visible, index.css).
 // İkon seti: lucide-react, varsayılan çizgi kalınlığı (2).
-import React, { forwardRef, useEffect, useRef, useState } from "react";
+import React, { forwardRef, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, CheckCircle2, ChevronDown, Info, RotateCcw, X, XCircle } from "lucide-react";
 import { useI18n } from "../i18n.jsx";
+import { DUR, EASE_CSS, prefersReducedMotion } from "../motion.js";
 
 const cx = (...parts) => parts.filter(Boolean).join(" ");
 
@@ -425,6 +426,46 @@ export function MenuItem({ icon: Icon, className = "", children, ...rest }) {
       {children}
     </button>
   );
+}
+
+// Onay penceresi (window.confirm yerine): ortak Modal + birincil/ikincil buton.
+export function ConfirmDialog({ title, body, confirmLabel, cancelLabel, onConfirm, onCancel }) {
+  return (
+    <Modal onClose={onCancel} labelledBy="confirm-title" size="sm">
+      <ModalHeader id="confirm-title" title={title} onClose={onCancel}>
+        {body}
+      </ModalHeader>
+      <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <Button onClick={onCancel}>{cancelLabel}</Button>
+        <Button variant="primary" onClick={onConfirm} data-autofocus>
+          {confirmLabel}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+// Liste sırası değişince öğeler yumuşakça yer değiştirsin (FLIP). Çocuklar data-key taşır.
+// Konumlar listeye göre (offsetTop) — sayfa kaydırması animasyon tetiklemez. reduced-motion: yok.
+export function useFlip(ref, deps) {
+  const prev = useRef(new Map());
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const items = [...el.children].filter((n) => n.dataset.key);
+    const next = new Map(items.map((n) => [n.dataset.key, n.offsetTop]));
+    if (!prefersReducedMotion() && prev.current.size) {
+      items.forEach((n) => {
+        const before = prev.current.get(n.dataset.key);
+        const after = next.get(n.dataset.key);
+        if (before != null && before !== after) {
+          n.animate([{ transform: `translateY(${before - after}px)` }, { transform: "none" }], { duration: DUR.move * 1000, easing: EASE_CSS });
+        }
+      });
+    }
+    prev.current = next;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
 }
 
 export { cx };

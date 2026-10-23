@@ -7,7 +7,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { fmtPct, useI18n } from "../../i18n.jsx";
 import { Button, LabelChip } from "../kit.jsx";
-import { StatusTag, riskColor } from "../ui.jsx";
+import { SignalPill, riskColor } from "../ui.jsx";
 import { clamp01 } from "../../motion.js";
 import { scrub, useScrub } from "./scroll.js";
 
@@ -44,7 +44,7 @@ function LiveCard({ demo, t }) {
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <span className="lx-display text-[2rem] text-slate-100">{e.name}</span>
         <span className="font-mono text-sm text-slate-500">{e.type === "ticker" ? "$" : "#"}{e.query}</span>
-        {e.analysis && <StatusTag stance={a.stance} evidence={e.evidence_strength} />}
+        {e.analysis && <SignalPill stance={a.stance} evidence={e.evidence_strength} />}
       </div>
       {a.headline_verdict && (
         <p className="mt-4 font-display text-[1.375rem] font-medium leading-snug tracking-[-0.01em] text-slate-100">{a.headline_verdict}</p>

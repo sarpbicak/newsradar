@@ -1,7 +1,9 @@
 // "Bunları da izlemek ister misin?" — co-mentioned şirket önerileri.
 // Öneri yoksa hiç render edilmez (boş başlık durmasın).
 import React, { useState } from "react";
+import { Plus } from "lucide-react";
 import { useI18n } from "../i18n.jsx";
+import { Button, Card, Chip } from "./kit.jsx";
 
 export default function SuggestionsSection({ suggestions, onAdd, onDismiss, embedded = false }) {
   const { t } = useI18n();
@@ -19,74 +21,36 @@ export default function SuggestionsSection({ suggestions, onAdd, onDismiss, embe
   }
 
   return (
-    <div className={embedded ? "" : "rounded-xl border border-ink-600 bg-ink-800/60 p-4"}>
-      {!embedded && (
-        <div className="mb-1 text-sm font-semibold text-slate-200">
-          {t("sug.title")}
-        </div>
-      )}
-      <div className="mb-3 text-[11px] text-slate-500">
-        {t("sug.subtitle")}
-      </div>
+    <div className={embedded ? "" : "rounded-card bg-ink-800 p-5"}>
+      {!embedded && <div className="mb-1 font-display text-base font-semibold text-slate-100">{t("sug.title")}</div>}
+      <p className="mb-4 text-meta text-slate-500">{t("sug.subtitle")}</p>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {suggestions.map((s) => {
           const busy = busyId === s.id;
           return (
-            <div
-              key={s.id}
-              className="flex flex-col gap-2 rounded-lg border border-ink-600 bg-ink-800 p-3"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-baseline gap-2">
-                  <span className="font-semibold text-slate-100">{s.name}</span>
-                  {s.ticker && (
-                    <span className="font-mono text-[11px] text-slate-500">${s.ticker}</span>
-                  )}
+            <Card key={s.id} className="flex flex-col gap-3 p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex flex-wrap items-baseline gap-2">
+                  <span className="font-display text-base font-semibold text-slate-100">{s.name}</span>
+                  {s.ticker && <span className="font-mono text-micro text-slate-500">${s.ticker}</span>}
                 </div>
-                <span className="shrink-0 rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">
-                  {t("sug.mentioned", { n: s.mention_count })}
-                </span>
+                <Chip tone="neutral">{t("sug.mentioned", { n: s.mention_count })}</Chip>
               </div>
-
-              {s.why_relevant && (
-                <p className="text-xs leading-relaxed text-slate-400">{s.why_relevant}</p>
-              )}
-
-              {s.source_entity_names?.length > 0 && (
-                <div className="text-[11px] text-slate-500">
-                  {t("sug.inNews", { names: s.source_entity_names.join(", ") })}
-                </div>
-              )}
-
-              {/* Eklenince ne olacağı — sürpriz olmasın */}
-              <div className="text-[11px] text-slate-500">
-                {s.add_as_type === "ticker" ? (
-                  <span className="text-sky-400">{t("sug.addTicker")}</span>
-                ) : (
-                  <span className="text-slate-400">
-                    {t("sug.addKeyword", { lang: s.add_as_language ? ` (${s.add_as_language})` : "" })}
-                  </span>
-                )}
-              </div>
-
-              <div className="mt-1 flex gap-2">
-                <button
-                  onClick={() => handle(onAdd, s.id)}
-                  disabled={busy}
-                  className="rounded-md bg-accent px-3 py-1 text-xs font-medium text-accent-fg disabled:opacity-50"
-                >
+              {s.why_relevant && <p className="text-meta leading-relaxed text-slate-400">{s.why_relevant}</p>}
+              <p className="text-micro text-slate-500">
+                {s.source_entity_names?.length > 0 && <>{t("sug.inNews", { names: s.source_entity_names.join(", ") })} · </>}
+                {s.add_as_type === "ticker" ? t("sug.addTicker") : t("sug.addKeyword", { lang: s.add_as_language ? ` (${s.add_as_language})` : "" })}
+              </p>
+              <div className="mt-auto flex gap-2">
+                <Button variant="primary" size="sm" icon={Plus} onClick={() => handle(onAdd, s.id)} disabled={busy}>
                   {busy ? "…" : t("sug.add")}
-                </button>
-                <button
-                  onClick={() => handle(onDismiss, s.id)}
-                  disabled={busy}
-                  className="rounded-md border border-ink-500 px-3 py-1 text-xs text-slate-400 hover:text-slate-200 disabled:opacity-50"
-                >
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => handle(onDismiss, s.id)} disabled={busy}>
                   {t("sug.hide")}
-                </button>
+                </Button>
               </div>
-            </div>
+            </Card>
           );
         })}
       </div>

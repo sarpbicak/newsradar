@@ -283,6 +283,7 @@ def entity_card(session: Session, entity: Entity, language: str = "tr") -> Entit
     return EntityCardOut(
         id=entity.id,
         name=entity.name,
+        display_name=entity.display_name,
         type=entity.type,
         query=entity.query,
         language=entity.language,

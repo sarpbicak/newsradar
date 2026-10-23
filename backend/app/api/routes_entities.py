@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from ..config import get_settings
 from ..db.database import get_db
 from ..db.models import Entity, User
+from ..entity_names import display_name_for
 from ..watchlist import (
     add_to_watchlist,
     can_add_entity,
@@ -135,7 +136,8 @@ def create_entity(
             )
 
         entity = Entity(
-            name=payload.name, type=payload.type, query=payload.query, language=payload.language
+            name=payload.name, display_name=display_name_for(payload.name),
+            type=payload.type, query=payload.query, language=payload.language,
         )
         db.add(entity)
         try:

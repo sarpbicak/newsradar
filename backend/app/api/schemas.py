@@ -260,6 +260,7 @@ class EntityCardOut(BaseModel):
 
     id: int
     name: str
+    display_name: str | None = None        # kısa görünen ad (AMD); arayüz `display_name or name`
     type: str
     query: str
     language: str = "en"

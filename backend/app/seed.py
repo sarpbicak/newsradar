@@ -9,6 +9,7 @@ from sqlalchemy import select
 
 from .db.database import init_db, session_scope
 from .db.models import Entity
+from .entity_names import display_name_for
 
 # (name, type, query)
 DEFAULT_WATCHLIST = [
@@ -31,7 +32,8 @@ def seed() -> None:
             if exists:
                 skipped += 1
                 continue
-            session.add(Entity(name=name, type=type_, query=query))
+            session.add(Entity(name=name, display_name=display_name_for(name),
+                               type=type_, query=query))
             added += 1
     print(f"Seed tamam: {added} eklendi, {skipped} zaten vardı.")
 

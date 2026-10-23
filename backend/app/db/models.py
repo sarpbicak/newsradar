@@ -99,6 +99,9 @@ class Entity(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
+    # Kısa görünen ad ("Advanced Micro Devices" → "AMD"). Bilinmiyorsa None; arayüz
+    # `display_name or name` gösterir. Eşleme tablosu: app/entity_names.py.
+    display_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     type: Mapped[str] = mapped_column(String(20), nullable=False)  # ticker | keyword
     # ticker için sembol (TSLA); keyword için arama sorgusu ("Anthropic").
     query: Mapped[str] = mapped_column(String(200), nullable=False)

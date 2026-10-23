@@ -9,7 +9,7 @@ import React, { useLayoutEffect, useRef, useState } from "react";
 import { MessageSquare } from "lucide-react";
 import { fmtInt, fmtPct, useI18n } from "../../i18n.jsx";
 import { LabelChip } from "../kit.jsx";
-import { StatusTag, riskColor, stanceLabel } from "../ui.jsx";
+import { SignalPill, riskColor, stanceLabel } from "../ui.jsx";
 import { ease, seg } from "../../motion.js";
 
 const symbolOf = (e) => `${e.type === "ticker" ? "$" : "#"}${e.query}`;
@@ -184,7 +184,7 @@ export function SceneVerdict({ data, p }) {
           <div className="flex flex-wrap items-center gap-2.5">
             <span className="font-display text-xl font-bold text-slate-100">{e.name}</span>
             <span className="font-mono text-sm text-slate-500">{symbolOf(e)}</span>
-            {e.analysis && <StatusTag stance={a.stance} evidence={e.evidence_strength} />}
+            {e.analysis && <SignalPill stance={a.stance} evidence={e.evidence_strength} />}
           </div>
           {a.headline_verdict && <p className="mt-3 font-display text-xl font-semibold leading-snug text-slate-100">{a.headline_verdict}</p>}
           {e.price != null && (

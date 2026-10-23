@@ -73,6 +73,12 @@ def init_db() -> None:
     _ensure_column("llm_usage", "cache_creation_tokens", "INTEGER NOT NULL DEFAULT 0")
     _ensure_column("llm_usage", "cache_read_tokens", "INTEGER NOT NULL DEFAULT 0")
     _ensure_column("llm_usage", "cost_usd", "FLOAT NOT NULL DEFAULT 0")
+    # Kısa görünen ad + bilinen uzun adlar için idempotent doldurma (yalnızca NULL'lar).
+    _ensure_column("entities", "display_name", "VARCHAR(200)")
+    from ..entity_names import backfill_display_names
+
+    with engine.begin() as conn:
+        backfill_display_names(conn)
 
 
 def _ensure_column(table: str, column: str, ddl_type: str) -> None:

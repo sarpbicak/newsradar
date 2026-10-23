@@ -2,7 +2,7 @@
 // global yenileme, sağlayıcı uyarıları, footer.
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { api, bootstrapSession, getUserToken, logout, setUnauthorizedHandler } from "./api.js";
-import Overview from "./components/Overview.jsx";
+import Overview, { OverviewSkeleton } from "./components/Overview.jsx";
 import EntityDetail from "./components/EntityDetail.jsx";
 import AccountModal from "./components/AccountModal.jsx";
 import PrivacyModal from "./components/PrivacyModal.jsx";
@@ -11,7 +11,8 @@ import HowItWorks from "./components/HowItWorks.jsx";
 import FeedbackWidget from "./components/FeedbackWidget.jsx";
 import AppHeader from "./components/AppHeader.jsx";
 import { LanguageModal } from "./components/LanguageBits.jsx";
-import { Skeleton, useIsMobile } from "./components/ui.jsx";
+import { useIsMobile } from "./components/ui.jsx";
+import { WRAP } from "./components/NavBar.jsx";
 import { fmtMsg, refreshParts, useI18n } from "./i18n.jsx";
 import { ArrowDown } from "lucide-react";
 import { navigate } from "./router.js";
@@ -359,9 +360,15 @@ export default function App({ setLang }) {
     handleRefresh();
   }
 
+  // Yeni şirketin henüz analizi yoksa "Yenile" kısa süre vurgulanır.
+  function pulseRefresh() {
+    setRefreshAttn(true);
+    setTimeout(() => setRefreshAttn(false), 2600);
+  }
   async function handleCreate(payload) {
-    await api.createEntity(payload);
+    const created = await api.createEntity(payload);
     await loadCards();
+    if (created && !created.analysis) pulseRefresh();
   }
   async function handleDelete(id) {
     await api.deleteEntity(id);
@@ -372,6 +379,7 @@ export default function App({ setLang }) {
   async function handleAddSuggestion(id) {
     const entity = await api.addSuggestion(id);
     await loadCards(); // entity listesi + öneriler otomatik güncellensin
+    if (entity && !entity.analysis) pulseRefresh();
     setNotice({
       type: "ok",
       text: t("notice.entityAdded", { name: entity.name }),
@@ -444,7 +452,7 @@ export default function App({ setLang }) {
       />
 
       {/* min-h: içerik yüklenirken footer görünür alanda başlayıp sonra aşağı itilmesin (CLS). */}
-      <main className={`mx-auto min-h-[calc(100vh-7rem)] max-w-7xl px-4 py-6 transition-opacity duration-200 sm:px-6 ${switchingLang ? "opacity-40" : "opacity-100"}`}>
+      <main className={`${WRAP} min-h-[calc(100vh-7rem)] py-8 transition-opacity duration-page ease-std md:py-10 ${switchingLang ? "opacity-40" : "opacity-100"}`}>
         {/* Görünüm geçişi (pano ↔ detay ↔ admin): kısa fade — key değişince yeniden oynar. */}
         <div key={view === "admin" ? "admin" : selected == null ? "overview" : `detail-${selected}`} className="page-in">
         {view === "admin" && user?.is_admin ? (
@@ -530,17 +538,8 @@ export default function App({ setLang }) {
         )}
 
         {!loaded && selected == null ? (
-          /* İlk yükleme — layout zıplamasın diye iskelet kartlar */
-          <div className="stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="rounded-xl border border-ink-600 bg-ink-800 p-4 shadow-card">
-                <Skeleton className="mb-3 h-4 w-24" />
-                <Skeleton className="mb-3 h-8 w-full" />
-                <Skeleton className="mb-3 h-12 w-full" />
-                <Skeleton className="h-4 w-32" />
-              </div>
-            ))}
-          </div>
+          /* İlk yükleme — pano düzenini taklit eden iskelet (layout zıplamasın) */
+          <OverviewSkeleton />
         ) : selected == null ? (
           <Overview
             cards={cards}

@@ -2,8 +2,11 @@
 //  - ticker: Ad + Sembol zorunlu, dil yok. Ada yazarken sembol araması çıkar.
 //  - keyword: sadece Ad (query=name), Sembol gizli, dil seçici görünür.
 import React, { useEffect, useRef, useState } from "react";
+import { AlertTriangle, X } from "lucide-react";
 import { api } from "../api.js";
 import { useI18n } from "../i18n.jsx";
+import { Button, ConfirmDialog, Field, Input, Select } from "./kit.jsx";
+import { displayName } from "./EntityCard.jsx";
 
 const LANGUAGES = [
   { code: "en", tkey: "lang.en" },
@@ -36,6 +39,7 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
   const skipSearch = useRef(false); // öneri seçilince tekrar aramayı bastır
+  const [confirmNonUs, setConfirmNonUs] = useState(null); // ABD dışı borsa sembolü → keyword önerisi
 
   // Ada yazarken (ticker, ≥2 karakter, 400ms debounce) sembol ara.
   useEffect(() => {
@@ -71,27 +75,26 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
   }, [name, type]);
 
   function pickSymbol(r) {
-    // ABD dışı borsa: ticker olarak eklenirse haber/fiyat gelmez → keyword'e yönlendir.
+    // ABD dışı borsa: ticker olarak eklenirse haber/fiyat gelmez → keyword'e yönlendir (onay penceresi).
     if (!r.us_supported) {
-      const ok = window.confirm(
-        `${r.symbol} — ${r.exchange_name}. Bu borsa için haber/fiyat verisi (Finnhub) yok; ` +
-          `keyword olarak eklemeniz önerilir.\n\nKeyword olarak devam edilsin mi?`
-      );
-      if (!ok) return;
-      // Tip keyword'e geç, ad dolsun, dil önerisi uygulansın. (type keyword olunca
-      // arama efekti erken döner; skipSearch gerekmez.)
-      setType("keyword");
-      setQuery("");
-      setLanguage(r.suggested_language || "en");
-      setName(r.description);
-      setResults([]);
-      setSearched(false);
+      setConfirmNonUs(r);
       return;
     }
     // ABD sembolü: ticker alanlarını doldur (name değişince yeniden arama yapma).
     skipSearch.current = true;
     setName(r.description);
     setQuery(r.symbol);
+    setResults([]);
+    setSearched(false);
+  }
+
+  function acceptKeyword(r) {
+    // Tip keyword'e geç, ad dolsun, dil önerisi uygulansın (type keyword olunca arama efekti erken döner).
+    setConfirmNonUs(null);
+    setType("keyword");
+    setQuery("");
+    setLanguage(r.suggested_language || "en");
+    setName(r.description);
     setResults([]);
     setSearched(false);
   }
@@ -134,150 +137,121 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
   const showDropdown = type === "ticker" && name.trim().length >= 2;
 
   return (
-    <div className={embedded ? "" : "rounded-xl border border-ink-600 bg-ink-800 p-4"}>
-      {!embedded && <h3 className="mb-3 text-sm font-semibold text-slate-200">{t("wl.title")}</h3>}
+    <div className={embedded ? "" : "rounded-card bg-ink-800 p-5"}>
+      {!embedded && <h3 className="mb-4 font-display text-base font-semibold text-slate-100">{t("wl.title")}</h3>}
 
-      <form onSubmit={submit} className="mb-3 flex flex-col gap-2 md:flex-row md:flex-wrap md:items-end">
-        {/* Tip */}
-        <div className="flex flex-col">
-          <label className="mb-1 text-[10px] uppercase text-slate-500">{t("wl.type")}</label>
-          <select
-            value={type}
-            onChange={(e) => changeType(e.target.value)}
-            className="min-h-[44px] w-full rounded-md border border-ink-500 bg-ink-900 px-2 py-2 text-sm outline-none focus:border-accent md:w-auto"
-          >
+      <form onSubmit={submit} className="grid gap-3 md:grid-cols-[12rem_minmax(0,1fr)_8rem_auto] md:items-end">
+        <Field label={t("wl.type")} htmlFor="wl-type">
+          <Select id="wl-type" value={type} onChange={(e) => changeType(e.target.value)}>
             <option value="ticker">{t("wl.typeTicker")}</option>
             <option value="keyword">{t("wl.typeKeyword")}</option>
-          </select>
-        </div>
+          </Select>
+        </Field>
 
-        {/* Ad — ticker'da arama kutusu, keyword'de arama terimi */}
-        <div className="relative flex flex-col md:flex-1">
-          <label className="mb-1 text-[10px] uppercase text-slate-500">
-            {type === "ticker" ? t("wl.nameSearch") : t("wl.nameTerm")}
-          </label>
-          <input
+        {/* Ad — ticker'da arama kutusu (sembol önerileri), keyword'de arama terimi */}
+        <Field label={type === "ticker" ? t("wl.nameSearch") : t("wl.nameTerm")} htmlFor="wl-name" className="relative">
+          <Input
+            id="wl-name"
             ref={nameInputRef}
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={type === "ticker" ? "Tesla" : "Aselsan"}
             autoComplete="off"
-            className="min-h-[44px] w-full rounded-md border border-ink-500 bg-ink-900 px-2 py-2 text-sm outline-none focus:border-accent md:w-48 md:flex-none"
           />
-
-          {/* Sembol arama açılır listesi (yalnızca ticker) */}
           {showDropdown && (searching || results.length > 0 || searched) && (
-            <div className="absolute top-full z-20 mt-1 w-full overflow-hidden rounded-md border border-ink-500 bg-ink-900 shadow-xl md:w-72">
-              {searching && (
-                <div className="px-3 py-2 text-xs text-slate-500">{t("wl.searching")}</div>
-              )}
+            <div className="fade-in absolute top-full z-20 mt-1.5 w-full overflow-hidden rounded-control bg-raised p-1 shadow-raised ring-1 ring-ink-600">
+              {searching && <div className="px-3 py-2 text-meta text-slate-500">{t("wl.searching")}</div>}
               {!searching &&
                 results.map((r) => (
                   <button
                     key={r.symbol}
                     type="button"
                     onClick={() => pickSymbol(r)}
-                    className="block min-h-[44px] w-full px-3 py-2 text-left text-xs hover:bg-ink-700"
+                    className="tap block w-full rounded-lg px-3 py-2 text-left text-meta transition-colors duration-hover ease-std hover:bg-ink-700"
                   >
-                    <div
-                      className={`flex items-center justify-between gap-2 ${
-                        r.us_supported ? "" : "opacity-60"
-                      }`}
-                    >
+                    <span className={`flex items-center justify-between gap-2 ${r.us_supported ? "" : "opacity-70"}`}>
                       <span className="truncate text-slate-200">{r.description}</span>
                       <span className="shrink-0 font-mono text-slate-400">
-                        {r.symbol}
-                        <span className="ml-1 text-slate-600">({r.market})</span>
+                        {r.symbol} <span className="text-slate-500">({r.market})</span>
                       </span>
-                    </div>
+                    </span>
                     {!r.us_supported && (
-                      <div className="mt-0.5 text-[10px] text-amber-400">
-                        ⚠ {r.exchange_name} — haber/fiyat yok, keyword önerilir
-                      </div>
+                      <span className="mt-0.5 flex items-center gap-1 text-micro text-amber-600">
+                        <AlertTriangle className="h-3 w-3" aria-hidden="true" /> {r.exchange_name} — {t("wl.nonUsShort")}
+                      </span>
                     )}
                   </button>
                 ))}
-              {!searching && searched && results.length === 0 && (
-                <div className="px-3 py-2 text-xs text-amber-300">
-                  {t("wl.notFound")}
-                </div>
-              )}
+              {!searching && searched && results.length === 0 && <div className="px-3 py-2 text-meta text-amber-600">{t("wl.notFound")}</div>}
             </div>
           )}
-        </div>
+        </Field>
 
-        {/* Sembol — yalnızca ticker */}
-        {type === "ticker" && (
-          <div className="flex flex-col">
-            <label className="mb-1 text-[10px] uppercase text-slate-500">{t("wl.symbol")}</label>
-            <input
+        {type === "ticker" ? (
+          <Field label={t("wl.symbol")} htmlFor="wl-symbol">
+            <Input
+              id="wl-symbol"
+              mono
               value={query}
               onChange={(e) => setQuery(e.target.value.toUpperCase().replace(/\s+/g, ""))}
               placeholder="TSLA"
               autoComplete="off"
-              className="min-h-[44px] w-full rounded-md border border-ink-500 bg-ink-900 px-2 py-2 font-mono text-sm outline-none focus:border-accent md:w-28"
             />
-          </div>
-        )}
-
-        {/* Dil — yalnızca keyword */}
-        {type === "keyword" && (
-          <div className="flex flex-col">
-            <label className="mb-1 text-[10px] uppercase text-slate-500">{t("wl.language")}</label>
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              className="min-h-[44px] w-full rounded-md border border-ink-500 bg-ink-900 px-2 py-2 text-sm outline-none focus:border-accent md:w-auto"
-            >
+          </Field>
+        ) : (
+          <Field label={t("wl.language")} htmlFor="wl-lang">
+            <Select id="wl-lang" value={language} onChange={(e) => setLanguage(e.target.value)}>
               {LANGUAGES.map((l) => (
                 <option key={l.code} value={l.code}>
                   {t(l.tkey)}
                 </option>
               ))}
-            </select>
-          </div>
+            </Select>
+          </Field>
         )}
 
-        <button
-          disabled={!canSubmit}
-          title={missing.length ? t("wl.missing", { fields: missing.join(", ") }) : ""}
-          className="min-h-[44px] w-full rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-fg disabled:opacity-50 md:w-auto"
-        >
+        <Button type="submit" variant="primary" disabled={!canSubmit} title={missing.length ? t("wl.missing", { fields: missing.join(", ") }) : ""}>
           {busy ? t("wl.adding") : t("wl.add")}
-        </button>
-
-        {missing.length > 0 && (
-          <span className="text-[11px] text-slate-500 md:self-center">{t("wl.missing", { fields: missing.join(", ") })}</span>
-        )}
+        </Button>
       </form>
-      {err && <p className="mb-2 text-xs text-rose-400">{err}</p>}
+      {missing.length > 0 && name && <p className="mt-2 text-micro text-slate-500">{t("wl.missing", { fields: missing.join(", ") })}</p>}
+      {err && <p className="mt-2 text-meta text-rose-600">{err}</p>}
 
-      <ul className="flex flex-wrap gap-2">
-        {cards.map((c) => (
-          <li
-            key={c.id}
-            className="flex items-center gap-2 rounded-md border border-ink-500 bg-ink-700 px-2 py-1 text-xs"
-          >
-            <span className="text-slate-200">{c.name}</span>
-            <span className="font-mono text-slate-500">
-              {c.type === "ticker" ? "$" : "#"}
-              {c.query}
-            </span>
-            {c.language && c.language !== "en" && (
-              <span className="rounded bg-ink-600 px-1 text-[10px] uppercase text-slate-400">
-                {c.language}
+      {cards.length > 0 && (
+        <ul className="mt-5 flex flex-wrap gap-2">
+          {cards.map((c) => (
+            <li key={c.id} className="inline-flex items-center gap-2 rounded-full bg-ink-800 py-1 pl-3 pr-1 text-meta ring-1 ring-slate-100/5">
+              <span className="text-slate-200">{displayName(c)}</span>
+              <span className="font-mono text-micro text-slate-500">
+                {c.type === "ticker" ? "$" : "#"}
+                {c.query}
               </span>
-            )}
-            <button
-              onClick={() => onDelete(c.id)}
-              title={t("wl.remove")}
-              className="text-slate-500 hover:text-rose-400"
-            >
-              ✕
-            </button>
-          </li>
-        ))}
-      </ul>
+              {c.language && c.language !== "en" && <span className="rounded-full bg-ink-700 px-1.5 text-micro uppercase text-slate-400">{c.language}</span>}
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                icon={X}
+                onClick={() => onDelete(c.id)}
+                aria-label={`${t("wl.remove")}: ${displayName(c)}`}
+                title={t("wl.remove")}
+                className="h-7 w-7 hover:text-rose-600"
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {confirmNonUs && (
+        <ConfirmDialog
+          title={t("wl.nonUsTitle", { symbol: confirmNonUs.symbol })}
+          body={t("wl.nonUsBody", { exchange: confirmNonUs.exchange_name })}
+          confirmLabel={t("wl.nonUsConfirm")}
+          cancelLabel={t("common.cancel")}
+          onConfirm={() => acceptKeyword(confirmNonUs)}
+          onCancel={() => setConfirmNonUs(null)}
+        />
+      )}
     </div>
   );
 }

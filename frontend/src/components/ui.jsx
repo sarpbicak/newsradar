@@ -208,16 +208,16 @@ const PILL_STYLE = {
   "-2": { bg: C.negStrong, color: C.onStrong },               // GÜÇLÜ OLUMSUZ (dolu)
 };
 
-// Büyük, dolgulu, uzaktan okunan DURUM etiketi (kartın en dikkat çekici öğesi).
+// DURUM etiketi (dolgulu, anlamsal; 5 kademe) — kart, liste, detay ve landing aynı etiketi kullanır.
 export function SignalPill({ stance, evidence }) {
   const sig = overallSignal(stance, evidence);
   const st = PILL_STYLE[String(sig.key)] || PILL_STYLE["0"];
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wide"
+      className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-micro font-semibold uppercase tracking-wide"
       style={{ background: st.bg, color: st.color }}
     >
-      <span className="h-1.5 w-1.5 rounded-full" style={{ background: st.color }} />
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: st.color }} aria-hidden="true" />
       {sig.label}
     </span>
   );

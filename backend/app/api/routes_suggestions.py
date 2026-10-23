@@ -16,6 +16,7 @@ from sqlalchemy import exists
 
 from ..db.database import get_db
 from ..db.models import Entity, Suggestion, SuggestionDismissal, User
+from ..entity_names import display_name_for
 from ..watchlist import add_to_watchlist, can_add_entity, in_watchlist, user_entity_ids
 from .routes_auth import get_current_user
 from .routes_entities import _add_lock
@@ -108,7 +109,9 @@ def list_suggestions(
     for e in db.scalars(select(Entity).where(Entity.id.in_(my_ids))).all():
         my_terms.add(e.name.strip().lower())
         my_terms.add(e.query.strip().lower())
-        name_by_id[e.id] = e.name
+        if e.display_name:
+            my_terms.add(e.display_name.strip().lower())
+        name_by_id[e.id] = e.display_name or e.name  # kaynak adı kısa haliyle gösterilir
 
     dismissed = set(db.scalars(
         select(SuggestionDismissal.suggestion_id).where(SuggestionDismissal.user_id == user.id)
@@ -206,7 +209,8 @@ def add_suggestion(
             db.commit()
             return entity_card(db, existing, user.language)
 
-        entity = Entity(name=sug.name.strip(), type=etype, query=query, language=language)
+        entity = Entity(name=sug.name.strip(), display_name=display_name_for(sug.name),
+                        type=etype, query=query, language=language)
         db.add(entity)
         try:
             db.flush()

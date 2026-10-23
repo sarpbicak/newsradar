@@ -1,16 +1,22 @@
-// KESİN SPEC kartı — 4 satır:
-// 1) Durum pill (sol, büyük dolgulu) + şirket adı/ticker (sağ, tek satır)
-// 2) Hüküm cümlesi (TAM, kesme yok, 3 satıra kadar sarar)
-// 3) Fiyat bloğu (çerçeveli kutu: şimdi → analist hedefi + %)
-// 4) Meta (küçük soluk: vade · N haber · yön değişti)
-// Tüm kartlar aynı yükseklik (h-full + flex; fiyat+meta alta yapışır).
+// Pano kartı — landing hero'daki canlı karar kartının dili (araç ölçeğinde):
+//  1) durum etiketi (dolgulu, anlamsal) + varsa ikincil bilgi çipi · sağda kısa ad + sembol
+//  2) hüküm cümlesi (Space Grotesk ~21px, kesilmez)
+//  3) fiyat satırı: $212.21 → $339 +60% (çerçevesiz; altında "şimdi / analist hedefi")
+//  4) analist dağılımı: "Analistler: alım yönlü" + ince bar + analist sayısı
+//  5) meta (vade · haber sayısı · yön değişti) — en alta yapışır; kartlar aynı yükseklikte.
+// Renk göstergesi: üst kenarda ince (2px) anlamsal çizgi. Kısa ad: display_name, yoksa ad
+// (iki satıra kadar sarar, asla kesilmez).
 import React from "react";
 import { ArrowRight, Lock } from "lucide-react";
-import { SignalPill, overallSignal, AnimatedNumber, horizonLabel } from "./ui.jsx";
+import { AnimatedNumber, SignalPill, horizonLabel, overallSignal, riskColor } from "./ui.jsx";
+import { Card, Chip, cx } from "./kit.jsx";
 import { tt, fmtPct } from "../i18n.jsx";
 import { C } from "../theme.js";
 
-// Kompakt analist barı — al/tut/sat segmentleri + baskın görüş + analist sayısı.
+export const displayName = (e) => e.display_name || e.name;
+export const symbolOf = (e) => `${e.type === "ticker" ? "$" : "#"}${e.query}`;
+
+// Analist dağılımı (al → sat) ve baskın görüşün TAVSİYE GİBİ OKUNMAYAN etiketi.
 const ANALYST_SEG = [
   { key: "strong_buy", color: C.posStrong },
   { key: "buy", color: C.pos },
@@ -18,159 +24,88 @@ const ANALYST_SEG = [
   { key: "sell", color: C.neg },
   { key: "strong_sell", color: C.negStrong },
 ];
-function analystLean(a) {
+export function analystLean(a) {
   const buyish = a.strong_buy + a.buy;
   const sellish = a.sell + a.strong_sell;
   if (buyish > a.hold && buyish >= sellish) return { text: tt("card.buyLean"), color: C.pos };
   if (sellish > a.hold && sellish > buyish) return { text: tt("card.sellLean"), color: C.neg };
   return { text: tt("card.holdLean"), color: C.neutral };
 }
-function AnalystMiniBar({ a }) {
+
+export function AnalystBar({ a, className = "" }) {
   const total = a.total || 1;
   const lean = analystLean(a);
   return (
-    <div className="flex items-center gap-2 text-[11px]">
+    <div className={cx("flex items-center gap-3 text-micro", className)}>
       <span className="whitespace-nowrap font-medium" style={{ color: lean.color }}>{lean.text}</span>
-      <div className="flex h-1.5 flex-1 overflow-hidden rounded-full bg-ink-700">
+      <div className="flex h-1 flex-1 overflow-hidden rounded-full bg-ink-700" aria-hidden="true">
         {ANALYST_SEG.map((s) => {
           const n = a[s.key] || 0;
-          if (!n) return null;
-          return <div key={s.key} style={{ width: `${(n / total) * 100}%`, background: s.color }} />;
+          return n ? <div key={s.key} style={{ width: `${(n / total) * 100}%`, background: s.color }} /> : null;
         })}
       </div>
-      <span className="whitespace-nowrap text-slate-500">{tt("card.analysts", { n: a.total })}</span>
+      <span className="whitespace-nowrap font-mono tabular-nums text-slate-500">{tt("card.analysts", { n: a.total })}</span>
     </div>
   );
 }
 
-// Özel (borsada işlem görmeyen) şirket bilgi kutusu — fiyat bloğunun yerini alır.
-const PRIVATE_SHELL = "rounded-lg border border-ink-600 bg-ink-900/40 px-3 py-2.5";
-function PrivateCompanyBox() {
+// Fiyat satırı: şimdi → analist hedefi (kart ve detay aynı dil).
+export function PriceRow({ entity, size = "md" }) {
+  const price = entity.price;
+  const chg = entity.change_percent;
+  const target = entity.analyst?.target_mean;
+  const upside = entity.analyst?.upside_percent;
+  if (price == null) return <p className="text-meta text-slate-500">{tt("card.noPrice")} · {tt("card.newsOnly")}</p>;
+  const num = size === "lg" ? "text-title" : "text-body";
   return (
-    <div className={PRIVATE_SHELL}>
-      <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-300">
-        <Lock className="h-3.5 w-3.5 text-slate-500" />
-        {tt("card.private")}
+    <div className="flex items-start gap-3">
+      <div>
+        <div className={cx("flex items-baseline gap-2 font-mono font-semibold tabular-nums text-slate-100", num)}>
+          <AnimatedNumber value={price} decimals={2} prefix="$" />
+          {chg != null && <span className={cx("text-meta font-medium", chg >= 0 ? "text-emerald-600" : "text-rose-600")}>{fmtPct(chg, { digits: 2 })}</span>}
+        </div>
+        <div className="text-micro text-slate-500">{tt("card.now")}</div>
       </div>
-      <div className="mt-1 text-[11px] leading-snug text-slate-500">
-        {tt("card.privateBody")}
-      </div>
-    </div>
-  );
-}
-
-// Özel şirket kartında analist barının yerini alır: en önemli tek etken.
-function TopDriverLine({ text }) {
-  return (
-    <div className="flex items-baseline gap-1.5 text-[11px]">
-      <span className="shrink-0 font-medium text-slate-500">{tt("card.topDriver")}</span>
-      <span className="min-w-0 flex-1 truncate text-slate-400">{text}</span>
-    </div>
-  );
-}
-
-// MOBİL tek satır fiyat: "$338.19 −%0.2 → hedef $338" (detay için karta dokun).
-function CompactPriceLine({ card }) {
-  const price = card.price;
-  const chg = card.change_percent;
-  const target = card.analyst?.target_mean;
-  if (price == null) {
-    return <div className="text-[13px] text-slate-500">{tt("card.noPrice")} · {tt("card.newsOnly")}</div>;
-  }
-  return (
-    <div className="flex flex-wrap items-baseline gap-x-1.5 font-mono text-[13px] tabular-nums text-slate-300">
-      <span className="font-semibold text-slate-100">${price.toFixed(2)}</span>
-      {chg != null && (
-        <span className={chg >= 0 ? "text-emerald-400" : "text-rose-400"}>
-          {fmtPct(chg, { digits: 1 })}
-        </span>
-      )}
       {target != null && (
-        <span className="text-slate-500">
-          → {tt("detail.target")} <span className="font-semibold text-slate-300">${target.toFixed(0)}</span>
-        </span>
+        <>
+          <ArrowRight className={cx("h-4 w-4 shrink-0 text-slate-600", size === "lg" ? "mt-2" : "mt-1")} aria-hidden="true" />
+          <div>
+            <div className={cx("flex items-baseline gap-2 font-mono font-semibold tabular-nums text-slate-100", num)}>
+              ${target.toFixed(0)}
+              {upside != null && <span className={cx("text-meta font-medium", upside >= 0 ? "text-emerald-600" : "text-rose-600")}>{fmtPct(upside)}</span>}
+            </div>
+            <div className="text-micro text-slate-500">{tt("card.analystTarget")}</div>
+          </div>
+        </>
       )}
     </div>
   );
 }
 
-// MOBİL özel şirket tek satırı — fiyat kutusunun yerine kısa not.
-function CompactPrivateLine({ drivers }) {
+function PrivateLine({ drivers }) {
   return (
-    <div className="text-[13px] text-slate-500">
-      {tt("card.privateShort")}
+    <div className="space-y-1.5">
+      <p className="flex items-center gap-1.5 text-meta text-slate-400">
+        <Lock className="h-3.5 w-3.5 text-slate-500" aria-hidden="true" />
+        {tt("card.privateShort")}
+      </p>
       {drivers?.[0] && (
-        <span className="mt-0.5 block truncate text-slate-400">{tt("card.topDriver")} {drivers[0]}</span>
+        <p className="text-micro text-slate-500">
+          <span className="font-medium">{tt("card.topDriver")}</span> <span className="text-slate-400">{drivers[0]}</span>
+        </p>
       )}
     </div>
   );
 }
 
-function PriceBox({ card }) {
-  const price = card.price;
-  const target = card.analyst?.target_mean;
-  const upside = card.analyst?.upside_percent;
-
-  // Ortak kutu kabuğu — tüm kartlarda aynı yükseklik.
-  const shell = "rounded-lg border border-ink-600 bg-ink-900/40 px-3 py-2.5";
-
-  // Ticker ama fiyat yok: aynı kutu, ortalanmış açıklama.
-  if (price == null) {
-    return (
-      <div className={`${shell} text-center`}>
-        <div className="text-sm text-slate-400">{tt("card.noPrice")}</div>
-        <div className="mt-0.5 text-[10px] text-slate-500">{tt("card.newsOnly")}</div>
-      </div>
-    );
-  }
-
-  return (
-    <div className={shell}>
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0 flex-1 text-center">
-          <div className="font-mono text-base font-semibold tabular-nums text-slate-100">
-            <AnimatedNumber value={price} decimals={2} prefix="$" />
-          </div>
-          <div className="text-[10px] text-slate-500">{tt("card.now")}</div>
-        </div>
-        <ArrowRight className="h-4 w-4 shrink-0 text-slate-500" />
-        <div className="min-w-0 flex-1 text-center">
-          <div className="font-mono text-base font-semibold tabular-nums text-slate-100">
-            {target != null ? (
-              <>
-                ${target.toFixed(0)}
-                {upside != null && (
-                  <span className={`ml-1 ${upside >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                    {fmtPct(upside)}
-                  </span>
-                )}
-              </>
-            ) : (
-              <span className="text-slate-500">—</span>
-            )}
-          </div>
-          <div className="text-[10px] text-slate-500">
-            {target != null ? tt("card.analystTarget") : tt("card.noTarget")}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export default function EntityCard({ card, onOpen, big = false }) {
+export default function EntityCard({ card, onOpen }) {
   const a = card.analysis;
-  // Sol şerit rengi: analiz varsa duruma göre (5 durum + nötr gri); YOKSA açık gri.
-  // ASLA koyu/siyah — eski koyu fallback kağıt temada siyah görünüyordu.
-  const stripColor = a ? overallSignal(a.stance, card.evidence_strength).color : C.subtle;
+  const edge = a ? overallSignal(a.stance, card.evidence_strength).color : C.subtle;
   const changed = a && card.delta?.stance_changed;
-
-  function open() {
-    onOpen(card.id);
-  }
-
+  const open = () => onOpen(card.id);
   return (
-    <div
+    <Card
+      interactive
       role="button"
       tabIndex={0}
       onClick={open}
@@ -180,115 +115,72 @@ export default function EntityCard({ card, onOpen, big = false }) {
           open();
         }
       }}
-      className={`group relative flex h-full cursor-pointer flex-col gap-3 overflow-hidden rounded-xl border bg-ink-800 text-left shadow-card transition duration-200 hover:-translate-y-0.5 hover:shadow-card-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 md:gap-4 ${
-        big ? "border-ink-500 p-4 pl-5 md:p-6 md:pl-7" : "border-ink-600 p-4 pl-5 hover:border-accent/60 md:p-5 md:pl-6"
-      }`}
+      className="relative flex h-full flex-col gap-4 overflow-hidden p-5 text-left md:p-6"
     >
-      {/* Sol kenar durum şeridi (pill rengiyle aynı; Katman 1'de daha kalın) */}
-      <span className={`absolute inset-y-0 left-0 ${big ? "w-2" : "w-1.5"}`} style={{ background: stripColor }} />
+      <span className="absolute inset-x-0 top-0 h-0.5" style={{ background: edge }} aria-hidden="true" />
 
-      {/* Satır 1 — Durum pill (sol) + ad/ticker (sağ, tek satır) */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          {a ? (
-            <SignalPill stance={a.stance} evidence={card.evidence_strength} />
-          ) : (
-            <span className="inline-flex items-center rounded-full bg-ink-700 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">
-              {tt("card.noAnalysis")}
-            </span>
-          )}
-          {/* Katman 1 nedeni — neden "bugün önemli" (mobilde gizli: sadeleştirme) */}
-          {big && card.priority_reason && (
-            <span className="hidden items-center rounded-full bg-accent/15 px-2.5 py-1 text-[11px] font-semibold text-accent md:inline-flex">
-              {tt(`pr.${card.priority_reason}`)}
-            </span>
-          )}
+          {a ? <SignalPill stance={a.stance} evidence={card.evidence_strength} /> : <Chip tone="muted">{tt("card.noAnalysis")}</Chip>}
+          {card.priority_reason && <Chip tone="neutral">{tt(`pr.${card.priority_reason}`)}</Chip>}
         </div>
-        <div className="min-w-0 text-right">
-          <div className={`truncate font-display font-semibold text-slate-100 ${big ? "text-lg" : "text-base"}`}>{card.name}</div>
-          <div className="font-mono text-[11px] text-slate-500">
-            {card.type === "ticker" ? "$" : "#"}{card.query}
-          </div>
+        <div className="min-w-0 basis-2/5 text-right">
+          <div className="break-words font-display text-base font-semibold leading-tight text-slate-100">{displayName(card)}</div>
+          <div className="mt-1 font-mono text-micro text-slate-500">{symbolOf(card)}</div>
         </div>
       </div>
 
       {a ? (
         <>
-          {/* Satır 2 — Hüküm cümlesi (SERİF, editöryel; TAM, kesme yok; mobilde
-              biraz küçük punto ama okunaklı satır aralığı) */}
-          <p className={`font-display font-semibold leading-snug text-slate-100 ${big ? "text-[19px] md:text-[23px]" : "text-[17px] md:text-[19px]"}`}>
-            {a.headline_verdict || a.summary}
-          </p>
-
-          {/* Alta yapışan blok — MOBİLDE tek satır (sadeleştirme), MASAÜSTÜNDE tam. */}
-          <div className="mt-auto">
-            {/* MOBİL: yalnızca tek satır fiyat / özel-şirket notu */}
-            <div className="md:hidden">
-              {card.type === "ticker" ? (
-                <CompactPriceLine card={card} />
-              ) : (
-                <CompactPrivateLine drivers={a.top_drivers} />
-              )}
-            </div>
-
-            {/* MASAÜSTÜ: fiyat kutusu + analist barı + meta satırı */}
-            <div className="hidden space-y-2.5 md:block">
-              {card.type === "ticker" ? (
-                <>
-                  <PriceBox card={card} />
-                  {card.analyst?.total > 0 && <AnalystMiniBar a={card.analyst} />}
-                </>
-              ) : (
-                <>
-                  <PrivateCompanyBox />
-                  {a.top_drivers?.[0] && <TopDriverLine text={a.top_drivers[0]} />}
-                </>
-              )}
-              <div className="text-xs text-slate-500">
-                {tt("card.horizon", { h: horizonLabel(card.horizon) })}
-                <span className="text-slate-600"> · </span>
-                {tt("card.newsCount", { n: card.evidence_count })}
-                {changed && <span className="text-amber-400"> · {tt("card.stanceChanged")}</span>}
-              </div>
-            </div>
+          <p className="font-display text-title font-medium text-slate-100">{a.headline_verdict || a.summary}</p>
+          <div className="mt-auto space-y-3">
+            {card.type === "ticker" ? (
+              <>
+                <PriceRow entity={card} />
+                {card.analyst?.total > 0 && <AnalystBar a={card.analyst} />}
+              </>
+            ) : (
+              <PrivateLine drivers={a.top_drivers} />
+            )}
+            <p className="text-micro text-slate-500">
+              {tt("card.horizon", { h: horizonLabel(card.horizon) })} · {tt("card.newsCount", { n: card.evidence_count })}
+              {changed && <span className="text-amber-600"> · {tt("card.stanceChanged")}</span>}
+            </p>
           </div>
         </>
       ) : (
-        <div className="mt-auto text-sm text-slate-400">
-          {tt("card.pressRefresh", { refresh: tt("header.refresh") })}
-        </div>
+        <p className="mt-auto text-body text-slate-400">{tt("card.pressRefresh", { refresh: tt("header.refresh") })}</p>
       )}
-    </div>
+    </Card>
   );
 }
 
-// Katman 2 — sıkışık tek satır (~48px). Sol şerit + ad + ticker + hüküm (kısaltılmış) + risk.
+// Liste satırı: ince renk göstergesi · kısa ad · sembol · tek satır değerlendirme (tooltip'te
+// tamamı) · sağda risk skoru (mono) ve varsa "yön değişti". Çizgi yerine boşluk + hover yüzeyi.
+// Mobilde değerlendirme adın altına iner (iki satıra kadar).
 export function EntityRow({ card, onOpen }) {
   const a = card.analysis;
-  const stripColor = a ? overallSignal(a.stance, card.evidence_strength).color : C.subtle;
+  const edge = a ? overallSignal(a.stance, card.evidence_strength).color : C.subtle;
   const changed = a && card.delta?.stance_changed;
+  const verdict = a ? a.headline_verdict || a.summary : tt("card.noAnalysisYet");
   return (
     <button
+      type="button"
       onClick={() => onOpen(card.id)}
-      className="group flex min-h-[44px] w-full items-center gap-3 overflow-hidden rounded-lg border border-ink-600 bg-ink-800 py-2 pl-0 pr-3 text-left transition hover:border-accent/50 hover:-translate-y-px hover:shadow-card"
+      title={verdict}
+      className="group flex w-full items-center gap-3 rounded-control px-3 py-3 text-left transition-colors duration-hover ease-std hover:bg-ink-800"
     >
-      <span className="w-1.5 shrink-0 self-stretch rounded-r" style={{ background: stripColor }} />
-      <span className="w-28 shrink-0 truncate font-display text-sm font-semibold text-slate-100 sm:w-32">
-        {card.name}
+      <span className="h-9 w-0.5 shrink-0 self-center rounded-full" style={{ background: edge }} aria-hidden="true" />
+      <span className="min-w-0 flex-1 md:flex md:items-center md:gap-4">
+        <span className="flex items-baseline gap-2 md:w-56 md:shrink-0">
+          <span className="break-words font-display text-sm font-semibold text-slate-100">{displayName(card)}</span>
+          <span className="shrink-0 font-mono text-micro text-slate-500">{symbolOf(card)}</span>
+        </span>
+        <span className="mt-0.5 line-clamp-2 text-meta text-slate-400 md:mt-0 md:line-clamp-1 md:flex-1">{verdict}</span>
       </span>
-      <span className="hidden w-14 shrink-0 truncate font-mono text-[11px] text-slate-500 sm:block">
-        {card.type === "ticker" ? "$" : "#"}{card.query}
-      </span>
-      <span className="min-w-0 flex-1 truncate text-[13px] text-slate-400">
-        {a ? a.headline_verdict || a.summary : tt("card.noAnalysisYet")}
-      </span>
-      {changed && <span className="hidden shrink-0 text-[11px] font-medium text-amber-400 md:inline">{tt("card.stanceChanged")}</span>}
+      {changed && <span className="hidden shrink-0 text-micro font-medium text-amber-600 md:inline">{tt("card.stanceChanged")}</span>}
       {a && (
-        <span
-          className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums"
-          style={{ background: `${stripColor}22`, color: stripColor }}
-          title="Risk skoru"
-        >
+        <span className="w-8 shrink-0 text-right font-mono text-meta font-semibold tabular-nums" style={{ color: riskColor(a.risk_score) }} title={tt("sum.riskLabel")}>
           {a.risk_score}
         </span>
       )}

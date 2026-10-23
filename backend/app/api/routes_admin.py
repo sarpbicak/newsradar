@@ -119,12 +119,12 @@ def user_detail(user_id: int, db: Session = Depends(get_db)) -> AdminUserDetail:
 
     # Kullanıcının izleme listesi (kim neyi takip ediyor).
     wl_rows = db.execute(
-        select(Entity.name, Entity.type, Entity.query)
+        select(Entity.name, Entity.display_name, Entity.type, Entity.query)
         .join(UserWatchlist, UserWatchlist.entity_id == Entity.id)
         .where(UserWatchlist.user_id == user_id)
         .order_by(UserWatchlist.added_at)
     ).all()
-    watchlist = [{"name": n, "type": t, "query": q} for n, t, q in wl_rows]
+    watchlist = [{"name": n, "display_name": dn, "type": t, "query": q} for n, dn, t, q in wl_rows]
 
     return AdminUserDetail(
         user=UserOut(
@@ -226,13 +226,15 @@ def stats(db: Session = Depends(get_db)) -> AdminStatsOut:
 
     # En çok takip edilen şirketler (kaç kullanıcının watchlist'inde) + toplam benzersiz.
     followed = db.execute(
-        select(Entity.name, Entity.type, func.count(UserWatchlist.user_id).label("followers"))
+        select(Entity.name, Entity.display_name, Entity.type,
+               func.count(UserWatchlist.user_id).label("followers"))
         .join(UserWatchlist, UserWatchlist.entity_id == Entity.id)
         .group_by(Entity.id)
         .order_by(func.count(UserWatchlist.user_id).desc())
         .limit(10)
     ).all()
-    most_followed = [{"name": n, "type": t, "followers": f} for n, t, f in followed]
+    most_followed = [{"name": n, "display_name": dn, "type": t, "followers": f}
+                     for n, dn, t, f in followed]
     total_entities = db.scalar(
         select(func.count(func.distinct(UserWatchlist.entity_id)))
     ) or 0
