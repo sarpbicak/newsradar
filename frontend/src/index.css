@@ -51,6 +51,14 @@
   --brush-fill: 250 248 244;    /* #FAF8F4 */
   --shadow-card: 0 1px 3px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.04);
   --shadow-card-hover: 0 2px 6px rgb(0 0 0 / 0.06), 0 14px 32px rgb(var(--accent) / 0.10);
+  /* Landing ("/"): tek vurgu = sinyal yeşili (radar). --signal: dolgu/ışıma/çizgi;
+     --signal-ink: metin olarak (AA); --signal-fg / --signal-ink-fg: üstündeki metin.
+     --night: landing zemini (açık temada kağıt, koyuda neredeyse siyah, sıcak). */
+  --signal: 163 230 53;       /* #A3E635 */
+  --signal-ink: 63 98 18;     /* #3F6212 */
+  --signal-fg: 26 46 5;       /* #1A2E05 */
+  --signal-ink-fg: 255 255 255; /* #FFFFFF */
+  --night: 247 245 241;       /* #F7F5F1 */
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -83,6 +91,11 @@
   --brush-fill: 34 34 31;    /* #22221F */
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.45), 0 8px 24px rgb(0 0 0 / 0.30);
   --shadow-card-hover: 0 2px 6px rgb(0 0 0 / 0.50), 0 14px 32px rgb(var(--accent) / 0.12);
+  --signal: 190 242 100;      /* #BEF264 */
+  --signal-ink: 190 242 100;  /* #BEF264 */
+  --signal-fg: 20 26 8;       /* #141A08 */
+  --signal-ink-fg: 20 26 8;   /* #141A08 */
+  --night: 13 13 11;          /* #0D0D0B */
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
@@ -116,6 +129,11 @@
     --brush-fill: 34 34 31;    /* #22221F */
     --shadow-card: 0 1px 2px rgb(0 0 0 / 0.45), 0 8px 24px rgb(0 0 0 / 0.30);
     --shadow-card-hover: 0 2px 6px rgb(0 0 0 / 0.50), 0 14px 32px rgb(var(--accent) / 0.12);
+    --signal: 190 242 100;      /* #BEF264 */
+    --signal-ink: 190 242 100;  /* #BEF264 */
+    --signal-fg: 20 26 8;       /* #141A08 */
+    --signal-ink-fg: 20 26 8;   /* #141A08 */
+    --night: 13 13 11;          /* #0D0D0B */
   }
 }
 
@@ -280,6 +298,161 @@ body {
 @keyframes skel {
   0% { background-position: 100% 50%; }
   100% { background-position: 0 50%; }
+}
+
+/* ── LANDING ("/") — görsel sistem + hareket ────────────────────────────────
+   Eğri ve süreler motion.js'ten gelir: Landing kökü --lx-* değişkenlerini satır içi koyar.
+   Kaydırmaya bağlı (scrub) hareketi GSAP yazar — yalnızca transform/opacity, satır içi stil.
+   Burada: bir kez oynayan hero açılışı, sakin iki döngü (radar taraması, akan başlıklar),
+   hover/durum geçişleri. prefers-reduced-motion'da hepsi kapalı (bloğun sonu). */
+html.lx-page body { background-color: rgb(var(--night)); }
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+.lenis.lenis-stopped { overflow: hidden; }
+
+.lx {
+  /* Landing'de TEK vurgu: uygulama parçaları (sahneler, dil/tema menüsü) da sinyal yeşilini alır. */
+  --accent: var(--signal-ink);
+  --accent-hover: var(--signal-ink);
+  --accent-fg: var(--signal-ink-fg);
+  position: relative;
+  isolation: isolate;
+  background-color: rgb(var(--night));
+  color: rgb(var(--slate-100));
+}
+/* Gren: sabit katman, içeriğin ARKASINDA (metin kontrastına dokunmaz), kaydırmada yeniden boyanmaz. */
+.lx-grain {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+  opacity: 0.06;
+}
+:root[data-theme="light"] .lx-grain { opacity: 0.045; }
+
+/* Tipografi: başlık Space Grotesk (akışkan, sıkı), metin Inter 18–20px, rakam JetBrains Mono. */
+.lx-display {
+  font-family: "Space Grotesk", Inter, system-ui, sans-serif;
+  font-weight: 600;
+  line-height: 0.95;
+  letter-spacing: -0.035em;
+}
+.lx-h1 { font-size: clamp(3.25rem, 1rem + 6.2vw, 8rem); }
+.lx-h2 { font-size: clamp(2.5rem, 1.25rem + 3.6vw, 4.5rem); }
+.lx-mega { font-size: clamp(2.25rem, 0.75rem + 5vw, 5.5rem); line-height: 1.04; }
+.lx-body { font-size: clamp(1.125rem, 1.05rem + 0.3vw, 1.25rem); line-height: 1.6; }
+.lx-num {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+}
+/* Maskeli satır: iç span aşağıdan çıkar. Pay: Türkçe aksanlar ve alt uzantılar kırpılmasın. */
+.lx-line {
+  display: block;
+  overflow: hidden;
+  padding: 0.1em 0 0.14em;
+  margin: -0.1em 0 -0.14em;
+}
+.lx-line > span { display: block; }
+.lx-clip-x { overflow-x: clip; }
+
+/* Hero açılışı — sayfa başına BİR KEZ (toplam ≤ 1.5 s, sabitler motion.js'te). */
+@keyframes lx-rise { from { transform: translate3d(0, 110%, 0); } }
+@keyframes lx-up { from { opacity: 0; transform: translate3d(0, 20px, 0); } }
+.lx-intro-line {
+  animation: lx-rise var(--lx-dur-intro) var(--lx-ease) both;
+  animation-delay: calc(var(--i, 0) * var(--lx-stagger));
+}
+.lx-intro-up {
+  animation: lx-up var(--lx-dur-intro) var(--lx-ease) both;
+  animation-delay: var(--at, 0s);
+}
+
+/* Radar: soluk halkalar + yavaşça dönen tarama. Hero ekran dışındayken durur (.lx-paused). */
+.lx-sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: conic-gradient(from 0deg, transparent 0turn 0.8turn, rgb(var(--signal-ink) / 0.16) 1turn);
+  animation: lx-spin 16s linear infinite;
+}
+@keyframes lx-spin { to { transform: rotate(1turn); } }
+.lx-flow { animation: lx-flow 42s linear infinite; }
+@keyframes lx-flow { to { transform: translate3d(0, -50%, 0); } }
+.lx-paused .lx-sweep,
+.lx-paused .lx-flow,
+.lx-paused .lx-cue-dot { animation-play-state: paused; }
+.lx-fade-y {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 16%, #000 84%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 16%, #000 84%, transparent);
+}
+.lx-cue-dot { animation: lx-cue 2.4s var(--lx-ease) infinite; }
+@keyframes lx-cue {
+  0% { transform: translate3d(0, 0, 0); opacity: 0; }
+  25% { opacity: 1; }
+  100% { transform: translate3d(0, 26px, 0); opacity: 0; }
+}
+
+/* Hover: kısa, tatmin edici (süre/eğri motion.js). */
+.lx-btn {
+  transition: transform var(--lx-dur-hover) var(--lx-ease), box-shadow var(--lx-dur-hover) var(--lx-ease),
+    filter var(--lx-dur-hover) var(--lx-ease);
+}
+.lx-btn:hover { transform: translate3d(0, -2px, 0); box-shadow: 0 12px 32px -12px rgb(var(--signal) / 0.7); filter: brightness(1.04); }
+.lx-btn:active { transform: none; }
+.lx-link { position: relative; }
+.lx-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3px;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform var(--lx-dur-hover) var(--lx-ease);
+}
+.lx-link:hover::after,
+.lx-link:focus-visible::after { transform: scaleX(1); transform-origin: left; }
+.lx-arrow { display: inline-block; transition: transform var(--lx-dur-hover) var(--lx-ease); }
+.lx-link:hover .lx-arrow { transform: translate3d(0, 3px, 0); }
+
+/* Nav: en üstte saydam; kaydırınca yarı saydam + bulanık zemin. */
+.lx-nav {
+  border-bottom: 1px solid transparent;
+  transition: background-color var(--lx-dur-state) var(--lx-ease), border-color var(--lx-dur-state) var(--lx-ease);
+}
+.lx-nav[data-scrolled="true"] {
+  background-color: rgb(var(--night) / 0.72);
+  border-bottom-color: rgb(var(--slate-100) / 0.08);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+}
+
+/* Uygulama penceresi (nasıl çalışır): yumuşak gölge + kenarda çok hafif sinyal ışıması. */
+.lx-window {
+  box-shadow: 0 0 0 1px rgb(var(--signal-ink) / 0.16), 0 40px 90px -36px rgb(0 0 0 / 0.65),
+    0 0 90px -30px rgb(var(--signal) / 0.32);
+}
+:root[data-theme="light"] .lx-window {
+  box-shadow: 0 0 0 1px rgb(var(--signal-ink) / 0.18), 0 30px 70px -34px rgb(0 0 0 / 0.22),
+    0 0 80px -34px rgb(var(--signal) / 0.45);
+}
+/* Adım durumu: soluk ↔ tam renk. Soluk hal de AA (slate-600), yalnızca renk geçişi. */
+.lx-step { color: rgb(var(--slate-600)); transition: color var(--lx-dur-state) var(--lx-ease); }
+.lx-step[data-active="true"] { color: rgb(var(--slate-100)); }
+.lx-step[data-active="true"] .lx-step-num { color: rgb(var(--signal-ink)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .lx-intro-line,
+  .lx-intro-up,
+  .lx-sweep,
+  .lx-flow,
+  .lx-cue-dot { animation: none !important; }
+  .lx-btn:hover { transform: none; }
 }
 
 /* iOS SAFARI ODAK-ZOOM'U: font-size < 16px olan input/textarea/select'e

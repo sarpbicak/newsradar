@@ -6,6 +6,7 @@
 //  - slate-* = metin. DİKKAT: ölçek TERS — küçük numara = KOYU/önemli metin (açık temada),
 //    büyük numara = soluk. Koyu temada da aynı anlam: 100 = en belirgin metin.
 //  - accent  = vurgu (açıkta koyu lacivert, koyuda açık lacivert); accent-fg = vurgu üstü metin.
+//  - signal/signal-ink/signal-fg/night = yalnızca landing ("/"): tek vurgu ve zemin.
 //  - emerald/rose/amber/sky = sinyal tonları (pos/neg/warn/info); 500-600 "güçlü" tonlar.
 const v = (name) => `rgb(var(--${name}) / <alpha-value>)`;
 export default {
@@ -18,6 +19,11 @@ export default {
         "accent-hover": v("accent-hover"),
         "accent-fg": v("accent-fg"),
         "on-strong": v("on-strong"),
+        // Landing: tek vurgu (sinyal yeşili) + zemin. Ayrıntı: index.css.
+        signal: v("signal"),
+        "signal-ink": v("signal-ink"),
+        "signal-fg": v("signal-fg"),
+        night: v("night"),
         slate: {
           100: v("slate-100"), 200: v("slate-200"), 300: v("slate-300"), 400: v("slate-400"),
           500: v("slate-500"), 600: v("slate-600"), 700: v("slate-700"),
