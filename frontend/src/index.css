@@ -42,8 +42,8 @@
   --slate-500: 110 107 101;     /* #6E6B65 */
   --slate-600: 111 108 102;     /* #6F6C66 */
   --slate-700: 196 192 182;     /* #C4C0B6 */
-  --accent: 63 98 18;        /* #3F6212 — sinyal yeşili, metin olarak (AA) */
-  --accent-hover: 77 124 15;  /* #4D7C0F */
+  --accent: 14 116 144;      /* #0E7490 — camgöbeği, metin olarak (AA: kremde 4.9, beyazda 5.3) */
+  --accent-hover: 21 94 117;  /* #155E75 */
   --accent-fg: 255 255 255;     /* #FFFFFF */
   --pos: 13 116 64;           /* #0D7440 */
   --pos-strong: 10 97 54;    /* #0A6136 */
@@ -59,12 +59,13 @@
   --brush-fill: 250 248 244;    /* #FAF8F4 */
   --shadow-card: 0 1px 3px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.04);
   --shadow-card-hover: 0 2px 6px rgb(0 0 0 / 0.06), 0 14px 32px rgb(var(--accent) / 0.10);
-  /* Landing ("/"): tek vurgu = sinyal yeşili (radar). --signal: dolgu/ışıma/çizgi;
-     --signal-ink: metin olarak (AA); --signal-fg / --signal-ink-fg: üstündeki metin.
+  /* TEK vurgu = camgöbeği (radar). --signal: birincil buton dolgusu; --signal-fg: üstündeki
+     metin (koyu, AA); --signal-ink: metin olarak (= --accent); --glow — ışıma ve ince çizgiler.
      Zemin her yerde --ink-900 (koyu: sıcak, neredeyse siyah; açık: krem). */
-  --signal: 163 230 53;       /* #A3E635 */
-  --signal-ink: 63 98 18;     /* #3F6212 */
-  --signal-fg: 26 46 5;       /* #1A2E05 */
+  --signal: 6 182 212;        /* #06B6D4 — dolgu (üstünde #083344: 5.5:1) */
+  --signal-ink: 14 116 144;   /* #0E7490 */
+  --signal-fg: 8 51 68;       /* #083344 */
+  --glow: 6 182 212;          /* #06B6D4 — ışıma, ince çizgiler */
   --signal-ink-fg: 255 255 255; /* #FFFFFF */
   --raised: 255 255 255;      /* #FFFFFF yükseltilmiş yüzey (modal, panel) */
   --chart-line: 42 42 38;     /* #2A2A26 grafik ana çizgisi (nötr, net) */
@@ -84,9 +85,9 @@
   --slate-500: 160 156 147;     /* #A09C93 */
   --slate-600: 143 139 131;     /* #8F8B83 */
   --slate-700: 94 91 85;     /* #5E5B55 */
-  --accent: 190 242 100;        /* #BEF264 — sinyal yeşili */
-  --accent-hover: 212 248 150;  /* #D4F896 */
-  --accent-fg: 20 26 8;     /* #141A08 */
+  --accent: 34 211 238;         /* #22D3EE — camgöbeği (koyu kartta 9.9:1) */
+  --accent-hover: 103 232 249;  /* #67E8F9 */
+  --accent-fg: 8 51 68;     /* #083344 (7.4:1) */
   --pos: 74 222 128;           /* #4ADE80 */
   --pos-strong: 52 211 153;    /* #34D399 */
   --neg: 248 113 113;           /* #F87171 */
@@ -101,10 +102,11 @@
   --brush-fill: 34 34 31;    /* #22221F */
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.45), 0 8px 24px rgb(0 0 0 / 0.30);
   --shadow-card-hover: 0 2px 6px rgb(0 0 0 / 0.50), 0 14px 32px rgb(var(--accent) / 0.12);
-  --signal: 190 242 100;      /* #BEF264 */
-  --signal-ink: 190 242 100;  /* #BEF264 */
-  --signal-fg: 20 26 8;       /* #141A08 */
-  --signal-ink-fg: 20 26 8;   /* #141A08 */
+  --signal: 34 211 238;       /* #22D3EE */
+  --signal-ink: 34 211 238;   /* #22D3EE */
+  --signal-fg: 8 51 68;       /* #083344 */
+  --signal-ink-fg: 8 51 68;   /* #083344 */
+  --glow: 34 211 238;         /* #22D3EE */
   --raised: 30 30 27;         /* #1E1E1B yükseltilmiş yüzey (modal, panel) */
   --chart-line: 228 225 218;  /* #E4E1DA grafik ana çizgisi (nötr, net) */
   --shadow-raised: 0 2px 8px rgb(0 0 0 / 0.5), 0 24px 60px -12px rgb(0 0 0 / 0.6);
@@ -124,9 +126,9 @@
     --slate-500: 160 156 147;     /* #A09C93 */
     --slate-600: 143 139 131;     /* #8F8B83 */
     --slate-700: 94 91 85;     /* #5E5B55 */
-    --accent: 190 242 100;        /* #BEF264 — sinyal yeşili */
-    --accent-hover: 212 248 150;  /* #D4F896 */
-    --accent-fg: 20 26 8;     /* #141A08 */
+    --accent: 34 211 238;         /* #22D3EE — camgöbeği (koyu kartta 9.9:1) */
+    --accent-hover: 103 232 249;  /* #67E8F9 */
+    --accent-fg: 8 51 68;     /* #083344 (7.4:1) */
     --pos: 74 222 128;           /* #4ADE80 */
     --pos-strong: 52 211 153;    /* #34D399 */
     --neg: 248 113 113;           /* #F87171 */
@@ -141,10 +143,11 @@
     --brush-fill: 34 34 31;    /* #22221F */
     --shadow-card: 0 1px 2px rgb(0 0 0 / 0.45), 0 8px 24px rgb(0 0 0 / 0.30);
     --shadow-card-hover: 0 2px 6px rgb(0 0 0 / 0.50), 0 14px 32px rgb(var(--accent) / 0.12);
-    --signal: 190 242 100;      /* #BEF264 */
-    --signal-ink: 190 242 100;  /* #BEF264 */
-    --signal-fg: 20 26 8;       /* #141A08 */
-    --signal-ink-fg: 20 26 8;   /* #141A08 */
+    --signal: 34 211 238;       /* #22D3EE */
+    --signal-ink: 34 211 238;   /* #22D3EE */
+    --signal-fg: 8 51 68;       /* #083344 */
+    --signal-ink-fg: 8 51 68;   /* #083344 */
+    --glow: 34 211 238;         /* #22D3EE */
     --raised: 30 30 27;         /* #1E1E1B yükseltilmiş yüzey (modal, panel) */
     --chart-line: 228 225 218;  /* #E4E1DA grafik ana çizgisi (nötr, net) */
     --shadow-raised: 0 2px 8px rgb(0 0 0 / 0.5), 0 24px 60px -12px rgb(0 0 0 / 0.6);
@@ -308,8 +311,8 @@ body {
 /* "Yenile"ye dikkat çek (yeni şirket eklendi, analiz yok): kısa, iki kez nabız. */
 .attn { animation: attn 1.2s var(--ease) 2; }
 @keyframes attn {
-  0%, 100% { box-shadow: 0 0 0 0 rgb(var(--signal) / 0); }
-  40% { box-shadow: 0 0 0 6px rgb(var(--signal) / 0.35); }
+  0%, 100% { box-shadow: 0 0 0 0 rgb(var(--glow) / 0); }
+  40% { box-shadow: 0 0 0 6px rgb(var(--glow) / 0.35); }
 }
 /* Header altındaki ince ilerleme çizgisi (içeriği itmez) */
 .nav-progress { transition: transform var(--dur-state) var(--ease); transform-origin: left; }
@@ -484,11 +487,11 @@ html.lenis, html.lenis body { height: auto; }
 /* Uygulama penceresi (nasıl çalışır): yumuşak gölge + kenarda çok hafif sinyal ışıması. */
 .lx-window {
   box-shadow: 0 0 0 1px rgb(var(--signal-ink) / 0.16), 0 40px 90px -36px rgb(0 0 0 / 0.65),
-    0 0 90px -30px rgb(var(--signal) / 0.32);
+    0 0 90px -30px rgb(var(--glow) / 0.32);
 }
 :root[data-theme="light"] .lx-window {
   box-shadow: 0 0 0 1px rgb(var(--signal-ink) / 0.18), 0 30px 70px -34px rgb(0 0 0 / 0.22),
-    0 0 80px -34px rgb(var(--signal) / 0.45);
+    0 0 80px -34px rgb(var(--glow) / 0.45);
 }
 /* Adım durumu: soluk ↔ tam renk. Soluk hal de AA (slate-600), yalnızca renk geçişi. */
 .lx-step { color: rgb(var(--slate-600)); transition: color var(--dur-state) var(--ease); }

@@ -20,8 +20,8 @@ export const LOGO_ELEMENTS = [
 
 // Renk: sitenin vurgu rengi — açık tema --accent, koyu tema --accent (src/index.css ile AYNI;
 // header logosu currentColor ile bu değişkeni izler, favicon statik olduğu için değer burada).
-export const LOGO_COLOR = "#1E3A5F";
-export const LOGO_COLOR_DARK = "#8FB4E3";
+export const LOGO_COLOR = "#0E7490";
+export const LOGO_COLOR_DARK = "#22D3EE";
 // Header'daki çizgi kalınlığı; favicon'da 16px'te okunsun diye daha kalın (şekil aynı).
 export const LOGO_STROKE = 2;
 export const FAVICON_STROKE = 2.75;

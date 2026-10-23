@@ -1,6 +1,6 @@
 // Ortak bileşen kütüphanesi — landing ve uygulama AYNI parçaları kullanır.
 // Renk/ölçek/yarıçap/gölge token'ları: index.css (+ tailwind.config.js), hareket: src/motion.js.
-// İlkeler: az çizgi, az kutu — ayrım yüzey tonu, boşluk ve tipografiyle. Tek vurgu (sinyal yeşili)
+// İlkeler: az çizgi, az kutu — ayrım yüzey tonu, boşluk ve tipografiyle. Tek vurgu (camgöbeği)
 // yalnızca birincil aksiyon ve aktif durumda. Odak halkası global (:focus-visible, index.css).
 // İkon seti: lucide-react, varsayılan çizgi kalınlığı (2).
 import React, { forwardRef, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -12,7 +12,7 @@ import { DUR, EASE_CSS, prefersReducedMotion } from "../motion.js";
 const cx = (...parts) => parts.filter(Boolean).join(" ");
 
 // ── Button ──────────────────────────────────────────────────────────────────────
-// primary: sinyal yeşili dolgulu · secondary: sade, ince kenarlı · ghost: yalnızca metin.
+// primary: camgöbeği dolgulu · secondary: sade, ince kenarlı · ghost: yalnızca metin.
 // iconOnly: kare ikon butonu (aria-label zorunlu). Aynı boyutta aynı yükseklik/yarıçap/hover.
 const BTN_BASE =
   "inline-flex shrink-0 select-none items-center justify-center gap-2 whitespace-nowrap rounded-full font-medium " +

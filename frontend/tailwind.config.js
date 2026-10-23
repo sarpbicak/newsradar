@@ -7,9 +7,9 @@
 //    raised = yükseltilmiş yüzey (modal, panel).
 //  - slate-* = metin. DİKKAT: ölçek TERS — küçük numara = KOYU/önemli metin (açık temada),
 //    büyük numara = soluk. Koyu temada da aynı anlam: 100 = en belirgin metin.
-//  - accent  = TEK vurgu: sinyal yeşili (metin olarak AA tonu); accent-fg = üstündeki metin.
+//  - accent  = TEK vurgu: camgöbeği (metin olarak AA tonu); accent-fg = üstündeki metin.
 //    YALNIZCA birincil aksiyon, aktif durum ve marka anlarında — anlamsal renklerle karışmaz.
-//  - signal / signal-fg = birincil buton dolgusu (canlı yeşil) ve üstündeki metin.
+//  - signal / signal-fg = birincil buton dolgusu (canlı camgöbeği) ve üstündeki metin; glow = ışıma.
 //  - emerald/rose/amber/sky = sinyal tonları (pos/neg/warn/info); 500-600 "güçlü" tonlar.
 const v = (name) => `rgb(var(--${name}) / <alpha-value>)`;
 export default {
@@ -22,10 +22,11 @@ export default {
         "accent-hover": v("accent-hover"),
         "accent-fg": v("accent-fg"),
         "on-strong": v("on-strong"),
-        // Birincil aksiyon dolgusu (canlı sinyal yeşili) + üstündeki metin. Ayrıntı: index.css.
+        // Birincil aksiyon dolgusu (canlı camgöbeği) + üstündeki metin + ışıma. Ayrıntı: index.css.
         signal: v("signal"),
         "signal-ink": v("signal-ink"),
         "signal-fg": v("signal-fg"),
+        glow: v("glow"),
         raised: v("raised"),
         "chart-line": v("chart-line"),
         slate: {
@@ -64,7 +65,7 @@ export default {
         card: "var(--shadow-card)",
         "card-hover": "var(--shadow-card-hover)",
         raised: "var(--shadow-raised)",
-        glow: "0 10px 28px -12px rgb(var(--signal) / 0.7)",
+        glow: "0 10px 28px -12px rgb(var(--glow) / 0.7)",
       },
       keyframes: {
         "card-in": {

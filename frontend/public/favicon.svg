@@ -4,8 +4,8 @@
        sade sürüm: iç yaylar/noktalar (.d) gizli, çizgi 3; dış şekil aynı.
        Açık temada sitenin ana rengi, koyu sekme çubuğunda açık ton. -->
   <style>
-    .r { stroke: #1E3A5F; stroke-width: 2.75; }
-    @media (prefers-color-scheme: dark) { .r { stroke: #8FB4E3; } }
+    .r { stroke: #0E7490; stroke-width: 2.75; }
+    @media (prefers-color-scheme: dark) { .r { stroke: #22D3EE; } }
     @media (max-width: 24px) { .d { display: none; } .r { stroke-width: 3; } }
   </style>
   <g class="r">
