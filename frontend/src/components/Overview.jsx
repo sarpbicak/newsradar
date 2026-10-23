@@ -8,7 +8,7 @@ import { tt } from "../i18n.jsx";
 import EntityCard, { EntityRow } from "./EntityCard.jsx";
 import WatchlistManager from "./WatchlistManager.jsx";
 import SuggestionsSection from "./SuggestionsSection.jsx";
-import { Button, Card, ChipButton, EmptyState, Skeleton, Tabs, cx, useFlip } from "./kit.jsx";
+import { Button, Card, Chip, ChipButton, EmptyState, Skeleton, Tabs, cx, useFlip } from "./kit.jsx";
 
 // "Tıkla-ekle" popüler başlangıç önerileri (boş durum + "birkaç şirket daha" satırı).
 const STARTERS = [
@@ -109,18 +109,20 @@ function MoreStarters({ cards, onCreate }) {
     }
   }
   return (
-    <section className="flex flex-col gap-3 sm:flex-row sm:items-center" aria-labelledby="more-starters-title">
-      <h2 id="more-starters-title" className="shrink-0 text-meta font-medium text-slate-300">
-        {tt("ov.moreTitle")}
-      </h2>
-      <div className="flex flex-1 flex-wrap gap-2">
+    <Card as="section" className="p-5" aria-labelledby="more-starters-title">
+      <div className="flex items-center justify-between gap-3">
+        <h2 id="more-starters-title" className="font-display text-lg font-semibold text-slate-100">
+          {tt("ov.moreTitle")}
+        </h2>
+        <Button variant="ghost" size="sm" iconOnly icon={X} onClick={dismiss} title={tt("ov.moreDismiss")} aria-label={tt("ov.moreDismiss")} className="-mr-2" />
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         {left.map((s) => (
           <StarterChip key={s.query} s={s} onAdd={add} adding={adding} />
         ))}
       </div>
-      <Button variant="ghost" size="sm" iconOnly icon={X} onClick={dismiss} title={tt("ov.moreDismiss")} aria-label={tt("ov.moreDismiss")} className="self-end sm:self-auto" />
-      {err && <p className="text-meta text-rose-600">{err}</p>}
-    </section>
+      {err && <p className="mt-2 text-meta text-rose-600">{err}</p>}
+    </Card>
   );
 }
 
@@ -139,25 +141,79 @@ function SectionTitle({ children, aside }) {
   );
 }
 
-// Katlanabilir bölüm (öneriler, izleme listesi): çerçeve yok, ince üst ayırıcı + başlık butonu.
-function Collapsible({ title, children, openSignal = 0 }) {
-  const [open, setOpen] = useState(false);
+// Katlanabilir bölüm (öneriler, izleme listesi): kapalıyken de bölüm gibi görünür (yüzey tonu +
+// iç boşluk), başlık Space Grotesk ~18px + sayı rozeti + ok. Açık/kapalı durumu bu cihazda saklanır.
+function readOpen(key) {
+  try {
+    return localStorage.getItem(`nr_section_${key}`) === "1";
+  } catch {
+    return false;
+  }
+}
+function Collapsible({ id, title, count, children, openSignal = 0 }) {
+  const [open, setOpenState] = useState(() => readOpen(id));
+  const setOpen = (v) => {
+    setOpenState(v);
+    try {
+      localStorage.setItem(`nr_section_${id}`, v ? "1" : "0");
+    } catch {
+      /* depolama kapalı — yalnızca bu oturumda */
+    }
+  };
   useEffect(() => {
     if (openSignal) setOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openSignal]);
+  const panelId = `section-${id}`;
   return (
-    <section className="border-t border-ink-600">
+    <Card as="section">
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen(!open)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-3 py-4 text-left font-display text-base font-semibold text-slate-200 transition-colors duration-hover ease-std hover:text-slate-100"
+        aria-controls={panelId}
+        className="flex w-full items-center gap-3 rounded-card px-5 py-4 text-left transition-colors duration-hover ease-std hover:bg-ink-700/50"
       >
-        <span>{title}</span>
-        <ChevronRight className={cx("h-4 w-4 text-slate-500 transition-transform duration-hover ease-std", open && "rotate-90")} aria-hidden="true" />
+        <span className="font-display text-lg font-semibold text-slate-100">{title}</span>
+        <Chip tone="neutral" className="font-mono">{count}</Chip>
+        <ChevronRight className={cx("ml-auto h-5 w-5 text-slate-500 transition-transform duration-hover ease-std", open && "rotate-90")} aria-hidden="true" />
       </button>
-      {open && <div className="fade-in pb-6">{children}</div>}
-    </section>
+      {open && (
+        <div id={panelId} className="fade-in px-5 pb-5">
+          {children}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// Misafire kısa, kapatılabilir ipucu: listeyi her cihazda görmek için hesap.
+const HINT_KEY = "nr_hint_account_dismissed";
+function AccountHint({ onAccount }) {
+  const [hidden, setHidden] = useState(() => {
+    try {
+      return localStorage.getItem(HINT_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  if (hidden) return null;
+  function dismiss() {
+    setHidden(true);
+    try {
+      localStorage.setItem(HINT_KEY, "1");
+    } catch {
+      /* yalnızca bu oturumda gizli */
+    }
+  }
+  return (
+    <p className="mt-2 flex flex-wrap items-center gap-x-1 text-meta text-slate-500">
+      <button type="button" onClick={() => onAccount("upgrade")} className="font-medium text-accent underline-offset-2 hover:underline">
+        {tt("ov.hintCreate")}
+      </button>
+      <span>{tt("ov.hintRest")}</span>
+      <Button variant="ghost" size="sm" iconOnly icon={X} onClick={dismiss} aria-label={tt("ov.hintDismiss")} title={tt("ov.hintDismiss")} className="h-7 w-7" />
+    </p>
   );
 }
 
@@ -169,7 +225,7 @@ export function OverviewSkeleton() {
         <Skeleton className="h-8 w-40" />
         <Skeleton className="mt-3 h-4 w-56" />
       </div>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="card-grid">
         {[0, 1, 2].map((i) => (
           <Card key={i} className="space-y-4 p-6">
             <div className="flex justify-between">
@@ -202,6 +258,8 @@ export default function Overview({
   onDismissSuggestion,
   scanning = false,
   onHowItWorks,
+  onAccount,
+  isAnonymous = false,
   focusAdd = 0,
 }) {
   const [sort, setSort] = useState("risk");
@@ -223,7 +281,7 @@ export default function Overview({
   useFlip(listRef, [listRows.map((c) => c.id).join(",")]);
 
   const cardGrid = (
-    <div className={cx("stagger grid gap-4 md:grid-cols-2 xl:grid-cols-3", scanning && "scan-host rounded-card")}>
+    <div data-count={bigCards.length} className={cx("card-grid stagger", scanning && "scan-host rounded-card")}>
       {bigCards.map((c) => (
         <EntityCard key={c.id} card={c} onOpen={onOpen} />
       ))}
@@ -244,6 +302,7 @@ export default function Overview({
       <header>
         <h1 className="font-display text-page font-semibold text-slate-100">{tt("ov.title")}</h1>
         {cards.length > 0 && <p className="mt-1.5 text-meta text-slate-500">{tt("ov.count", { n: cards.length })}</p>}
+        {isAnonymous && onAccount && <AccountHint onAccount={onAccount} />}
       </header>
 
       <MoreStarters cards={cards} onCreate={onCreate} />
@@ -283,13 +342,13 @@ export default function Overview({
         </>
       )}
 
-      <div>
+      <div className="space-y-4">
         {suggestions.length > 0 && (
-          <Collapsible title={tt("ov.suggestions", { n: suggestions.length })}>
+          <Collapsible id="suggestions" title={tt("ov.suggestionsTitle")} count={suggestions.length}>
             <SuggestionsSection suggestions={suggestions} onAdd={onAddSuggestion} onDismiss={onDismissSuggestion} embedded />
           </Collapsible>
         )}
-        <Collapsible title={tt("ov.watchlist", { n: cards.length })} openSignal={focusAdd}>
+        <Collapsible id="watchlist" title={tt("ov.watchlistTitle")} count={cards.length} openSignal={focusAdd}>
           <WatchlistManager cards={cards} onCreate={onCreate} onDelete={onDelete} embedded focusSignal={focusAdd} />
         </Collapsible>
       </div>

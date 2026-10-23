@@ -312,6 +312,25 @@ body {
 /* Header altındaki ince ilerleme çizgisi (içeriği itmez) */
 .nav-progress { transition: transform var(--dur-state) var(--ease); transform-origin: left; }
 
+/* Pano kart ızgarası: kart sayısına uyar — boş sütun kalmaz, en fazla 3 sütun.
+   min(100%, …): dar ekranda tek sütun · max(18rem, üçte bir): geniş ekranda 3'ü aşmaz.
+   Tek kart tam genişlikte ama okunur bir üst sınırla (720px). */
+.card-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, max(18rem, calc((100% - 2rem) / 3))), 1fr));
+}
+.card-grid[data-count="1"] { max-width: 720px; }
+
+/* Kart başlığı: durum etiketi ve ikincil çip HER kartta tek satır. Kart daralınca ikincil çip
+   küçük ikon + açıklamaya döner (container query) — içeriğin başladığı hiza hiç değişmez. */
+.card-cq { container-type: inline-size; }
+.chip-compact { display: none; }
+@container (max-width: 23rem) {
+  .chip-full { display: none; }
+  .chip-compact { display: inline-flex; }
+}
+
 /* Dokunmatik ekranlarda en az 44px dokunma alanı (Button: tap / tap-sq). */
 @media (pointer: coarse) {
   .tap { min-height: 44px; }

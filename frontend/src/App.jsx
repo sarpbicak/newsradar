@@ -493,6 +493,8 @@ export default function App({ setLang }) {
             onDismissSuggestion={handleDismissSuggestion}
             scanning={isRefreshing}
             onHowItWorks={() => setShowHow(true)}
+            onAccount={setAccount}
+            isAnonymous={!!user?.is_anonymous}
             focusAdd={focusAdd}
           />
         ) : (

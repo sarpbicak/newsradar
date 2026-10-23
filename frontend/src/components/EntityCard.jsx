@@ -7,7 +7,7 @@
 // Renk göstergesi: üst kenarda ince (2px) anlamsal çizgi. Kısa ad: display_name, yoksa ad
 // (iki satıra kadar sarar, asla kesilmez).
 import React from "react";
-import { ArrowRight, Lock } from "lucide-react";
+import { Activity, ArrowLeftRight, ArrowRight, Compass, GitFork, Lock, TrendingUp, Zap } from "lucide-react";
 import { AnimatedNumber, SignalPill, horizonLabel, overallSignal, riskColor } from "./ui.jsx";
 import { Card, Chip, cx } from "./kit.jsx";
 import { tt, fmtPct } from "../i18n.jsx";
@@ -100,6 +100,22 @@ function PrivateLine({ drivers }) {
   );
 }
 
+// "Bugün önemli" nedeni (sert hareket, risk sıçraması…): genişte çip, darda ikon + açıklama.
+const PRIORITY_ICON = { stance_reversed: ArrowLeftRight, stance_clarified: Compass, risk_jump: TrendingUp, sharp_move: Activity, divergence: GitFork };
+function PriorityChip({ reason }) {
+  const label = tt(`pr.${reason}`);
+  const Icon = PRIORITY_ICON[reason] || Zap;
+  return (
+    <>
+      <Chip tone="neutral" className="chip-full">{label}</Chip>
+      <span className="chip-compact h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ink-700 text-slate-300" title={label}>
+        <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+        <span className="sr-only">{label}</span>
+      </span>
+    </>
+  );
+}
+
 export default function EntityCard({ card, onOpen }) {
   const a = card.analysis;
   const edge = a ? overallSignal(a.stance, card.evidence_strength).color : C.subtle;
@@ -117,14 +133,15 @@ export default function EntityCard({ card, onOpen }) {
           open();
         }
       }}
-      className="relative flex h-full flex-col gap-4 overflow-hidden p-5 text-left md:p-6"
+      className="card-cq relative flex h-full flex-col gap-4 overflow-hidden p-5 text-left md:p-6"
     >
       <span className="absolute inset-x-0 top-0 h-0.5" style={{ background: edge }} aria-hidden="true" />
 
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
+      {/* Başlık: sabit en az yükseklik (iki satırlık ad + sembol) → hüküm her kartta aynı hizada. */}
+      <div className="flex min-h-14 items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-nowrap items-center gap-2">
           {a ? <SignalPill stance={a.stance} evidence={card.evidence_strength} /> : <Chip tone="muted">{tt(card.analysis_missing_language ? "card.langMissingShort" : "card.noAnalysis")}</Chip>}
-          {card.priority_reason && <Chip tone="neutral">{tt(`pr.${card.priority_reason}`)}</Chip>}
+          {card.priority_reason && <PriorityChip reason={card.priority_reason} />}
         </div>
         <div className="min-w-0 basis-2/5 text-right">
           <div className="break-words font-display text-base font-semibold leading-tight text-slate-100">{displayName(card)}</div>

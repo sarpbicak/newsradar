@@ -75,7 +75,7 @@ export const ChipButton = forwardRef(function ChipButton({ icon: Icon, className
       ref={ref}
       type={type || "button"}
       className={cx(
-        "tap inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-left text-meta font-medium text-slate-200 ring-1 ring-inset ring-ink-500",
+        "tap inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 py-1.5 text-left text-meta font-medium text-slate-200 ring-1 ring-inset ring-ink-500",
         "transition duration-hover ease-std hover:bg-ink-700 hover:text-slate-100 disabled:opacity-50",
         className
       )}
