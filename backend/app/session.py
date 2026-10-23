@@ -58,10 +58,19 @@ class AnonCreateLimiter:
     kullanıcı' üretilmesin). BELLEK-İÇİ + EPHEMERAL — IP kalıcı SAKLANMAZ (GDPR).
     Süreç yeniden başlarsa sıfırlanır (anti-abuse için yeterli)."""
 
-    def __init__(self, per_hour: int = 10) -> None:
-        self.per_hour = per_hour
+    def __init__(self, per_hour: int | None = None) -> None:
+        # None → NEWSRADAR_ANON_SESSIONS_PER_IP_HOUR (varsayılan 10; 0 = sınırsız). Her
+        # kontrolde ayardan okunur: modül import edilirken değer dondurulmaz.
+        self._per_hour = per_hour
         self._lock = threading.Lock()
         self._hits: dict[str, list[float]] = {}
+
+    @property
+    def per_hour(self) -> int:
+        if self._per_hour is not None:
+            return self._per_hour
+        from .config import get_settings
+        return get_settings().anon_sessions_per_ip_hour
 
     def allow(self, ip: str) -> bool:
         if self.per_hour <= 0:
