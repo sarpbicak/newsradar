@@ -55,7 +55,7 @@ export default function Manifesto() {
 
   return (
     <section ref={ref} className="relative" style={pinned ? { height: "260vh" } : undefined}>
-      <div className={pinned ? "sticky top-0 flex h-screen items-center" : "py-32"}>
+      <div className={pinned ? "sticky top-0 flex h-svh items-center" : "py-32"}>
         <p className="lx-display lx-mega mx-auto w-full max-w-[1360px] px-5 text-slate-100 sm:px-8 lg:px-10">
           {words.map(({ w, accent }, i) => (
             <React.Fragment key={i}>

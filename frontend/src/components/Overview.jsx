@@ -66,7 +66,7 @@ function Empty({ onCreate, onHowItWorks }) {
           {onHowItWorks && (
             <>
               {" · "}
-              <button type="button" onClick={onHowItWorks} className="font-medium text-accent underline-offset-2 hover:underline">
+              <button type="button" onClick={onHowItWorks} className="-mx-1 -my-3.5 inline-block px-1 py-3.5 font-medium text-accent underline-offset-2 hover:underline">
                 {tt("hiw.link")}
               </button>
             </>
@@ -208,7 +208,7 @@ function AccountHint({ onAccount }) {
   }
   return (
     <p className="mt-2 flex flex-wrap items-center gap-x-1 text-meta text-slate-500">
-      <button type="button" onClick={() => onAccount("upgrade")} className="font-medium text-accent underline-offset-2 hover:underline">
+      <button type="button" onClick={() => onAccount("upgrade")} className="-mx-1 -my-3.5 inline-block px-1 py-3.5 font-medium text-accent underline-offset-2 hover:underline">
         {tt("ov.hintCreate")}
       </button>
       <span>{tt("ov.hintRest")}</span>

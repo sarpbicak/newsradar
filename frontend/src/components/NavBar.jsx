@@ -38,7 +38,7 @@ export function NavLink({ href, onClick, className = "", children }) {
     <a
       href={href}
       onClick={onClick}
-      className={`link-u nav-text hidden h-10 items-center px-1 text-slate-300 transition-colors duration-hover ease-std hover:text-slate-100 md:inline-flex ${className}`}
+      className={`link-u nav-text tap hidden h-10 items-center px-1 text-slate-300 transition-colors duration-hover ease-std hover:text-slate-100 md:inline-flex ${className}`}
     >
       {children}
     </a>

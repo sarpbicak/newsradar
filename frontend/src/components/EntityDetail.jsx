@@ -203,7 +203,7 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
       {/* ---- ASK AI ---- */}
       {a && isDesktop && chatOpen && (
         <aside className="sticky top-24">
-          <ChatPanel entityId={entity.id} entityName={name} suggestions={suggestions} onClose={() => toggleChat(false)} className="h-[calc(100vh-8rem)]" />
+          <ChatPanel entityId={entity.id} entityName={name} suggestions={suggestions} onClose={() => toggleChat(false)} className="h-[calc(100dvh-8rem)]" />
         </aside>
       )}
       {a && isDesktop && !chatOpen && (
@@ -213,12 +213,12 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
       )}
       {a && !isDesktop && (
         <>
-          <Button variant="primary" icon={MessageSquare} onClick={() => setSheetOpen(true)} className="fixed bottom-20 right-4 z-40 shadow-raised">
+          <Button variant="primary" icon={MessageSquare} onClick={() => setSheetOpen(true)} className="fixed bottom-[max(5rem,calc(env(safe-area-inset-bottom)+4rem))] right-[max(1rem,env(safe-area-inset-right))] z-40 shadow-raised">
             {tt("chat.askAi")}
           </Button>
           {sheetOpen && (
             <Modal onClose={() => setSheetOpen(false)} label={tt("chat.title", { name })} size="lg" className="!p-0">
-              <ChatPanel entityId={entity.id} entityName={name} suggestions={suggestions} onClose={() => setSheetOpen(false)} className="h-[78vh] sm:h-[70vh]" bare />
+              <ChatPanel entityId={entity.id} entityName={name} suggestions={suggestions} onClose={() => setSheetOpen(false)} className="h-[min(78dvh,calc(var(--vvh,100dvh)_-_1rem))] sm:h-[min(70dvh,calc(var(--vvh,100dvh)_-_2rem))]" bare />
             </Modal>
           )}
         </>

@@ -29,7 +29,10 @@ function StatCard({ label, value, hint, tone }) {
   return (
     <Card className="p-5">
       <div className="text-micro font-medium text-slate-500">{label}</div>
-      <div className={cx("mt-2 break-all font-mono text-xl font-semibold tabular-nums sm:text-2xl", toneText)}>{value}</div>
+      {/* Dar ekranda sayı ortadan bölünmesin: yalnızca "/" sonrasında satır kırılabilir. */}
+      <div className={cx("mt-2 break-words font-mono text-xl font-semibold tabular-nums sm:text-2xl", toneText)}>
+        {typeof value === "string" ? value.replaceAll("/", "/\u200b") : value}
+      </div>
       {hint && <div className={cx("mt-1 text-micro", tone === "neg" ? "text-rose-600" : "text-slate-500")}>{hint}</div>}
     </Card>
   );

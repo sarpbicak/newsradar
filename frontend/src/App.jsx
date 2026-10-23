@@ -301,11 +301,11 @@ export default function App({ setLang }) {
   }
 
   // Oturum hazırlanıyor (token doğrulama / anon bootstrap) — flaş önlemek için boş bekle.
-  if (checkingSession) return <main className="min-h-screen" aria-busy="true" />;
+  if (checkingSession) return <main className="min-h-dvh" aria-busy="true" />;
   // Bootstrap tümden başarısız olduysa (nadir) küçük bir hata göster.
   if (!authed)
     return (
-      <main className="flex min-h-screen items-center justify-center p-6">
+      <main className="flex min-h-dvh items-center justify-center p-6">
         <ErrorState message={t("notice.sessionFailShort")} onRetry={() => window.location.reload()} className="w-full max-w-lg" />
       </main>
     );
@@ -405,7 +405,7 @@ export default function App({ setLang }) {
 
   return (
     <div
-      className="min-h-screen"
+      className="min-h-dvh"
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
@@ -453,7 +453,7 @@ export default function App({ setLang }) {
       />
 
       {/* min-h: içerik yüklenirken footer görünür alanda başlayıp sonra aşağı itilmesin (CLS). */}
-      <main className={`${WRAP} min-h-[calc(100vh-7rem)] py-8 transition-opacity duration-page ease-std md:py-10 ${switchingLang ? "opacity-40" : "opacity-100"}`}>
+      <main className={`${WRAP} min-h-[calc(100dvh-7rem)] pb-24 pt-8 transition-opacity duration-page ease-std md:py-10 ${switchingLang ? "opacity-40" : "opacity-100"}`}>
         {/* Görünüm geçişi (pano ↔ detay ↔ admin): kısa fade — key değişince yeniden oynar. */}
         <div key={view === "admin" ? "admin" : selected == null ? "overview" : `detail-${selected}`} className="page-in">
         {view === "admin" && user?.is_admin ? (
@@ -527,13 +527,13 @@ export default function App({ setLang }) {
             <p className="mt-1 max-w-2xl">{t("footer.disclaimer")}</p>
           </div>
           <nav className="flex flex-wrap gap-x-5 gap-y-2" aria-label={t("footer.nav")}>
-            <a href="/?welcome" onClick={(e) => { e.preventDefault(); navigate("/?welcome"); }} className="link-u text-slate-400 hover:text-slate-200">
+            <a href="/?welcome" onClick={(e) => { e.preventDefault(); navigate("/?welcome"); }} className="link-u -mx-1 -my-3.5 inline-block px-1 py-3.5 text-slate-400 hover:text-slate-200">
               {t("app.about")}
             </a>
-            <button type="button" onClick={() => setShowPrivacy(true)} className="link-u text-slate-400 hover:text-slate-200">
+            <button type="button" onClick={() => setShowPrivacy(true)} className="link-u -mx-1 -my-3.5 inline-block px-1 py-3.5 text-slate-400 hover:text-slate-200">
               {t("footer.privacy")}
             </button>
-            <button type="button" onClick={() => setFeedbackOpen(true)} className="link-u text-slate-400 hover:text-slate-200">
+            <button type="button" onClick={() => setFeedbackOpen(true)} className="link-u -mx-1 -my-3.5 inline-block px-1 py-3.5 text-slate-400 hover:text-slate-200">
               {t("fb.button")}
             </button>
           </nav>

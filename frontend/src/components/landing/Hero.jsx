@@ -151,7 +151,7 @@ export default function Hero({ demo, onAnchor, onApp }) {
               <Button as="a" href="/app" onClick={onApp} variant="primary" size="lg">
                 {t("land.openApp")} <ArrowRight className="h-5 w-5" aria-hidden="true" />
               </Button>
-              <a href="#how-it-works" onClick={onAnchor} className="link-u text-[17px] font-medium text-slate-200">
+              <a href="#how-it-works" onClick={onAnchor} className="link-u tap inline-flex items-center gap-1.5 text-[17px] font-medium text-slate-200">
                 {t("land.hero.how")} <span className="lx-arrow" aria-hidden="true">↓</span>
               </a>
             </div>

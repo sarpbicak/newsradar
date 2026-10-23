@@ -8,6 +8,7 @@ import { createPortal } from "react-dom";
 import { AlertTriangle, CheckCircle2, ChevronDown, Info, RotateCcw, X, XCircle } from "lucide-react";
 import { useI18n } from "../i18n.jsx";
 import { DUR, EASE_CSS, prefersReducedMotion } from "../motion.js";
+import { useVisualViewport } from "./ui.jsx";
 
 const cx = (...parts) => parts.filter(Boolean).join(" ");
 
@@ -33,7 +34,7 @@ export const Button = forwardRef(function Button(
     <Tag
       ref={ref}
       type={Tag === "button" ? type || "button" : undefined}
-      className={cx(BTN_BASE, iconOnly ? BTN_SQUARE[size] : BTN_SIZE[size], BTN_VARIANT[variant], iconOnly ? "tap-sq" : "tap", className)}
+      className={cx(BTN_BASE, iconOnly ? BTN_SQUARE[size] : BTN_SIZE[size], BTN_VARIANT[variant], "tap-sq", className)}
       {...rest}
     >
       {Icon && <Icon className={size === "lg" ? "h-5 w-5" : "h-4 w-4"} aria-hidden="true" />}
@@ -210,8 +211,11 @@ const MODAL_SIZE = { sm: "sm:max-w-sm", md: "sm:max-w-md", lg: "sm:max-w-lg", xl
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
 // drawer: sağdan kayan yan çekmece (mobil menü) — dışarı dokununca kapanır, güvenli alanlara uyar.
+// Klavye: sarmalayıcı GÖRÜNÜR alana (visualViewport) oturur → iOS'ta klavye açılınca modal ve
+// içindeki input klavyenin üstünde kalır; içerik --vvh ile kendi yüksekliğini sınırlayabilir.
 export function Modal({ onClose, labelledBy, label, size = "md", drawer = false, dismissable = true, className = "", wrapperStyle, children }) {
   const panel = useRef(null);
+  const vp = useVisualViewport();
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   useEffect(() => {
@@ -251,7 +255,7 @@ export function Modal({ onClose, labelledBy, label, size = "md", drawer = false,
     };
   }, [dismissable]);
   return createPortal(
-    <div className={cx("fixed inset-0 z-50 flex", drawer ? "items-stretch justify-end" : "items-end justify-center sm:items-center sm:p-4")} style={wrapperStyle}>
+    <div className={cx("fixed inset-0 z-50 flex", drawer ? "items-stretch justify-end" : "items-end justify-center sm:items-center sm:p-4")} style={drawer ? wrapperStyle : { top: vp.offsetTop, height: vp.height, "--vvh": `${vp.height}px`, ...wrapperStyle }}>
       <div className="fade-in absolute inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true" onMouseDown={() => dismissable && closeRef.current?.()} />
       <div
         ref={panel}
@@ -263,7 +267,7 @@ export function Modal({ onClose, labelledBy, label, size = "md", drawer = false,
         className={cx(
           "relative overflow-y-auto overscroll-contain bg-raised focus:outline-none",
           drawer
-            ? "drawer-in flex h-full w-80 max-w-[88vw] flex-col px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] shadow-raised"
+            ? "drawer-in flex h-full w-80 max-w-[88vw] flex-col pl-6 pr-[max(1.5rem,env(safe-area-inset-right))] pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] shadow-raised"
             : "modal-in max-h-full w-full rounded-t-panel p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-raised ring-1 ring-ink-600 sm:max-h-[92dvh] sm:rounded-panel sm:pb-6",
           !drawer && MODAL_SIZE[size],
           className

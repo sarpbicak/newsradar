@@ -109,7 +109,7 @@ function Pinned({ demo }) {
   const active = u == null ? -1 : Math.min(STEPS.length - 1, Math.floor(u));
   return (
     <div ref={ref} className="relative" style={{ height: `${100 + STEPS.length * STEP_VH}vh` }}>
-      <div className="sticky top-0 flex h-screen items-center">
+      <div className="sticky top-0 flex h-svh items-center">
         <div className="mx-auto grid w-full max-w-[1360px] grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] items-center gap-16 px-10 pt-16">
           <ol className="relative pl-10">
             <span className="absolute inset-y-0 left-0 w-px bg-ink-600" aria-hidden="true" />

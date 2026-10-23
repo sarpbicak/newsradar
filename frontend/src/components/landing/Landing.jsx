@@ -181,7 +181,7 @@ function Footer({ onPrivacy }) {
           <div className="font-display text-lg font-semibold text-slate-100">{t("land.footer.built", { name: "Sarp Bıçak" })}</div>
           <p className="mt-2 text-sm text-slate-500">
             {t("land.footer.note")}{" "}
-            <button onClick={onPrivacy} className="link-u text-slate-400 hover:text-slate-200">
+            <button onClick={onPrivacy} className="link-u -mx-1 -my-3.5 inline-block px-1 py-3.5 text-slate-400 hover:text-slate-200">
               {t("land.footer.privacy")}
             </button>
           </p>
@@ -247,13 +247,13 @@ export default function Landing({ lang, setLang }) {
 
   return (
     <EngineContext.Provider value={engine}>
-      <div ref={root} className="lx min-h-screen">
+      <div ref={root} className="lx min-h-dvh">
         <div className="lx-grain" aria-hidden="true" />
         <Nav lang={lang} onLang={onLang} onAnchor={onAnchor} />
         <main>
           <Hero demo={demo} onAnchor={onAnchor} onApp={goApp} />
           {/* Yer tutucu: sayfa baştan kaydırılabilir (kaydırma çubuğu sonradan çıkıp hero'yu kaydırmasın). */}
-          {!below && <div style={{ height: "100vh" }} aria-hidden="true" />}
+          {!below && <div style={{ height: "100dvh" }} aria-hidden="true" />}
           {below && (
             <>
               <Manifesto />

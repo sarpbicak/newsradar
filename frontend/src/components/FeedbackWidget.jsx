@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import { MessageSquare, Send } from "lucide-react";
 import { api } from "../api.js";
-import { useVisualViewport } from "./ui.jsx";
 import { useI18n } from "../i18n.jsx";
 import { Button, Field, Input, Modal, ModalHeader, Textarea } from "./kit.jsx";
 import { INSTAGRAM_URL, InstagramIcon, LINKEDIN_URL, LinkedInIcon, SocialIcon } from "./Social.jsx";
@@ -43,7 +42,6 @@ export default function FeedbackWidget({ open, onOpenChange, showButton = true }
   const [error, setError] = useState(null);
   const [sent, setSent] = useState(false);
   const { t } = useI18n();
-  const vp = useVisualViewport(); // iOS klavyesi açılınca panel klavyenin üstünde kalsın
 
   function close() {
     onOpenChange(false);
@@ -79,14 +77,14 @@ export default function FeedbackWidget({ open, onOpenChange, showButton = true }
           size="sm"
           icon={MessageSquare}
           onClick={() => onOpenChange(true)}
-          className="fixed bottom-4 right-4 z-40 bg-raised shadow-card md:bottom-6 md:right-6"
+          className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-40 bg-raised shadow-card md:bottom-6 md:right-6"
         >
           {t("fb.button")}
         </Button>
       )}
 
       {open && (
-        <Modal onClose={close} labelledBy="fb-title" size="md" wrapperStyle={{ top: vp.offsetTop, height: vp.height }}>
+        <Modal onClose={close} labelledBy="fb-title" size="md">
           {sent ? (
             <div className="py-8 text-center" role="status">
               <span className="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-accent/10 text-accent">

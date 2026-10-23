@@ -60,7 +60,7 @@ export function SocialIcon({ href, label, children }) {
       rel="noreferrer"
       aria-label={label}
       title={label}
-      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-ink-500 text-slate-500 transition hover:border-accent/60 hover:text-accent"
+      className="tap-sq flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-ink-500 text-slate-500 transition hover:border-accent/60 hover:text-accent"
     >
       {children}
     </a>

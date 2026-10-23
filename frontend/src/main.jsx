@@ -31,7 +31,7 @@ function Root() {
         {/* Sayfa geçişi: kısa (≤250ms) fade/slide — key değişince yeniden oynar. */}
         <div key={inApp ? "app" : "landing"} className="page-in">
           {inApp ? (
-            <Suspense fallback={<main className="min-h-screen" aria-busy="true" />}>
+            <Suspense fallback={<main className="min-h-dvh" aria-busy="true" />}>
               <App lang={lang} setLang={setLang} />
             </Suspense>
           ) : (
