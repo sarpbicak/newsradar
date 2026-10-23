@@ -6,9 +6,10 @@ NewsRadar collects financial news for a watchlist of companies, has an LLM read 
 
 > Portfolio project, not affiliated with newsradar.com.tr.
 
-| Light theme | Dark theme |
-|---|---|
-| ![NewsRadar landing page, light theme](docs/images/landing-light.png) | ![NewsRadar landing page, dark theme](docs/images/landing-dark.png) |
+| | Light theme | Dark theme |
+|---|---|---|
+| **Landing** | ![NewsRadar landing page, light theme](docs/images/landing-light.png) | ![NewsRadar landing page, dark theme](docs/images/landing-dark.png) |
+| **App** | ![NewsRadar dashboard, light theme](docs/images/app-light.png) | ![NewsRadar dashboard, dark theme](docs/images/app-dark.png) |
 
 > **Principle:** NewsRadar gives a clear direction (bullish / neutral / bearish) and a conviction level, but it keeps the **news-flow signal separate from price prediction**. It says explicitly what news cannot tell you (valuation, whether a move is already priced in), and every view includes a **"verify first" checklist**. There are no unexplained BUY/SELL calls. This is not investment advice.
 
@@ -25,7 +26,8 @@ NewsRadar collects financial news for a watchlist of companies, has an LLM read 
 - **Analyst consensus and price targets** (Finnhub / Financial Modeling Prep), shown next to the news signal.
 - **Bilingual (TR / EN):** both the interface and the AI analysis are generated in the user's language.
 - **Light / dark / system theme:** colours come from a single set of CSS variables. Both themes meet WCAG AA contrast, checked with axe on every screen.
-- **Landing page** with a looping walkthrough built from real data and live numbers from a public stats endpoint. The dashboard lives at `/app` in its own bundle.
+- **Landing page** with a scroll-driven walkthrough built from real data and live numbers from a public stats endpoint. The dashboard lives at `/app` in its own bundle.
+- **One design system for the landing page and the app:** shared tokens (colours, type scale, radii, motion) and shared components (buttons, chips, cards, inputs, tabs, modals, toasts), so moving from the landing page into the app feels like the same product.
 - **Multi-user and cost-safe for a public site:**
   - Accounts and sessions: bcrypt passwords, signed session tokens, anonymous device sessions.
   - Spending limits: tiered per-user quotas and a system-wide **daily LLM budget in USD**.
