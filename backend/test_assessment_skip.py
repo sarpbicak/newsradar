@@ -62,6 +62,8 @@ class FakeClient:
     def call_tool(self, *, system, user, tool, max_tokens=4096):
         if tool["name"] == ENTITY_ANALYSIS_TOOL["name"]:
             self.assess_calls += 1
+            if "CRITICAL RULES" in user:  # EN çıktı istendi → İngilizce (dil sızıntısı yok)
+                return {"headline_verdict": "Verdict.", "summary": "Summary.", "risk_score": 40}
             return {"headline_verdict": "hüküm", "summary": "özet", "risk_score": 40}
         self.article_calls += 1
         return {"analyses": []}

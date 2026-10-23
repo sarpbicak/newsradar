@@ -16,10 +16,10 @@ from sqlalchemy import exists
 
 from ..db.database import get_db
 from ..db.models import Entity, Suggestion, SuggestionDismissal, User
-from ..entity_names import display_name_for
+from ..entity_names import company_keys, display_name_for, entity_keys
 from ..watchlist import add_to_watchlist, can_add_entity, in_watchlist, user_entity_ids
 from .routes_auth import get_current_user
-from .routes_entities import _add_lock
+from .routes_entities import _add_lock, duplicate_response, find_watchlist_duplicate
 from .schemas import EntityCardOut, SuggestionOut
 from .serializers import entity_card
 from .usage import record_event
@@ -105,8 +105,10 @@ def list_suggestions(
     # Kullanıcının entity'lerinin isim+query'leri (zaten takip edilenleri elemek için)
     # ve kaynak adı gösterimi için yalnızca kendi entity'leri.
     my_terms: set[str] = set()
+    my_keys: set[str] = set()  # şirket anahtarları: "SpaceX" önerisi SPCX takipçisine çıkmasın
     name_by_id: dict[int, str] = {}
     for e in db.scalars(select(Entity).where(Entity.id.in_(my_ids))).all():
+        my_keys |= entity_keys(e)
         my_terms.add(e.name.strip().lower())
         my_terms.add(e.query.strip().lower())
         if e.display_name:
@@ -130,7 +132,7 @@ def list_suggestions(
         # Kaynak, kullanıcının takip ettiği en az bir entity'yi içermeli (kişisel alaka).
         if not (set(s.source_entity_ids or []) & my_ids):
             continue
-        if _in_watchlist(s, my_terms):
+        if _in_watchlist(s, my_terms) or (company_keys(s.name) & my_keys):
             continue
         out.append(_suggestion_out(db, s, name_by_id))
         if len(out) >= MAX_RESULTS:
@@ -195,6 +197,12 @@ def add_suggestion(
         # ABD borsası + halka açık + İngilizce kaynak ise ticker; aksi halde keyword
         # + kaynak dili (Türk/Avrupa şirketleri Finnhub'da çalışmaz → keyword).
         etype, query, language = resolve_add_target(sug)
+
+        # Aynı şirket BAŞKA bir kayıtla listede zaten varsa (birebir değil) → 409, eklenmez.
+        # (Birebir aynı kayıt listedeyse eski davranış: kart sessizce döner.)
+        dup, exact = find_watchlist_duplicate(db, user.id, sug.name, etype, query)
+        if dup is not None and not exact:
+            return duplicate_response(dup, exact)
 
         _dismiss_for_user(db, user.id, suggestion_id)  # yalnızca bu kullanıcı için kaldır
 

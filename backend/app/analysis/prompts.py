@@ -121,16 +121,22 @@ def output_language_directive(out_lang: str) -> str:
         return (
             "ÇIKTI DİLİ (KATI): TÜM metin alanları (rationale, summary, ai_take, "
             "headline_verdict, top_drivers, what_to_verify, invalidation, why_relevant) "
-            "AKICI ve DOĞAL İNGİLİZCE olacak. Türkçe kelime/bağlaç KARIŞTIRMA; yalnızca "
-            "özel adlar (şirket/ürün/kişi) olduğu gibi kalır. Yarım/karışık dil YASAK. "
+            "AKICI ve DOĞAL İNGİLİZCE olacak. YALNIZCA İngilizce yaz: Türkçe kelime/bağlaç "
+            "(ve, ile, için, ama, ancak, değil, gibi) ve Türkçe harf (ğ, ş, ı, ü, ö, ç) "
+            "KULLANMA — kaynak haber ya da gerekçe Türkçe olsa bile çevir. Yalnızca özel adlar "
+            "(şirket/ürün/kişi) olduğu gibi kalır. Yarım/karışık dil YASAK; göndermeden önce "
+            "her cümlenin tamamen İngilizce olduğunu kontrol et. "
             "Kategorik alanlar (event_type, stance, …) enum değerleri olarak İngilizce kalır."
         )
     return (
         "ÇIKTI DİLİ (KATI): TÜM metin alanları (rationale, summary, ai_take, "
         "headline_verdict, top_drivers, what_to_verify, invalidation, why_relevant) "
-        "AKICI ve DOĞAL TÜRKÇE olacak. İngilizce kelime/bağlaç (however, thus, overall, "
-        "meanwhile) KARIŞTIRMA; yalnızca özel adlar (NVIDIA, Helios, Lisa Su) İngilizce "
-        "kalır. Yarım İngilizce cümle YASAK."
+        "AKICI ve DOĞAL TÜRKÇE olacak. YALNIZCA Türkçe yaz: İngilizce kelime/bağlaç "
+        "(already, however, although, because, while, still, which, also, the, thus, "
+        "overall, meanwhile) KARIŞTIRMA — kaynak haber İngilizce olsa bile Türkçeye çevir "
+        "('piyasanın already tepki vermesi' YANLIŞ, 'piyasanın zaten tepki vermesi' DOĞRU). "
+        "Yalnızca özel adlar (NVIDIA, Helios, Lisa Su) İngilizce kalır. Yarım İngilizce "
+        "cümle YASAK; göndermeden önce her cümlenin tamamen Türkçe olduğunu kontrol et."
     )
 
 
@@ -323,7 +329,16 @@ def entity_assessment_rules(out_lang: str) -> str:
             "complete sentence ending with '.', '!' or '?'. Never stop mid-sentence.\n"
             "8) BANNED PHRASES (boilerplate that fits any company — never use them): "
             + ", ".join(f"'{p}'" for p in BANNED_PHRASES["en"]) + ". Lead with the concrete "
-            "event instead."
+            "event instead.\n"
+            "9) NEVER SAY THE NEWS IS MIXED. Do not write that the news is 'mixed' or "
+            "'balanced'. State the concrete tension in ONE sentence: which positive "
+            "development clashes with which negative one. Good examples (other companies — "
+            "copy the structure, never the content): 'Azure grew 43%, but the $80 billion AI "
+            "spending plan is squeezing margins.' / 'The Starship test succeeded, yet the "
+            "shares are still 40% below the IPO price.'\n"
+            "10) LANGUAGE: write ONLY in English. No Turkish words or Turkish letters, even "
+            "when the source news or the article rationales are Turkish; only proper nouns "
+            "stay as they are."
         )
     return (
         "KRİTİK KURALLAR (aynen uygula):\n"
@@ -355,5 +370,13 @@ def entity_assessment_rules(out_lang: str) -> str:
         "'?' ile biten TAM bir cümledir. Asla cümle ortasında bitirme.\n"
         "8) YASAKLI İFADELER (her şirkete uyan kalıp — asla kullanma): "
         + ", ".join(f"'{p}'" for p in BANNED_PHRASES["tr"]) + ". Bunun yerine somut olayla "
-        "başla."
+        "başla.\n"
+        "9) KARIŞIK DEME. Haberlerin karışık olduğunu söyleme. Somut gerilimi tek cümlede "
+        "anlat: hangi olumlu gelişme, hangi olumsuz gelişmeyle çatışıyor. İyi örnekler "
+        "(başka şirketler — yapıyı al, içeriği ASLA kopyalama): 'Azure yüzde 43 büyüdü ama "
+        "80 milyar dolarlık yapay zekâ harcaması kâr marjını sıkıştırıyor.' / 'Starship "
+        "testi başarılı geçti, fakat hisse hâlâ halka arz fiyatının yüzde 40 altında.'\n"
+        "10) DİL: YALNIZCA Türkçe yaz. Kaynak haber İngilizce olsa bile İngilizce kelime "
+        "(already, however, although, because, while, still, which, also, the) kullanma; "
+        "yalnızca özel adlar olduğu gibi kalır."
     )

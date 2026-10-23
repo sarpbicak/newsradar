@@ -44,7 +44,8 @@ from .prompts import (
     build_entity_prompt,
 )
 from .text_quality import (
-    BANNED_PHRASES, PROMPT_LIMITS, banned_phrase_hits, hard_cap, has_markup_leak, word_count,
+    BANNED_PHRASES, PROMPT_LIMITS, banned_phrase_hits, hard_cap, has_markup_leak,
+    headline_openings, language_leak_hits, word_count,
 )
 from .schemas import (
     ARTICLE_ANALYSIS_TOOL,
@@ -158,6 +159,16 @@ _MARKUP_NOTE = {
     "en": ("NOTE: The previous attempt wrote tags/XML INSIDE a text field (e.g. '</summary>', "
            "'<parameter ...>'). Write plain text only in text fields."),
 }
+# Dil sızıntısı: TR metinde İngilizce işlev kelimesi / EN metinde Türkçe kelime → tekrar.
+_LANG_NOTE = {
+    "tr": ("NOT: Önceki denemede Türkçe metne İngilizce kelime karıştı ({found}). TÜM metin "
+           "alanlarını YALNIZCA Türkçe yaz; İngilizce bağlaç/zarf (already, however, although, "
+           "because, while, still, which, also, the) KULLANMA. Yalnızca özel adlar (şirket/"
+           "ürün/kişi) olduğu gibi kalır."),
+    "en": ("NOTE: The previous attempt mixed Turkish into the English text ({found}). Write ALL "
+           "text fields ONLY in English; no Turkish words or Turkish letters (ğ, ş, ı, ü, ö, ç). "
+           "Only proper nouns (company/product/person) stay as they are."),
+}
 _BANNED_FIELDS = ("headline_verdict", "ai_take", "summary")
 _TEXT_FIELDS = ("headline_verdict", "ai_take", "summary", "invalidation")
 _LIST_FIELDS = ("top_drivers", "what_to_verify")
@@ -181,6 +192,9 @@ def _quality_notes(data: dict, lang: str) -> list[str]:
         pieces += [str(x) for x in v] if isinstance(v, list) else [str(v or "")]
     if any(has_markup_leak(p) for p in pieces):
         notes.append(_MARKUP_NOTE[lang])
+    leaks = language_leak_hits(" \n ".join(pieces), lang)
+    if leaks:
+        notes.append(_LANG_NOTE[lang].format(found=", ".join(f"'{w}'" for w in leaks)))
     return notes
 
 
@@ -188,8 +202,9 @@ def _assess_entity_with_recovery(client, build_fn, payload, name, lang: str = "t
     """Değerlendirme + kalite denetimi. (adata, kullanılan_payload) döner.
 
     Hüküm emniyet tavanını (text_quality.HARD_CAPS) aşarsa, hüküm/ai_take/summary yasaklı
-    ifade (text_quality.BANNED_PATTERNS) içerirse ya da bir metin alanına tool-call
-    işaretlemesi sızarsa değerlendirme BİR KEZ ilgili
+    ifade (text_quality.BANNED_PATTERNS) içerirse, bir metin alanına tool-call
+    işaretlemesi sızarsa ya da metne hedef dil dışından kelime karışırsa
+    (text_quality.language_leak_hits) değerlendirme BİR KEZ ilgili
     notlarla yeniden istenir (sorunlar birlikteyse notlar tek denemede gider — en fazla bir
     ek çağrı, döngü yok). Daha az sorunlu yanıt kullanılır (eşitlikte yenisi); kalan sorun
     loglanır: uzun hükmü sanitize son tam cümlede keser, sızan işaretlemeyi ilk etiketten
@@ -662,8 +677,10 @@ def _assessment_due(entity_id: int, language: str) -> str | None:
             .order_by(EntityAnalysis.created_at.desc())
             .limit(1)
         )
+        # O DİLDE hiç kayıt yoksa yeni veri olmasa da değerlendir: diğer dilde analiz olsa
+        # bile bu dilin kullanıcısı aksi halde hiç analiz göremez (API başka dile düşmez).
         if last_at is None:
-            return "ilk değerlendirme"
+            return "bu dilde değerlendirme yok"
         if now - last_at > timedelta(hours=ASSESSMENT_MAX_AGE_HOURS):
             return f"son değerlendirme {ASSESSMENT_MAX_AGE_HOURS} saatten eski"
         new_articles = session.scalar(
@@ -783,6 +800,8 @@ async def analyze_all_async(
         return is_budget_exceeded()
 
     totals = AnalyzeTotals()
+    # Şablon çöküşü denetimi için bu taramada yazılan hükümler: {dil: {ad: (hüküm, adlar)}}.
+    run_headlines: dict[str, dict[str, tuple[str, list[str]]]] = {"tr": {}, "en": {}}
 
     def _step(eid, name, step, n=None, frac=None):
         if step_cb:
@@ -825,6 +844,7 @@ async def analyze_all_async(
                 {
                     "id": e.id, "name": e.name, "query": e.query, "type": e.type,
                     "language": e.language, "batches": batches,
+                    "aliases": [a for a in (e.name, e.display_name, e.query) if a],
                 }
             )
         # session çıkışında prefiltered işaretleri commit edilir.
@@ -1025,6 +1045,8 @@ async def analyze_all_async(
                             _write_assessment, t["id"], adata, len(used), _avg_sentiment(used), out_lang
                         )
                     totals.entity_assessments += 1
+                    run_headlines[out_lang][t["name"]] = (
+                        str(adata.get("headline_verdict") or ""), t.get("aliases") or [t["name"]])
                 except ProviderQuotaError as exc:
                     _note_quota(exc)  # değerlendirme _call'ı kullanmaz → burada işaretle
                     break
@@ -1056,12 +1078,22 @@ async def analyze_all_async(
 
     # Tüm entity'ler eşzamanlı; Claude çağrıları semaphore ile sınırlı. Hata izole.
     await asyncio.gather(*[_process_entity_safe(t) for t in entity_tasks])
+    _warn_template_collapse(run_headlines)
 
     # Bakım: tablo şişmesin diye eski/az anılan önerileri temizle.
     async with db_lock:
         await asyncio.to_thread(prune_stale_suggestions)
 
     return totals
+
+
+def _warn_template_collapse(run_headlines: dict[str, dict[str, tuple[str, list[str]]]]) -> None:
+    """Aynı taramada >3 entity'nin hükmü aynı ilk 3 kelimeyle başlıyorsa UYAR (şablon çöküşü:
+    "X news is mixed…"). Entity'nin kendi adı yok sayılır. Yalnızca log — metin değişmez."""
+    for lang, heads in run_headlines.items():
+        for opening, names in headline_openings(heads, n_words=3, max_same=3).items():
+            logger.warning("[şablon] %d entity'nin %s hükmü aynı açılışla başlıyor (%r): %s",
+                           len(names), lang, opening, ", ".join(sorted(names)))
 
 
 def analyze_entity_sync(entity_id: int, client: ClaudeClient, assess_client=None,

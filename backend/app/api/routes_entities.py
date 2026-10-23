@@ -10,7 +10,8 @@ from __future__ import annotations
 import threading
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -18,7 +19,7 @@ from sqlalchemy.orm import Session
 from ..config import get_settings
 from ..db.database import get_db
 from ..db.models import Entity, User
-from ..entity_names import display_name_for
+from ..entity_names import company_keys, display_name_for, entity_keys
 from ..watchlist import (
     add_to_watchlist,
     can_add_entity,
@@ -28,7 +29,7 @@ from ..watchlist import (
 )
 from .routes_auth import get_current_user
 from .schemas import EntityCardOut, EntityCreate
-from .serializers import entity_card
+from .serializers import content_language, entity_card
 from .usage import record_event
 
 router = APIRouter(prefix="/entities", tags=["entities"])
@@ -48,6 +49,40 @@ TIER1_MAX_CARDS = 3
 FEW_ENTITIES_THRESHOLD = 4
 
 
+def find_watchlist_duplicate(db: Session, user_id: int, name: str, type_: str,
+                             query: str) -> tuple[Entity | None, bool]:
+    """Kullanıcının listesinde bu şirketin ZATEN olup olmadığı: (entity, birebir_mi).
+
+    Birebir = aynı (type, query). Değilse aynı şirketin başka kaydı (ticker "Space
+    Exploration Technologies" ↔ keyword "SpaceX"): entity_names.company_keys kesişimi."""
+    ids = user_entity_ids(db, user_id)
+    if not ids:
+        return None, False
+    mine = db.scalars(select(Entity).where(Entity.id.in_(ids)).order_by(Entity.created_at)).all()
+    for e in mine:
+        if e.type == type_ and e.query == query:
+            return e, True
+    keys = company_keys(name, type_, query, display_name_for(name))
+    for e in mine:
+        if keys & entity_keys(e):
+            return e, False
+    return None, False
+
+
+def duplicate_response(existing: Entity, exact: bool) -> JSONResponse:
+    """409 — şirket zaten listede. `detail` düz metin kalır (mevcut arayüz onu gösterir);
+    makine-okur alanlar: code ("already_in_watchlist" | "duplicate_entity") + duplicate_of."""
+    label = existing.display_name or existing.name
+    return JSONResponse(status_code=409, content={
+        "detail": f"Bu şirket zaten listende: {label}",
+        "code": "already_in_watchlist" if exact else "duplicate_entity",
+        "duplicate_of": {
+            "id": existing.id, "name": existing.name, "display_name": existing.display_name,
+            "type": existing.type, "query": existing.query,
+        },
+    })
+
+
 def _daily_new_entity_ok(db: Session, user: User) -> bool:
     """Sistem geneli GÜNLÜK yeni-entity ekleme sınırı (biri havuza 500 şirket ekleyip
     kotayı yakmasın). Admin muaf. Yalnızca YENİ entity oluşturmayı sınırlar; mevcut
@@ -65,6 +100,7 @@ def _daily_new_entity_ok(db: Session, user: User) -> bool:
 
 @router.get("", response_model=list[EntityCardOut])
 def list_entities(
+    lang: str | None = Query(None, description="AI içeriği dili (tr|en); yoksa kullanıcının dili"),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> list[EntityCardOut]:
@@ -75,7 +111,8 @@ def list_entities(
     entities = db.scalars(
         select(Entity).where(Entity.id.in_(ids)).order_by(Entity.created_at)
     ).all()
-    cards = [entity_card(db, e, user.language) for e in entities]
+    language = content_language(user, lang)
+    cards = [entity_card(db, e, language) for e in entities]
     # AZ ŞİRKET (≤ eşik): kademe uygulama — hepsi büyük kart (tier=1). 1 şirket varken
     # "Bugün önemli" boş kalıp sayfa boş görünmesin. Liste büyüdükçe kademeye geçilir.
     if len(cards) <= FEW_ENTITIES_THRESHOLD:
@@ -109,6 +146,13 @@ def create_entity(
     # KRİTİK BÖLÜM (yarış-güvenli): kota kontrolü + watchlist ekleme + commit tek kilit
     # altında; commit KİLİT İÇİNDE ki bir sonraki eşzamanlı ekleme taze sayıyı görsün.
     with _add_lock:
+        # MÜKERRER: aynı şirket listede zaten varsa (birebir ya da başka kayıtla — ör.
+        # SPCX ticker'ı varken "SpaceX" keyword'ü) ekleme YAPILMAZ, 409 + duplicate_of döner.
+        # Mevcut mükerrerler silinmez/birleştirilmez; yalnızca yenisi engellenir.
+        dup, exact = find_watchlist_duplicate(db, user.id, payload.name, payload.type, payload.query)
+        if dup is not None:
+            return duplicate_response(dup, exact)
+
         ok, limit = can_add_entity(db, user)
         if not ok:
             raise HTTPException(
@@ -120,8 +164,6 @@ def create_entity(
             select(Entity).where(Entity.type == payload.type, Entity.query == payload.query)
         )
         if existing is not None:
-            if in_watchlist(db, user.id, existing.id):
-                raise HTTPException(status_code=409, detail="Bu şirket zaten izleme listenizde.")
             add_to_watchlist(db, user.id, existing.id)
             record_event(db, user.id, "add_entity",
                          {"entity_id": existing.id, "name": existing.name, "pool_hit": True})

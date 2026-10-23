@@ -1,5 +1,6 @@
 """Bölüm 1c — iki dilli analiz: üretim (prompt), saklama, dil-farkında serileştirme,
-fallback notu, dil-başına delta. Çalıştır: python test_dual_language.py"""
+eksik dil (başka dile DÜŞMEZ + analysis_missing_language), dil-başına delta.
+Çalıştır: python test_dual_language.py"""
 import os
 import tempfile
 
@@ -65,15 +66,27 @@ def main():
     check(tr_card.analysis.headline_verdict == "TR hüküm" and tr_card.analysis_language == "tr",
           "TR kullanıcı → TR değerlendirme (analysis_language=tr)")
 
-    print("\n== Fallback: o dilde yoksa diğer dil + analysis_language notu ==")
+    print("\n== Eksik dil: başka dile DÜŞMEZ, analysis_missing_language bayrağı ==")
     with session_scope() as s:
         e2 = Entity(name="AMD", type="ticker", query="AMD", language="en")
         s.add(e2); s.flush(); eid2 = e2.id
         s.add(_mk_analysis(eid2, "tr", 40, "bullish", "sadece TR"))  # yalnızca TR
         s.flush()
         card = entity_card(s, e2, "en")  # EN ister ama yok
-    check(card.analysis.headline_verdict == "sadece TR" and card.analysis_language == "tr",
-          "EN yokken TR gösterilir; analysis_language=tr → arayüz 'TR üretildi' notu koyar")
+        card_tr = entity_card(s, e2, "tr")
+        e_none = Entity(name="Yeni", type="keyword", query="Yeni", language="en")
+        s.add(e_none); s.flush()
+        card_none = entity_card(s, e_none, "tr")  # hiç analiz yok
+    check(card.analysis is None and card.analysis_language is None,
+          "EN yokken TR GÖSTERİLMEZ (analysis=None, analysis_language=None)")
+    check(card.analysis_missing_language is True,
+          "analysis_missing_language=True → arayüz 'Bu dilde henüz analiz yok' der")
+    check(card.last_updated is None and card.delta is None and card.previous_analysis is None,
+          "eksik dilde son güncelleme/delta/önceki de başka dilden türetilmez")
+    check(card_tr.analysis.headline_verdict == "sadece TR" and not card_tr.analysis_missing_language,
+          "TR kullanıcı TR analizini görür (bayrak False)")
+    check(card_none.analysis is None and card_none.analysis_missing_language is False,
+          "hiç analiz yoksa bayrak False (yeni entity'nin boş hali)")
 
     print("\n== Delta AYNI dilde hesaplanır (tr'yi en ile karıştırmaz) ==")
     with session_scope() as s:

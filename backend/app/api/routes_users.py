@@ -242,4 +242,8 @@ def set_language(payload: LanguageIn, user: User = Depends(get_current_user),
     """Arayüz dilini kaydet ("tr" | "en"). Geçersizse tr'ye düşer."""
     lang = (payload.language or "").strip().lower()
     user.language = lang if lang in ("tr", "en") else "tr"
+    # YANITTAN ÖNCE commit: get_db'nin commit'i yanıt gönderildikten SONRA çalışıyor.
+    # Arayüz bu yanıtı bekleyip hemen GET /entities çekiyor; commit gecikirse kartlar ESKİ
+    # dilde geliyordu (Türkçe arayüzde İngilizce analiz — dil karışmasının bir yolu).
+    db.commit()
     return _user_out(user)

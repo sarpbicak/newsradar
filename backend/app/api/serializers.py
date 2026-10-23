@@ -20,23 +20,38 @@ from .schemas import (
 )
 
 
+ANALYSIS_LANGUAGES = ("tr", "en")
+
+
+def content_language(user, lang: str | None = None) -> str:
+    """AI içeriğinin dili: istekte geçerli `?lang=tr|en` varsa o (arayüzün o anki dili —
+    POST /users/me/language ile yarışmaz), yoksa kullanıcının kayıtlı dili."""
+    v = (lang or "").strip().lower()
+    if v in ANALYSIS_LANGUAGES:
+        return v
+    return (getattr(user, "language", None) or "tr")
+
+
 def _latest_analysis(session: Session, entity_id: int, language: str | None = None) -> EntityAnalysis | None:
-    """Kullanıcı dilindeki EN SON değerlendirme; o dilde yoksa herhangi bir dile düşer
-    (eski kayıtlar tr; yeni bir dil henüz üretilmemiş olabilir). Gösterilen kaydın
-    .language alanı gerçek dili söyler → arayüz gerekirse 'başka dilde üretildi' notu koyar."""
+    """Kullanıcı dilindeki EN SON değerlendirme. O dilde yoksa None — başka dile DÜŞMEZ.
+
+    Eskiden diğer dile düşülüyordu; Türkçe arayüzde kartta İngilizce hüküm görünüyordu
+    (dil karışması). Artık kart analizsiz döner + `analysis_missing_language=True`; eksik
+    dil bir sonraki yenilemede yeni veri olmasa da üretilir (pipeline._assessment_due).
+    language=None → dilden bağımsız en son kayıt (yalnızca dil-nötr iç kullanım)."""
+    q = select(EntityAnalysis).where(EntityAnalysis.entity_id == entity_id)
     if language:
-        row = session.scalar(
-            select(EntityAnalysis)
-            .where(EntityAnalysis.entity_id == entity_id, EntityAnalysis.language == language)
-            .order_by(EntityAnalysis.created_at.desc())
-        )
-        if row is not None:
-            return row
+        q = q.where(EntityAnalysis.language == language)
+    return session.scalar(q.order_by(EntityAnalysis.created_at.desc()))
+
+
+def _has_other_language_analysis(session: Session, entity_id: int, language: str) -> bool:
+    """Bu entity için BAŞKA bir dilde değerlendirme var mı (kullanıcının dilinde yokken)?"""
     return session.scalar(
-        select(EntityAnalysis)
-        .where(EntityAnalysis.entity_id == entity_id)
-        .order_by(EntityAnalysis.created_at.desc())
-    )
+        select(EntityAnalysis.id)
+        .where(EntityAnalysis.entity_id == entity_id, EntityAnalysis.language != language)
+        .limit(1)
+    ) is not None
 
 
 def _previous_analysis(session: Session, entity_id: int, language: str | None = None) -> EntityAnalysis | None:
@@ -253,9 +268,10 @@ def entity_card(session: Session, entity: Entity, language: str = "tr") -> Entit
     top_flags = [f for f, _ in counter.most_common(4)]
 
     latest = _latest_analysis(session, entity.id, language)
-    # Gösterilen değerlendirmenin GERÇEK dili (fallback olabilir); delta/önceki aynı dilde.
-    shown_lang = latest.language if latest else language
-    previous = _previous_analysis(session, entity.id, shown_lang)
+    # Kullanıcının dilinde analiz yok ama başka dilde var → başka dile DÜŞME; arayüz
+    # "Bu dilde henüz analiz yok, bir sonraki yenilemede gelecek" der.
+    missing_language = latest is None and _has_other_language_analysis(session, entity.id, language)
+    previous = _previous_analysis(session, entity.id, language) if latest else None
     delta = _delta_out(latest, previous)
     horizon, evidence_strength, evidence_count = _horizon_and_evidence(session, entity.id, latest)
 
@@ -295,6 +311,7 @@ def entity_card(session: Session, entity: Entity, language: str = "tr") -> Entit
         last_updated=latest.created_at if latest else None,
         analysis=analysis_out(latest),
         analysis_language=latest.language if latest else None,
+        analysis_missing_language=missing_language,
         horizon=horizon,
         evidence_strength=evidence_strength,
         evidence_count=evidence_count,

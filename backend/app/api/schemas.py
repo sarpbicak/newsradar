@@ -271,8 +271,12 @@ class EntityCardOut(BaseModel):
     top_flags: list[str]
     last_updated: datetime | None
     analysis: AnalysisOut | None
-    analysis_language: str | None = None   # gösterilen değerlendirmenin dili (tr/en); UI diliyle
-                                           # farklıysa frontend "başka dilde üretildi" notu koyar
+    analysis_language: str | None = None   # gösterilen değerlendirmenin dili; artık HEP istenen
+                                           # dil (başka dile düşülmez) ya da analiz yoksa None
+    # İstenen dilde analiz YOK ama başka dilde VAR → analysis=None + bu bayrak True. Arayüz
+    # "Bu dilde henüz analiz yok, bir sonraki yenilemede gelecek" gösterir. Hiç analiz yoksa
+    # (yeni entity) False kalır — o durum "henüz analiz yok" boş halidir.
+    analysis_missing_language: bool = False
     # Kart hiyerarşisi için türetilmiş "3 saniyelik" alanlar (analiz varsa dolu).
     horizon: str | None = None            # çoğunluk vade: short | medium | long
     evidence_strength: str | None = None  # strong | medium | weak

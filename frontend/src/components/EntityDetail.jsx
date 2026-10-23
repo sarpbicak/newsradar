@@ -178,7 +178,9 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
         </header>
 
         {!a ? (
-          <Card className="p-6 text-body text-slate-400">{tt("detail.noAnalysisBox", { refresh: tt("header.refresh") })}</Card>
+          <Card className="p-6 text-body text-slate-400">
+            {entity.analysis_missing_language ? tt("card.langMissing") : tt("detail.noAnalysisBox", { refresh: tt("header.refresh") })}
+          </Card>
         ) : (
           <div>
             <div className="-mx-5 overflow-x-auto px-5 sm:mx-0 sm:px-0">

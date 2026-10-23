@@ -58,6 +58,8 @@ const STR = {
 
   // ---- Kart ----
   "card.noAnalysis": { tr: "analiz yok", en: "no analysis" },
+  "card.langMissingShort": { tr: "bu dilde yok", en: "not in this language" },
+  "card.langMissing": { tr: "Bu dilde henüz analiz yok, bir sonraki yenilemede gelecek.", en: "No analysis in this language yet; it'll arrive with the next refresh." },
   "card.noAnalysisYet": { tr: "Henüz analiz yok", en: "No analysis yet" },
   "card.pressRefresh": { tr: "Henüz analiz edilmedi. {refresh}’ye bas.", en: "Not analyzed yet. Press {refresh}." },
   "card.now": { tr: "şimdi", en: "now" },
@@ -191,6 +193,8 @@ const STR = {
   "wl.nonUsTitle": { tr: "{symbol} keyword olarak eklensin mi?", en: "Add {symbol} as a keyword?" },
   "wl.nonUsBody": { tr: "{exchange} için haber ve fiyat verisi (Finnhub) yok. Keyword olarak eklersen haber akışı yine takip edilir.", en: "There's no news or price data (Finnhub) for {exchange}. Added as a keyword, its news is still tracked." },
   "wl.nonUsConfirm": { tr: "Keyword olarak devam et", en: "Continue as keyword" },
+  "wl.duplicate": { tr: "Bu şirket zaten listende: {name}", en: "This company is already on your list: {name}" },
+  "wl.alreadyIn": { tr: "Bu şirket zaten listende: {name}", en: "This company is already on your list: {name}" },
   "wl.remove": { tr: "Kaldır", en: "Remove" },
   "lang.en": { tr: "İngilizce", en: "English" },
   "lang.tr": { tr: "Türkçe", en: "Turkish" },

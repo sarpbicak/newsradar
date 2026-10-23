@@ -11,7 +11,7 @@ from ..db.models import Article, Entity, User
 from ..watchlist import in_watchlist
 from .routes_auth import get_current_user
 from .schemas import ArticleStatusOut, DashboardOut
-from .serializers import article_out, entity_card, price_history, risk_history
+from .serializers import article_out, content_language, entity_card, price_history, risk_history
 from .usage import record_event
 
 router = APIRouter(tags=["dashboard"])
@@ -21,6 +21,7 @@ router = APIRouter(tags=["dashboard"])
 def entity_dashboard(
     entity_id: int,
     limit: int = Query(50, ge=1, le=200),
+    lang: str | None = Query(None, description="AI içeriği dili (tr|en); yoksa kullanıcının dili"),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> DashboardOut:
@@ -54,10 +55,11 @@ def entity_dashboard(
         expired=_count(Article.analyzed.is_(False), Article.expired.is_(True)),
     )
 
+    language = content_language(user, lang)
     return DashboardOut(
-        entity=entity_card(db, entity, user.language),
+        entity=entity_card(db, entity, language),
         articles=[article_out(a) for a in articles],
         article_status=status,
-        risk_history=risk_history(db, entity_id, limit=30, language=user.language),
+        risk_history=risk_history(db, entity_id, limit=30, language=language),
         price_history=price_history(db, entity_id, limit=30),
     )

@@ -1,4 +1,5 @@
 // NewsRadar API istemcisi — REST uçları + sohbet için SSE streaming.
+import { getLang, tt } from "./i18n.jsx";
 
 // Deploy'da Render backend adresi VITE_API_URL ile verilir; yereldeyse localhost.
 // (VITE_API_BASE eski isim — geriye uyumluluk için hâlâ kabul edilir.)
@@ -55,6 +56,24 @@ async function parseError(res, fallback) {
   return detail;
 }
 
+// Makinece okunur hata kodları → kullanıcının dilinde mesaj (ör. mükerrer şirket: 409).
+const CODE_MESSAGES = { duplicate_entity: "wl.duplicate", already_in_watchlist: "wl.alreadyIn" };
+async function apiError(res) {
+  let body = null;
+  try {
+    body = await res.json();
+  } catch {
+    /* gövde yok */
+  }
+  const key = body && CODE_MESSAGES[body.code];
+  const dup = body?.duplicate_of;
+  const msg = key ? tt(key, { name: dup?.display_name || dup?.name || "" }) : body?.detail || res.statusText;
+  const err = new Error(typeof msg === "string" ? msg : res.statusText);
+  err.code = body?.code;
+  err.data = body;
+  return err;
+}
+
 async function req(path, options = {}) {
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
@@ -66,7 +85,7 @@ async function req(path, options = {}) {
     onUnauthorized?.();
     throw new Error("Oturum geçersiz. Lütfen tekrar deneyin.");
   }
-  if (!res.ok) throw new Error(await parseError(res));
+  if (!res.ok) throw await apiError(res);
   if (res.status === 204) return null;
   return res.json();
 }
@@ -155,11 +174,12 @@ export const api = {
   adminResetPassword: (id) => req(`/admin/users/${id}/reset-password`, { method: "POST" }),
   adminStats: () => req("/admin/stats"),
   status: () => req("/status"),
-  listEntities: () => req("/entities"),
+  // ?lang: AI içeriği arayüzün GÜNCEL dilinde (backend user.language'e güvenmeden).
+  listEntities: () => req(`/entities?lang=${getLang()}`),
   createEntity: (payload) =>
     req("/entities", { method: "POST", body: JSON.stringify(payload) }),
   deleteEntity: (id) => req(`/entities/${id}`, { method: "DELETE" }),
-  dashboard: (id) => req(`/entities/${id}/dashboard`),
+  dashboard: (id) => req(`/entities/${id}/dashboard?lang=${getLang()}`),
   refresh: () => req("/refresh", { method: "POST" }),
   searchSymbols: (q) => req(`/symbol-search?q=${encodeURIComponent(q)}`),
   // Öneriler (co-mentioned şirketler)

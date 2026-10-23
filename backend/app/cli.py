@@ -6,6 +6,7 @@ Kullanım:
   python -m app.cli fetch TSLA              # tek bir entity (query ile) için çek
   python -m app.cli fetch TSLA --hours 168  # geriye dönük pencereyi değiştir
   python -m app.cli analyze TSLA            # tek entity'yi Claude ile analiz et + JSON yazdır
+  python -m app.cli content-report          # SALT OKUNUR: dil bazında analiz + mükerrer entity
 """
 
 from __future__ import annotations
@@ -472,6 +473,18 @@ def cmd_reconcile(_args: argparse.Namespace) -> None:
     print(f"Ön-filtre reconcile: {n} makale yeniden değerlendirmeye açıldı.")
 
 
+def cmd_content_report(args: argparse.Namespace) -> None:
+    """SALT OKUNUR içerik raporu (init_db ÇAĞRILMAZ; DB mode=ro açılır)."""
+    from .content_report import collect, open_readonly, render
+
+    path = args.db or str(get_settings().db_path)
+    con = open_readonly(path)
+    try:
+        print(render(collect(con, stale_hours=args.stale_hours)))
+    finally:
+        con.close()
+
+
 def main() -> None:
     # CLI'de de analiz hattının [analiz] loglarını göster (entity-başı görünürlük).
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -511,6 +524,15 @@ def main() -> None:
     p_an.add_argument("--force-assessment", action="store_true",
                       help="Yeni veri olmasa da TR+EN değerlendirmeyi yeniden üret")
     p_an.set_defaults(func=cmd_analyze)
+
+    p_rep = sub.add_parser(
+        "content-report",
+        help="SALT OKUNUR: entity başına tr/en analiz durumu + mükerrer entity grupları",
+    )
+    p_rep.add_argument("--db", default=None, help="SQLite dosyası (vars: NEWSRADAR_DB)")
+    p_rep.add_argument("--stale-hours", type=float, default=24.0,
+                       help="Bu saatten eski son analiz 'ESKİ' sayılır (vars: 24)")
+    p_rep.set_defaults(func=cmd_content_report)
 
     args = parser.parse_args()
     args.func(args)

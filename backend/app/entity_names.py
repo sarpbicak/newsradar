@@ -88,3 +88,53 @@ def backfill_display_names(conn) -> int:
     if n:
         logger.info("display_name backfill: %d entity kısa adla dolduruldu.", n)
     return n
+
+
+# ------------------------------ mükerrer şirket ------------------------------ #
+# Aynı şirket iki kayıtla izlenebiliyor: ticker "Space Exploration Technologies" (SPCX) ve
+# keyword "SpaceX". Kural basit ve açık: her entity için şirket ANAHTARLARI üretilir —
+# normalize ad, kısa ad (display_name ya da yukarıdaki eşleme tablosu = bilinen takma adlar)
+# ve keyword'ün sorgusu — ve iki entity'nin anahtarları kesişiyorsa AYNI şirkettir. Ticker
+# sembolü anahtar DEĞİL ("F", "ON" gibi kısa semboller keyword adlarıyla yanlış eşleşmesin).
+def _compact(text: str) -> str:
+    """Boşluksuz anahtar: "Space X" ile "SpaceX" aynı sayılsın."""
+    return _norm(text).replace(" ", "")
+
+
+def company_keys(name: str, entity_type: str | None = None, query: str | None = None,
+                 display_name: str | None = None) -> set[str]:
+    """Bir entity'nin şirket anahtarları (boş değerler atlanır)."""
+    cands = [name, display_name, display_name_for(name)]
+    if entity_type == "keyword" and query:
+        cands += [query, display_name_for(query)]
+    return {k for k in (_compact(c) for c in cands if c) if k}
+
+
+def entity_keys(e) -> set[str]:
+    """ORM Entity (ya da aynı alanlara sahip nesne) için company_keys."""
+    return company_keys(e.name, e.type, e.query, getattr(e, "display_name", None))
+
+
+def duplicate_groups(rows: list[dict]) -> list[list[dict]]:
+    """Aynı şirketi temsil eden entity grupları (2+ üyeli). rows: {'name','type','query',
+    'display_name', ...}. Anahtar kesişimi geçişlidir (union-find)."""
+    parent = list(range(len(rows)))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    owner: dict[str, int] = {}
+    for i, r in enumerate(rows):
+        for k in company_keys(r.get("name") or "", r.get("type"), r.get("query"),
+                              r.get("display_name")):
+            if k in owner:
+                parent[find(i)] = find(owner[k])
+            else:
+                owner[k] = i
+    groups: dict[int, list[dict]] = {}
+    for i, r in enumerate(rows):
+        groups.setdefault(find(i), []).append(r)
+    return [g for g in groups.values() if len(g) > 1]

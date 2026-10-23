@@ -123,7 +123,7 @@ export default function EntityCard({ card, onOpen }) {
 
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          {a ? <SignalPill stance={a.stance} evidence={card.evidence_strength} /> : <Chip tone="muted">{tt("card.noAnalysis")}</Chip>}
+          {a ? <SignalPill stance={a.stance} evidence={card.evidence_strength} /> : <Chip tone="muted">{tt(card.analysis_missing_language ? "card.langMissingShort" : "card.noAnalysis")}</Chip>}
           {card.priority_reason && <Chip tone="neutral">{tt(`pr.${card.priority_reason}`)}</Chip>}
         </div>
         <div className="min-w-0 basis-2/5 text-right">
@@ -151,7 +151,10 @@ export default function EntityCard({ card, onOpen }) {
           </div>
         </>
       ) : (
-        <p className="mt-auto text-body text-slate-400">{tt("card.pressRefresh", { refresh: tt("header.refresh") })}</p>
+        // Kullanıcının dilinde analiz yoksa diğer dili sessizce göstermek yerine açık not.
+        <p className="mt-auto text-body text-slate-400">
+          {card.analysis_missing_language ? tt("card.langMissing") : tt("card.pressRefresh", { refresh: tt("header.refresh") })}
+        </p>
       )}
     </Card>
   );
@@ -164,7 +167,7 @@ export function EntityRow({ card, onOpen }) {
   const a = card.analysis;
   const edge = a ? overallSignal(a.stance, card.evidence_strength).color : C.subtle;
   const changed = a && card.delta?.stance_changed;
-  const verdict = a ? a.headline_verdict || a.summary : tt("card.noAnalysisYet");
+  const verdict = a ? a.headline_verdict || a.summary : tt(card.analysis_missing_language ? "card.langMissing" : "card.noAnalysisYet");
   return (
     <button
       type="button"
