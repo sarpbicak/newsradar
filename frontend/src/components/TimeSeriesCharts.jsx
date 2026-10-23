@@ -159,7 +159,9 @@ function RiskSentimentChart({ data, isMobile }) {
           <span className="pointer-events-none absolute right-7 top-1 z-10 text-[10px] font-semibold" style={{ color: MUTED }}>{tt("chart.newsMood")}</span>
         )}
         <ResponsiveContainer width="100%" height={isMobile ? 190 : 210}>
-          <ComposedChart data={data} margin={{ top: 16, right: 8, bottom: 0, left: -18 }} syncId="ts">
+          {/* left: 0 — negatif kenar boşluğu sol eksen alanını SVG dışına itip "100"/"50"
+              rakamlarını kırpıyordu; eksen genişliği (30) üç haneye yeter. */}
+          <ComposedChart data={data} margin={{ top: 16, right: 8, bottom: 0, left: 0 }} syncId="ts">
             <CartesianGrid vertical={false} stroke={GRID} />
             <XAxis dataKey="label" tick={{ fill: MUTED, fontSize: 10 }} axisLine={false} tickLine={false}
                    minTickGap={isMobile ? 52 : 34} interval="preserveStartEnd" />
