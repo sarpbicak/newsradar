@@ -9,13 +9,11 @@ import PrivacyModal from "./components/PrivacyModal.jsx";
 import AdminPanel from "./components/AdminPanel.jsx";
 import HowItWorks from "./components/HowItWorks.jsx";
 import FeedbackWidget from "./components/FeedbackWidget.jsx";
-import ScanStrip from "./components/ScanStrip.jsx";
-import { LanguageModal, LanguageSwitcher } from "./components/LanguageBits.jsx";
+import AppHeader from "./components/AppHeader.jsx";
+import { LanguageModal } from "./components/LanguageBits.jsx";
 import { Skeleton, useIsMobile } from "./components/ui.jsx";
 import { fmtMsg, refreshParts, useI18n } from "./i18n.jsx";
-import { RefreshCw, Menu, X, LogOut, ShieldCheck, LayoutDashboard, HelpCircle, UserPlus, ArrowDown } from "lucide-react";
-import Logo from "./components/Logo.jsx";
-import { ThemeMenu, ThemeSegmented } from "./components/ThemeToggle.jsx";
+import { ArrowDown } from "lucide-react";
 import { navigate } from "./router.js";
 
 // Mobil aşağı-çekip-yenile eşiği (px). Bu mesafeyi geçince bırakınca yenilenir.
@@ -35,7 +33,6 @@ export default function App({ setLang }) {
   const [account, setAccount] = useState(null);      // "upgrade" | "login" | null (modal)
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [view, setView] = useState("dashboard");     // "dashboard" | "admin"
-  const [menuOpen, setMenuOpen] = useState(false);   // mobil header menüsü
   const [showHow, setShowHow] = useState(false); // "Nasıl çalışır?" anlatımı
   const [focusAdd, setFocusAdd] = useState(0); // "Kendi şirketlerinle dene" → ekleme alanı
   const isMobile = useIsMobile();
@@ -53,6 +50,8 @@ export default function App({ setLang }) {
   // Tarama tamamlanınca kısa süre gösterilen bitiş kartı ({news, analyses}) + sönme.
   const [scanDone, setScanDone] = useState(null);
   const [scanFading, setScanFading] = useState(false);
+  // "Yenile"ye kısa süre dikkat çek (ör. yeni eklenen şirketin henüz analizi yok).
+  const [refreshAttn, setRefreshAttn] = useState(false);
 
   // Tarama sürüyor mu: sunucu durumu VEYA iyimser 'başlatılıyor' bayrağı.
   const running = !!status?.is_running;
@@ -273,7 +272,6 @@ export default function App({ setLang }) {
 
   // Logo → ana sayfa (pano). Detay/admin'den döner; zaten anasayfadaysa en üste kaydırır.
   function goHome() {
-    setMenuOpen(false);
     setView("dashboard");
     setSelected(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -416,192 +414,34 @@ export default function App({ setLang }) {
           </div>
         </div>
       )}
-      <header className="sticky top-0 z-10 border-b border-ink-600 bg-ink-900/70 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-2">
-            {/* Logo → her zaman ana sayfa (pano). Detay/admin/alt sayfadan döner;
-                zaten anasayfadaysa en üste kaydırır. */}
-            <button
-              onClick={goHome}
-              aria-label="Ana sayfaya dön"
-              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg font-display text-lg font-bold tracking-tight text-slate-100 transition hover:opacity-70"
-            >
-              <Logo className="h-5 w-5 text-accent" />
-              NewsRadar
-            </button>
-            <span className="hidden font-mono text-[11px] uppercase tracking-wide text-slate-500 md:inline">
-              {t("app.subtitle")}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Dil değiştirici (masaüstü + mobilde görünür, küçük) */}
-            <LanguageSwitcher lang={lang} onChange={applyLang} />
-            {/* Tema (Sistem/Açık/Koyu) — masaüstünde ikon menüsü; mobilde "…" menüsünde */}
-            <div className="hidden md:block">
-              <ThemeMenu />
-            </div>
-
-            {/* Yenile — her zaman görünür (mobilde ikon, masaüstünde metin) */}
-            <button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              aria-label={t("header.refresh")}
-              className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-accent-fg shadow-sm transition hover:brightness-105 disabled:opacity-70 md:px-4"
-            >
-              <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-              {/* Mobil: yer dar — tarama sürerken yalnızca kısa sayaç (3/12) */}
-              {isRefreshing && running && status.progress_total > 0 && (
-                <span className="font-mono text-xs tabular-nums md:hidden">
-                  {status.progress_done}/{status.progress_total}
-                </span>
-              )}
-              <span className="hidden md:inline">
-                {isRefreshing
-                  ? running
-                    ? t("header.refreshing", { done: status.progress_done, total: status.progress_total })
-                    : t("header.starting")
-                  : refreshQuotaLabel
-                  ? `${t("header.refresh")} ${refreshQuotaLabel}`
-                  : t("header.refresh")}
-              </span>
-            </button>
-
-            {/* Nasıl çalışır — masaüstünde görünür; mobilde "…" menüsüne toplanır */}
-            <button
-              onClick={() => setShowHow(true)}
-              title={t("header.howItWorks")}
-              aria-label={t("header.howItWorks")}
-              className="hidden min-h-[44px] items-center gap-1.5 rounded-lg px-2.5 text-sm text-slate-500 transition hover:bg-ink-700 hover:text-slate-200 md:inline-flex"
-            >
-              <HelpCircle className="h-5 w-5" />
-              <span className="hidden md:inline">{t("header.howItWorks")}</span>
-            </button>
-
-            {/* MASAÜSTÜ: admin + kullanıcı + çıkış inline (NewsAPI kotası header'da
-                gösterilmez — teknik iç detay; kota admin panelinde görünür) */}
-            <div className="hidden items-center gap-2 md:flex">
-              {user?.is_admin && (
-                <button
-                  onClick={() => setView((v) => (v === "admin" ? "dashboard" : "admin"))}
-                  className={`inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition ${
-                    view === "admin"
-                      ? "bg-accent/15 text-accent"
-                      : "text-slate-500 hover:bg-ink-700 hover:text-slate-200"
-                  }`}
-                >
-                  {view === "admin" ? <LayoutDashboard className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
-                  {view === "admin" ? t("header.dashboard") : t("header.admin")}
-                </button>
-              )}
-              {user?.is_anonymous ? (
-                <>
-                  <button
-                    onClick={() => setAccount("upgrade")}
-                    className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg bg-accent px-3 text-sm font-medium text-accent-fg transition hover:brightness-105"
-                  >
-                    <UserPlus className="h-4 w-4" /> {t("header.createAccount")}
-                  </button>
-                  <button
-                    onClick={() => setAccount("login")}
-                    className="inline-flex min-h-[40px] items-center rounded-lg border border-ink-500 px-3 text-sm text-slate-300 transition hover:bg-ink-700"
-                  >
-                    {t("header.login")}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-ink-700 px-2.5 py-1.5 text-sm text-slate-300">
-                    <span className="font-medium">{user?.username}</span>
-                    {user?.is_admin && (
-                      <span className="rounded bg-ink-700 px-1.5 text-[10px] font-semibold text-slate-500">admin</span>
-                    )}
-                  </span>
-                  <button
-                    onClick={handleLogout}
-                    title={t("header.logout")}
-                    className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border border-ink-500 text-slate-400 transition hover:bg-ink-700 hover:text-slate-200"
-                  >
-                    <LogOut className="h-4 w-4" />
-                  </button>
-                </>
-              )}
-            </div>
-
-            {/* MOBİL: hamburger menü */}
-            <div className="relative md:hidden">
-              <button
-                onClick={() => setMenuOpen((o) => !o)}
-                aria-label={t("header.menu")}
-                className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-ink-500 text-slate-500 transition hover:bg-ink-700 hover:text-slate-200"
-              >
-                {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-              </button>
-              {menuOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-                  <div className="absolute right-0 top-full z-20 mt-2 w-60 rounded-xl border border-ink-500 bg-ink-800 p-2 shadow-card-hover">
-                    <div className="flex items-center justify-between gap-2 border-b border-ink-600 px-3 py-2">
-                      <span className="font-medium text-slate-200">
-                        {user?.is_anonymous ? t("header.guest") : user?.username}
-                      </span>
-                      {user?.is_admin && (
-                        <span className="rounded bg-ink-700 px-1.5 text-[10px] font-semibold text-slate-500">admin</span>
-                      )}
-                    </div>
-                    <ThemeSegmented />
-                    {/* Nasıl çalışır — tutorial'ı tekrar aç */}
-                    <button
-                      onClick={() => { setShowHow(true); setMenuOpen(false); }}
-                      className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-slate-300 hover:bg-ink-700"
-                    >
-                      <HelpCircle className="h-4 w-4" /> {t("header.howItWorks")}
-                    </button>
-                    {user?.is_anonymous && (
-                      <>
-                        <button
-                          onClick={() => { setAccount("upgrade"); setMenuOpen(false); }}
-                          className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-slate-300 hover:bg-ink-700"
-                        >
-                          <UserPlus className="h-4 w-4" /> {t("header.createAccount")}
-                        </button>
-                        <button
-                          onClick={() => { setAccount("login"); setMenuOpen(false); }}
-                          className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-slate-300 hover:bg-ink-700"
-                        >
-                          {t("header.login")}
-                        </button>
-                      </>
-                    )}
-                    {user?.is_admin && (
-                      <button
-                        onClick={() => {
-                          setView((v) => (v === "admin" ? "dashboard" : "admin"));
-                          setMenuOpen(false);
-                        }}
-                        className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-slate-300 hover:bg-ink-700"
-                      >
-                        {view === "admin" ? <LayoutDashboard className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
-                        {view === "admin" ? t("header.dashboard") : t("header.admin")}
-                      </button>
-                    )}
-                    {!user?.is_anonymous && (
-                      <button
-                        onClick={() => {
-                          handleLogout();
-                          setMenuOpen(false);
-                        }}
-                        className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-slate-300 hover:bg-ink-700"
-                      >
-                        <LogOut className="h-4 w-4" /> {t("header.logout")}
-                      </button>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
+      <AppHeader
+        user={user}
+        view={view}
+        lang={lang}
+        onLang={applyLang}
+        onHome={goHome}
+        onAccount={setAccount}
+        onAdmin={() => setView((v) => (v === "admin" ? "dashboard" : "admin"))}
+        onLogout={handleLogout}
+        refresh={{ isRefreshing, running, status, quotaLabel: refreshQuotaLabel, onRefresh: handleRefresh, attn: refreshAttn }}
+        scan={
+          isRefreshing || scanDone
+            ? {
+                phase: scanDone ? "done" : running ? "running" : "starting",
+                currentEntity: running ? status.current_entity : null,
+                step: running ? status.step : null,
+                stepEntity: running ? status.step_entity : null,
+                stepCount: running ? status.step_count : null,
+                fraction: running ? status.progress_fraction : null,
+                skippedEntity: running ? status.skipped_entity : null,
+                done: running ? status.progress_done : 0,
+                total: running ? status.progress_total : 0,
+                summary: scanDone,
+                fading: scanFading,
+              }
+            : null
+        }
+      />
 
       {/* min-h: içerik yüklenirken footer görünür alanda başlayıp sonra aşağı itilmesin (CLS). */}
       <main className={`mx-auto min-h-[calc(100vh-7rem)] max-w-7xl px-4 py-6 transition-opacity duration-200 sm:px-6 ${switchingLang ? "opacity-40" : "opacity-100"}`}>
@@ -617,24 +457,6 @@ export default function App({ setLang }) {
           </div>
         )}
 
-        {(isRefreshing || scanDone) && (
-          <div className="mb-4">
-            <ScanStrip
-              isMobile={isMobile}
-              phase={scanDone ? "done" : running ? "running" : "starting"}
-              currentEntity={running ? status.current_entity : null}
-              step={running ? status.step : null}
-              stepEntity={running ? status.step_entity : null}
-              stepCount={running ? status.step_count : null}
-              fraction={running ? status.progress_fraction : null}
-              skippedEntity={running ? status.skipped_entity : null}
-              done={running ? status.progress_done : 0}
-              total={running ? status.progress_total : scanDone ? 0 : 0}
-              summary={scanDone}
-              fading={scanFading}
-            />
-          </div>
-        )}
 
         {status?.last_summary?.quota_error && (
           <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">

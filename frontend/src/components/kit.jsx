@@ -204,7 +204,8 @@ export function Tabs({ items, value, onChange, variant = "underline", label, cla
 const MODAL_SIZE = { sm: "sm:max-w-sm", md: "sm:max-w-md", lg: "sm:max-w-lg", xl: "sm:max-w-2xl" };
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
-export function Modal({ onClose, labelledBy, label, size = "md", dismissable = true, className = "", wrapperStyle, children }) {
+// full: tam ekran çekmece (mobil menü).
+export function Modal({ onClose, labelledBy, label, size = "md", full = false, dismissable = true, className = "", wrapperStyle, children }) {
   const panel = useRef(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
@@ -241,7 +242,7 @@ export function Modal({ onClose, labelledBy, label, size = "md", dismissable = t
     };
   }, [dismissable]);
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4" style={wrapperStyle}>
+    <div className={cx("fixed inset-0 z-50 flex justify-center", full ? "items-stretch" : "items-end sm:items-center sm:p-4")} style={wrapperStyle}>
       <div className="fade-in absolute inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true" onMouseDown={() => dismissable && closeRef.current?.()} />
       <div
         ref={panel}
@@ -251,9 +252,11 @@ export function Modal({ onClose, labelledBy, label, size = "md", dismissable = t
         aria-label={labelledBy ? undefined : label}
         tabIndex={-1}
         className={cx(
-          "modal-in relative max-h-full w-full overflow-y-auto overscroll-contain rounded-t-panel bg-raised p-6 shadow-raised ring-1 ring-ink-600",
-          "pb-[max(1.5rem,env(safe-area-inset-bottom))] focus:outline-none sm:max-h-[92vh] sm:rounded-panel sm:pb-6",
-          MODAL_SIZE[size],
+          "relative w-full overflow-y-auto overscroll-contain bg-raised focus:outline-none",
+          full
+            ? "sheet-in h-full p-5"
+            : "modal-in max-h-full rounded-t-panel p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-raised ring-1 ring-ink-600 sm:max-h-[92vh] sm:rounded-panel sm:pb-6",
+          !full && MODAL_SIZE[size],
           className
         )}
       >

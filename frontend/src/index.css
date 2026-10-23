@@ -243,24 +243,6 @@ body {
   pointer-events: none;
 }
 
-/* ── Tarama ilerleme çubuğu — bilgi öncelikli, sade ──────────────────────────
-   Şu an işlenen şirket + gerçek ilerleme (done/total). İnce (4px) yuvarlak uçlu
-   lacivert çubuk; üzerinde çok hafif bir parlama (shimmer) soldan sağa geçer. */
-.nr-bar { position: relative; height: 4px; border-radius: 9999px; overflow: hidden; }
-.nr-bar__fill {
-  position: relative; height: 100%; border-radius: 9999px; background: rgb(var(--accent));
-  overflow: hidden; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); will-change: width;
-}
-/* "Çalışıyor" hissi: fill üzerinde soldan sağa süzülen hafif ışık şeridi. */
-.nr-bar__shine {
-  position: absolute; inset: 0; transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
-  animation: nr-shine 1.7s ease-in-out infinite;
-}
-@keyframes nr-shine {
-  0% { transform: translateX(-100%); }
-  60%, 100% { transform: translateX(220%); }
-}
 /* Durum metni değişince yumuşak beliriş (şirket adı geçişi). */
 .nr-name-in { animation: nr-name-in 0.35s ease; }
 @keyframes nr-name-in {
@@ -290,10 +272,8 @@ body {
   .hiw-merge { display: none; }
 }
 
-/* reduced-motion: parlama ve geçişler dursun, çubuk kalsın. */
+/* reduced-motion: durum metni geçişi de dursun. */
 @media (prefers-reduced-motion: reduce) {
-  .nr-bar__shine { display: none; }
-  .nr-bar__fill { transition: none; }
   .nr-name-in { animation: none; }
 }
 
@@ -441,8 +421,8 @@ html.lenis, html.lenis body { height: auto; }
 }
 
 /* Hover: kısa, tatmin edici (süre/eğri motion.js). Butonlar: kit.jsx Button. */
-.lx-link { position: relative; }
-.lx-link::after {
+.link-u { position: relative; }
+.link-u::after {
   content: "";
   position: absolute;
   left: 0;
@@ -454,17 +434,17 @@ html.lenis, html.lenis body { height: auto; }
   transform-origin: right;
   transition: transform var(--dur-hover) var(--ease);
 }
-.lx-link:hover::after,
-.lx-link:focus-visible::after { transform: scaleX(1); transform-origin: left; }
+.link-u:hover::after,
+.link-u:focus-visible::after { transform: scaleX(1); transform-origin: left; }
 .lx-arrow { display: inline-block; transition: transform var(--dur-hover) var(--ease); }
-.lx-link:hover .lx-arrow { transform: translate3d(0, 3px, 0); }
+.link-u:hover .lx-arrow { transform: translate3d(0, 3px, 0); }
 
 /* Nav: en üstte saydam; kaydırınca yarı saydam + bulanık zemin. */
-.lx-nav {
+.nav-bar {
   border-bottom: 1px solid transparent;
   transition: background-color var(--dur-state) var(--ease), border-color var(--dur-state) var(--ease);
 }
-.lx-nav[data-scrolled="true"] {
+.nav-bar[data-scrolled="true"] {
   background-color: rgb(var(--ink-900) / 0.72);
   border-bottom-color: rgb(var(--slate-100) / 0.08);
   -webkit-backdrop-filter: blur(14px) saturate(140%);

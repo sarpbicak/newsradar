@@ -10,8 +10,8 @@ import { ArrowRight } from "lucide-react";
 import { api } from "../../api.js";
 import { fmtInt, useI18n } from "../../i18n.jsx";
 import { navigate } from "../../router.js";
-import Logo from "../Logo.jsx";
 import { Button } from "../kit.jsx";
+import NavBar, { Brand, NavLink, WRAP } from "../NavBar.jsx";
 import PrivacyModal from "../PrivacyModal.jsx";
 import { LanguageSwitcher } from "../LanguageBits.jsx";
 import { ThemeMenu } from "../ThemeToggle.jsx";
@@ -24,7 +24,6 @@ import { ease } from "../../motion.js";
 import { EngineContext, scrollToId, scrub, useEngineLoader, useScrub } from "./scroll.js";
 import { Lines, Reveal } from "./Type.jsx";
 
-const WRAP = "mx-auto w-full max-w-[1360px] px-5 sm:px-8 lg:px-10";
 
 function goApp(e) {
   e?.preventDefault();
@@ -41,40 +40,32 @@ function AppButton({ size = "md", className = "", children }) {
 
 function Nav({ lang, onLang, onAnchor }) {
   const { t } = useI18n();
-  const [scrolled, setScrolled] = useState(false);
-  useEffect(() => {
-    const on = () => setScrolled(window.scrollY > 8);
-    on();
-    window.addEventListener("scroll", on, { passive: true });
-    return () => window.removeEventListener("scroll", on);
-  }, []);
   return (
-    <header data-lx-nav data-scrolled={scrolled} className="lx-nav fixed inset-x-0 top-0 z-40">
-      <div className={`${WRAP} flex h-16 items-center justify-between gap-3`}>
-        <a
+    <NavBar
+      fixed
+      brand={
+        <Brand
           href="/?welcome"
-          onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0 }); }}
-          className="inline-flex min-h-[44px] items-center gap-2 font-display text-lg font-semibold tracking-tight text-slate-100"
-        >
-          <Logo className="h-5 w-5 text-accent" />
-          NewsRadar
-        </a>
-        <nav className="flex items-center gap-1 sm:gap-2" aria-label="NewsRadar">
-          <a href="#how-it-works" onClick={onAnchor} className="lx-link mx-3 hidden text-[15px] text-slate-300 transition-colors hover:text-slate-100 md:inline">
-            {t("land.nav.how")}
-          </a>
-          <a href="#stack" onClick={onAnchor} className="lx-link mx-3 hidden text-[15px] text-slate-300 transition-colors hover:text-slate-100 md:inline">
-            {t("land.nav.stack")}
-          </a>
-          <LanguageSwitcher lang={lang} onChange={onLang} />
-          <ThemeMenu />
-          <AppButton className="ml-1">
-            <span className="sm:hidden">{t("land.openAppShort")}</span>
-            <span className="hidden sm:inline">{t("land.openApp")}</span>
-          </AppButton>
-        </nav>
-      </div>
-    </header>
+          onClick={(e) => {
+            e.preventDefault();
+            window.scrollTo({ top: 0 });
+          }}
+        />
+      }
+    >
+      <NavLink href="#how-it-works" onClick={onAnchor}>
+        {t("land.nav.how")}
+      </NavLink>
+      <NavLink href="#stack" onClick={onAnchor}>
+        {t("land.nav.stack")}
+      </NavLink>
+      <LanguageSwitcher lang={lang} onChange={onLang} />
+      <ThemeMenu />
+      <AppButton className="ml-1">
+        <span className="sm:hidden">{t("land.openAppShort")}</span>
+        <span className="hidden sm:inline">{t("land.openApp")}</span>
+      </AppButton>
+    </NavBar>
   );
 }
 
@@ -154,7 +145,7 @@ function Stack() {
           <ArchitectureDiagram />
         </div>
         <Reveal className="mt-12">
-          <a href={GITHUB_REPO_URL} target="_blank" rel="noreferrer" className="lx-link inline-flex min-h-[44px] items-center gap-2.5 text-[17px] font-medium text-slate-200">
+          <a href={GITHUB_REPO_URL} target="_blank" rel="noreferrer" className="link-u inline-flex min-h-[44px] items-center gap-2.5 text-[17px] font-medium text-slate-200">
             <GitHubIcon /> {t("land.stack.repo")} <span aria-hidden="true">↗</span>
           </a>
         </Reveal>
@@ -188,7 +179,7 @@ function Footer({ onPrivacy }) {
           <div className="font-display text-lg font-semibold text-slate-100">{t("land.footer.built", { name: "Sarp Bıçak" })}</div>
           <p className="mt-2 text-sm text-slate-500">
             {t("land.footer.note")}{" "}
-            <button onClick={onPrivacy} className="lx-link text-slate-400 hover:text-slate-200">
+            <button onClick={onPrivacy} className="link-u text-slate-400 hover:text-slate-200">
               {t("land.footer.privacy")}
             </button>
           </p>

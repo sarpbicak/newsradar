@@ -194,7 +194,7 @@ export function paintSegs(nodes, p) {
 export function scrollToId(engine, id) {
   const el = document.getElementById(id);
   if (!el) return;
-  const header = document.querySelector("[data-lx-nav]")?.offsetHeight || 0;
+  const header = document.querySelector("[data-nav-bar]")?.offsetHeight || 0;
   if (engine?.lenis) engine.lenis.scrollTo(el, { offset: -header });
   else el.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
   window.history.replaceState(null, "", `#${id}`);

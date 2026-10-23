@@ -80,8 +80,8 @@ export function LanguageSwitcher({ lang, onChange }) {
         title={label}
         aria-label={label}
         aria-pressed={on}
-        className={`inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-lg px-1.5 transition ${
-          on ? "bg-ink-700 ring-1 ring-accent/40" : "opacity-55 hover:opacity-100"
+        className={`tap-sq inline-flex h-10 w-10 items-center justify-center rounded-full transition duration-hover ease-std ${
+          on ? "bg-ink-700" : "opacity-55 hover:bg-ink-700 hover:opacity-100"
         }`}
       >
         <Flag lang={l} className="h-4 w-6" />
