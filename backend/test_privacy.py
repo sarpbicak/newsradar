@@ -88,7 +88,7 @@ with TestClient(app) as client:
     r = client.get("/privacy-info")
     check(r.status_code == 200, f"girişsiz erişilebilir ({r.status_code})")
     d = r.json()
-    check(d == {"llm_provider": "Anthropic (Claude API)", "hosting_provider": "Render",
+    check(d == {"llm_provider": "Anthropic", "hosting_provider": "Render",
                 "contact_email": "privacy@example.com", "ip_retention_days": 7}, f"değerler config'ten: {d}")
 
 print("== D: sağlayıcı adı tek kaynaktan ==")

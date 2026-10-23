@@ -267,7 +267,7 @@ def provider_name() -> str:
 
 # Kullanıcıya gösterilen LLM sağlayıcı adı — TEK kaynak (gizlilik metni bunu kullanır).
 # provider env'i değişince metin de değişir.
-_PROVIDER_DISPLAY = {"anthropic": "Anthropic (Claude API)"}
+_PROVIDER_DISPLAY = {"anthropic": "Anthropic"}
 _HOST_DISPLAY = {"openrouter.ai": "OpenRouter", "integrate.api.nvidia.com": "NVIDIA",
                  "api.together.xyz": "Together AI"}
 
