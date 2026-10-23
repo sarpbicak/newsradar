@@ -86,7 +86,7 @@ def _find_by_username_ci(db: Session, username: str) -> User | None:
 
 
 @router.post("/register", response_model=UserTokenOut, status_code=201)
-def register(payload: RegisterIn, request: Request, db: Session = Depends(get_db)) -> UserTokenOut:
+def register(payload: RegisterIn, request: Request, db: Session = Depends(get_db, scope="function")) -> UserTokenOut:
     """Yeni kişisel hesap (HERKESE AÇIK — genel şifre kapısı kaldırıldı; max_users + anon
     hız sınırı korur). İlk kullanıcı (ya da ADMIN_USERNAME) admin olur."""
     _check_locked(request)
@@ -145,7 +145,7 @@ def register(payload: RegisterIn, request: Request, db: Session = Depends(get_db
 
 
 @router.post("/login", response_model=UserTokenOut)
-def login(payload: UserLoginIn, request: Request, db: Session = Depends(get_db)) -> UserTokenOut:
+def login(payload: UserLoginIn, request: Request, db: Session = Depends(get_db, scope="function")) -> UserTokenOut:
     """Kişisel giriş. Kullanıcı adı büyük/küçük harf duyarsız; şifre bcrypt ile doğrulanır.
 
     Hız-sınırlı (kaba kuvvet). Hata mesajı kullanıcı adı/şifre ayrımı yapmaz (enum'a karşı)."""
@@ -194,7 +194,7 @@ def me(user: User = Depends(get_current_user)) -> UserOut:
 
 @router.post("/upgrade", response_model=UserTokenOut)
 def upgrade(payload: RegisterIn, user: User = Depends(get_current_user),
-            db: Session = Depends(get_db)) -> UserTokenOut:
+            db: Session = Depends(get_db, scope="function")) -> UserTokenOut:
     """Anonim oturumu KALICI hesaba çevir (liste/geçmiş korunur — aynı satır).
 
     Yalnızca anonim kullanıcı için. Kullanıcı adı + şifre belirlenir; device_id_hash
@@ -219,14 +219,14 @@ def upgrade(payload: RegisterIn, user: User = Depends(get_current_user),
 
 
 @router.post("/me/guide-dismiss", response_model=UserOut)
-def dismiss_guide(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> UserOut:
+def dismiss_guide(user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")) -> UserOut:
     """"NewsRadar ne yapar?" açıklama kutusunu kalıcı olarak kapat (kullanıcı tercihi)."""
     user.guide_dismissed = True
     return _user_out(user)
 
 
 @router.post("/me/tutorial-done", response_model=UserOut)
-def finish_tutorial(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> UserOut:
+def finish_tutorial(user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")) -> UserOut:
     """İlk giriş tutorial'ını tamamlandı işaretle (bir daha gösterilmez)."""
     user.tutorial_done = True
     return _user_out(user)
@@ -238,12 +238,13 @@ class LanguageIn(BaseModel):
 
 @router.post("/me/language", response_model=UserOut)
 def set_language(payload: LanguageIn, user: User = Depends(get_current_user),
-                 db: Session = Depends(get_db)) -> UserOut:
+                 db: Session = Depends(get_db, scope="function")) -> UserOut:
     """Arayüz dilini kaydet ("tr" | "en"). Geçersizse tr'ye düşer."""
     lang = (payload.language or "").strip().lower()
     user.language = lang if lang in ("tr", "en") else "tr"
-    # YANITTAN ÖNCE commit: get_db'nin commit'i yanıt gönderildikten SONRA çalışıyor.
-    # Arayüz bu yanıtı bekleyip hemen GET /entities çekiyor; commit gecikirse kartlar ESKİ
-    # dilde geliyordu (Türkçe arayüzde İngilizce analiz — dil karışmasının bir yolu).
+    # YANITTAN ÖNCE commit: arayüz bu yanıtı bekleyip hemen GET /entities çekiyor; commit
+    # gecikirse kartlar ESKİ dilde geliyordu (dil karışmasının bir yolu). get_db artık
+    # scope="function" ile zaten yanıttan önce commit ediyor; bu açık commit fonksiyon
+    # doğrudan çağrıldığında da (test_language_missing C) kalıcılığı garanti eder.
     db.commit()
     return _user_out(user)

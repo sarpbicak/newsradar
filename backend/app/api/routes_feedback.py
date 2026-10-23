@@ -39,7 +39,7 @@ def device_from_user_agent(ua: str | None) -> str:
 
 def _optional_user(
     authorization: str | None = Header(default=None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> User | None:
     """Token varsa kullanıcıyı çöz; yoksa/geçersizse None (401 ATMAZ)."""
     if not authorization:
@@ -54,7 +54,7 @@ def _optional_user(
 def submit_feedback(
     payload: FeedbackIn,
     request: Request,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     user: User | None = Depends(_optional_user),
 ) -> FeedbackAck:
     """Geri bildirim kaydet. Anon ya da kayıtlı; user_id varsa bağlanır."""

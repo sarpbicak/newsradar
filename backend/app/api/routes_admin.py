@@ -74,7 +74,7 @@ def _top_entities(db: Session, user_id: int | None = None, limit: int = 5) -> li
 
 
 @router.get("/users", response_model=list[AdminUserRow])
-def list_users(db: Session = Depends(get_db)) -> list[AdminUserRow]:
+def list_users(db: Session = Depends(get_db, scope="function")) -> list[AdminUserRow]:
     """Kullanıcı listesi + özet sayaçlar (giriş/yenileme/toplam) + son aktiflik."""
     users = db.scalars(select(User).order_by(User.created_at)).all()
     rows: list[AdminUserRow] = []
@@ -96,7 +96,7 @@ def list_users(db: Session = Depends(get_db)) -> list[AdminUserRow]:
 
 
 @router.get("/users/{user_id}", response_model=AdminUserDetail)
-def user_detail(user_id: int, db: Session = Depends(get_db)) -> AdminUserDetail:
+def user_detail(user_id: int, db: Session = Depends(get_db, scope="function")) -> AdminUserDetail:
     """Tek kullanıcının detaylı kullanımı: eylem dökümü + en çok baktığı şirketler + son eylemler."""
     user = db.get(User, user_id)
     if user is None:
@@ -147,7 +147,7 @@ def user_detail(user_id: int, db: Session = Depends(get_db)) -> AdminUserDetail:
 def delete_user(
     user_id: int,
     admin: User = Depends(require_admin),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> None:
     """Kullanıcıyı ve ona bağlı TÜM verileri siler (yalnızca admin).
 
@@ -192,7 +192,7 @@ def delete_user(
 def reset_password(
     user_id: int,
     admin: User = Depends(require_admin),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> PasswordResetOut:
     """Kullanıcının şifresini GEÇİCİ bir şifreyle sıfırlar (yalnızca admin).
 
@@ -211,7 +211,7 @@ def reset_password(
 
 
 @router.get("/stats", response_model=AdminStatsOut)
-def stats(db: Session = Depends(get_db)) -> AdminStatsOut:
+def stats(db: Session = Depends(get_db, scope="function")) -> AdminStatsOut:
     """Genel istatistikler: toplam kullanıcı, bugün aktif, bugünkü yenileme, popüler şirketler."""
     today = _start_of_today()
     total_users = db.scalar(select(func.count()).select_from(User)) or 0
@@ -273,7 +273,7 @@ def stats(db: Session = Depends(get_db)) -> AdminStatsOut:
 
 
 @router.get("/feedback", response_model=list[AdminFeedbackOut])
-def list_feedback(db: Session = Depends(get_db)) -> list[AdminFeedbackOut]:
+def list_feedback(db: Session = Depends(get_db, scope="function")) -> list[AdminFeedbackOut]:
     """Tüm geri bildirimler — OKUNMAMIŞLAR önce, sonra en yeni üstte.
 
     Gönderen kullanıcı adı/anon durumu User join'iyle çözülür (silinmiş/anon → None).
@@ -304,7 +304,7 @@ def list_feedback(db: Session = Depends(get_db)) -> list[AdminFeedbackOut]:
 @router.delete("/feedback/{feedback_id}", status_code=204)
 def delete_feedback(
     feedback_id: int,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     admin: User = Depends(require_admin),
 ) -> None:
     """Bir geri bildirimi KALICI olarak siler (yalnızca admin; arayüz onay sorar).
@@ -320,7 +320,7 @@ def delete_feedback(
 
 
 @router.post("/feedback/{feedback_id}/read", status_code=204)
-def mark_feedback_read(feedback_id: int, db: Session = Depends(get_db)) -> None:
+def mark_feedback_read(feedback_id: int, db: Session = Depends(get_db, scope="function")) -> None:
     """Bir geri bildirimi okundu işaretle (idempotent)."""
     fb = db.get(Feedback, feedback_id)
     if fb is None:

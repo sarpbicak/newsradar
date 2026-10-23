@@ -1,7 +1,8 @@
 """Kullanım eventi kaydı — 'kim ne yaptı' takibi (usage_events).
 
 Veri ORTAK; yalnızca eylemler kullanıcıya bağlanır. record_event mevcut session'a
-event ekler (route'un get_db bağımlılığı commit eder). Hata-toleranslı: loglama
+event ekler (route'un get_db bağımlılığı, scope="function" ile yanıttan ÖNCE commit
+eder). Hata-toleranslı: loglama
 başarısız olsa bile ASIL işlem etkilenmez.
 """
 

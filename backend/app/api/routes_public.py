@@ -24,7 +24,7 @@ CACHE = "public, max-age=300"
 
 
 @router.get("/stats", response_model=PublicStatsOut)
-def public_stats(response: Response, db: Session = Depends(get_db)) -> PublicStatsOut:
+def public_stats(response: Response, db: Session = Depends(get_db, scope="function")) -> PublicStatsOut:
     """Gerçek toplamlar (uydurma/şişirme yok): AI'ın analiz ettiği haber, üretilen AI
     değerlendirmesi (entity_analyses), haberlerdeki farklı kaynak sayısı, desteklenen diller."""
     analyzed = db.scalar(select(func.count()).select_from(Article).where(Article.analyzed.is_(True))) or 0
@@ -38,6 +38,6 @@ def public_stats(response: Response, db: Session = Depends(get_db)) -> PublicSta
 
 @router.get("/how-it-works", response_model=HowItWorksOut)
 def public_how_it_works(response: Response, lang: str = Query("en", pattern="^(tr|en)$"),
-                        db: Session = Depends(get_db)) -> HowItWorksOut:
+                        db: Session = Depends(get_db, scope="function")) -> HowItWorksOut:
     response.headers["Cache-Control"] = CACHE
     return build_how_it_works(db, lang)

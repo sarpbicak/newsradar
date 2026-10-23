@@ -54,7 +54,7 @@ def _pick_entity(db: Session, language: str) -> Entity | None:
 
 
 @router.get("/how-it-works", response_model=HowItWorksOut)
-def how_it_works(db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> HowItWorksOut:
+def how_it_works(db: Session = Depends(get_db, scope="function"), user: User = Depends(get_current_user)) -> HowItWorksOut:
     return build_how_it_works(db, getattr(user, "language", "tr") or "tr")
 
 

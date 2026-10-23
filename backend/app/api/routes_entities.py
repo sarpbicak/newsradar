@@ -101,7 +101,7 @@ def _daily_new_entity_ok(db: Session, user: User) -> bool:
 @router.get("", response_model=list[EntityCardOut])
 def list_entities(
     lang: str | None = Query(None, description="AI içeriği dili (tr|en); yoksa kullanıcının dili"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> list[EntityCardOut]:
     """YALNIZCA kullanıcının izleme listesindeki entity'ler (ortak havuzdaki analizle)."""
@@ -134,7 +134,7 @@ def list_entities(
 @router.post("", response_model=EntityCardOut, status_code=201)
 def create_entity(
     payload: EntityCreate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> EntityCardOut:
     """Şirketi kullanıcının listesine ekler (HAVUZ-FARKINDA).
@@ -207,7 +207,7 @@ def create_entity(
 @router.delete("/{entity_id}", status_code=204)
 def delete_entity(
     entity_id: int,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> None:
     """Şirketi YALNIZCA kullanıcının listesinden çıkarır (havuzdan silmez).

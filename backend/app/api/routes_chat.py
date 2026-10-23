@@ -76,7 +76,7 @@ def _build_context(db: Session, entity: Entity) -> str:
 @router.post("/chat")
 def chat(
     payload: ChatRequest,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     entity = db.get(Entity, payload.entity_id)
@@ -85,6 +85,8 @@ def chat(
     # sohbete sızardı. dashboard ucuyla aynı davranış: yoksa/erişilemezse 404.
     if entity is None or not in_watchlist(db, user.id, entity.id):
         raise HTTPException(status_code=404, detail="Entity bulunamadı.")
+    # Bu kayıt (ve get_current_user'ın last_active_at'i) get_db (scope="function")
+    # tarafından StreamingResponse DÖNMEDEN, yani akış başlamadan commit edilir.
     record_event(db, user.id, "chat", {"entity_id": entity.id, "name": entity.name})
 
     # Mesajları doğrula/normalize et (role user/assistant, string content).
@@ -104,6 +106,11 @@ def chat(
         f"\n\nBAĞLAM (bu varlığın haber akışı):\n{context}"
     )
 
+    # ÖNEMLİ: istek oturumu (db) bu fonksiyon döndüğünde commit edilip KAPATILIR;
+    # akış ondan SONRA başlar. Bu yüzden DB'den gereken her şey (bağlam, dil, mesajlar)
+    # yukarıda düz değerlere çevrildi; event_stream db'yi ya da ORM nesnelerini
+    # (entity/user) KULLANMAZ. Akış sırasında yazma gerekirse kendi session_scope()'unu
+    # açmalı (LLM kullanım/maliyet kaydı zaten budget içinde ayrı oturumla yazılıyor).
     def event_stream():
         # GÜVENLİK: kullanıcıya GENEL mesaj (model adı/config/iç ayrıntı sızdırma);
         # gerçek hatayı sunucuda logla.

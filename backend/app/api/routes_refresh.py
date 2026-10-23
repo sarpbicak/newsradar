@@ -63,7 +63,7 @@ def refresh(
     scheduler_enabled: bool | None = Query(
         None, description="Saatlik otomatik yenilemeyi aç/kapat"
     ),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> RefreshAck:
     """Yenilemeyi ARKA PLANDA başlatır ve hemen döner (tarama 1-2 dk sürebilir).
@@ -108,7 +108,7 @@ def refresh(
 
 @router.get("/status", response_model=ProviderStatusOut)
 def status(
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> ProviderStatusOut:
     """Sağlayıcı/LLM/zamanlayıcı + yenileme süreci + NewsAPI kotası + KİŞİSEL yenileme kotası."""

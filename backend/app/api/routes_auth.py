@@ -72,7 +72,7 @@ def _bearer(authorization: str | None) -> str:
 
 def get_current_user(
     authorization: str | None = Header(default=None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> User:
     """Veri uçları için bağımlılık: geçerli+süresi dolmamış KİŞİSEL token yoksa 401."""
     settings = get_settings()
@@ -106,7 +106,7 @@ def get_current_user(
     now_dt = datetime.now(timezone.utc)
     la = user.last_active_at
     if la is None or (now_dt - la).total_seconds() >= _ACTIVE_THROTTLE_S:
-        user.last_active_at = now_dt  # get_db istek sonunda commit eder
+        user.last_active_at = now_dt  # get_db (scope=function) yanıttan önce commit eder
     return user
 
 

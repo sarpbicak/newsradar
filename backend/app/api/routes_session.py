@@ -45,7 +45,7 @@ def _set_device_cookie(response: Response, device_id: str) -> None:
 
 
 @router.post("/bootstrap", response_model=UserTokenOut)
-def bootstrap(request: Request, response: Response, db: Session = Depends(get_db)) -> UserTokenOut:
+def bootstrap(request: Request, response: Response, db: Session = Depends(get_db, scope="function")) -> UserTokenOut:
     """Cihaz oturumu al/oluştur (şifresiz). Token + kullanıcı döner, cookie'yi tazeler."""
     settings = get_settings()
     device_id = request.cookies.get(settings.session_cookie_name)

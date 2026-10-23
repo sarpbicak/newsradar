@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 
+from fastapi import HTTPException
 from sqlalchemy import create_engine, event
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from ..config import get_settings
 
 _settings = get_settings()
+logger = logging.getLogger("newsradar.db")
 
 # SQLite + FastAPI (çok thread'li) için check_same_thread=False gerekli.
 # timeout=30: kilit meşgulken 30 sn beklenir, hemen "database is locked" atmaz.
@@ -104,13 +108,43 @@ def session_scope() -> Iterator[Session]:
 
 
 def get_db() -> Iterator[Session]:
-    """FastAPI bağımlılığı (Depends) — istek başına oturum verir."""
+    """FastAPI bağımlılığı — istek başına oturum; route gövdesi bitince commit eder.
+
+    ROUTE'LARDA HER ZAMAN ``Depends(get_db, scope="function")`` İLE KULLANILIR.
+    Varsayılan (scope="request") yield-bağımlılığında yield sonrası kod YANIT
+    GÖNDERİLDİKTEN SONRA çalışır: istemci 200/204 alır ama commit henüz olmamıştır →
+    hemen ardından gelen istek eski veriyi görür (ör. silinen kullanıcının token'ı
+    bir süre daha 200 alır) ve commit başarısız olursa istemciye yine "başarılı"
+    denmiş olur. scope="function" ile yield sonrası kod route fonksiyonu (ve yanıt
+    serileştirmesi) bittikten hemen sonra, yanıt GÖNDERİLMEDEN önce çalışır.
+
+    Önbellek anahtarı scope'u içerir: aynı istekte get_current_user ile route'un AYNI
+    oturumu paylaşması için tüm kullanımlar aynı scope'u kullanmalı
+    (test_commit_timing bunu tüm route'lar için denetler).
+
+    Commit başarısızsa rollback + 500 (genel mesaj; ayrıntı yalnızca sunucu logunda).
+    Route bir istisna fırlatırsa (HTTPException dahil) değişiklikler geri alınır.
+
+    SSE/streaming uçları: oturum, akış BAŞLAMADAN commit edilip kapanır → akış
+    üreteci bu oturumu ya da ondan gelen ORM nesnelerinin tembel alanlarını
+    KULLANMAMALI; akış sırasında DB gerekiyorsa kendi ``session_scope()``'unu açmalı
+    (bkz. routes_chat).
+    """
     session = SessionLocal()
     try:
-        yield session
-        session.commit()
-    except Exception:
-        session.rollback()
-        raise
+        try:
+            yield session
+        except Exception:
+            session.rollback()
+            raise
+        try:
+            session.commit()
+        except SQLAlchemyError as exc:
+            session.rollback()
+            logger.exception("İstek sonu commit başarısız — değişiklikler geri alındı.")
+            raise HTTPException(
+                status_code=500,
+                detail="Değişiklik kaydedilemedi, lütfen tekrar deneyin.",
+            ) from exc
     finally:
         session.close()

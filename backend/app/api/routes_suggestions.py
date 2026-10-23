@@ -89,7 +89,7 @@ def _suggestion_out(db: Session, sug: Suggestion, name_by_id: dict[int, str]) ->
 
 @router.get("", response_model=list[SuggestionOut])
 def list_suggestions(
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> list[SuggestionOut]:
     """KİŞİSEL öneriler: yalnızca KULLANICININ listesindeki entity'lerin haberlerinden
@@ -143,7 +143,7 @@ def list_suggestions(
 @router.post("/{suggestion_id}/dismiss", status_code=204)
 def dismiss_suggestion(
     suggestion_id: int,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> None:
     """Öneriyi YALNIZCA bu kullanıcı için kapatır (KİŞİSEL — başkasını etkilemez)."""
@@ -172,7 +172,7 @@ def _dismiss_for_user(db: Session, user_id: int, suggestion_id: int) -> None:
 @router.post("/{suggestion_id}/add", response_model=EntityCardOut, status_code=201)
 def add_suggestion(
     suggestion_id: int,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> EntityCardOut:
     """Öneriyi KULLANICININ listesine ekler (havuz-farkında) ve öneriyi KİŞİSEL kapatır.

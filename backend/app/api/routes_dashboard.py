@@ -22,7 +22,7 @@ def entity_dashboard(
     entity_id: int,
     limit: int = Query(50, ge=1, le=200),
     lang: str | None = Query(None, description="AI içeriği dili (tr|en); yoksa kullanıcının dili"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> DashboardOut:
     entity = db.get(Entity, entity_id)
