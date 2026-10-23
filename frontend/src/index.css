@@ -445,6 +445,8 @@ html.lenis, html.lenis body { height: auto; }
 .lx-step { color: rgb(var(--slate-600)); transition: color var(--lx-dur-state) var(--lx-ease); }
 .lx-step[data-active="true"] { color: rgb(var(--slate-100)); }
 .lx-step[data-active="true"] .lx-step-num { color: rgb(var(--signal-ink)); }
+.lx-step .lx-step-body { color: rgb(var(--slate-600)); transition: color var(--lx-dur-state) var(--lx-ease); }
+.lx-step[data-active="true"] .lx-step-body { color: rgb(var(--slate-400)); }
 
 @media (prefers-reduced-motion: reduce) {
   .lx-intro-line,

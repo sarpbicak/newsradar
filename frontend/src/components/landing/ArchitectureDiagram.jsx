@@ -1,71 +1,66 @@
-// "Altında ne var" — mimari şeması (HTML + tema tokenları; SVG'de metin mobilde okunmaz
-// küçüklüğe inerdi). Katmanlar soldan sağa (masaüstü) / yukarıdan aşağı (mobil) akar.
-// Erişilebilirlik: anlamlı liste (ol/li); oklar dekoratif (aria-hidden).
-import React from "react";
+// "Altında ne var" — sade mimari şeması. Beş şerit, her biri soldan sağa akan üç düğüm.
+// Kaydırdıkça şeritler sırayla belirir, düğümler gelir ve aradaki çizgiler çizilir (scrub; geri
+// kaydırınca geri sarar). Yalnızca transform/opacity. Model adı ("Claude") landing'de yalnızca burada.
+// Erişilebilirlik: anlamlı liste (ol/li); çizgiler dekoratif.
+import React, { useRef } from "react";
 import { useI18n } from "../../i18n.jsx";
+import { paintSegs, scrub, useScrub } from "./scroll.js";
 
-function Node({ title, detail, strong = false }) {
-  return (
-    <div className={`rounded-lg border bg-ink-800 px-3 py-2 ${strong ? "border-accent/60 shadow-[inset_3px_0_0_rgb(var(--accent))]" : "border-ink-500"}`}>
-      <div className="text-[13px] font-semibold text-slate-100">{title}</div>
-      {detail && <div className="mt-0.5 font-mono text-[11px] leading-snug text-slate-400">{detail}</div>}
-    </div>
-  );
-}
-
-function Arrow({ label }) {
-  return (
-    <div className="flex items-center justify-center gap-1 py-1 text-slate-500 md:px-1 md:py-0" aria-hidden="true">
-      <span className="md:hidden">↓</span>
-      <span className="hidden md:inline">→</span>
-      {label && <span className="font-mono text-[10px]">{label}</span>}
-    </div>
-  );
-}
-
-function Lane({ name, children }) {
-  return (
-    <li className="rounded-xl border border-ink-600 bg-ink-900/60 p-3">
-      <div className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-wide text-slate-500">{name}</div>
-      <div className="flex flex-col items-stretch md:flex-row md:items-center md:gap-1">{children}</div>
-    </li>
-  );
-}
+const LANE = 0.16; // şerit başına ilerleme payı
 
 export default function ArchitectureDiagram() {
   const { t } = useI18n();
+  const ref = useRef(null);
+  const lanes = [
+    { name: t("land.stack.frontend"), nodes: ["React · Vite", "CloudFront", "S3"] },
+    { name: t("land.stack.api"), nodes: ["Caddy · TLS", "FastAPI · Docker", "EC2"] },
+    { name: t("land.stack.ai"), nodes: ["Finnhub · NewsAPI", "Claude", t("land.stack.verdict")], key: 1 },
+    { name: t("land.stack.data"), nodes: ["SQLite", t("land.stack.nightly"), "S3"] },
+    { name: t("land.stack.delivery"), nodes: ["GitHub Actions", "OIDC", t("land.stack.deploy")] },
+  ];
+  useScrub(
+    ref,
+    (engine, el) => {
+      const nodes = el.querySelectorAll("[data-fx]");
+      return scrub(engine, { trigger: el, end: "bottom 75%", render: (p) => paintSegs(nodes, p) });
+    },
+    [t]
+  );
   return (
-    <ol className="space-y-3" aria-label={t("land.stack.title")}>
-      <Lane name={t("land.stack.frontend")}>
-        <Node title={t("land.stack.browser")} detail="Vite · Tailwind · i18n" />
-        <Arrow label="HTTPS" />
-        <Node title="CloudFront" detail="HTTP/2+3 · www → apex" strong />
-        <Arrow label="OAC" />
-        <Node title="S3" detail="private bucket" />
-      </Lane>
-      <Lane name={t("land.stack.api")}>
-        <Node title="Caddy" detail="api.newsradarapp.com · auto TLS" />
-        <Arrow />
-        <Node title="FastAPI" detail="Docker · EC2 t4g (arm64)" strong />
-        <Arrow />
-        <Node title="Claude API" detail="Anthropic · article + verdict + chat" />
-        <Arrow />
-        <Node title={t("land.stack.sources")} />
-      </Lane>
-      <Lane name={t("land.stack.data")}>
-        <Node title="SQLite" detail="WAL · Docker volume" strong />
-        <Arrow label="sqlite3 .backup" />
-        <Node title={t("land.stack.backup")} detail="S3 · versioned · 30d" />
-        <Arrow />
-        <Node title="SSM Parameter Store" detail="secrets · KMS" />
-      </Lane>
-      <Lane name={t("land.stack.delivery")}>
-        <Node title="GitHub Actions" detail={t("land.stack.noKeys")} strong />
-        <Arrow label="arm64" />
-        <Node title="ECR" detail="scan on push" />
-        <Arrow label="SSM" />
-        <Node title="EC2" detail={t("land.stack.rollback")} />
-      </Lane>
+    <ol ref={ref} className="divide-y divide-ink-600 border-y border-ink-600" aria-label={t("land.stack.title")}>
+      {lanes.map((lane, j) => {
+        const base = j * LANE;
+        return (
+          <li key={j} className="grid gap-4 py-6 sm:grid-cols-[10rem_minmax(0,1fr)] sm:items-center sm:py-7">
+            <span data-fx="rise" data-seg={`${base},${base + 0.08}`} className="font-mono text-sm uppercase tracking-wider text-slate-500">
+              {lane.name}
+            </span>
+            <div className="flex items-center">
+              {lane.nodes.map((node, k) => {
+                const at = base + 0.02 + k * 0.045;
+                return (
+                  <React.Fragment key={k}>
+                    {k > 0 && (
+                      <span className="relative mx-2 h-px min-w-[14px] flex-1 bg-ink-600 sm:mx-3 sm:max-w-[120px]" aria-hidden="true">
+                        <span data-fx="line" data-seg={`${at - 0.03},${at + 0.01}`} className="absolute inset-0 origin-left bg-signal" />
+                      </span>
+                    )}
+                    <span
+                      data-fx="rise"
+                      data-seg={`${at},${at + 0.06}`}
+                      className={`rounded-full border px-3 py-1.5 text-center text-[13px] leading-tight sm:px-4 sm:py-2 sm:text-[15px] ${
+                        lane.key === k ? "border-accent text-slate-100" : "border-ink-500 text-slate-300"
+                      }`}
+                    >
+                      {node}
+                    </span>
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          </li>
+        );
+      })}
     </ol>
   );
 }

@@ -1,174 +1,136 @@
 // Landing sayfası (/). Pano /app'te (ayrı pakette, lazy). Daha önce gelmiş ziyaretçi "/"'ta
 // durmaz, doğrudan /app'e gider (router.shouldSkipLanding).
-// Bölümler: hero (imza animasyonu: HeroLoop) · nasıl çalışır (4 adım, görününce bir kez oynayan
-// sahneler — Scenes.jsx) · gerçek rakamlar (API) · altında ne var (mimari + GitHub) · footer.
-// Hero ve sahneler aynı gerçek örneği kullanır: /public/how-it-works bir kez çekilir.
-// Örnek yoksa uydurma yok: hero görseli ve sahneler gizlenir, adım metinleri kalır.
-// reduced-motion'da hiçbir şey oynamaz; sahneler son karede statik.
-import React, { useEffect, useRef, useState } from "react";
+// Yön: haber masasının gece vardiyası — koyu, sakin, az ama büyük; her bölüm tek fikir.
+// Bölümler: hero · manifesto · nasıl çalışır (sabitlenen anlatım) · rakamlar · altında ne var ·
+// kapanış · footer. Hareket kaydırmaya bağlı (scroll.js); yalnızca hero açılışı bir kez oynar.
+// Hero ve sahneler aynı gerçek örneği kullanır: /public/how-it-works bir kez çekilir; örnek yoksa
+// uydurma yok, görseller gizlenir. reduced-motion: hareket yok, her şey son halinde.
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { api } from "../../api.js";
 import { fmtInt, useI18n } from "../../i18n.jsx";
 import { navigate } from "../../router.js";
 import Logo from "../Logo.jsx";
 import PrivacyModal from "../PrivacyModal.jsx";
-import { AnimatedNumber } from "../ui.jsx";
 import { LanguageSwitcher } from "../LanguageBits.jsx";
 import { ThemeMenu } from "../ThemeToggle.jsx";
 import { GITHUB_PROFILE_URL, GITHUB_REPO_URL, GitHubIcon, LINKEDIN_URL, LinkedInIcon, SocialIcon } from "../Social.jsx";
 import ArchitectureDiagram from "./ArchitectureDiagram.jsx";
-import HeroLoop from "./HeroLoop.jsx";
-import { SCENES } from "./Scenes.jsx";
+import Hero from "./Hero.jsx";
+import Manifesto from "./Manifesto.jsx";
+import Walkthrough from "./Walkthrough.jsx";
+import { ease, motionVars } from "./motion.js";
+import { EngineContext, scrollToId, scrub, useEngineLoader, useScrub } from "./scroll.js";
+import { Lines, Reveal } from "./Type.jsx";
+
+const WRAP = "mx-auto w-full max-w-[1360px] px-5 sm:px-8 lg:px-10";
 
 function goApp(e) {
   e?.preventDefault();
   navigate("/app");
 }
 
-function useInViewOnce(ref) {
-  const [seen, setSeen] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || seen) return undefined;
-    if (!("IntersectionObserver" in window)) { setSeen(true); return undefined; }
-    const io = new IntersectionObserver(([e]) => e.isIntersecting && setSeen(true), { threshold: 0.3 });
-    io.observe(el);
-    return () => io.disconnect();
-  }, [ref, seen]);
-  return seen;
+function AppButton({ className = "", children }) {
+  return (
+    <a href="/app" onClick={goApp} className={`lx-btn inline-flex items-center gap-2 rounded-full bg-signal font-semibold text-signal-fg ${className}`}>
+      {children}
+    </a>
+  );
 }
 
-function Header({ lang, onLang }) {
+function Nav({ lang, onLang, onAnchor }) {
   const { t } = useI18n();
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const on = () => setScrolled(window.scrollY > 8);
+    on();
+    window.addEventListener("scroll", on, { passive: true });
+    return () => window.removeEventListener("scroll", on);
+  }, []);
   return (
-    <header className="sticky top-0 z-20 border-b border-ink-600 bg-ink-900/80 backdrop-blur-md">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3 sm:px-6">
+    <header data-lx-nav data-scrolled={scrolled} className="lx-nav fixed inset-x-0 top-0 z-40">
+      <div className={`${WRAP} flex h-16 items-center justify-between gap-3`}>
         <a
           href="/?welcome"
-          onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-          className="inline-flex min-h-[44px] items-center gap-1.5 font-display text-lg font-bold tracking-tight text-slate-100"
+          onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0 }); }}
+          className="inline-flex min-h-[44px] items-center gap-2 font-display text-lg font-semibold tracking-tight text-slate-100"
         >
           <Logo className="h-5 w-5 text-accent" />
           NewsRadar
         </a>
-        <nav className="flex items-center gap-0.5 sm:gap-2" aria-label="NewsRadar">
-          <a href="#how-it-works" className="hidden min-h-[44px] items-center rounded-lg px-3 text-sm text-slate-400 transition hover:bg-ink-700 hover:text-slate-200 md:inline-flex">
+        <nav className="flex items-center gap-1 sm:gap-2" aria-label="NewsRadar">
+          <a href="#how-it-works" onClick={onAnchor} className="lx-link mx-3 hidden text-[15px] text-slate-300 transition-colors hover:text-slate-100 md:inline">
             {t("land.nav.how")}
           </a>
-          <a href="#stack" className="hidden min-h-[44px] items-center rounded-lg px-3 text-sm text-slate-400 transition hover:bg-ink-700 hover:text-slate-200 md:inline-flex">
+          <a href="#stack" onClick={onAnchor} className="lx-link mx-3 hidden text-[15px] text-slate-300 transition-colors hover:text-slate-100 md:inline">
             {t("land.nav.stack")}
           </a>
           <LanguageSwitcher lang={lang} onChange={onLang} />
           <ThemeMenu />
-          <a
-            href="/app"
-            onClick={goApp}
-            className="ml-1 inline-flex min-h-[40px] items-center whitespace-nowrap rounded-lg bg-accent px-3 text-sm font-medium text-accent-fg transition hover:brightness-105 sm:px-4"
-          >
+          <AppButton className="ml-1 h-10 whitespace-nowrap px-4 text-sm sm:px-5">
             <span className="sm:hidden">{t("land.openAppShort")}</span>
             <span className="hidden sm:inline">{t("land.openApp")}</span>
-          </a>
+          </AppButton>
         </nav>
       </div>
     </header>
   );
 }
 
-function Hero({ demo }) {
-  const { t } = useI18n();
-  return (
-    <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-16 pt-10 sm:px-6 md:pt-16 lg:grid-cols-[1.05fr_1fr] lg:gap-14">
-      <div>
-        <h1 className="font-serif text-[2.1rem] font-semibold leading-[1.12] text-slate-100 sm:text-5xl">
-          {t("land.hero.title")}
-        </h1>
-        <p className="mt-5 max-w-xl text-[16px] leading-relaxed text-slate-400 sm:text-lg">{t("land.hero.sub")}</p>
-        <div className="mt-7 flex flex-wrap items-center gap-3">
-          <a
-            href="/app"
-            onClick={goApp}
-            className="inline-flex min-h-[48px] items-center gap-2 rounded-xl bg-accent px-5 text-[15px] font-semibold text-accent-fg shadow-card transition hover:brightness-105"
-          >
-            {t("land.hero.cta")} <ArrowRight className="h-4 w-4" />
-          </a>
-          <a href="#how-it-works" className="inline-flex min-h-[48px] items-center rounded-xl px-4 text-[15px] font-medium text-accent underline-offset-4 hover:underline">
-            {t("land.hero.how")}
-          </a>
-        </div>
-      </div>
-      {demo !== false && <HeroLoop data={demo} />}
-    </section>
-  );
-}
-
-const STEPS = [1, 2, 3, 4];
-
-function Steps({ demo }) {
-  const { t } = useI18n();
-  return (
-    <section id="how-it-works" className="scroll-mt-20 border-t border-ink-600 bg-ink-800/40">
-      <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-        <h2 className="font-display text-2xl font-bold text-slate-100 sm:text-3xl">{t("land.how.title")}</h2>
-        <p className="mt-2 text-slate-400">{t("land.how.sub")}</p>
-        <ol className="mt-10 space-y-12">
-          {STEPS.map((n) => {
-            const Scene = SCENES[n - 1];
-            return (
-              <li key={n} className="grid items-center gap-6 md:grid-cols-2 md:gap-10">
-                <div className={n % 2 === 0 ? "md:order-2" : ""}>
-                  <div className="font-mono text-sm font-semibold text-accent">0{n}</div>
-                  <h3 className="mt-1 font-display text-xl font-bold text-slate-100">{t(`land.step${n}.title`)}</h3>
-                  <p className="mt-2 max-w-md text-[15px] leading-relaxed text-slate-400">{t(`land.step${n}.body`)}</p>
-                </div>
-                {demo ? (
-                  <Scene data={demo} />
-                ) : demo === null ? (
-                  <div className="skeleton h-[280px] w-full rounded-2xl" aria-hidden="true" />
-                ) : null}
-              </li>
-            );
-          })}
-        </ol>
-      </div>
-    </section>
-  );
-}
-
+// Rakamlar: /public/stats. Sayaçlar kaydırmayla artar, geri kaydırınca azalır. Uydurma yok —
+// veri gelmezse bölüm görünmez.
 function Stats() {
   const { t } = useI18n();
   const [stats, setStats] = useState(null);
   const [failed, setFailed] = useState(false);
   const ref = useRef(null);
-  const seen = useInViewOnce(ref);
   useEffect(() => {
     api.publicStats().then(setStats).catch(() => setFailed(true));
   }, []);
-  if (failed) return null; // uydurma rakam yok — veri gelmezse bölüm görünmez
+  useScrub(
+    ref,
+    (engine, el) => {
+      const nums = [...el.querySelectorAll("[data-count]")];
+      if (!nums.length) return undefined;
+      return scrub(engine, {
+        trigger: el,
+        end: "center 55%",
+        render: (p) => {
+          const e = ease(p);
+          nums.forEach((n) => (n.textContent = fmtInt(Math.round(Number(n.dataset.count) * e))));
+        },
+      });
+    },
+    [stats]
+  );
+  if (failed) return null;
   const items = stats
     ? [
         { value: stats.articles_analyzed, label: t("land.stats.articles") },
         { value: stats.companies_tracked, label: t("land.stats.companies") },
         { value: stats.languages.length, label: t("land.stats.languages") },
       ]
-    : [null, null, null];
+    : null;
   return (
-    <section ref={ref} className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-      <h2 className="font-display text-2xl font-bold text-slate-100 sm:text-3xl">{t("land.stats.title")}</h2>
-      <p className="mt-2 text-slate-400">{t("land.stats.sub")}</p>
-      <dl className="mt-8 grid gap-4 sm:grid-cols-3">
-        {items.map((it, i) => (
-          <div key={i} className="rounded-xl border border-ink-600 bg-ink-800 p-5 shadow-card">
+    <section className={`${WRAP} py-32 lg:py-44`} aria-labelledby="stats-title">
+      <Lines id="stats-title" lines={[t("land.stats.title")]} className="lx-h2 text-slate-100" />
+      <Reveal as="p" className="lx-body mt-6 max-w-xl text-slate-400">
+        {t("land.stats.sub")}
+      </Reveal>
+      <dl ref={ref} className="mt-16 grid gap-12 sm:grid-cols-3 sm:gap-8 lg:mt-20">
+        {(items || [0, 1, 2]).map((it, i) => (
+          <div key={i} className="flex flex-col-reverse border-t border-ink-600 pt-6">
             {it ? (
               <>
-                <dd className="font-display text-4xl font-bold text-slate-100">
-                  <AnimatedNumber value={seen ? it.value : 0} from={0} format={(v) => fmtInt(Math.round(v))} />
+                <dt className="lx-body mt-3 text-slate-400">{it.label}</dt>
+                <dd className="lx-num text-[clamp(3.25rem,1.5rem+4.6vw,6.5rem)] font-medium leading-none text-accent" data-count={it.value}>
+                  {fmtInt(it.value)}
                 </dd>
-                <dt className="mt-1 text-sm text-slate-400">{it.label}</dt>
               </>
             ) : (
               <div aria-hidden="true">
-                <div className="skeleton h-9 w-24" />
-                <div className="skeleton mt-2 h-4 w-36" />
+                <div className="skeleton h-20 w-40" />
+                <div className="skeleton mt-4 h-5 w-24" />
               </div>
             )}
           </div>
@@ -181,21 +143,36 @@ function Stats() {
 function Stack() {
   const { t } = useI18n();
   return (
-    <section id="stack" className="scroll-mt-20 border-t border-ink-600 bg-ink-800/40">
-      <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-        <h2 className="font-display text-2xl font-bold text-slate-100 sm:text-3xl">{t("land.stack.title")}</h2>
-        <p className="mt-2 text-slate-400">{t("land.stack.sub")}</p>
-        <div className="mt-8">
+    <section id="stack" tabIndex={-1} className="scroll-mt-16 border-t border-ink-600 py-32 outline-none lg:py-44" aria-labelledby="stack-title">
+      <div className={WRAP}>
+        <Lines id="stack-title" lines={[t("land.stack.title")]} className="lx-h2 text-slate-100" />
+        <Reveal as="p" className="lx-body mt-6 max-w-2xl text-slate-400">
+          {t("land.stack.sub")}
+        </Reveal>
+        <div className="mt-16 lg:mt-20">
           <ArchitectureDiagram />
         </div>
-        <a
-          href={GITHUB_REPO_URL}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-6 inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-ink-500 bg-ink-800 px-4 text-sm font-medium text-slate-200 transition hover:border-accent/60 hover:text-accent"
-        >
-          <GitHubIcon /> {t("land.stack.repo")}
-        </a>
+        <Reveal className="mt-12">
+          <a href={GITHUB_REPO_URL} target="_blank" rel="noreferrer" className="lx-link inline-flex min-h-[44px] items-center gap-2.5 text-[17px] font-medium text-slate-200">
+            <GitHubIcon /> {t("land.stack.repo")} <span aria-hidden="true">↗</span>
+          </a>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
+function Closing() {
+  const { t } = useI18n();
+  return (
+    <section className="lx-clip-x border-t border-ink-600 py-32 lg:py-48">
+      <div className={WRAP}>
+        <Lines lines={[t("land.cta.title")]} className="lx-h1 text-slate-100" drift={6} />
+        <Reveal className="mt-12">
+          <AppButton className="h-14 px-7 text-[17px]">
+            {t("land.openApp")} <ArrowRight className="h-5 w-5" aria-hidden="true" />
+          </AppButton>
+        </Reveal>
       </div>
     </section>
   );
@@ -205,12 +182,12 @@ function Footer({ onPrivacy }) {
   const { t } = useI18n();
   return (
     <footer className="border-t border-ink-600">
-      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <div className={`${WRAP} flex flex-col gap-6 py-10 sm:flex-row sm:items-end sm:justify-between`}>
         <div>
-          <div className="font-medium text-slate-300">{t("land.footer.built", { name: "Sarp Bıçak" })}</div>
-          <p className="mt-1 text-xs text-slate-500">
+          <div className="font-display text-lg font-semibold text-slate-100">{t("land.footer.built", { name: "Sarp Bıçak" })}</div>
+          <p className="mt-2 text-sm text-slate-500">
             {t("land.footer.note")}{" "}
-            <button onClick={onPrivacy} className="underline underline-offset-2 hover:text-slate-300">
+            <button onClick={onPrivacy} className="lx-link text-slate-400 hover:text-slate-200">
               {t("land.footer.privacy")}
             </button>
           </p>
@@ -226,8 +203,24 @@ function Footer({ onPrivacy }) {
 
 export default function Landing({ lang, setLang }) {
   const { t } = useI18n();
+  const root = useRef(null);
+  const engine = useEngineLoader(root);
   const [privacy, setPrivacy] = useState(false);
   const [demo, setDemo] = useState(null); // null = yükleniyor, false = örnek yok
+  // Ekranın altındaki bölümler ilk boyamadan kısa süre sonra: ilk render küçük kalır, yalnızca
+  // aşağıda kullanılan fontlar (serif, kalın) hero'dan sonra istenir. #bağlantıyla gelindiyse hemen.
+  const [below, setBelow] = useState(() => !!window.location.hash);
+  useEffect(() => {
+    if (below) return undefined;
+    const id = setTimeout(() => setBelow(true), 250);
+    return () => clearTimeout(id);
+  }, [below]);
+
+  // Dil: landing'de oturum yok — yalnızca cihaz tercihi (uygulama girişte backend'e yazar).
+  function onLang(l) {
+    localStorage.setItem("nr_lang", l);
+    setLang(l);
+  }
 
   useEffect(() => {
     let alive = true;
@@ -238,16 +231,16 @@ export default function Landing({ lang, setLang }) {
     return () => { alive = false; };
   }, [lang]);
 
-  // Dil: landing'de oturum yok — yalnızca cihaz tercihi (uygulama girişte backend'e yazar).
-  function onLang(l) {
-    localStorage.setItem("nr_lang", l);
-    setLang(l);
-  }
-
   useEffect(() => {
     document.documentElement.lang = lang;
-    document.title = `NewsRadar — ${t("land.hero.title")}`;
+    document.title = `NewsRadar — ${t("land.hero.l1")} ${t("land.hero.l2")} ${t("land.hero.l3")}`;
   }, [lang, t]);
+
+  // Landing zemini gövdeye de (aşırı kaydırmada görünen alan); ayrılınca geri alınır.
+  useEffect(() => {
+    document.documentElement.classList.add("lx-page");
+    return () => document.documentElement.classList.remove("lx-page");
+  }, []);
 
   // "/#how-it-works" ile gelindiyse (ör. uygulamadaki modaldan) o bölüme kaydır.
   useEffect(() => {
@@ -255,17 +248,37 @@ export default function Landing({ lang, setLang }) {
     if (id) requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView());
   }, []);
 
+  const onAnchor = useCallback(
+    (e) => {
+      const id = e.currentTarget.getAttribute("href").slice(1);
+      e.preventDefault();
+      scrollToId(engine, id);
+    },
+    [engine]
+  );
+
   return (
-    <div className="min-h-screen">
-      <Header lang={lang} onLang={onLang} />
-      <main>
-        <Hero demo={demo} />
-        <Steps demo={demo} />
-        <Stats />
-        <Stack />
-      </main>
-      <Footer onPrivacy={() => setPrivacy(true)} />
-      {privacy && <PrivacyModal onClose={() => setPrivacy(false)} />}
-    </div>
+    <EngineContext.Provider value={engine}>
+      <div ref={root} className="lx min-h-screen" style={motionVars}>
+        <div className="lx-grain" aria-hidden="true" />
+        <Nav lang={lang} onLang={onLang} onAnchor={onAnchor} />
+        <main>
+          <Hero demo={demo} onAnchor={onAnchor} onApp={goApp} />
+          {/* Yer tutucu: sayfa baştan kaydırılabilir (kaydırma çubuğu sonradan çıkıp hero'yu kaydırmasın). */}
+          {!below && <div style={{ height: "100vh" }} aria-hidden="true" />}
+          {below && (
+            <>
+              <Manifesto />
+              <Walkthrough demo={demo} />
+              <Stats />
+              <Stack />
+              <Closing />
+            </>
+          )}
+        </main>
+        {below && <Footer onPrivacy={() => setPrivacy(true)} />}
+        {privacy && <PrivacyModal onClose={() => setPrivacy(false)} />}
+      </div>
+    </EngineContext.Provider>
   );
 }
