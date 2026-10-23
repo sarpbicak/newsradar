@@ -392,8 +392,9 @@ const STR = {
   "land.window": { tr: "NewsRadar uygulaması — adım {n}: {title}", en: "NewsRadar app — step {n}: {title}" },
   "land.stats.title": { tr: "Maket değil.", en: "Not a mockup." },
   "land.stats.sub": { tr: "Rakamlar doğrudan canlı veritabanından.", en: "Every number comes straight from the live database." },
-  "land.stats.articles": { tr: "makale", en: "articles" },
-  "land.stats.companies": { tr: "şirket", en: "companies" },
+  "land.stats.articles": { tr: "analiz edilen makale", en: "articles analyzed" },
+  "land.stats.assessments": { tr: "AI değerlendirmesi", en: "AI assessments" },
+  "land.stats.sources": { tr: "haber kaynağı", en: "news sources" },
   "land.stats.languages": { tr: "dil", en: "languages" },
   "land.stack.title": { tr: "Altında ne var", en: "Under the hood" },
   "land.stack.sub": {
@@ -702,6 +703,16 @@ export function fmtPct(value, { digits = 0, signed = true } = {}) {
 // Tam sayı — dile göre binlik ayırıcı (EN 1,158 · TR 1.158).
 export function fmtInt(value) {
   return value == null ? "—" : new Intl.NumberFormat(LOCALE()).format(value);
+}
+// Büyük sayıyı kısalt (EN 77K+ · TR 77 B+). Aşağı yuvarlanır, "+" bu yüzden doğru;
+// 10.000 altı tam yazılır (binlik ayırıcıyla zaten okunur).
+export function fmtCompact(value) {
+  if (value == null) return "—";
+  if (value < 1e4) return fmtInt(value);
+  const step = value < 1e6 ? 1000 : value < 1e7 ? 1e5 : 1e6;
+  const digits = step === 1e5 ? 1 : 0;
+  const n = Math.floor(value / step) * step;
+  return new Intl.NumberFormat(LOCALE(), { notation: "compact", maximumFractionDigits: digits }).format(n) + "+";
 }
 
 // Dil-farkında tarih/zaman yardımcıları (locale'e göre biçim).

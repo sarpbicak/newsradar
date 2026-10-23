@@ -8,7 +8,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { api } from "../../api.js";
-import { fmtInt, useI18n } from "../../i18n.jsx";
+import { fmtCompact, useI18n } from "../../i18n.jsx";
 import { navigate } from "../../router.js";
 import { Button } from "../kit.jsx";
 import NavBar, { Brand, NavLink, WRAP } from "../NavBar.jsx";
@@ -89,7 +89,7 @@ function Stats() {
         end: "center 55%",
         render: (p) => {
           const e = ease(p);
-          nums.forEach((n) => (n.textContent = fmtInt(Math.round(Number(n.dataset.count) * e))));
+          nums.forEach((n) => (n.textContent = fmtCompact(Math.round(Number(n.dataset.count) * e))));
         },
       });
     },
@@ -99,7 +99,8 @@ function Stats() {
   const items = stats
     ? [
         { value: stats.articles_analyzed, label: t("land.stats.articles") },
-        { value: stats.companies_tracked, label: t("land.stats.companies") },
+        { value: stats.assessments, label: t("land.stats.assessments") },
+        { value: stats.news_sources, label: t("land.stats.sources") },
         { value: stats.languages.length, label: t("land.stats.languages") },
       ]
     : null;
@@ -109,19 +110,20 @@ function Stats() {
       <Reveal as="p" className="lx-body mt-6 max-w-xl text-slate-400">
         {t("land.stats.sub")}
       </Reveal>
-      <dl ref={ref} className="mt-16 grid gap-12 sm:grid-cols-3 sm:gap-8 lg:mt-20">
-        {(items || [0, 1, 2]).map((it, i) => (
+      {/* Masaüstünde 4 yan yana, mobilde 2×2. */}
+      <dl ref={ref} className="mt-16 grid grid-cols-2 gap-x-5 gap-y-12 sm:gap-x-8 lg:mt-20 lg:grid-cols-4">
+        {(items || [0, 1, 2, 3]).map((it, i) => (
           <div key={i} className="flex flex-col-reverse border-t border-ink-600 pt-6">
             {it ? (
               <>
                 <dt className="lx-body mt-3 text-slate-400">{it.label}</dt>
-                <dd className="lx-num text-[clamp(3.25rem,1.5rem+4.6vw,6.5rem)] font-medium leading-none text-accent" data-count={it.value}>
-                  {fmtInt(it.value)}
+                <dd className="lx-num whitespace-nowrap text-[clamp(2.5rem,1rem+4vw,5rem)] font-medium leading-none text-accent" data-count={it.value}>
+                  {fmtCompact(it.value)}
                 </dd>
               </>
             ) : (
               <div aria-hidden="true">
-                <div className="skeleton h-20 w-40" />
+                <div className="skeleton h-16 w-32 max-w-full" />
                 <div className="skeleton mt-4 h-5 w-24" />
               </div>
             )}

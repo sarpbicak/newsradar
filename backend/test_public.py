@@ -2,8 +2,9 @@
 
 Doğrular:
   (A) oturum GEREKMEZ; yanıtlar 5 dk önbelleklenebilir (Cache-Control)
-  (B) stats gerçek toplamlar: analyzed=True haber sayısı; en az bir kişinin izlediği AKTİF
-      şirket sayısı (izlenmeyen ve pasif şirket sayılmaz); diller tr+en
+  (B) stats gerçek toplamlar: analyzed=True haber sayısı; tüm AI değerlendirmeleri
+      (entity_analyses, her dil); farklı haber kaynağı (büyük/küçük harf ve boşluk farkı tek,
+      boş kaynak sayılmaz); diller tr+en
   (C) how-it-works dili parametreden alır; seed dışı (kullanıcının eklediği) şirket — daha
       güncel analizi olsa bile — seçilmez; geçersiz dil 422
   (D) yanıtlarda kullanıcı bilgisi yok (yalnızca toplamlar / seed örneği)
@@ -64,8 +65,10 @@ with session_scope() as s:
     s.add_all([UserWatchlist(user_id=u1.id, entity_id=nvda.id), UserWatchlist(user_id=u2.id, entity_id=nvda.id),
                UserWatchlist(user_id=u1.id, entity_id=priv.id), UserWatchlist(user_id=u2.id, entity_id=gone.id)])
     s.add_all([analysis(nvda.id, "tr", 3), analysis(nvda.id, "en", 3), analysis(priv.id, "en", 0)])
+    # kaynaklar: "Src" ×2, " src " (aynı kaynak), "" (sayılmaz), "Other" → farklı kaynak = 2
+    srcs = ["Src", "Src", " src ", "", "Other"]
     for i in range(5):
-        s.add(Article(entity_id=nvda.id, url=f"http://n/{i}", url_hash=f"n{i}", source="Src", title=f"NVDA {i}",
+        s.add(Article(entity_id=nvda.id, url=f"http://n/{i}", url_hash=f"n{i}", source=srcs[i], title=f"NVDA {i}",
                       description="d", provider="finnhub", analyzed=i < 3, relevance=0.9, sentiment=0.5,
                       published_at=now - timedelta(hours=i + 1), fetched_at=now - timedelta(hours=i)))
 
@@ -76,9 +79,10 @@ with TestClient(app) as c:
     check(r.headers.get("cache-control") == "public, max-age=300", f"Cache-Control: {r.headers.get('cache-control')}")
     d = r.json()
     check(d["articles_analyzed"] == 3, f"analiz edilen haber = 3 (analyzed=True) ({d['articles_analyzed']})")
-    check(d["companies_tracked"] == 2, f"izlenen aktif şirket = 2 (pasif ve izlenmeyen sayılmaz) ({d['companies_tracked']})")
+    check(d["assessments"] == 3, f"AI değerlendirmesi = 3 (tüm diller) ({d['assessments']})")
+    check(d["news_sources"] == 2, f"farklı haber kaynağı = 2 (boş sayılmaz, harf/boşluk farkı tek) ({d['news_sources']})")
     check(d["languages"] == ["tr", "en"], f"diller ({d['languages']})")
-    check(set(d) == {"articles_analyzed", "companies_tracked", "languages"}, f"yalnızca toplamlar ({sorted(d)})")
+    check(set(d) == {"articles_analyzed", "assessments", "news_sources", "languages"}, f"yalnızca toplamlar ({sorted(d)})")
 
     print("== C+D: /public/how-it-works (oturumsuz)")
     for lang in ("tr", "en"):

@@ -13,7 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..db.database import get_db
-from ..db.models import Article, Entity, UserWatchlist
+from ..db.models import Article, EntityAnalysis
 from .routes_how import build_how_it_works
 from .schemas import HowItWorksOut, PublicStatsOut
 
@@ -25,16 +25,15 @@ CACHE = "public, max-age=300"
 
 @router.get("/stats", response_model=PublicStatsOut)
 def public_stats(response: Response, db: Session = Depends(get_db)) -> PublicStatsOut:
-    """Gerçek toplamlar: AI'ın analiz ettiği haber sayısı, en az bir kişinin takip ettiği
-    (aktif) şirket sayısı, desteklenen diller."""
+    """Gerçek toplamlar (uydurma/şişirme yok): AI'ın analiz ettiği haber, üretilen AI
+    değerlendirmesi (entity_analyses), haberlerdeki farklı kaynak sayısı, desteklenen diller."""
     analyzed = db.scalar(select(func.count()).select_from(Article).where(Article.analyzed.is_(True))) or 0
-    tracked = db.scalar(
-        select(func.count(func.distinct(UserWatchlist.entity_id)))
-        .join(Entity, Entity.id == UserWatchlist.entity_id)
-        .where(Entity.active.is_(True))
+    assessments = db.scalar(select(func.count()).select_from(EntityAnalysis)) or 0
+    sources = db.scalar(
+        select(func.count(func.distinct(func.lower(func.trim(Article.source))))).where(func.trim(Article.source) != "")
     ) or 0
     response.headers["Cache-Control"] = CACHE
-    return PublicStatsOut(articles_analyzed=analyzed, companies_tracked=tracked, languages=LANGUAGES)
+    return PublicStatsOut(articles_analyzed=analyzed, assessments=assessments, news_sources=sources, languages=LANGUAGES)
 
 
 @router.get("/how-it-works", response_model=HowItWorksOut)
