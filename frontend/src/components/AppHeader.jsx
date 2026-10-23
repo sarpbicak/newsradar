@@ -4,10 +4,10 @@
 // ilerleme header'ın alt kenarında ince bir çizgi (içeriği itmez) + küçük durum metni.
 // Mobil: logo · Yenile · menü → tam ekran çekmece (dil, tema, nasıl çalışır, hesap).
 import React, { useEffect, useId, useRef, useState } from "react";
-import { HelpCircle, LayoutDashboard, LogIn, LogOut, Menu as MenuIcon, RefreshCw, ShieldCheck, UserPlus, X } from "lucide-react";
+import { HelpCircle, LayoutDashboard, LogOut, Menu as MenuIcon, MessageSquare, RefreshCw, ShieldCheck, X } from "lucide-react";
 import { fmtTime, parseUtc, refreshParts, useI18n } from "../i18n.jsx";
 import { navigate } from "../router.js";
-import { Button, Menu, MenuItem, Modal, cx } from "./kit.jsx";
+import { Button, Chip, Menu, MenuItem, Modal, cx } from "./kit.jsx";
 import { LanguageSwitcher } from "./LanguageBits.jsx";
 import NavBar, { Brand, NavLink } from "./NavBar.jsx";
 import { ThemeMenu, ThemeSegmented } from "./ThemeToggle.jsx";
@@ -193,7 +193,7 @@ function UserMenu({ user, view, onAdmin, onLogout }) {
     >
       <div className="px-3 pb-2 pt-1.5">
         <div className="truncate text-sm font-semibold text-slate-100">{user.username}</div>
-        {user.is_admin && <span className="mt-1 inline-block rounded-full bg-accent/10 px-2 py-0.5 text-micro font-medium text-accent">{t("header.roleAdmin")}</span>}
+        {user.is_admin && <Chip tone="neutral" className="mt-1">{t("header.roleAdmin")}</Chip>}
       </div>
       <div className="my-1 h-px bg-ink-600" />
       {user.is_admin && (
@@ -208,52 +208,77 @@ function UserMenu({ user, view, onAdmin, onLogout }) {
   );
 }
 
-// Mobil tam ekran çekmece.
-function Drawer({ user, view, lang, onLang, onClose, onHow, onAccount, onAdmin, onLogout }) {
+// Mobil çekmece (sağdan kayar): tek sol hiza — üstte ad + rol (misafirde giriş / hesap
+// butonları), dil, tema, ayraç, menü öğeleri (52px), en altta ayrık "Çıkış yap".
+function SectionLabel({ children }) {
+  return <div className="mb-2 text-micro font-medium text-slate-500">{children}</div>;
+}
+
+function Drawer({ user, view, lang, onLang, onClose, onHow, onAccount, onAdmin, onLogout, onFeedback }) {
   const { t } = useI18n();
   const act = (fn) => () => {
     onClose();
     fn();
   };
+  const item = "h-[52px] px-3 text-body";
   return (
-    <Modal full onClose={onClose} label={t("header.menu")}>
-      <div className="flex h-full flex-col">
-        <div className="flex items-center justify-between">
-          <span className="font-display text-lg font-semibold text-slate-100">{user.is_anonymous ? t("header.guest") : user.username}</span>
-          <Button variant="ghost" iconOnly icon={X} onClick={onClose} aria-label={t("common.close")} />
+    <Modal drawer onClose={onClose} labelledBy="drawer-title">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 id="drawer-title" className="truncate font-display text-title font-semibold text-slate-100">
+            {user.is_anonymous ? t("header.guest") : user.username}
+          </h2>
+          {user.is_admin && <Chip tone="neutral" className="mt-1.5">{t("header.roleAdmin")}</Chip>}
         </div>
-        {user.is_admin && <span className="mt-1 inline-block self-start rounded-full bg-accent/10 px-2 py-0.5 text-micro font-medium text-accent">{t("header.roleAdmin")}</span>}
-        <div className="mt-8 space-y-6">
-          <div>
-            <div className="mb-2 text-micro font-medium text-slate-500">{t("header.language")}</div>
-            <LanguageSwitcher lang={lang} onChange={(l) => { onLang(l); onClose(); }} />
-          </div>
-          <ThemeSegmented />
-          <div className="space-y-1">
-            <MenuItem icon={HelpCircle} onClick={act(onHow)}>{t("header.howItWorks")}</MenuItem>
-            {user.is_anonymous ? (
-              <>
-                <MenuItem icon={UserPlus} onClick={act(() => onAccount("upgrade"))}>{t("header.createAccount")}</MenuItem>
-                <MenuItem icon={LogIn} onClick={act(() => onAccount("login"))}>{t("header.login")}</MenuItem>
-              </>
-            ) : (
-              <>
-                {user.is_admin && (
-                  <MenuItem icon={view === "admin" ? LayoutDashboard : ShieldCheck} onClick={act(onAdmin)}>
-                    {view === "admin" ? t("header.backToDashboard") : t("header.adminPanel")}
-                  </MenuItem>
-                )}
-                <MenuItem icon={LogOut} onClick={act(onLogout)}>{t("header.logout")}</MenuItem>
-              </>
-            )}
-          </div>
-        </div>
+        <Button variant="ghost" iconOnly icon={X} onClick={onClose} aria-label={t("common.close")} className="-mr-2 -mt-1" />
       </div>
+
+      {user.is_anonymous && (
+        <div className="mt-5 space-y-2">
+          <Button onClick={act(() => onAccount("login"))} className="nav-text w-full">
+            {t("header.login")}
+          </Button>
+          <Button variant="primary" onClick={act(() => onAccount("upgrade"))} className="nav-text w-full">
+            {t("header.createAccount")}
+          </Button>
+        </div>
+      )}
+
+      <div className="mt-6 space-y-5">
+        <div>
+          <SectionLabel>{t("header.language")}</SectionLabel>
+          <LanguageSwitcher lang={lang} size="lg" onChange={(l) => { onLang(l); onClose(); }} />
+        </div>
+        <ThemeSegmented />
+      </div>
+
+      <div className="my-5 h-px bg-ink-600" aria-hidden="true" />
+
+      {/* Öğeler sol hizayı korur: hover zemini kenara taşar (-mx-3), ikon ve metin hizada kalır. */}
+      <nav className="-mx-3 space-y-0.5" aria-label={t("header.menu")}>
+        <MenuItem icon={HelpCircle} onClick={act(onHow)} className={item}>{t("header.howItWorks")}</MenuItem>
+        {user.is_admin && (
+          <MenuItem icon={view === "admin" ? LayoutDashboard : ShieldCheck} onClick={act(onAdmin)} className={item}>
+            {view === "admin" ? t("header.backToDashboard") : t("header.adminPanel")}
+          </MenuItem>
+        )}
+        <MenuItem icon={MessageSquare} onClick={act(onFeedback)} className={item}>{t("fb.button")}</MenuItem>
+      </nav>
+
+      {!user.is_anonymous && (
+        <div className="mt-auto border-t border-ink-600 pt-3">
+          <div className="-mx-3">
+            <MenuItem icon={LogOut} tone="danger" onClick={act(onLogout)} className={item}>
+              {t("header.logout")}
+            </MenuItem>
+          </div>
+        </div>
+      )}
     </Modal>
   );
 }
 
-export default function AppHeader({ user, view, lang, onLang, onHome, onAccount, onAdmin, onLogout, refresh, scan }) {
+export default function AppHeader({ user, view, lang, onLang, onHome, onAccount, onAdmin, onLogout, onFeedback, refresh, scan }) {
   const { t } = useI18n();
   const [drawer, setDrawer] = useState(false);
   // Görünüm değişince çekmece açık kalmasın.
@@ -306,6 +331,7 @@ export default function AppHeader({ user, view, lang, onLang, onHome, onAccount,
           onAccount={onAccount}
           onAdmin={onAdmin}
           onLogout={onLogout}
+          onFeedback={onFeedback}
         />
       )}
     </NavBar>

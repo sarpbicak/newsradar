@@ -209,8 +209,8 @@ export function Tabs({ items, value, onChange, variant = "underline", label, cla
 const MODAL_SIZE = { sm: "sm:max-w-sm", md: "sm:max-w-md", lg: "sm:max-w-lg", xl: "sm:max-w-2xl" };
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
-// full: tam ekran çekmece (mobil menü).
-export function Modal({ onClose, labelledBy, label, size = "md", full = false, dismissable = true, className = "", wrapperStyle, children }) {
+// drawer: sağdan kayan yan çekmece (mobil menü) — dışarı dokununca kapanır, güvenli alanlara uyar.
+export function Modal({ onClose, labelledBy, label, size = "md", drawer = false, dismissable = true, className = "", wrapperStyle, children }) {
   const panel = useRef(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
@@ -238,16 +238,20 @@ export function Modal({ onClose, labelledBy, label, size = "md", full = false, d
       }
     };
     document.addEventListener("keydown", onKey, true);
+    // Arka plan kaydırma kilidi (iOS Safari için <html> de).
     const overflow = document.body.style.overflow;
+    const htmlOverflow = document.documentElement.style.overflow;
     document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", onKey, true);
       document.body.style.overflow = overflow;
+      document.documentElement.style.overflow = htmlOverflow;
       if (prev && document.contains(prev)) prev.focus?.({ preventScroll: true });
     };
   }, [dismissable]);
   return createPortal(
-    <div className={cx("fixed inset-0 z-50 flex justify-center", full ? "items-stretch" : "items-end sm:items-center sm:p-4")} style={wrapperStyle}>
+    <div className={cx("fixed inset-0 z-50 flex", drawer ? "items-stretch justify-end" : "items-end justify-center sm:items-center sm:p-4")} style={wrapperStyle}>
       <div className="fade-in absolute inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true" onMouseDown={() => dismissable && closeRef.current?.()} />
       <div
         ref={panel}
@@ -257,11 +261,11 @@ export function Modal({ onClose, labelledBy, label, size = "md", full = false, d
         aria-label={labelledBy ? undefined : label}
         tabIndex={-1}
         className={cx(
-          "relative w-full overflow-y-auto overscroll-contain bg-raised focus:outline-none",
-          full
-            ? "sheet-in h-full p-5"
-            : "modal-in max-h-full rounded-t-panel p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-raised ring-1 ring-ink-600 sm:max-h-[92vh] sm:rounded-panel sm:pb-6",
-          !full && MODAL_SIZE[size],
+          "relative overflow-y-auto overscroll-contain bg-raised focus:outline-none",
+          drawer
+            ? "drawer-in flex h-full w-80 max-w-[88vw] flex-col px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] shadow-raised"
+            : "modal-in max-h-full w-full rounded-t-panel p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-raised ring-1 ring-ink-600 sm:max-h-[92dvh] sm:rounded-panel sm:pb-6",
+          !drawer && MODAL_SIZE[size],
           className
         )}
       >
@@ -414,14 +418,16 @@ export function Menu({ button, label, align = "right", className = "", children 
   );
 }
 
-export function MenuItem({ icon: Icon, className = "", children, ...rest }) {
+// tone="danger": yıkıcı aksiyon (çıkış) — soluk kırmızı, bağırmayan.
+export function MenuItem({ icon: Icon, tone, className = "", children, ...rest }) {
   return (
     <button
       type="button"
       role="menuitem"
       data-close
       className={cx(
-        "tap flex h-10 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm text-slate-300 transition-colors duration-hover ease-std hover:bg-ink-700 hover:text-slate-100",
+        "tap flex h-10 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm transition-colors duration-hover ease-std hover:bg-ink-700",
+        tone === "danger" ? "text-rose-600/90 hover:text-rose-600" : "text-slate-300 hover:text-slate-100",
         className
       )}
       {...rest}

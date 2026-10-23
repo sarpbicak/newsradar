@@ -431,6 +431,7 @@ export default function App({ setLang }) {
         onAccount={setAccount}
         onAdmin={() => setView((v) => (v === "admin" ? "dashboard" : "admin"))}
         onLogout={handleLogout}
+        onFeedback={() => setFeedbackOpen(true)}
         refresh={{ isRefreshing, running, status, onRefresh: handleRefresh, attn: refreshAttn, anonymous: !!user?.is_anonymous }}
         scan={
           isRefreshing || scanDone

@@ -73,25 +73,28 @@ export function LanguageModal({ onSelect }) {
 }
 
 // Header'daki değiştirici — iki küçük bayrak butonu (tooltip'te dil adı).
-export function LanguageSwitcher({ lang, onChange }) {
+// size="lg": mobil çekmecede tema kontrolüyle aynı ölçü (48px).
+export function LanguageSwitcher({ lang, onChange, size = "md" }) {
+  const lg = size === "lg";
   const btn = (l, label) => {
     const on = lang === l;
     return (
       <button
+        type="button"
         onClick={() => onChange(l)}
         title={label}
         aria-label={label}
         aria-pressed={on}
-        className={`tap-sq inline-flex h-10 w-10 items-center justify-center rounded-full transition duration-hover ease-std ${
+        className={`tap-sq inline-flex items-center justify-center rounded-full transition duration-hover ease-std ${lg ? "h-12 w-12" : "h-10 w-10"} ${
           on ? "bg-ink-700" : "opacity-55 hover:bg-ink-700 hover:opacity-100"
         }`}
       >
-        <Flag lang={l} className="h-4 w-6" />
+        <Flag lang={l} className={lg ? "h-5 w-7" : "h-4 w-6"} />
       </button>
     );
   };
   return (
-    <div className="inline-flex items-center gap-0.5">
+    <div className={`inline-flex items-center ${lg ? "gap-1" : "gap-0.5"}`}>
       {btn("tr", "Türkçe")}
       {btn("en", "English")}
     </div>
