@@ -8,7 +8,7 @@
 // görünür sahne dışında aria-hidden.
 import React, { useLayoutEffect, useRef, useState } from "react";
 import { useI18n } from "../../i18n.jsx";
-import { clamp01, ease, prefersReducedMotion, seg } from "./motion.js";
+import { clamp01, ease, prefersReducedMotion, seg } from "../../motion.js";
 import { SCENES } from "./Scenes.jsx";
 import { DESKTOP_MQ, scrub, useMedia, useScrub } from "./scroll.js";
 import { Lines } from "./Type.jsx";

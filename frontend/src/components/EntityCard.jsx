@@ -216,7 +216,7 @@ export default function EntityCard({ card, onOpen, big = false }) {
         <>
           {/* Satır 2 — Hüküm cümlesi (SERİF, editöryel; TAM, kesme yok; mobilde
               biraz küçük punto ama okunaklı satır aralığı) */}
-          <p className={`font-serif font-semibold leading-snug text-slate-100 ${big ? "text-[19px] md:text-[23px]" : "text-[17px] md:text-[19px]"}`}>
+          <p className={`font-display font-semibold leading-snug text-slate-100 ${big ? "text-[19px] md:text-[23px]" : "text-[17px] md:text-[19px]"}`}>
             {a.headline_verdict || a.summary}
           </p>
 

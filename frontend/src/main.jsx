@@ -4,7 +4,11 @@ import Landing from "./components/landing/Landing.jsx";
 import { I18nProvider } from "./i18n.jsx";
 import { ThemeProvider } from "./theme.js";
 import { isAppPath, shouldSkipLanding, usePath } from "./router.js";
+import { applyMotionVars } from "./motion.js";
 import "./index.css";
+
+// Hareket token'ları (eğri, süreler) — landing ve uygulama aynı değerleri okur.
+applyMotionVars();
 
 // Pano (Recharts dahil) AYRI pakette: landing'in ilk yüklemesi küçük kalsın.
 const App = lazy(() => import("./App.jsx"));

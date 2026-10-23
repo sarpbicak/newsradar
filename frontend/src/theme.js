@@ -11,6 +11,7 @@ export const cssColor = (name, alpha) =>
 
 export const C = {
   accent: cssColor("accent"),
+  line: cssColor("chart-line"),      // grafik ana çizgisi (nötr; vurgu rengi grafikte kullanılmaz)
   pos: cssColor("pos"),
   posStrong: cssColor("pos-strong"),
   neg: cssColor("neg"),
@@ -29,7 +30,7 @@ export const THEME_KEY = "nr_theme";
 export const THEME_PREFS = ["system", "light", "dark"];
 const media = () => window.matchMedia?.("(prefers-color-scheme: dark)");
 // Tarayıcı arayüzü (adres çubuğu) rengi — sayfa zeminiyle uyumlu.
-const THEME_COLOR = { light: "#F7F5F1", dark: "#141412" };
+const THEME_COLOR = { light: "#F7F5F1", dark: "#0D0D0B" };
 
 export function getPref() {
   try {

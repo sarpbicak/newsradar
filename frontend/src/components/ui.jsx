@@ -88,10 +88,8 @@ export function AnimatedNumber({ value, decimals = 0, prefix = "", suffix = "", 
   );
 }
 
-// Skeleton kutusu — yükleme sırasında layout zıplamasın.
-export function Skeleton({ className = "" }) {
-  return <div className={`skeleton ${className}`} />;
-}
+// Skeleton kutusu — ortak bileşen kütüphanesinden (geri uyum için buradan da dışa açık).
+export { Skeleton } from "./kit.jsx";
 
 // --- Yön (stance) rozeti ---
 const STANCE = {

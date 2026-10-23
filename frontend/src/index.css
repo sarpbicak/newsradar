@@ -7,9 +7,6 @@
 @import "@fontsource/space-grotesk/700.css";
 @import "@fontsource/jetbrains-mono/400.css";
 @import "@fontsource/jetbrains-mono/500.css";
-/* Editöryel serif — hüküm cümlesi (gazete manşeti) */
-@import "@fontsource/source-serif-4/400.css";
-@import "@fontsource/source-serif-4/600.css";
 
 @tailwind base;
 @tailwind components;
@@ -21,6 +18,17 @@
    betik React'ten ÖNCE koyar (yanlış tema flaşı yok); JS kapalıysa @media yedeği devrede.
    Kontrast: iki temada metin/zemin çiftleri WCAG AA (≥4.5:1), grafik çizgileri ≥3:1. */
 :root {
+  /* ÖLÇEK (temadan bağımsız) — uygulama araç ölçeği; landing'in dev boyutları .lx-* sınıflarında.
+     Boşluk ölçeği Tailwind'in 4px tabanlı ölçeği (keyfi değer yok). */
+  --fs-page: 1.875rem;    /* 30px sayfa başlığı */
+  --fs-verdict: 1.75rem;  /* 28px detay hüküm cümlesi (sayfanın en büyük metni) */
+  --fs-title: 1.3125rem;  /* 21px kart başlığı / hüküm */
+  --fs-body: 0.9375rem;   /* 15px gövde */
+  --fs-meta: 0.8125rem;   /* 13px yardımcı metin */
+  --fs-micro: 0.75rem;    /* 12px etiket */
+  --r-control: 10px;      /* input, select, küçük yüzey */
+  --r-card: 16px;         /* kart */
+  --r-panel: 20px;        /* modal, panel */
   color-scheme: light;
   --ink-900: 247 245 241;       /* #F7F5F1 */
   --ink-800: 255 255 255;       /* #FFFFFF */
@@ -34,8 +42,8 @@
   --slate-500: 110 107 101;     /* #6E6B65 */
   --slate-600: 111 108 102;     /* #6F6C66 */
   --slate-700: 196 192 182;     /* #C4C0B6 */
-  --accent: 30 58 95;        /* #1E3A5F */
-  --accent-hover: 44 82 130;  /* #2C5282 */
+  --accent: 63 98 18;        /* #3F6212 — sinyal yeşili, metin olarak (AA) */
+  --accent-hover: 77 124 15;  /* #4D7C0F */
   --accent-fg: 255 255 255;     /* #FFFFFF */
   --pos: 13 116 64;           /* #0D7440 */
   --pos-strong: 10 97 54;    /* #0A6136 */
@@ -53,19 +61,21 @@
   --shadow-card-hover: 0 2px 6px rgb(0 0 0 / 0.06), 0 14px 32px rgb(var(--accent) / 0.10);
   /* Landing ("/"): tek vurgu = sinyal yeşili (radar). --signal: dolgu/ışıma/çizgi;
      --signal-ink: metin olarak (AA); --signal-fg / --signal-ink-fg: üstündeki metin.
-     --night: landing zemini (açık temada kağıt, koyuda neredeyse siyah, sıcak). */
+     Zemin her yerde --ink-900 (koyu: sıcak, neredeyse siyah; açık: krem). */
   --signal: 163 230 53;       /* #A3E635 */
   --signal-ink: 63 98 18;     /* #3F6212 */
   --signal-fg: 26 46 5;       /* #1A2E05 */
   --signal-ink-fg: 255 255 255; /* #FFFFFF */
-  --night: 247 245 241;       /* #F7F5F1 */
+  --raised: 255 255 255;      /* #FFFFFF yükseltilmiş yüzey (modal, panel) */
+  --chart-line: 42 42 38;     /* #2A2A26 grafik ana çizgisi (nötr, net) */
+  --shadow-raised: 0 2px 8px rgb(0 0 0 / 0.06), 0 24px 60px -12px rgb(0 0 0 / 0.18);
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --ink-900: 20 20 18;       /* #141412 */
-  --ink-800: 28 28 26;       /* #1C1C1A */
-  --ink-700: 38 37 34;       /* #262522 */
-  --ink-600: 48 47 43;       /* #302F2B */
+  --ink-900: 13 13 11;       /* #0D0D0B zemin (landing ile aynı) */
+  --ink-800: 23 23 21;       /* #171715 yüzey (kart) */
+  --ink-700: 35 34 31;       /* #23221F hover / iç yüzey */
+  --ink-600: 45 44 40;       /* #2D2C28 ince ayırıcı */
   --ink-500: 64 62 57;       /* #403E39 */
   --slate-100: 242 240 235;     /* #F2F0EB */
   --slate-200: 228 225 218;     /* #E4E1DA */
@@ -74,9 +84,9 @@
   --slate-500: 160 156 147;     /* #A09C93 */
   --slate-600: 143 139 131;     /* #8F8B83 */
   --slate-700: 94 91 85;     /* #5E5B55 */
-  --accent: 143 180 227;        /* #8FB4E3 */
-  --accent-hover: 169 198 236;  /* #A9C6EC */
-  --accent-fg: 15 27 45;     /* #0F1B2D */
+  --accent: 190 242 100;        /* #BEF264 — sinyal yeşili */
+  --accent-hover: 212 248 150;  /* #D4F896 */
+  --accent-fg: 20 26 8;     /* #141A08 */
   --pos: 74 222 128;           /* #4ADE80 */
   --pos-strong: 52 211 153;    /* #34D399 */
   --neg: 248 113 113;           /* #F87171 */
@@ -86,7 +96,7 @@
   --info: 96 165 250;          /* #60A5FA */
   --info-strong: 147 197 253;   /* #93C5FD */
   --neutral: 168 164 155;       /* #A8A49B */
-  --chart-grid: 43 42 39;    /* #2B2A27 */
+  --chart-grid: 34 33 31;    /* #22211F */
   --brush-stroke: 74 72 67;  /* #4A4843 */
   --brush-fill: 34 34 31;    /* #22221F */
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.45), 0 8px 24px rgb(0 0 0 / 0.30);
@@ -95,15 +105,17 @@
   --signal-ink: 190 242 100;  /* #BEF264 */
   --signal-fg: 20 26 8;       /* #141A08 */
   --signal-ink-fg: 20 26 8;   /* #141A08 */
-  --night: 13 13 11;          /* #0D0D0B */
+  --raised: 30 30 27;         /* #1E1E1B yükseltilmiş yüzey (modal, panel) */
+  --chart-line: 228 225 218;  /* #E4E1DA grafik ana çizgisi (nötr, net) */
+  --shadow-raised: 0 2px 8px rgb(0 0 0 / 0.5), 0 24px 60px -12px rgb(0 0 0 / 0.6);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     color-scheme: dark;
-    --ink-900: 20 20 18;       /* #141412 */
-    --ink-800: 28 28 26;       /* #1C1C1A */
-    --ink-700: 38 37 34;       /* #262522 */
-    --ink-600: 48 47 43;       /* #302F2B */
+    --ink-900: 13 13 11;       /* #0D0D0B zemin (landing ile aynı) */
+    --ink-800: 23 23 21;       /* #171715 yüzey (kart) */
+    --ink-700: 35 34 31;       /* #23221F hover / iç yüzey */
+    --ink-600: 45 44 40;       /* #2D2C28 ince ayırıcı */
     --ink-500: 64 62 57;       /* #403E39 */
     --slate-100: 242 240 235;     /* #F2F0EB */
     --slate-200: 228 225 218;     /* #E4E1DA */
@@ -112,9 +124,9 @@
     --slate-500: 160 156 147;     /* #A09C93 */
     --slate-600: 143 139 131;     /* #8F8B83 */
     --slate-700: 94 91 85;     /* #5E5B55 */
-    --accent: 143 180 227;        /* #8FB4E3 */
-    --accent-hover: 169 198 236;  /* #A9C6EC */
-    --accent-fg: 15 27 45;     /* #0F1B2D */
+    --accent: 190 242 100;        /* #BEF264 — sinyal yeşili */
+    --accent-hover: 212 248 150;  /* #D4F896 */
+    --accent-fg: 20 26 8;     /* #141A08 */
     --pos: 74 222 128;           /* #4ADE80 */
     --pos-strong: 52 211 153;    /* #34D399 */
     --neg: 248 113 113;           /* #F87171 */
@@ -124,7 +136,7 @@
     --info: 96 165 250;          /* #60A5FA */
     --info-strong: 147 197 253;   /* #93C5FD */
     --neutral: 168 164 155;       /* #A8A49B */
-    --chart-grid: 43 42 39;    /* #2B2A27 */
+    --chart-grid: 34 33 31;    /* #22211F */
     --brush-stroke: 74 72 67;  /* #4A4843 */
     --brush-fill: 34 34 31;    /* #22221F */
     --shadow-card: 0 1px 2px rgb(0 0 0 / 0.45), 0 8px 24px rgb(0 0 0 / 0.30);
@@ -133,7 +145,9 @@
     --signal-ink: 190 242 100;  /* #BEF264 */
     --signal-fg: 20 26 8;       /* #141A08 */
     --signal-ink-fg: 20 26 8;   /* #141A08 */
-    --night: 13 13 11;          /* #0D0D0B */
+    --raised: 30 30 27;         /* #1E1E1B yükseltilmiş yüzey (modal, panel) */
+    --chart-line: 228 225 218;  /* #E4E1DA grafik ana çizgisi (nötr, net) */
+    --shadow-raised: 0 2px 8px rgb(0 0 0 / 0.5), 0 24px 60px -12px rgb(0 0 0 / 0.6);
   }
 }
 
@@ -158,11 +172,6 @@ body {
      'scroll' ile sayfayla birlikte kayar, repaint yok. */
   background-attachment: scroll;
   -webkit-font-smoothing: antialiased;
-}
-
-/* Editöryel serif yardımcı sınıfı — hüküm cümlesi */
-.font-serif {
-  font-family: "Source Serif 4", Georgia, Cambria, "Times New Roman", serif;
 }
 
 /* Teknik/mono ve display fontları için yardımcı sınıflar */
@@ -197,15 +206,15 @@ body {
    position:fixed öğeleri (geri bildirim butonu, mobil sekme çubuğu, modallar) sarmalayıcıya
    bağlayıp kaydırırdı. */
 .page-in {
-  animation: page-in 0.2s ease-out both;
+  animation: page-in var(--dur-page) var(--ease) both;
 }
 @keyframes page-in {
   from { opacity: 0; }
 }
 
-/* Kart girişi — grid içinde kısa sırayla (toplam ≤ ~0.35s) */
+/* Kart girişi — grid içinde kısa sırayla (toplam ≤ ~0.32s) */
 .stagger > * {
-  animation: card-in 0.22s ease-out both;
+  animation: card-in var(--dur-page) var(--ease) both;
 }
 .stagger > *:nth-child(1) { animation-delay: 0s; }
 .stagger > *:nth-child(2) { animation-delay: 0.03s; }
@@ -215,7 +224,7 @@ body {
 
 /* Sekme değişiminde yumuşak geçiş */
 .tab-fade {
-  animation: tab-fade 0.2s ease-out both;
+  animation: tab-fade var(--dur-page) var(--ease) both;
 }
 @keyframes tab-fade {
   from { opacity: 0; transform: translateY(4px); }
@@ -288,11 +297,52 @@ body {
   .nr-name-in { animation: none; }
 }
 
+/* ── ORTAK ETKİLEŞİM (landing + uygulama) ─────────────────────────────────────
+   Odak: klavyeyle gezinmede her etkileşimli öğede net, vurgu renginde halka. */
+:focus-visible {
+  outline: 2px solid rgb(var(--accent));
+  outline-offset: 2px;
+}
+/* Modal açılışı: ölçek + fade (200ms); arka plan karartması yalnızca fade. */
+.modal-in { animation: modal-in var(--dur-modal) var(--ease) both; }
+@keyframes modal-in { from { opacity: 0; transform: scale(0.97) translateY(4px); } }
+.sheet-in { animation: sheet-in var(--dur-modal) var(--ease) both; }
+@keyframes sheet-in { from { transform: translateY(24px); opacity: 0; } }
+.fade-in { animation: page-in var(--dur-modal) var(--ease) both; }
+.toast-in { animation: toast-in var(--dur-modal) var(--ease) both; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(-6px); } }
+/* Akan cevapta yanıp sönen imleç */
+.caret::after {
+  content: "";
+  display: inline-block;
+  width: 0.5ch;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.15em;
+  background: currentColor;
+  animation: caret 1s steps(1) infinite;
+}
+@keyframes caret { 50% { opacity: 0; } }
+/* "Yenile"ye dikkat çek (yeni şirket eklendi, analiz yok): kısa, iki kez nabız. */
+.attn { animation: attn 1.2s var(--ease) 2; }
+@keyframes attn {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(var(--signal) / 0); }
+  40% { box-shadow: 0 0 0 6px rgb(var(--signal) / 0.35); }
+}
+/* Header altındaki ince ilerleme çizgisi (içeriği itmez) */
+.nav-progress { transition: transform var(--dur-state) var(--ease); transform-origin: left; }
+
+/* Dokunmatik ekranlarda en az 44px dokunma alanı (Button: tap / tap-sq). */
+@media (pointer: coarse) {
+  .tap { min-height: 44px; }
+  .tap-sq { min-height: 44px; min-width: 44px; }
+}
+
 /* Skeleton (iskelet) — layout zıplamasın */
 .skeleton {
   background: linear-gradient(90deg, rgb(var(--ink-700)) 25%, rgb(var(--ink-600)) 37%, rgb(var(--ink-700)) 63%);
   background-size: 400% 100%;
-  animation: skel 1.4s ease infinite;
+  animation: skel var(--dur-shimmer) ease infinite;
   border-radius: 6px;
 }
 @keyframes skel {
@@ -305,19 +355,14 @@ body {
    Kaydırmaya bağlı (scrub) hareketi GSAP yazar — yalnızca transform/opacity, satır içi stil.
    Burada: bir kez oynayan hero açılışı, sakin iki döngü (radar taraması, akan başlıklar),
    hover/durum geçişleri. prefers-reduced-motion'da hepsi kapalı (bloğun sonu). */
-html.lx-page body { background-color: rgb(var(--night)); }
 html.lenis, html.lenis body { height: auto; }
 .lenis.lenis-smooth { scroll-behavior: auto !important; }
 .lenis.lenis-stopped { overflow: hidden; }
 
 .lx {
-  /* Landing'de TEK vurgu: uygulama parçaları (sahneler, dil/tema menüsü) da sinyal yeşilini alır. */
-  --accent: var(--signal-ink);
-  --accent-hover: var(--signal-ink);
-  --accent-fg: var(--signal-ink-fg);
   position: relative;
   isolation: isolate;
-  background-color: rgb(var(--night));
+  background-color: rgb(var(--ink-900));
   color: rgb(var(--slate-100));
 }
 /* Gren: sabit katman, içeriğin ARKASINDA (metin kontrastına dokunmaz), kaydırmada yeniden boyanmaz. */
@@ -362,11 +407,11 @@ html.lenis, html.lenis body { height: auto; }
 @keyframes lx-rise { from { transform: translate3d(0, 110%, 0); } }
 @keyframes lx-up { from { opacity: 0; transform: translate3d(0, 20px, 0); } }
 .lx-intro-line {
-  animation: lx-rise var(--lx-dur-intro) var(--lx-ease) both;
-  animation-delay: calc(var(--i, 0) * var(--lx-stagger));
+  animation: lx-rise var(--dur-intro) var(--ease) both;
+  animation-delay: calc(var(--i, 0) * var(--stagger));
 }
 .lx-intro-up {
-  animation: lx-up var(--lx-dur-intro) var(--lx-ease) both;
+  animation: lx-up var(--dur-intro) var(--ease) both;
   animation-delay: var(--at, 0s);
 }
 
@@ -388,20 +433,14 @@ html.lenis, html.lenis body { height: auto; }
   -webkit-mask-image: linear-gradient(to bottom, transparent, #000 16%, #000 84%, transparent);
   mask-image: linear-gradient(to bottom, transparent, #000 16%, #000 84%, transparent);
 }
-.lx-cue-dot { animation: lx-cue 2.4s var(--lx-ease) infinite; }
+.lx-cue-dot { animation: lx-cue 2.4s var(--ease) infinite; }
 @keyframes lx-cue {
   0% { transform: translate3d(0, 0, 0); opacity: 0; }
   25% { opacity: 1; }
   100% { transform: translate3d(0, 26px, 0); opacity: 0; }
 }
 
-/* Hover: kısa, tatmin edici (süre/eğri motion.js). */
-.lx-btn {
-  transition: transform var(--lx-dur-hover) var(--lx-ease), box-shadow var(--lx-dur-hover) var(--lx-ease),
-    filter var(--lx-dur-hover) var(--lx-ease);
-}
-.lx-btn:hover { transform: translate3d(0, -2px, 0); box-shadow: 0 12px 32px -12px rgb(var(--signal) / 0.7); filter: brightness(1.04); }
-.lx-btn:active { transform: none; }
+/* Hover: kısa, tatmin edici (süre/eğri motion.js). Butonlar: kit.jsx Button. */
 .lx-link { position: relative; }
 .lx-link::after {
   content: "";
@@ -413,20 +452,20 @@ html.lenis, html.lenis body { height: auto; }
   background: currentColor;
   transform: scaleX(0);
   transform-origin: right;
-  transition: transform var(--lx-dur-hover) var(--lx-ease);
+  transition: transform var(--dur-hover) var(--ease);
 }
 .lx-link:hover::after,
 .lx-link:focus-visible::after { transform: scaleX(1); transform-origin: left; }
-.lx-arrow { display: inline-block; transition: transform var(--lx-dur-hover) var(--lx-ease); }
+.lx-arrow { display: inline-block; transition: transform var(--dur-hover) var(--ease); }
 .lx-link:hover .lx-arrow { transform: translate3d(0, 3px, 0); }
 
 /* Nav: en üstte saydam; kaydırınca yarı saydam + bulanık zemin. */
 .lx-nav {
   border-bottom: 1px solid transparent;
-  transition: background-color var(--lx-dur-state) var(--lx-ease), border-color var(--lx-dur-state) var(--lx-ease);
+  transition: background-color var(--dur-state) var(--ease), border-color var(--dur-state) var(--ease);
 }
 .lx-nav[data-scrolled="true"] {
-  background-color: rgb(var(--night) / 0.72);
+  background-color: rgb(var(--ink-900) / 0.72);
   border-bottom-color: rgb(var(--slate-100) / 0.08);
   -webkit-backdrop-filter: blur(14px) saturate(140%);
   backdrop-filter: blur(14px) saturate(140%);
@@ -442,10 +481,10 @@ html.lenis, html.lenis body { height: auto; }
     0 0 80px -34px rgb(var(--signal) / 0.45);
 }
 /* Adım durumu: soluk ↔ tam renk. Soluk hal de AA (slate-600), yalnızca renk geçişi. */
-.lx-step { color: rgb(var(--slate-600)); transition: color var(--lx-dur-state) var(--lx-ease); }
+.lx-step { color: rgb(var(--slate-600)); transition: color var(--dur-state) var(--ease); }
 .lx-step[data-active="true"] { color: rgb(var(--slate-100)); }
 .lx-step[data-active="true"] .lx-step-num { color: rgb(var(--signal-ink)); }
-.lx-step .lx-step-body { color: rgb(var(--slate-600)); transition: color var(--lx-dur-state) var(--lx-ease); }
+.lx-step .lx-step-body { color: rgb(var(--slate-600)); transition: color var(--dur-state) var(--ease); }
 .lx-step[data-active="true"] .lx-step-body { color: rgb(var(--slate-400)); }
 
 @media (prefers-reduced-motion: reduce) {
@@ -454,7 +493,6 @@ html.lenis, html.lenis body { height: auto; }
   .lx-sweep,
   .lx-flow,
   .lx-cue-dot { animation: none !important; }
-  .lx-btn:hover { transform: none; }
 }
 
 /* iOS SAFARI ODAK-ZOOM'U: font-size < 16px olan input/textarea/select'e
@@ -477,14 +515,12 @@ html.lenis, html.lenis body { height: auto; }
   body {
     overscroll-behavior-y: contain;
   }
-  /* Uzun gövde/hüküm metinleri mobilde biraz ferah okunsun */
-  .font-serif {
-    line-height: 1.35;
-  }
 }
 
 /* prefers-reduced-motion — ZORUNLU: kapalıysa tüm animasyonlar dursun */
 @media (prefers-reduced-motion: reduce) {
+  .caret::after,
+  .attn { animation: none !important; }
   *,
   *::before,
   *::after {

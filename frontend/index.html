@@ -22,7 +22,7 @@
           var p = localStorage.getItem("nr_theme");
           var dark = p === "dark" || (p !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
           document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
-          document.querySelector('meta[name="theme-color"]').setAttribute("content", dark ? "#141412" : "#F7F5F1");
+          document.querySelector('meta[name="theme-color"]').setAttribute("content", dark ? "#0D0D0B" : "#F7F5F1");
         } catch (e) {}
       })();
     </script>

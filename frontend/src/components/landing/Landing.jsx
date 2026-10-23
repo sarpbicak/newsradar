@@ -11,6 +11,7 @@ import { api } from "../../api.js";
 import { fmtInt, useI18n } from "../../i18n.jsx";
 import { navigate } from "../../router.js";
 import Logo from "../Logo.jsx";
+import { Button } from "../kit.jsx";
 import PrivacyModal from "../PrivacyModal.jsx";
 import { LanguageSwitcher } from "../LanguageBits.jsx";
 import { ThemeMenu } from "../ThemeToggle.jsx";
@@ -19,7 +20,7 @@ import ArchitectureDiagram from "./ArchitectureDiagram.jsx";
 import Hero from "./Hero.jsx";
 import Manifesto from "./Manifesto.jsx";
 import Walkthrough from "./Walkthrough.jsx";
-import { ease, motionVars } from "./motion.js";
+import { ease } from "../../motion.js";
 import { EngineContext, scrollToId, scrub, useEngineLoader, useScrub } from "./scroll.js";
 import { Lines, Reveal } from "./Type.jsx";
 
@@ -30,11 +31,11 @@ function goApp(e) {
   navigate("/app");
 }
 
-function AppButton({ className = "", children }) {
+function AppButton({ size = "md", className = "", children }) {
   return (
-    <a href="/app" onClick={goApp} className={`lx-btn inline-flex items-center gap-2 rounded-full bg-signal font-semibold text-signal-fg ${className}`}>
+    <Button as="a" href="/app" onClick={goApp} variant="primary" size={size} className={className}>
       {children}
-    </a>
+    </Button>
   );
 }
 
@@ -67,7 +68,7 @@ function Nav({ lang, onLang, onAnchor }) {
           </a>
           <LanguageSwitcher lang={lang} onChange={onLang} />
           <ThemeMenu />
-          <AppButton className="ml-1 h-10 whitespace-nowrap px-4 text-sm sm:px-5">
+          <AppButton className="ml-1">
             <span className="sm:hidden">{t("land.openAppShort")}</span>
             <span className="hidden sm:inline">{t("land.openApp")}</span>
           </AppButton>
@@ -169,7 +170,7 @@ function Closing() {
       <div className={WRAP}>
         <Lines lines={[t("land.cta.title")]} className="lx-h1 text-slate-100" drift={6} />
         <Reveal className="mt-12">
-          <AppButton className="h-14 px-7 text-[17px]">
+          <AppButton size="lg">
             {t("land.openApp")} <ArrowRight className="h-5 w-5" aria-hidden="true" />
           </AppButton>
         </Reveal>
@@ -236,12 +237,6 @@ export default function Landing({ lang, setLang }) {
     document.title = `NewsRadar — ${t("land.hero.l1")} ${t("land.hero.l2")} ${t("land.hero.l3")}`;
   }, [lang, t]);
 
-  // Landing zemini gövdeye de (aşırı kaydırmada görünen alan); ayrılınca geri alınır.
-  useEffect(() => {
-    document.documentElement.classList.add("lx-page");
-    return () => document.documentElement.classList.remove("lx-page");
-  }, []);
-
   // "/#how-it-works" ile gelindiyse (ör. uygulamadaki modaldan) o bölüme kaydır.
   useEffect(() => {
     const id = window.location.hash.slice(1);
@@ -259,7 +254,7 @@ export default function Landing({ lang, setLang }) {
 
   return (
     <EngineContext.Provider value={engine}>
-      <div ref={root} className="lx min-h-screen" style={motionVars}>
+      <div ref={root} className="lx min-h-screen">
         <div className="lx-grain" aria-hidden="true" />
         <Nav lang={lang} onLang={onLang} onAnchor={onAnchor} />
         <main>

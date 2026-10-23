@@ -8,23 +8,15 @@
 import React, { useLayoutEffect, useRef, useState } from "react";
 import { MessageSquare } from "lucide-react";
 import { fmtInt, fmtPct, useI18n } from "../../i18n.jsx";
-import { LABEL_STYLE } from "../HowItWorks.jsx";
+import { LabelChip } from "../kit.jsx";
 import { StatusTag, riskColor, stanceLabel } from "../ui.jsx";
-import { ease, seg } from "./motion.js";
+import { ease, seg } from "../../motion.js";
 
 const symbolOf = (e) => `${e.type === "ticker" ? "$" : "#"}${e.query}`;
 const shown = (v) => ({ opacity: v, visibility: v === 0 ? "hidden" : undefined });
 
 function SceneTitle({ children }) {
   return <div className="mb-4 text-xs font-semibold uppercase tracking-wide text-accent">{children}</div>;
-}
-
-function Label({ label, t, style }) {
-  return (
-    <span className={`shrink-0 rounded-full px-2.5 py-1 text-[13px] font-semibold ${LABEL_STYLE[label] || LABEL_STYLE.neutral}`} style={style}>
-      {t(`hiw.label.${label}`)}
-    </span>
-  );
 }
 
 // ── 1) Şirket ekle: ad harf harf yazılır → öneri listesi → çip eklenir (kutuda ad kalır) ───
@@ -143,7 +135,7 @@ export function SceneRead({ data, p }) {
           if (isJunk) lift += out * ((heights[i] || 0) + GAP);
           return (
             <HeadlineCard key={i} h={h} style={style} dim={isJunk ? 1 - 0.55 * fade : 1} cardRef={(el) => (cards.current[i] = el)}>
-              <Label label={h.label} t={t} style={{ ...shown(o), transform: `scale(${0.8 + 0.2 * o})` }} />
+              <LabelChip label={h.label} t={t} size="md" style={{ ...shown(o), transform: `scale(${0.8 + 0.2 * o})` }} />
             </HeadlineCard>
           );
         })}
@@ -194,7 +186,7 @@ export function SceneVerdict({ data, p }) {
             <span className="font-mono text-sm text-slate-500">{symbolOf(e)}</span>
             {e.analysis && <StatusTag stance={a.stance} evidence={e.evidence_strength} />}
           </div>
-          {a.headline_verdict && <p className="mt-3 font-serif text-xl font-semibold leading-snug text-slate-100">{a.headline_verdict}</p>}
+          {a.headline_verdict && <p className="mt-3 font-display text-xl font-semibold leading-snug text-slate-100">{a.headline_verdict}</p>}
           {e.price != null && (
             <p className="mt-3 flex flex-wrap items-baseline gap-x-2 text-sm">
               <span className="font-mono font-semibold text-slate-100">${e.price.toFixed(2)}</span>

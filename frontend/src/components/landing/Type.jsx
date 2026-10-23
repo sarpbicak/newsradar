@@ -4,7 +4,7 @@
 //  <Reveal> paragraf/kart/rakam; belirip 20px yukarı kayar (geri kaydırınca geri gider).
 // Motor yoksa / reduced-motion: düz, son halde metin.
 import React, { useRef } from "react";
-import { ease } from "./motion.js";
+import { ease } from "../../motion.js";
 import { paintSegs, scrub, useScrub } from "./scroll.js";
 
 export function Lines({ as: Tag = "h2", lines, className = "", drift = 0, end = "top 55%", ...rest }) {

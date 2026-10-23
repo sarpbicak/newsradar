@@ -6,9 +6,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { fmtPct, useI18n } from "../../i18n.jsx";
-import { LABEL_STYLE } from "../HowItWorks.jsx";
+import { Button, LabelChip } from "../kit.jsx";
 import { StatusTag, riskColor } from "../ui.jsx";
-import { clamp01 } from "./motion.js";
+import { clamp01 } from "../../motion.js";
 import { scrub, useScrub } from "./scroll.js";
 
 function Radar() {
@@ -79,9 +79,7 @@ function Flow({ headlines, t }) {
       <div className="lx-flow space-y-3">
         {loop.map((h, i) => (
           <div key={i} className={`flex items-center gap-3 rounded-xl border border-ink-600 bg-ink-800 px-4 py-3 ${i % 2 ? "ml-6" : "mr-6"}`}>
-            <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${LABEL_STYLE[h.label] || LABEL_STYLE.neutral}`}>
-              {t(`hiw.label.${h.label}`)}
-            </span>
+            <LabelChip label={h.label} t={t} />
             <span className="truncate text-sm text-slate-300">{h.title}</span>
           </div>
         ))}
@@ -146,17 +144,13 @@ export default function Hero({ demo, onAnchor, onApp }) {
             ))}
           </h1>
           <div ref={rest}>
-            <p className="lx-body lx-intro-up mt-8 max-w-[34rem] text-slate-400" style={{ "--at": "var(--lx-at-sub)" }}>
+            <p className="lx-body lx-intro-up mt-8 max-w-[34rem] text-slate-400" style={{ "--at": "var(--at-sub)" }}>
               {t("land.hero.sub")}
             </p>
-            <div className="lx-intro-up mt-10 flex flex-wrap items-center gap-x-8 gap-y-5" style={{ "--at": "var(--lx-at-cta)" }}>
-              <a
-                href="/app"
-                onClick={onApp}
-                className="lx-btn inline-flex h-14 items-center gap-2 rounded-full bg-signal px-7 text-[17px] font-semibold text-signal-fg"
-              >
+            <div className="lx-intro-up mt-10 flex flex-wrap items-center gap-x-8 gap-y-5" style={{ "--at": "var(--at-cta)" }}>
+              <Button as="a" href="/app" onClick={onApp} variant="primary" size="lg">
                 {t("land.openApp")} <ArrowRight className="h-5 w-5" aria-hidden="true" />
-              </a>
+              </Button>
               <a href="#how-it-works" onClick={onAnchor} className="lx-link text-[17px] font-medium text-slate-200">
                 {t("land.hero.how")} <span className="lx-arrow" aria-hidden="true">↓</span>
               </a>
@@ -169,7 +163,7 @@ export default function Hero({ demo, onAnchor, onApp }) {
           </div>
           <div ref={visual} className="relative mx-auto max-w-[440px]">
             {demo ? (
-              <div className="lx-intro-up" style={{ "--at": "var(--lx-at-card)" }}>
+              <div className="lx-intro-up" style={{ "--at": "var(--at-card)" }}>
                 <Flow headlines={demo.headlines} t={t} />
                 <LiveCard demo={demo} t={t} />
               </div>

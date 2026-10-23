@@ -11,14 +11,9 @@ import { api } from "../api.js";
 import { useI18n, fmtInt, fmtPct } from "../i18n.jsx";
 import { StatusTag, stanceLabel } from "./ui.jsx";
 import { navigate } from "../router.js";
+import { LabelChip } from "./kit.jsx";
 
 const STEPS = 4;
-export const LABEL_STYLE = {
-  positive: "bg-emerald-500/10 text-emerald-600",
-  negative: "bg-rose-500/10 text-rose-600",
-  neutral: "bg-slate-500/10 text-slate-500",
-  irrelevant: "bg-ink-700 text-slate-500",
-};
 
 export function HeadlineCards({ headlines, withLabels, t }) {
   return (
@@ -38,12 +33,7 @@ export function HeadlineCards({ headlines, withLabels, t }) {
               {h.source && <p className="mt-0.5 text-[10px] text-slate-500">{h.source}</p>}
             </div>
             {withLabels && (
-              <span
-                className={`hiw-pop shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${LABEL_STYLE[h.label] || LABEL_STYLE.neutral}`}
-                style={{ animationDelay: `${i * 80}ms` }}
-              >
-                {t(`hiw.label.${h.label}`)}
-              </span>
+              <LabelChip label={h.label} t={t} className="hiw-pop" style={{ animationDelay: `${i * 80}ms` }} />
             )}
           </div>
         );
@@ -65,7 +55,7 @@ export function MiniCard({ entity, t, animate }) {
         {a && <StatusTag stance={a.stance} evidence={entity.evidence_strength} />}
       </div>
       {a?.headline_verdict && (
-        <p className="mt-2 font-serif text-[15px] font-semibold leading-snug text-slate-100">{a.headline_verdict}</p>
+        <p className="mt-2 font-display text-[15px] font-semibold leading-snug text-slate-100">{a.headline_verdict}</p>
       )}
       {entity.price != null && (
         <p className="mt-2 flex flex-wrap items-baseline gap-x-1.5 text-xs">
@@ -167,13 +157,7 @@ export default function HowItWorks({ onClose, onTry }) {
         <div className="relative">
           <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex flex-wrap justify-center gap-1.5">
             {relevant.map((h, i) => (
-              <span
-                key={i}
-                className={`hiw-merge rounded-full px-2 py-0.5 text-[10px] font-semibold ${LABEL_STYLE[h.label]}`}
-                style={{ animationDelay: `${i * 40}ms` }}
-              >
-                {t(`hiw.label.${h.label}`)}
-              </span>
+              <LabelChip key={i} label={h.label} t={t} className="hiw-merge" style={{ animationDelay: `${i * 40}ms` }} />
             ))}
           </div>
           <MiniCard entity={e} t={t} animate />

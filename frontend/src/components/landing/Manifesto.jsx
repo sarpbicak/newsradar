@@ -4,7 +4,7 @@
 // Motor yoksa / reduced-motion: tüm kelimeler tam renkte.
 import React, { useRef } from "react";
 import { useI18n } from "../../i18n.jsx";
-import { clamp01, prefersReducedMotion } from "./motion.js";
+import { clamp01, prefersReducedMotion } from "../../motion.js";
 import { DESKTOP_MQ, scrub, useMedia, useScrub } from "./scroll.js";
 
 const DIM = 0.16;

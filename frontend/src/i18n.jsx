@@ -409,6 +409,8 @@ const STR = {
   "acc.working": { tr: "İşleniyor…", en: "Working…" },
   "acc.toLogin": { tr: "Zaten hesabın var mı? Giriş yap", en: "Already have an account? Log in" },
   "acc.toUpgrade": { tr: "Hesabın yok mu? Oluştur", en: "No account? Create one" },
+  "state.errorBody": { tr: "Bir şeyler ters gitti. Bağlantını kontrol edip tekrar dene.", en: "Something went wrong. Check your connection and try again." },
+  "state.retry": { tr: "Tekrar dene", en: "Try again" },
   "common.close": { tr: "Kapat", en: "Close" },
 
   // ---- Öneriler ----

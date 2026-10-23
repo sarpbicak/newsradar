@@ -8,7 +8,7 @@
 // açıkken sayfa statik ve eksiksiz görünür. Tetik aralığının tamamen altında (ekran dışında)
 // kalan öğeler de son halde bekletilir; ekrana girdikleri an başlangıç karesine geçerler.
 import { createContext, useContext, useEffect, useLayoutEffect, useState } from "react";
-import { DUR, INTRO_AT, ease, prefersReducedMotion, seg } from "./motion.js";
+import { DUR, INTRO_AT, ease, prefersReducedMotion, seg } from "../../motion.js";
 
 export const DESKTOP_MQ = "(min-width: 1024px)";
 const LENIS_MQ = "(min-width: 1024px) and (pointer: fine)";
