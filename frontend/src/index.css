@@ -439,6 +439,15 @@ html.lenis, html.lenis body { height: auto; }
 .lx-arrow { display: inline-block; transition: transform var(--dur-hover) var(--ease); }
 .link-u:hover .lx-arrow { transform: translate3d(0, 3px, 0); }
 
+/* Nav metni (bağlantılar, nav butonları, kullanıcı adı): başlıklarla aynı karakter —
+   Space Grotesk Medium, 15px, hafif negatif harf aralığı. Landing ve uygulama ortak. */
+.nav-text {
+  font-family: "Space Grotesk", Inter, system-ui, sans-serif;
+  font-weight: 500;
+  font-size: var(--fs-body);
+  letter-spacing: -0.01em;
+}
+
 /* Nav: en üstte saydam; kaydırınca yarı saydam + bulanık zemin. */
 .nav-bar {
   border-bottom: 1px solid transparent;

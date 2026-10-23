@@ -38,7 +38,7 @@ export function NavLink({ href, onClick, className = "", children }) {
     <a
       href={href}
       onClick={onClick}
-      className={`link-u mx-2 hidden h-10 items-center text-sm text-slate-300 transition-colors duration-hover ease-std hover:text-slate-100 md:inline-flex ${className}`}
+      className={`link-u nav-text hidden h-10 items-center px-1 text-slate-300 transition-colors duration-hover ease-std hover:text-slate-100 md:inline-flex ${className}`}
     >
       {children}
     </a>
@@ -51,7 +51,8 @@ export default function NavBar({ brand, fixed = false, below = null, children })
     <header data-nav-bar data-scrolled={scrolled} className={`nav-bar ${fixed ? "fixed inset-x-0" : "sticky"} top-0 z-40`}>
       <div className={`${WRAP} flex h-16 items-center justify-between gap-3`}>
         {brand}
-        <nav className="flex items-center gap-1 sm:gap-1.5" aria-label="NewsRadar">
+        {/* Tüm öğeler 40px; aralık tutarlı (8px, geniş ekranda 10px). */}
+        <nav className="flex items-center gap-2 lg:gap-2.5" aria-label="NewsRadar">
           {children}
         </nav>
       </div>

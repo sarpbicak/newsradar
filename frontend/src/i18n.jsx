@@ -14,7 +14,7 @@ const STR = {
   "header.refresh": { tr: "Yenile", en: "Refresh" },
   "header.refreshing": { tr: "Yenileniyor {done}/{total}", en: "Refreshing {done}/{total}" },
   "header.starting": { tr: "Başlatılıyor…", en: "Starting…" },
-  "header.howItWorks": { tr: "Nasıl çalışır?", en: "How it works?" },
+  "header.howItWorks": { tr: "Nasıl çalışır", en: "How it works" },
   "header.admin": { tr: "Admin", en: "Admin" },
   "header.dashboard": { tr: "Pano", en: "Dashboard" },
   "header.createAccount": { tr: "Hesap oluştur", en: "Create account" },

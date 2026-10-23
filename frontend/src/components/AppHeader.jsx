@@ -70,7 +70,7 @@ function RefreshButton({ refresh, compact = false }) {
       onClick={onRefresh}
       disabled={isRefreshing}
       aria-label={compact ? text : undefined}
-      className={cx("disabled:opacity-80", attn && "attn", compact && "px-3")}
+      className={cx("nav-text disabled:opacity-80", attn && "attn", compact && "px-3")}
     >
       <RefreshCw className={cx("h-4 w-4", isRefreshing && "animate-spin")} aria-hidden="true" />
       {compact ? counting && <span className="font-mono text-micro tabular-nums">{status.progress_done}/{status.progress_total}</span> : <span className="tabular-nums">{text}</span>}
@@ -98,7 +98,7 @@ function UserMenu({ user, view, onAdmin, onLogout }) {
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-ink-700 font-display text-sm font-semibold text-slate-100" aria-hidden="true">
             {initials(user.username)}
           </span>
-          <span className="max-w-36 truncate font-medium">{user.username}</span>
+          <span className="nav-text max-w-36 truncate">{user.username}</span>
           {/* Erişilebilir ad görünen metinle başlar (label-content-name-mismatch olmasın). */}
           <span className="sr-only"> — {t("header.accountMenu")}</span>
         </button>
@@ -188,23 +188,23 @@ export default function AppHeader({ user, view, lang, onLang, onHome, onAccount,
       <NavLink href="/#how-it-works" onClick={(e) => { e.preventDefault(); goHow(); }}>
         {t("header.howItWorks")}
       </NavLink>
-      <div className="hidden items-center gap-1.5 md:flex">
+      <div className="hidden items-center gap-2 md:flex lg:gap-2.5">
         <LanguageSwitcher lang={lang} onChange={onLang} />
         <ThemeMenu />
         {user.is_anonymous ? (
           <>
-            <Button variant="ghost" onClick={() => onAccount("login")}>{t("header.login")}</Button>
-            <Button onClick={() => onAccount("upgrade")}>{t("header.createAccount")}</Button>
+            <Button variant="ghost" onClick={() => onAccount("login")} className="nav-text">{t("header.login")}</Button>
+            <Button onClick={() => onAccount("upgrade")} className="nav-text">{t("header.createAccount")}</Button>
           </>
         ) : (
           <UserMenu user={user} view={view} onAdmin={onAdmin} onLogout={onLogout} />
         )}
       </div>
-      <div className="ml-1 hidden md:block">
+      <div className="hidden md:block">
         <RefreshButton refresh={refresh} />
       </div>
       {/* Mobil */}
-      <div className="flex items-center gap-1 md:hidden">
+      <div className="flex items-center gap-2 md:hidden">
         <RefreshButton refresh={refresh} compact />
         <Button variant="ghost" iconOnly icon={MenuIcon} onClick={() => setDrawer(true)} aria-label={t("header.menu")} aria-haspopup="dialog" />
       </div>

@@ -61,7 +61,7 @@ function Nav({ lang, onLang, onAnchor }) {
       </NavLink>
       <LanguageSwitcher lang={lang} onChange={onLang} />
       <ThemeMenu />
-      <AppButton className="ml-1">
+      <AppButton className="nav-text">
         <span className="sm:hidden">{t("land.openAppShort")}</span>
         <span className="hidden sm:inline">{t("land.openApp")}</span>
       </AppButton>
