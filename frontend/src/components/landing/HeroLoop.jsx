@@ -1,15 +1,13 @@
 // Hero'nun TEK imza animasyonu: "Nasıl çalışır?" akışı (gerçek başlıklar → AI etiketi →
 // alakasızlar düşer → karar kartı) sakin, sürekli bir döngü halinde. Veri GERÇEK:
-// /public/how-it-works (seed listesindeki örnek şirket). Örnek yoksa uydurma yapılmaz —
-// uygulamanın gerçek ekran görüntüsü gösterilir.
+// /public/how-it-works (seed listesindeki örnek şirket; Landing bir kez çekip verir).
+// Örnek yoksa uydurma yapılmaz — Landing bu bileşeni hiç göstermez.
 // Performans: yalnızca opacity/transform animasyonu (CSS sınıfları, HowItWorks ile aynı);
 // döngü ekran dışındayken ve sekme arka plandayken durur; alan önceden ayrılır (CLS yok).
 // prefers-reduced-motion: animasyon yok, son hal (etiketli başlıklar + kart) statik.
 import React, { useEffect, useRef, useState } from "react";
-import { api } from "../../api.js";
 import { useI18n } from "../../i18n.jsx";
 import { HeadlineCards, MiniCard } from "../HowItWorks.jsx";
-import ThemedShot from "./ThemedShot.jsx";
 
 const PHASE_MS = [2000, 2600, 4200]; // başlıklar · etiketler (+ alakasız düşer) · karar
 const reduced = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -26,23 +24,13 @@ function useInView(ref) {
   return inView;
 }
 
-export default function HeroLoop() {
-  const { t, lang } = useI18n();
-  const [data, setData] = useState(null); // null = yükleniyor, false = örnek yok
+export default function HeroLoop({ data }) { // data: null = yükleniyor
+  const { t } = useI18n();
   const [phase, setPhase] = useState(0);
   const [cycle, setCycle] = useState(0);
   const wrap = useRef(null);
   const inView = useInView(wrap);
   const still = reduced();
-
-  useEffect(() => {
-    let alive = true;
-    setData(null);
-    api.publicHowItWorks(lang)
-      .then((d) => alive && setData(d?.available && d.entity && d.headlines?.length ? d : false))
-      .catch(() => alive && setData(false));
-    return () => { alive = false; };
-  }, [lang]);
 
   // Faz ilerletme: yalnızca görünürken ve sekme öndeyken.
   useEffect(() => {
@@ -69,40 +57,34 @@ export default function HeroLoop() {
       className="relative w-full rounded-2xl border border-ink-600 bg-ink-800/70 p-4 shadow-card sm:p-5"
       aria-label={data ? t("land.hero.live", { name: data.entity.name }) : undefined}
     >
-      {data === false ? (
-        <ThemedShot step={4} lang={lang} alt={t("land.hero.fallbackAlt")} eager />
-      ) : (
-        <>
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-accent">
-              {data ? t("land.hero.live", { name: data.entity.name }) : " "}
-            </span>
-            <span className="flex items-center gap-1.5" aria-hidden="true">
-              {captions.map((_, i) => (
-                <span key={i} className={`h-1.5 rounded-full transition-all duration-300 ${i === shown ? "w-4 bg-accent" : "w-1.5 bg-ink-500"}`} />
-              ))}
-            </span>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-accent">
+          {data ? t("land.hero.live", { name: data.entity.name }) : " "}
+        </span>
+        <span className="flex items-center gap-1.5" aria-hidden="true">
+          {captions.map((_, i) => (
+            <span key={i} className={`h-1.5 rounded-full transition-all duration-300 ${i === shown ? "w-4 bg-accent" : "w-1.5 bg-ink-500"}`} />
+          ))}
+        </span>
+      </div>
+      <p className="mb-3 text-[13px] text-slate-400" aria-live="off">{captions[shown]}</p>
+      {/* Alan sabit: fazlar üst üste, yalnızca opaklık değişir (düzen kayması yok). */}
+      <div className={still ? "space-y-3" : "relative h-[300px] sm:h-[290px]"}>
+        {!data ? (
+          <div className="space-y-2" aria-hidden="true">
+            {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-[52px] w-full" />)}
           </div>
-          <p className="mb-3 text-[13px] text-slate-400" aria-live="off">{captions[shown]}</p>
-          {/* Alan sabit: fazlar üst üste, yalnızca opaklık değişir (düzen kayması yok). */}
-          <div className={still ? "space-y-3" : "relative h-[300px] sm:h-[290px]"}>
-            {!data ? (
-              <div className="space-y-2" aria-hidden="true">
-                {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-[52px] w-full" />)}
-              </div>
-            ) : (
-              <>
-                <div className={still ? "" : `absolute inset-0 transition-opacity duration-300 ${shown < 2 ? "opacity-100" : "opacity-0"}`}>
-                  <HeadlineCards key={`h${cycle}-${shown >= 1}`} headlines={data.headlines} withLabels={shown >= 1} t={t} />
-                </div>
-                <div className={still ? "" : `absolute inset-0 flex items-center transition-opacity duration-300 ${shown === 2 ? "opacity-100" : "pointer-events-none opacity-0"}`}>
-                  {(shown === 2 || still) && <div className="w-full"><MiniCard key={`c${cycle}`} entity={data.entity} t={t} animate={!still} /></div>}
-                </div>
-              </>
-            )}
-          </div>
-        </>
-      )}
+        ) : (
+          <>
+            <div className={still ? "" : `absolute inset-0 transition-opacity duration-300 ${shown < 2 ? "opacity-100" : "opacity-0"}`}>
+              <HeadlineCards key={`h${cycle}-${shown >= 1}`} headlines={data.headlines} withLabels={shown >= 1} t={t} />
+            </div>
+            <div className={still ? "" : `absolute inset-0 flex items-center transition-opacity duration-300 ${shown === 2 ? "opacity-100" : "pointer-events-none opacity-0"}`}>
+              {(shown === 2 || still) && <div className="w-full"><MiniCard key={`c${cycle}`} entity={data.entity} t={t} animate={!still} /></div>}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

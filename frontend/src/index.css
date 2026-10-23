@@ -157,12 +157,6 @@ body {
    Kalan animasyonlar olay-kapsamlı: .stagger (bir kez), .scan-host (yalnızca
    yenileme sırasında), .skeleton (yalnızca yükleme), .tab-fade (bir kez). */
 
-/* Landing ekran görüntüleri: yalnızca etkin temanın varyantı görünür (diğeri lazy → indirilmez). */
-:root[data-theme="dark"] .shot-light,
-:root:not([data-theme="dark"]) .shot-dark {
-  display: none;
-}
-
 /* İnce açık kaydırma çubuğu */
 ::-webkit-scrollbar {
   width: 10px;

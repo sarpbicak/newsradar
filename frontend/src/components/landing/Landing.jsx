@@ -1,8 +1,10 @@
 // Landing sayfası (/). Pano /app'te (ayrı pakette, lazy). Daha önce gelmiş ziyaretçi "/"'ta
 // durmaz, doğrudan /app'e gider (router.shouldSkipLanding).
-// Bölümler: hero (tek imza animasyonu: HeroLoop) · nasıl çalışır (4 adım, gerçek ekran
-// görüntüleri) · gerçek rakamlar (API) · altında ne var (mimari + GitHub) · footer.
-// Hareket yalnızca hero döngüsü + rakamlarda kısa sayma; reduced-motion'da hepsi kapalı.
+// Bölümler: hero (imza animasyonu: HeroLoop) · nasıl çalışır (4 adım, görününce bir kez oynayan
+// sahneler — Scenes.jsx) · gerçek rakamlar (API) · altında ne var (mimari + GitHub) · footer.
+// Hero ve sahneler aynı gerçek örneği kullanır: /public/how-it-works bir kez çekilir.
+// Örnek yoksa uydurma yok: hero görseli ve sahneler gizlenir, adım metinleri kalır.
+// reduced-motion'da hiçbir şey oynamaz; sahneler son karede statik.
 import React, { useEffect, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { api } from "../../api.js";
@@ -16,7 +18,7 @@ import { ThemeMenu } from "../ThemeToggle.jsx";
 import { GITHUB_PROFILE_URL, GITHUB_REPO_URL, GitHubIcon, LINKEDIN_URL, LinkedInIcon, SocialIcon } from "../Social.jsx";
 import ArchitectureDiagram from "./ArchitectureDiagram.jsx";
 import HeroLoop from "./HeroLoop.jsx";
-import ThemedShot from "./ThemedShot.jsx";
+import { SCENES } from "./Scenes.jsx";
 
 function goApp(e) {
   e?.preventDefault();
@@ -72,7 +74,7 @@ function Header({ lang, onLang }) {
   );
 }
 
-function Hero() {
+function Hero({ demo }) {
   const { t } = useI18n();
   return (
     <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-16 pt-10 sm:px-6 md:pt-16 lg:grid-cols-[1.05fr_1fr] lg:gap-14">
@@ -94,14 +96,14 @@ function Hero() {
           </a>
         </div>
       </div>
-      <HeroLoop />
+      {demo !== false && <HeroLoop data={demo} />}
     </section>
   );
 }
 
 const STEPS = [1, 2, 3, 4];
 
-function Steps({ lang }) {
+function Steps({ demo }) {
   const { t } = useI18n();
   return (
     <section id="how-it-works" className="scroll-mt-20 border-t border-ink-600 bg-ink-800/40">
@@ -110,15 +112,19 @@ function Steps({ lang }) {
         <p className="mt-2 text-slate-400">{t("land.how.sub")}</p>
         <ol className="mt-10 space-y-12">
           {STEPS.map((n) => {
-            const title = t(`land.step${n}.title`);
+            const Scene = SCENES[n - 1];
             return (
               <li key={n} className="grid items-center gap-6 md:grid-cols-2 md:gap-10">
                 <div className={n % 2 === 0 ? "md:order-2" : ""}>
                   <div className="font-mono text-sm font-semibold text-accent">0{n}</div>
-                  <h3 className="mt-1 font-display text-xl font-bold text-slate-100">{title}</h3>
+                  <h3 className="mt-1 font-display text-xl font-bold text-slate-100">{t(`land.step${n}.title`)}</h3>
                   <p className="mt-2 max-w-md text-[15px] leading-relaxed text-slate-400">{t(`land.step${n}.body`)}</p>
                 </div>
-                <ThemedShot step={n} lang={lang} alt={t("land.stepImgAlt", { n, title })} />
+                {demo ? (
+                  <Scene data={demo} />
+                ) : demo === null ? (
+                  <div className="skeleton h-[280px] w-full rounded-2xl" aria-hidden="true" />
+                ) : null}
               </li>
             );
           })}
@@ -221,6 +227,16 @@ function Footer({ onPrivacy }) {
 export default function Landing({ lang, setLang }) {
   const { t } = useI18n();
   const [privacy, setPrivacy] = useState(false);
+  const [demo, setDemo] = useState(null); // null = yükleniyor, false = örnek yok
+
+  useEffect(() => {
+    let alive = true;
+    setDemo(null);
+    api.publicHowItWorks(lang)
+      .then((d) => alive && setDemo(d?.available && d.entity && d.headlines?.length ? d : false))
+      .catch(() => alive && setDemo(false));
+    return () => { alive = false; };
+  }, [lang]);
 
   // Dil: landing'de oturum yok — yalnızca cihaz tercihi (uygulama girişte backend'e yazar).
   function onLang(l) {
@@ -243,8 +259,8 @@ export default function Landing({ lang, setLang }) {
     <div className="min-h-screen">
       <Header lang={lang} onLang={onLang} />
       <main>
-        <Hero />
-        <Steps lang={lang} />
+        <Hero demo={demo} />
+        <Steps demo={demo} />
         <Stats />
         <Stack />
       </main>

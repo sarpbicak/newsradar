@@ -13,7 +13,7 @@ import { StatusTag, stanceLabel } from "./ui.jsx";
 import { navigate } from "../router.js";
 
 const STEPS = 4;
-const LABEL_STYLE = {
+export const LABEL_STYLE = {
   positive: "bg-emerald-500/10 text-emerald-600",
   negative: "bg-rose-500/10 text-rose-600",
   neutral: "bg-slate-500/10 text-slate-500",
