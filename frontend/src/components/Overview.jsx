@@ -1,6 +1,6 @@
 // Genel görünüm: Katman 1 (bugün önemli — büyük kartlar) + Katman 2 (liste — satırlar).
 import React, { useEffect, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { useIsMobile } from "./ui.jsx";
 import { tt } from "../i18n.jsx";
 import EntityCard, { EntityRow } from "./EntityCard.jsx";
@@ -17,8 +17,8 @@ const STARTERS = [
   { name: "OpenAI", type: "keyword", query: "OpenAI" },
 ];
 
-// Boş durum: yeni kullanıcı için açıklama + popüler şirketlerle hızlı başlangıç.
-function EmptyState({ onCreate, onHowItWorks }) {
+// Başlangıç önerisine tıkla-ekle (boş durum ve "birkaç şirket daha" satırı ortak kullanır).
+function useStarterAdd(onCreate) {
   const [adding, setAdding] = useState(null);
   const [err, setErr] = useState(null);
   async function add(s) {
@@ -32,6 +32,28 @@ function EmptyState({ onCreate, onHowItWorks }) {
       setAdding(null);
     }
   }
+  return { add, adding, err };
+}
+
+function StarterChip({ s, onAdd, adding }) {
+  return (
+    <button
+      onClick={() => onAdd(s)}
+      disabled={adding === s.query}
+      className="inline-flex items-center gap-1.5 rounded-lg border border-ink-500 bg-ink-700 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-accent/60 hover:bg-accent/10 disabled:opacity-60"
+    >
+      <Plus className="h-3.5 w-3.5 text-accent" />
+      {s.name}
+      <span className="font-mono text-[11px] text-slate-500">
+        {s.type === "ticker" ? "$" : "#"}{s.query}
+      </span>
+    </button>
+  );
+}
+
+// Boş durum: yeni kullanıcı için açıklama + popüler şirketlerle hızlı başlangıç.
+function EmptyState({ onCreate, onHowItWorks }) {
+  const { add, adding, err } = useStarterAdd(onCreate);
   return (
     <div className="rounded-2xl border border-ink-600 bg-ink-800 p-8 text-center">
       <h2 className="font-display text-xl font-bold text-slate-100">
@@ -50,18 +72,7 @@ function EmptyState({ onCreate, onHowItWorks }) {
       )}
       <div className="mt-5 flex flex-wrap justify-center gap-2">
         {STARTERS.map((s) => (
-          <button
-            key={s.query}
-            onClick={() => add(s)}
-            disabled={adding === s.query}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-ink-500 bg-ink-700 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-accent/60 hover:bg-accent/10 disabled:opacity-60"
-          >
-            <Plus className="h-3.5 w-3.5 text-accent" />
-            {s.name}
-            <span className="font-mono text-[11px] text-slate-500">
-              {s.type === "ticker" ? "$" : "#"}{s.query}
-            </span>
-          </button>
+          <StarterChip key={s.query} s={s} onAdd={add} adding={adding} />
         ))}
       </div>
       {err && <p className="mt-3 text-xs text-rose-400">{err}</p>}
@@ -69,6 +80,62 @@ function EmptyState({ onCreate, onHowItWorks }) {
         {tt("ov.emptyNote")}
       </p>
     </div>
+  );
+}
+
+// "Birkaç şirket daha ekle": listede 3'ten az şirket varken listenin üstünde kalır. Eklenen
+// öneri düşer, yerine sıradaki gelir; × ile kapatılır (tercih bu cihazda saklanır); 3 şirkete
+// ulaşınca kendiliğinden kaybolur.
+const MORE_MIN = 3;
+const MORE_SHOWN = 4;
+const MORE_DISMISS_KEY = "nr_more_starters_dismissed";
+
+function readDismissed() {
+  try {
+    return localStorage.getItem(MORE_DISMISS_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function MoreStarters({ cards, onCreate }) {
+  const { add, adding, err } = useStarterAdd(onCreate);
+  const [dismissed, setDismissed] = useState(readDismissed);
+  if (dismissed || cards.length === 0 || cards.length >= MORE_MIN) return null;
+  const have = (s) =>
+    cards.some((c) => (c.query || "").toLowerCase() === s.query.toLowerCase() || (c.name || "").toLowerCase() === s.name.toLowerCase());
+  const left = STARTERS.filter((s) => !have(s)).slice(0, MORE_SHOWN);
+  if (left.length === 0) return null;
+  function dismiss() {
+    setDismissed(true);
+    try {
+      localStorage.setItem(MORE_DISMISS_KEY, "1");
+    } catch {
+      /* depolama kapalıysa yalnızca bu oturumda gizli */
+    }
+  }
+  return (
+    <section className="rounded-xl border border-ink-600 bg-ink-800/60 p-3 sm:p-4" aria-labelledby="more-starters-title">
+      <div className="flex items-center justify-between gap-3">
+        <h2 id="more-starters-title" className="text-sm font-semibold text-slate-200">
+          {tt("ov.moreTitle")}
+        </h2>
+        <button
+          onClick={dismiss}
+          title={tt("ov.moreDismiss")}
+          aria-label={tt("ov.moreDismiss")}
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-ink-700 hover:text-slate-200"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {left.map((s) => (
+          <StarterChip key={s.query} s={s} onAdd={add} adding={adding} />
+        ))}
+      </div>
+      {err && <p className="mt-2 text-xs text-rose-400">{err}</p>}
+    </section>
   );
 }
 
@@ -134,6 +201,7 @@ export default function Overview({
 
   return (
     <div className="space-y-6">
+      <MoreStarters cards={cards} onCreate={onCreate} />
       {cards.length === 0 ? (
         <EmptyState onCreate={onCreate} onHowItWorks={onHowItWorks} />
       ) : fewMode ? (

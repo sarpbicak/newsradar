@@ -42,6 +42,8 @@ const STR = {
   "ov.watchlist": { tr: "İzleme listesi ({n})", en: "Watchlist ({n})" },
   "ov.emptyTitle": { tr: "Henüz takip ettiğin şirket yok", en: "You're not following any company yet" },
   "ov.emptyBody": { tr: "İzleme listene şirket ekleyerek başla. Aşağıdakilerden biriyle hemen deneyebilir ya da aşağıdaki formdan istediğini ekleyebilirsin.", en: "Start by adding a company to your watchlist. Try one below, or add your own with the form." },
+  "ov.moreTitle": { tr: "Birkaç şirket daha ekle", en: "Add a few more companies" },
+  "ov.moreDismiss": { tr: "Önerileri kapat", en: "Close suggestions" },
   "ov.emptyNote": { tr: "Eklediğin şirketler bir sonraki yenilemede analiz edilir.", en: "Companies you add are analyzed on the next refresh." },
 
   // ---- Kart ----
