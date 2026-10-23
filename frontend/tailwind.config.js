@@ -75,15 +75,10 @@ export default {
           "0%": { transform: "translateX(-100%)" },
           "100%": { transform: "translateX(300%)" },
         },
-        flash: {
-          "0%": { background: "rgb(var(--accent) / 0.14)" },
-          "100%": { background: "transparent" },
-        },
       },
       animation: {
         "card-in": "card-in var(--dur-page) var(--ease) both",
-        scan: "scan 1.4s ease-in-out infinite",
-        flash: "flash 0.9s ease-out",
+        scan: "scan var(--dur-shimmer) ease-in-out infinite",
       },
     },
   },

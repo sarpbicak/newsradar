@@ -2,6 +2,7 @@
 // değiştirici. Bayraklar küçük, yuvarlatılmış, ince kenarlıklı (beyaz kısımlar kaybolmasın).
 import React from "react";
 import { useI18n } from "../i18n.jsx";
+import { Modal } from "./kit.jsx";
 
 const flagWrap = "inline-block overflow-hidden rounded-[3px] ring-1 ring-slate-500/30";
 
@@ -44,29 +45,30 @@ export function Flag({ lang, className }) {
   return lang === "tr" ? <FlagTR className={className} /> : <FlagGB className={className} />;
 }
 
-// İlk giriş: sade dil seçim modalı (tek tıkla geçer).
+// İlk giriş: sade dil seçim modalı (tek tıkla geçer; seçim yapılmadan kapanmaz).
 export function LanguageModal({ onSelect }) {
   const { t } = useI18n();
   const opt = (lang, name) => (
     <button
+      type="button"
       onClick={() => onSelect(lang)}
-      className="flex min-h-[56px] w-full items-center gap-3 rounded-xl border border-ink-500 bg-ink-800 px-4 text-left transition hover:border-accent/60 hover:bg-ink-700"
+      className="tap flex h-14 w-full items-center gap-3 rounded-control bg-ink-800 px-4 text-left ring-1 ring-ink-600 transition duration-hover ease-std hover:bg-ink-700 hover:ring-accent/50"
     >
       <Flag lang={lang} className="h-6 w-9" />
       <span className="font-display text-base font-semibold text-slate-100">{name}</span>
     </button>
   );
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-xs rounded-2xl border border-ink-600 bg-ink-800 p-6 shadow-card-hover anim-modal-in">
-        <h2 className="mb-1 text-center font-display text-lg font-bold text-slate-100">{t("langmodal.title")}</h2>
-        <p className="mb-5 text-center text-[13px] text-slate-500">{t("langmodal.subtitle")}</p>
-        <div className="space-y-2.5">
-          {opt("tr", "Türkçe")}
-          {opt("en", "English")}
-        </div>
+    <Modal labelledBy="lang-title" size="sm" dismissable={false}>
+      <h2 id="lang-title" className="text-center font-display text-title font-semibold text-slate-100">
+        {t("langmodal.title")}
+      </h2>
+      <p className="mb-6 mt-1.5 text-center text-meta text-slate-500">{t("langmodal.subtitle")}</p>
+      <div className="space-y-2.5">
+        {opt("tr", "Türkçe")}
+        {opt("en", "English")}
       </div>
-    </div>
+    </Modal>
   );
 }
 

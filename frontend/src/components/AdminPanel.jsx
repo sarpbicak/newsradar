@@ -1,71 +1,73 @@
-// Admin kullanım paneli — yalnızca is_admin kullanıcı görür (backend 403 ile korur).
-// Genel istatistik + kullanıcı tablosu + tıklanınca kullanıcı detayı (eylem dökümü,
-// en çok baktığı şirketler, zaman çizelgesi). Veri ORTAK; bu sadece 'kim ne yaptı'.
+// Admin paneli — yalnızca is_admin kullanıcı görür (backend 403 ile korur). Ayrı pakette (lazy).
+// Sistem sağlığı · genel istatistik · maliyet · model kırılımı · geri bildirim kutusu · en çok
+// takip/görüntülenen · kullanıcı tablosu (tıklanınca detay). Ortak bileşenler; sayılar mono.
+// Onaylar ortak ConfirmDialog, geçici şifre ortak Modal, hatalar ortak Toast.
 import React, { useEffect, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Copy, Trash2, X } from "lucide-react";
 import { api } from "../api.js";
 import { timeAgo } from "./ui.jsx";
 import { tt, fmtDate, fmtDateTime, fmtPct } from "../i18n.jsx";
+import { Button, Card, Chip, ConfirmDialog, ErrorState, Input, Modal, ModalHeader, Skeleton, Toast, cx } from "./kit.jsx";
+import { displayName } from "./EntityCard.jsx";
 
 function eventLabel(t) {
   const s = tt(`ev.${t}`);
   return s.startsWith("ev.") ? t : s; // bilinmeyen tip → ham anahtar
 }
 
-function StatCard({ label, value, hint }) {
+function SectionLabel({ children, aside }) {
   return (
-    <div className="rounded-xl border border-ink-600 bg-ink-800 p-4 shadow-card">
-      <div className="text-[11px] uppercase tracking-wide text-slate-500">{label}</div>
-      <div className="mt-1 font-display text-2xl font-bold text-slate-100">{value}</div>
-      {hint && <div className="mt-0.5 text-xs text-slate-500">{hint}</div>}
+    <div className="mb-3 flex items-center justify-between gap-3">
+      <h3 className="font-display text-sm font-semibold text-slate-200">{children}</h3>
+      {aside}
     </div>
   );
 }
 
-// LLM sistem sağlığı: son çağrı başarılı mıydı + son 24s kota/hata sayısı.
-// Sorun (ör. OpenRouter kota/bakiye limiti) kullanıcı fark etmeden admin'e görünsün.
+function StatCard({ label, value, hint, tone }) {
+  const toneText = tone === "neg" ? "text-rose-600" : tone === "accent" ? "text-accent" : "text-slate-100";
+  return (
+    <Card className="p-5">
+      <div className="text-micro font-medium text-slate-500">{label}</div>
+      <div className={cx("mt-2 break-all font-mono text-xl font-semibold tabular-nums sm:text-2xl", toneText)}>{value}</div>
+      {hint && <div className={cx("mt-1 text-micro", tone === "neg" ? "text-rose-600" : "text-slate-500")}>{hint}</div>}
+    </Card>
+  );
+}
+
+// LLM sistem sağlığı: son çağrı başarılı mıydı + son 24s kota/hata sayısı. Anlamsal renk
+// yalnızca ince sol kenar ve noktada (ağır dolgu yok).
 export function HealthBanner({ health }) {
   const h = health || {};
   const quota = h.quota_errors_24h || 0;
   const errs = h.errors_24h || 0;
-  // Durum: kota hatası → kırmızı; diğer hata → amber; son çağrı ok → yeşil; veri yok → nötr.
-  let tone, dot, title;
+  let edge, dot, title;
   if (h.last_kind == null) {
-    tone = "border-ink-600 bg-ink-800 text-slate-400"; dot = "bg-slate-500";
-    title = tt("adm.healthNoData");
+    edge = "bg-slate-500"; dot = "bg-slate-500"; title = tt("adm.healthNoData");
   } else if (quota > 0 || h.last_kind === "quota") {
-    tone = "border-rose-500/50 bg-rose-500/10 text-rose-300"; dot = "bg-rose-400";
-    title = tt("adm.healthQuota");
+    edge = "bg-rose-500"; dot = "bg-rose-500"; title = tt("adm.healthQuota");
   } else if (errs > 0 || h.last_kind === "error") {
-    tone = "border-amber-500/50 bg-amber-500/10 text-amber-200"; dot = "bg-amber-400";
-    title = tt("adm.healthErrors");
+    edge = "bg-amber-500"; dot = "bg-amber-500"; title = tt("adm.healthErrors");
   } else {
-    tone = "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"; dot = "bg-emerald-400";
-    title = tt("adm.healthOk");
+    edge = "bg-emerald-500"; dot = "bg-emerald-500"; title = tt("adm.healthOk");
   }
   return (
-    <div className={`rounded-xl border p-4 shadow-card ${tone}`}>
-      <div className="flex items-center gap-2">
-        <span className={`inline-block h-2.5 w-2.5 rounded-full ${dot}`} />
-        <span className="text-[11px] font-semibold uppercase tracking-wide">
-          {tt("adm.healthTitle")}
-        </span>
+    <Card className="relative overflow-hidden p-5">
+      <span className={cx("absolute inset-y-0 left-0 w-0.5", edge)} aria-hidden="true" />
+      <div className="flex items-center gap-2 text-micro font-medium text-slate-500">
+        <span className={cx("h-2 w-2 rounded-full", dot)} aria-hidden="true" />
+        {tt("adm.healthTitle")}
       </div>
-      <div className="mt-1.5 text-sm font-medium">{title}</div>
-      <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-400">
+      <div className="mt-1.5 font-display text-base font-semibold text-slate-100">{title}</div>
+      <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-micro text-slate-500">
         <span>
-          {tt("adm.healthLastOk")}:{" "}
-          <span className="text-slate-300">
-            {h.last_ok_at ? timeAgo(h.last_ok_at) : tt("adm.healthNever")}
-          </span>
+          {tt("adm.healthLastOk")}: <span className="text-slate-300">{h.last_ok_at ? timeAgo(h.last_ok_at) : tt("adm.healthNever")}</span>
         </span>
         <span>
-          {tt("adm.healthQuota24h")}:{" "}
-          <span className={quota > 0 ? "font-semibold text-rose-400" : "text-slate-300"}>{quota}</span>
+          {tt("adm.healthQuota24h")}: <span className={cx("font-mono", quota > 0 ? "font-semibold text-rose-600" : "text-slate-300")}>{quota}</span>
         </span>
         <span>
-          {tt("adm.healthErr24h")}:{" "}
-          <span className={errs > 0 ? "font-semibold text-amber-300" : "text-slate-300"}>{errs}</span>
+          {tt("adm.healthErr24h")}: <span className={cx("font-mono", errs > 0 ? "font-semibold text-amber-600" : "text-slate-300")}>{errs}</span>
         </span>
         {h.last_status_code ? (
           <span>
@@ -73,6 +75,21 @@ export function HealthBanner({ health }) {
           </span>
         ) : null}
       </div>
+    </Card>
+  );
+}
+
+function AdminSkeleton() {
+  return (
+    <div className="space-y-6" aria-busy="true">
+      <Skeleton className="h-8 w-48" />
+      <Skeleton className="h-24 w-full" />
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-28" />
+        ))}
+      </div>
+      <Skeleton className="h-64 w-full" />
     </div>
   );
 }
@@ -84,18 +101,26 @@ export default function AdminPanel({ currentUserId }) {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null); // seçili kullanıcı id
-  const [deleting, setDeleting] = useState(null); // silinmekte olan kullanıcı id
+  const [busy, setBusy] = useState(null); // `${işlem}:${id}`
+  const [confirm, setConfirm] = useState(null); // { title, body, label, run }
+  const [notice, setNotice] = useState(null); // hata metni (toast)
+  const [tempPw, setTempPw] = useState(null); // { username, temp_password }
 
   async function reload() {
-    const [s, u, f] = await Promise.all([
-      api.adminStats(),
-      api.adminUsers(),
-      api.adminFeedback(),
-    ]);
+    const [s, u, f] = await Promise.all([api.adminStats(), api.adminUsers(), api.adminFeedback()]);
     setStats(s);
     setUsers(u);
     setFeedback(f);
   }
+
+  function load() {
+    setLoading(true);
+    setError(null);
+    reload()
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }
+  useEffect(load, []);
 
   async function markRead(id) {
     // İyimser: yereldeki satırı okundu yap + rozeti düşür; sonra sunucuya yaz.
@@ -104,136 +129,114 @@ export default function AdminPanel({ currentUserId }) {
     try {
       await api.adminMarkFeedbackRead(id);
     } catch (err) {
-      window.alert(tt("adm.markFail", { m: err.message }));
+      setNotice(tt("adm.markFail", { m: err.message }));
       reload().catch(() => {});
     }
   }
 
-  async function deleteFeedback(f) {
-    // Kalıcı silme → önce onay. İyimser: listeden çıkar (okunmamışsa rozeti düşür).
-    if (!window.confirm(tt("adm.deleteFbConfirm"))) return;
-    setFeedback((prev) => prev.filter((x) => x.id !== f.id));
-    if (!f.is_read) {
-      setStats((prev) => (prev ? { ...prev, unread_feedback: Math.max(0, prev.unread_feedback - 1) } : prev));
-    }
-    try {
-      await api.adminDeleteFeedback(f.id);
-    } catch (err) {
-      window.alert(tt("adm.deleteFbFail", { m: err.message }));
-      reload().catch(() => {});
-    }
+  function deleteFeedback(f) {
+    setConfirm({
+      title: tt("adm.deleteFb"),
+      body: tt("adm.deleteFbConfirm"),
+      label: tt("adm.delete"),
+      run: async () => {
+        setFeedback((prev) => prev.filter((x) => x.id !== f.id));
+        if (!f.is_read) setStats((prev) => (prev ? { ...prev, unread_feedback: Math.max(0, prev.unread_feedback - 1) } : prev));
+        try {
+          await api.adminDeleteFeedback(f.id);
+        } catch (err) {
+          setNotice(tt("adm.deleteFbFail", { m: err.message }));
+          reload().catch(() => {});
+        }
+      },
+    });
   }
 
-  useEffect(() => {
-    let alive = true;
-    reload()
-      .catch((e) => alive && setError(e.message))
-      .finally(() => alive && setLoading(false));
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  async function handleDelete(u, e) {
+  function handleDelete(u, e) {
     e.stopPropagation(); // satır tıklamasıyla detay açılmasın
-    if (!window.confirm(tt("adm.confirmDelete", { u: u.username })))
-      return;
-    setDeleting(u.id);
-    try {
-      await api.adminDeleteUser(u.id);
-      if (selected === u.id) setSelected(null);
-      await reload();
-    } catch (err) {
-      window.alert(tt("adm.deleteFail", { m: err.message }));
-    } finally {
-      setDeleting(null);
-    }
+    setConfirm({
+      title: tt("adm.deleteTitle"),
+      body: tt("adm.confirmDelete", { u: u.username }),
+      label: tt("adm.delete"),
+      run: async () => {
+        setBusy(`del:${u.id}`);
+        try {
+          await api.adminDeleteUser(u.id);
+          if (selected === u.id) setSelected(null);
+          await reload();
+        } catch (err) {
+          setNotice(tt("adm.deleteFail", { m: err.message }));
+        } finally {
+          setBusy(null);
+        }
+      },
+    });
   }
 
-  const [resetting, setResetting] = useState(null);
-  async function handleReset(u, e) {
+  function handleReset(u, e) {
     e.stopPropagation();
-    if (!window.confirm(tt("adm.confirmReset", { u: u.username })))
-      return;
-    setResetting(u.id);
-    try {
-      const r = await api.adminResetPassword(u.id);
-      window.prompt(
-        tt("adm.tempPrompt", { u: r.username }),
-        r.temp_password
-      );
-    } catch (err) {
-      window.alert(tt("adm.resetFail", { m: err.message }));
-    } finally {
-      setResetting(null);
-    }
+    setConfirm({
+      title: tt("adm.pwResetTitle"),
+      body: tt("adm.confirmReset", { u: u.username }),
+      label: tt("adm.pwReset"),
+      run: async () => {
+        setBusy(`pw:${u.id}`);
+        try {
+          setTempPw(await api.adminResetPassword(u.id));
+        } catch (err) {
+          setNotice(tt("adm.resetFail", { m: err.message }));
+        } finally {
+          setBusy(null);
+        }
+      },
+    });
   }
 
-  if (loading) return <div className="p-8 text-slate-500">{tt("adm.loading")}</div>;
-  if (error) return <div className="p-8 text-rose-400">{tt("adm.errPrefix", { m: error })}</div>;
+  if (loading && !stats) return <AdminSkeleton />;
+  if (error) return <ErrorState message={tt("adm.errorBody")} detail={error} onRetry={load} />;
+
+  const overUsers = stats.max_users > 0 && stats.total_users > stats.max_users;
+  const cap = stats.daily_budget_usd || 0;
+  const unread = stats.unread_feedback;
 
   return (
-    <div className="space-y-6">
-      <h2 className="font-display text-xl font-bold text-slate-100">{tt("adm.title")}</h2>
+    <div className="space-y-8">
+      <h1 className="font-display text-page font-semibold text-slate-100">{tt("adm.title")}</h1>
 
-      {/* SİSTEM SAĞLIĞI (LLM) — sorunu kullanıcıdan önce gör. En üstte, dikkat çekici. */}
+      {notice && (
+        <Toast tone="error" inline onClose={() => setNotice(null)}>
+          {notice}
+        </Toast>
+      )}
+
+      {/* SİSTEM SAĞLIĞI (LLM) — sorunu kullanıcıdan önce gör. */}
       <HealthBanner health={stats.health} />
 
-      {/* Genel istatistik */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {(() => {
-          const over = stats.max_users > 0 && stats.total_users > stats.max_users;
-          const label = stats.max_users > 0
-            ? `${stats.total_users}/${stats.max_users}`
-            : `${stats.total_users}`;
-          return (
-            <div className={`rounded-xl border bg-ink-800 p-4 shadow-card ${
-              over ? "border-rose-500/50" : "border-ink-600"}`}>
-              <div className="text-[11px] uppercase tracking-wide text-slate-500">{tt("adm.userLimit")}</div>
-              <div className={`mt-1 font-display text-2xl font-bold ${over ? "text-rose-400" : "text-slate-100"}`}>
-                {label}
-              </div>
-              <div className={`mt-0.5 text-xs ${over ? "text-rose-400" : "text-slate-500"}`}>
-                {over ? tt("adm.limitReached") : stats.max_users > 0 ? tt("adm.regLimit") : tt("adm.unlimited")}
-              </div>
-            </div>
-          );
-        })()}
+        <StatCard
+          label={tt("adm.userLimit")}
+          value={stats.max_users > 0 ? `${stats.total_users}/${stats.max_users}` : `${stats.total_users}`}
+          hint={overUsers ? tt("adm.limitReached") : stats.max_users > 0 ? tt("adm.regLimit") : tt("adm.unlimited")}
+          tone={overUsers ? "neg" : undefined}
+        />
         <StatCard label={tt("adm.activeToday")} value={stats.active_today} hint={tt("adm.atLeast1")} />
         <StatCard label={tt("adm.refreshesToday")} value={stats.refreshes_today} />
-        {/* Okunmamış geri bildirim — >0 ise lacivert vurguyla dikkat çeker */}
-        <div className={`rounded-xl border bg-ink-800 p-4 shadow-card ${
-          stats.unread_feedback > 0 ? "border-accent/50" : "border-ink-600"}`}>
-          <div className="text-[11px] uppercase tracking-wide text-slate-500">{tt("adm.unreadFb")}</div>
-          <div className={`mt-1 font-display text-2xl font-bold ${
-            stats.unread_feedback > 0 ? "text-accent" : "text-slate-100"}`}>
-            {stats.unread_feedback}
-          </div>
-          <div className="mt-0.5 text-xs text-slate-500">
-            {stats.unread_feedback > 0 ? tt("adm.unreadWaiting") : tt("adm.allRead")}
-          </div>
-        </div>
+        <StatCard
+          label={tt("adm.unreadFb")}
+          value={unread}
+          hint={unread > 0 ? tt("adm.unreadWaiting") : tt("adm.allRead")}
+          tone={unread > 0 ? "accent" : undefined}
+        />
       </div>
 
-      {/* MALİYET (USD, çağrı başına model fiyatı) + günlük USD bütçesi */}
+      {/* MALİYET (USD) + günlük bütçe */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {(() => {
-          const over = stats.budget_exceeded;
-          const cap = stats.daily_budget_usd || 0;
-          const label = cap > 0
-            ? `$${stats.cost_today_usd.toFixed(2)}/$${cap.toFixed(2)}`
-            : `$${stats.cost_today_usd.toFixed(2)}`;
-          return (
-            <div className={`rounded-xl border bg-ink-800 p-4 shadow-card ${over ? "border-rose-500/50" : "border-ink-600"}`}>
-              <div className="text-[11px] uppercase tracking-wide text-slate-500">{tt("adm.costBudget")}</div>
-              <div className={`mt-1 font-display text-2xl font-bold ${over ? "text-rose-400" : "text-slate-100"}`}>{label}</div>
-              <div className={`mt-0.5 text-xs ${over ? "text-rose-400" : "text-slate-500"}`}>
-                {over ? tt("adm.budgetFull") : cap > 0 ? tt("adm.dailyCap") : tt("adm.unlimited")}
-                {" · "}{tt("adm.tokenK", { n: (stats.tokens_today / 1000).toFixed(0) })}
-              </div>
-            </div>
-          );
-        })()}
+        <StatCard
+          label={tt("adm.costBudget")}
+          value={cap > 0 ? `$${stats.cost_today_usd.toFixed(2)}/$${cap.toFixed(2)}` : `$${stats.cost_today_usd.toFixed(2)}`}
+          hint={`${stats.budget_exceeded ? tt("adm.budgetFull") : cap > 0 ? tt("adm.dailyCap") : tt("adm.unlimited")} · ${tt("adm.tokenK", { n: (stats.tokens_today / 1000).toFixed(0) })}`}
+          tone={stats.budget_exceeded ? "neg" : undefined}
+        />
         <StatCard label={tt("adm.cost7")} value={`$${(stats.cost_week_usd ?? 0).toFixed(2)}`} hint={tt("adm.tokenK", { n: ((stats.tokens_week ?? 0) / 1000).toFixed(0) })} />
         <StatCard label={tt("adm.cost30")} value={`$${stats.cost_month_usd.toFixed(2)}`} hint={tt("adm.tokenK", { n: (stats.tokens_month / 1000).toFixed(0) })} />
         <StatCard
@@ -245,104 +248,83 @@ export default function AdminPanel({ currentUserId }) {
 
       {/* Model kırılımı (son 30 gün) */}
       {stats.model_breakdown?.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border border-ink-600 bg-ink-800 p-4">
-          <div className="mb-2 text-[11px] uppercase tracking-wide text-slate-500">{tt("adm.modelBreakdown")}</div>
-          <table className="w-full text-left text-xs">
-            <thead className="text-slate-500">
+        <Card className="overflow-x-auto p-5">
+          <SectionLabel>{tt("adm.modelBreakdown")}</SectionLabel>
+          <table className="w-full text-left text-meta">
+            <thead className="text-micro text-slate-500">
               <tr>
-                <th className="py-1 pr-3 font-medium">{tt("adm.mbModel")}</th>
-                <th className="py-1 pr-3 text-right font-medium">{tt("adm.mbCalls")}</th>
-                <th className="py-1 pr-3 text-right font-medium">{tt("adm.mbInOut")}</th>
-                <th className="py-1 pr-3 text-right font-medium">{tt("adm.cacheHit")}</th>
-                <th className="py-1 text-right font-medium">USD</th>
+                <th className="py-2 pr-3 font-medium">{tt("adm.mbModel")}</th>
+                <th className="py-2 pr-3 text-right font-medium">{tt("adm.mbCalls")}</th>
+                <th className="py-2 pr-3 text-right font-medium">{tt("adm.mbInOut")}</th>
+                <th className="py-2 pr-3 text-right font-medium">{tt("adm.cacheHit")}</th>
+                <th className="py-2 text-right font-medium">USD</th>
               </tr>
             </thead>
-            <tbody className="text-slate-300">
+            <tbody className="font-mono tabular-nums text-slate-300">
               {stats.model_breakdown.map((m) => (
-                <tr key={m.model} className="border-t border-ink-600">
-                  <td className="py-1 pr-3 font-mono">{m.model}</td>
-                  <td className="py-1 pr-3 text-right">{m.calls}</td>
-                  <td className="py-1 pr-3 text-right">
+                <tr key={m.model}>
+                  <td className="py-1.5 pr-3">{m.model}</td>
+                  <td className="py-1.5 pr-3 text-right">{m.calls}</td>
+                  <td className="py-1.5 pr-3 text-right">
                     {((m.input_tokens + m.cache_creation_tokens + m.cache_read_tokens) / 1000).toFixed(0)}K / {(m.output_tokens / 1000).toFixed(0)}K
                   </td>
-                  <td className="py-1 pr-3 text-right">
-                    {m.cache_hit_rate == null ? "—" : fmtPct(m.cache_hit_rate * 100, { signed: false })}
-                  </td>
-                  <td className="py-1 text-right">${m.cost_usd.toFixed(3)}</td>
+                  <td className="py-1.5 pr-3 text-right">{m.cache_hit_rate == null ? "—" : fmtPct(m.cache_hit_rate * 100, { signed: false })}</td>
+                  <td className="py-1.5 text-right">${m.cost_usd.toFixed(3)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </Card>
       )}
 
-      {/* Geri bildirim gelen kutusu — okunmamışlar önce, vurgulu */}
       <FeedbackInbox items={feedback} onMarkRead={markRead} onDelete={deleteFeedback} />
 
-      {/* En çok TAKİP EDİLEN şirketler (kaç kullanıcının listesinde) + toplam benzersiz */}
-      <div className="rounded-xl border border-ink-600 bg-ink-800 p-4">
-        <div className="mb-2 flex items-center justify-between">
-          <div className="text-[11px] uppercase tracking-wide text-slate-500">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card className="p-5">
+          <SectionLabel aside={<span className="font-mono text-micro text-slate-500">{tt("adm.poolUniqueN", { n: stats.total_entities })}</span>}>
             {tt("adm.mostFollowed")}
-          </div>
-          <div className="text-[11px] text-slate-500">
-            {tt("adm.poolUniqueN", { n: stats.total_entities })}
-          </div>
-        </div>
-        {stats.most_followed.length === 0 ? (
-          <span className="text-sm text-slate-500">{tt("adm.noneFollow")}</span>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {stats.most_followed.map((e) => (
-              <span
-                key={`${e.type}:${e.name}`}
-                className="inline-flex items-center gap-1.5 rounded-md border border-ink-500 bg-ink-700 px-2 py-1 text-xs text-slate-300"
-              >
-                <span className="font-mono text-[10px] text-slate-500">
-                  {e.type === "ticker" ? "$" : "#"}
-                </span>
-                {e.name}
-                <span className="rounded bg-ink-700 px-1.5 font-semibold text-slate-500">
-                  {tt("adm.person", { n: e.followers })}
-                </span>
-              </span>
-            ))}
-          </div>
+          </SectionLabel>
+          {stats.most_followed.length === 0 ? (
+            <span className="text-meta text-slate-500">{tt("adm.noneFollow")}</span>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {stats.most_followed.map((e) => (
+                <Chip key={`${e.type}:${e.name}`} tone="neutral" size="md">
+                  <span className="font-mono text-micro text-slate-500">{e.type === "ticker" ? "$" : "#"}</span>
+                  {displayName(e)}
+                  <span className="font-mono text-micro text-slate-500">{tt("adm.person", { n: e.followers })}</span>
+                </Chip>
+              ))}
+            </div>
+          )}
+        </Card>
+        {stats.top_entities.length > 0 && (
+          <Card className="p-5">
+            <SectionLabel>{tt("adm.mostViewed")}</SectionLabel>
+            <div className="flex flex-wrap gap-2">
+              {stats.top_entities.map((e) => (
+                <Chip key={e.name} tone="neutral" size="md">
+                  {e.name} <span className="font-mono font-semibold text-slate-100">{e.count}</span>
+                </Chip>
+              ))}
+            </div>
+          </Card>
         )}
       </div>
 
-      {/* En çok görüntülenen şirketler */}
-      {stats.top_entities.length > 0 && (
-        <div className="rounded-xl border border-ink-600 bg-ink-800 p-4">
-          <div className="mb-2 text-[11px] uppercase tracking-wide text-slate-500">
-            {tt("adm.mostViewed")}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {stats.top_entities.map((e) => (
-              <span
-                key={e.name}
-                className="rounded-md border border-ink-500 bg-ink-700 px-2 py-1 text-xs text-slate-300"
-              >
-                {e.name} <span className="font-semibold text-slate-100">{e.count}</span>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Kullanıcı tablosu */}
-      <div className="overflow-x-auto rounded-xl border border-ink-600 bg-ink-800">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-ink-600 text-[11px] uppercase text-slate-500">
-            <tr>
-              <th className="px-4 py-2.5">{tt("adm.thUser")}</th>
-              <th className="px-4 py-2.5">{tt("adm.thReg")}</th>
-              <th className="px-4 py-2.5">{tt("adm.thLastLogin")}</th>
-              <th className="px-4 py-2.5 text-right">{tt("adm.thLogin")}</th>
-              <th className="px-4 py-2.5 text-right">{tt("adm.thRefresh")}</th>
-              <th className="px-4 py-2.5 text-right">{tt("adm.thTotal")}</th>
-              <th className="px-4 py-2.5">{tt("adm.thActive")}</th>
-              <th className="px-4 py-2.5 text-right">{tt("adm.thAction")}</th>
+      <Card className="overflow-x-auto">
+        <table className="w-full text-left text-meta">
+          <thead className="text-micro text-slate-500">
+            <tr className="border-b border-ink-600">
+              <th className="px-5 py-3 font-medium">{tt("adm.thUser")}</th>
+              <th className="px-4 py-3 font-medium">{tt("adm.thReg")}</th>
+              <th className="px-4 py-3 font-medium">{tt("adm.thLastLogin")}</th>
+              <th className="px-4 py-3 text-right font-medium">{tt("adm.thLogin")}</th>
+              <th className="px-4 py-3 text-right font-medium">{tt("adm.thRefresh")}</th>
+              <th className="px-4 py-3 text-right font-medium">{tt("adm.thTotal")}</th>
+              <th className="px-4 py-3 font-medium">{tt("adm.thActive")}</th>
+              <th className="px-5 py-3 text-right font-medium">{tt("adm.thAction")}</th>
             </tr>
           </thead>
           <tbody>
@@ -350,45 +332,29 @@ export default function AdminPanel({ currentUserId }) {
               <tr
                 key={u.id}
                 onClick={() => setSelected(u.id)}
-                className="cursor-pointer border-b border-ink-700 last:border-0 hover:bg-ink-700"
+                className={cx("cursor-pointer transition-colors duration-hover ease-std hover:bg-ink-700", selected === u.id && "bg-ink-700")}
               >
-                <td className="px-4 py-2.5">
-                  <span className="font-medium text-slate-200">{u.username}</span>
-                  {u.is_admin && (
-                    <span className="ml-1.5 rounded bg-ink-700 px-1.5 text-[10px] font-semibold text-slate-500">
-                      admin
-                    </span>
-                  )}
+                <td className="px-5 py-2.5">
+                  <span className="font-medium text-slate-100">{u.username}</span>
+                  {u.is_admin && <Chip tone="accent" className="ml-2">admin</Chip>}
                 </td>
                 <td className="px-4 py-2.5 text-slate-500">{fmtDate(u.created_at)}</td>
                 <td className="px-4 py-2.5 text-slate-500">{u.last_login_at ? timeAgo(u.last_login_at) : "—"}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-slate-300">{u.login_count}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-slate-300">{u.refresh_count}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-slate-300">{u.total_events}</td>
-                <td className="px-4 py-2.5 text-slate-500">
-                  {u.last_active_at ? timeAgo(u.last_active_at) : "hiç"}
-                </td>
-                <td className="px-4 py-2.5 text-right">
-                  <div className="flex items-center justify-end gap-1.5">
-                    <button
-                      onClick={(e) => handleReset(u, e)}
-                      disabled={resetting === u.id}
-                      title={tt("adm.pwResetTitle")}
-                      className="rounded-md border border-ink-500 px-2 py-1 text-[11px] font-medium text-slate-400 transition hover:bg-ink-700 hover:text-slate-200 disabled:opacity-50"
-                    >
-                      {resetting === u.id ? "…" : tt("adm.pwReset")}
-                    </button>
+                <td className="px-4 py-2.5 text-right font-mono tabular-nums text-slate-300">{u.login_count}</td>
+                <td className="px-4 py-2.5 text-right font-mono tabular-nums text-slate-300">{u.refresh_count}</td>
+                <td className="px-4 py-2.5 text-right font-mono tabular-nums text-slate-300">{u.total_events}</td>
+                <td className="px-4 py-2.5 text-slate-500">{u.last_active_at ? timeAgo(u.last_active_at) : tt("adm.never")}</td>
+                <td className="px-5 py-2.5 text-right">
+                  <div className="flex items-center justify-end gap-1">
+                    <Button variant="ghost" size="sm" onClick={(e) => handleReset(u, e)} disabled={busy === `pw:${u.id}`} title={tt("adm.pwResetTitle")}>
+                      {busy === `pw:${u.id}` ? "…" : tt("adm.pwReset")}
+                    </Button>
                     {u.id === currentUserId ? (
-                      <span className="text-[11px] text-slate-600">{tt("adm.you")}</span>
+                      <span className="px-3 text-micro text-slate-500">{tt("adm.you")}</span>
                     ) : (
-                      <button
-                        onClick={(e) => handleDelete(u, e)}
-                        disabled={deleting === u.id}
-                        title={tt("adm.deleteTitle")}
-                        className="rounded-md border border-rose-500/30 px-2 py-1 text-[11px] font-medium text-rose-400 transition hover:bg-rose-500/10 disabled:opacity-50"
-                      >
-                        {deleting === u.id ? tt("adm.deleting") : tt("adm.delete")}
-                      </button>
+                      <Button variant="ghost" size="sm" onClick={(e) => handleDelete(u, e)} disabled={busy === `del:${u.id}`} title={tt("adm.deleteTitle")} className="text-rose-600 hover:bg-rose-500/10 hover:text-rose-600">
+                        {busy === `del:${u.id}` ? tt("adm.deleting") : tt("adm.delete")}
+                      </Button>
                     )}
                   </div>
                 </td>
@@ -396,89 +362,95 @@ export default function AdminPanel({ currentUserId }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </Card>
 
       {selected != null && <UserDetail userId={selected} onClose={() => setSelected(null)} />}
+
+      {confirm && (
+        <ConfirmDialog
+          title={confirm.title}
+          body={confirm.body}
+          confirmLabel={confirm.label}
+          cancelLabel={tt("common.cancel")}
+          onCancel={() => setConfirm(null)}
+          onConfirm={() => {
+            const run = confirm.run;
+            setConfirm(null);
+            run();
+          }}
+        />
+      )}
+      {tempPw && <TempPasswordModal data={tempPw} onClose={() => setTempPw(null)} />}
     </div>
   );
 }
 
-// Geri bildirim gelen kutusu — okunmamışlar önce (backend sıralar), vurgulu.
+// Geçici şifre (window.prompt yerine): kopyalanabilir alan + kopyala butonu.
+function TempPasswordModal({ data, onClose }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(data.temp_password);
+      setCopied(true);
+    } catch {
+      /* pano erişimi yoksa alan seçili kalır, elle kopyalanır */
+    }
+  }
+  return (
+    <Modal onClose={onClose} labelledBy="temp-pw-title" size="sm">
+      <ModalHeader id="temp-pw-title" title={tt("adm.pwReset")} onClose={onClose}>
+        {tt("adm.tempPrompt", { u: data.username })}
+      </ModalHeader>
+      <div className="flex gap-2">
+        <Input readOnly mono value={data.temp_password} onFocus={(e) => e.target.select()} data-autofocus aria-label={tt("adm.pwReset")} />
+        <Button icon={Copy} onClick={copy}>
+          {copied ? tt("adm.copied") : tt("adm.copy")}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+// Geri bildirim gelen kutusu — okunmamışlar önce (backend sıralar), ince vurgu kenarıyla.
 function FeedbackInbox({ items, onMarkRead, onDelete }) {
   const unread = items.filter((f) => !f.is_read).length;
   return (
-    <div className="rounded-xl border border-ink-600 bg-ink-800 p-4">
-      <div className="mb-3 flex items-center gap-2">
-        <span className="text-[11px] uppercase tracking-wide text-slate-500">{tt("adm.feedbackTitle")}</span>
-        {unread > 0 && (
-          <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-semibold text-accent">
-            {tt("adm.unread", { n: unread })}
-          </span>
-        )}
-        <span className="ml-auto text-[11px] text-slate-500">{tt("adm.totalN", { n: items.length })}</span>
-      </div>
-
+    <Card className="p-5">
+      <SectionLabel aside={<span className="font-mono text-micro text-slate-500">{tt("adm.totalN", { n: items.length })}</span>}>
+        <span className="flex items-center gap-2">
+          {tt("adm.feedbackTitle")}
+          {unread > 0 && <Chip tone="accent">{tt("adm.unread", { n: unread })}</Chip>}
+        </span>
+      </SectionLabel>
       {items.length === 0 ? (
-        <span className="text-sm text-slate-500">{tt("adm.noFeedback")}</span>
+        <span className="text-meta text-slate-500">{tt("adm.noFeedback")}</span>
       ) : (
-        <div className="space-y-2.5">
+        <div className="space-y-1">
           {items.map((f) => (
-            <div
-              key={f.id}
-              className={`rounded-lg border p-3 transition ${
-                f.is_read
-                  ? "border-ink-600 bg-ink-800"
-                  : "border-accent/40 bg-accent/5"
-              }`}
-            >
+            <div key={f.id} className={cx("relative rounded-control px-4 py-3", !f.is_read && "bg-ink-700")}>
+              {!f.is_read && <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-accent" aria-hidden="true" />}
               <div className="flex items-start justify-between gap-3">
-                <p
-                  className={`min-w-0 flex-1 whitespace-pre-wrap break-words text-sm leading-relaxed ${
-                    f.is_read ? "text-slate-400" : "font-medium text-slate-100"
-                  }`}
-                >
-                  {f.message}
-                </p>
-                <div className="flex shrink-0 items-center gap-1.5">
+                <p className={cx("min-w-0 flex-1 whitespace-pre-wrap break-words text-body", f.is_read ? "text-slate-400" : "font-medium text-slate-100")}>{f.message}</p>
+                <div className="flex shrink-0 items-center gap-1">
                   {!f.is_read ? (
-                    <button
-                      onClick={() => onMarkRead(f.id)}
-                      className="rounded-md border border-ink-500 px-2 py-1 text-[11px] font-medium text-slate-400 transition hover:bg-ink-700 hover:text-slate-200"
-                    >{tt("adm.read")}</button>
+                    <Button variant="ghost" size="sm" onClick={() => onMarkRead(f.id)}>
+                      {tt("adm.read")}
+                    </Button>
                   ) : (
-                    <span className="text-[10px] uppercase tracking-wide text-slate-600">{tt("adm.readMark")}</span>
+                    <span className="px-2 text-micro text-slate-500">{tt("adm.readMark")}</span>
                   )}
-                  <button
-                    onClick={() => onDelete(f)}
-                    aria-label={tt("adm.deleteFb")}
-                    title={tt("adm.deleteFb")}
-                    className="flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition hover:bg-rose-500/10 hover:text-rose-400"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  <Button variant="ghost" size="sm" iconOnly icon={Trash2} onClick={() => onDelete(f)} aria-label={tt("adm.deleteFb")} title={tt("adm.deleteFb")} className="hover:text-rose-600" />
                 </div>
               </div>
-
-              <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
-                <span className="font-medium text-slate-400">
-                  {f.username || tt("adm.anon")}
-                </span>
-                {f.contact && (
-                  <>
-                    <span className="text-slate-600">·</span>
-                    <span className="text-accent">{f.contact}</span>
-                  </>
-                )}
-                <span className="text-slate-600">·</span>
-                <span>{f.device}</span>
-                <span className="text-slate-600">·</span>
-                <span title={fmtDate(f.created_at)}>{timeAgo(f.created_at)}</span>
-              </div>
+              <p className="mt-1.5 text-micro text-slate-500">
+                <span className="font-medium text-slate-400">{f.username || tt("adm.anon")}</span>
+                {f.contact && <> · <span className="text-accent">{f.contact}</span></>} · {f.device} · <span title={fmtDate(f.created_at)}>{timeAgo(f.created_at)}</span>
+              </p>
             </div>
           ))}
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -486,24 +458,10 @@ function UserDetail({ userId, onClose }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
 
-  async function deleteFeedback(f) {
-    // Kalıcı silme → önce onay. İyimser: listeden çıkar (okunmamışsa rozeti düşür).
-    if (!window.confirm(tt("adm.deleteFbConfirm"))) return;
-    setFeedback((prev) => prev.filter((x) => x.id !== f.id));
-    if (!f.is_read) {
-      setStats((prev) => (prev ? { ...prev, unread_feedback: Math.max(0, prev.unread_feedback - 1) } : prev));
-    }
-    try {
-      await api.adminDeleteFeedback(f.id);
-    } catch (err) {
-      window.alert(tt("adm.deleteFbFail", { m: err.message }));
-      reload().catch(() => {});
-    }
-  }
-
   useEffect(() => {
     let alive = true;
     setData(null);
+    setError(null);
     api
       .adminUserDetail(userId)
       .then((d) => alive && setData(d))
@@ -514,108 +472,78 @@ function UserDetail({ userId, onClose }) {
   }, [userId]);
 
   return (
-    <div className="rounded-xl border border-accent/30 bg-accent/5 p-5">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="font-display text-lg font-semibold text-slate-100">
-          {data ? data.user.username : tt("detail.loading")}
-          {data?.user.is_admin && (
-            <span className="ml-2 rounded bg-ink-700 px-1.5 text-[10px] font-semibold text-slate-500">
-              admin
-            </span>
-          )}
-        </h3>
-        <button onClick={onClose} className="text-slate-500 hover:text-slate-200">
-          {tt("adm.close")}
-        </button>
+    <section className="rounded-card bg-raised p-6 shadow-raised ring-1 ring-ink-600">
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 font-display text-title font-semibold text-slate-100">
+          {data ? data.user.username : <Skeleton className="h-6 w-32" />}
+          {data?.user.is_admin && <Chip tone="accent">admin</Chip>}
+        </h2>
+        <Button variant="ghost" size="sm" iconOnly icon={X} onClick={onClose} aria-label={tt("adm.close")} title={tt("adm.close")} />
       </div>
 
-      {error && <div className="text-sm text-rose-400">{tt("adm.errPrefix", { m: error })}</div>}
+      {error && <ErrorState message={tt("adm.errorBody")} detail={error} />}
+      {!data && !error && <Skeleton className="h-40 w-full" />}
       {data && (
-        <div className="grid gap-5 md:grid-cols-2">
-          {/* Eylem dökümü + en çok baktığı şirketler */}
-          <div className="space-y-4">
+        <div className="grid gap-8 md:grid-cols-2">
+          <div className="space-y-6">
             <div>
-              <div className="mb-2 text-[11px] uppercase tracking-wide text-slate-500">{tt("adm.eventBreakdown")}</div>
+              <SectionLabel>{tt("adm.eventBreakdown")}</SectionLabel>
               <div className="flex flex-wrap gap-2">
-                {Object.keys(data.event_counts).length === 0 && (
-                  <span className="text-sm text-slate-500">{tt("adm.noActions")}</span>
-                )}
+                {Object.keys(data.event_counts).length === 0 && <span className="text-meta text-slate-500">{tt("adm.noActions")}</span>}
                 {Object.entries(data.event_counts).map(([t, c]) => (
-                  <span
-                    key={t}
-                    className="rounded-md border border-ink-500 bg-ink-800 px-2 py-1 text-xs text-slate-300"
-                  >
-                    {eventLabel(t)} <span className="font-semibold text-slate-100">{c}</span>
-                  </span>
+                  <Chip key={t} tone="neutral" size="md">
+                    {eventLabel(t)} <span className="font-mono font-semibold text-slate-100">{c}</span>
+                  </Chip>
                 ))}
               </div>
             </div>
             {data.top_entities.length > 0 && (
               <div>
-                <div className="mb-2 text-[11px] uppercase tracking-wide text-slate-500">
-                  {tt("adm.topViewed")}
-                </div>
+                <SectionLabel>{tt("adm.topViewed")}</SectionLabel>
                 <div className="flex flex-wrap gap-2">
                   {data.top_entities.map((e) => (
-                    <span
-                      key={e.name}
-                      className="rounded-md border border-ink-500 bg-ink-800 px-2 py-1 text-xs text-slate-300"
-                    >
-                      {e.name} <span className="font-semibold text-slate-100">{e.count}</span>
-                    </span>
+                    <Chip key={e.name} tone="neutral" size="md">
+                      {e.name} <span className="font-mono font-semibold text-slate-100">{e.count}</span>
+                    </Chip>
                   ))}
                 </div>
               </div>
             )}
-            {/* İzleme listesi — kullanıcının TAKİP ETTİĞİ şirketler (B6) */}
             <div>
-              <div className="mb-2 text-[11px] uppercase tracking-wide text-slate-500">
-                {tt("adm.watchlistN", { n: data.watchlist_size })}
-              </div>
+              <SectionLabel>{tt("adm.watchlistN", { n: data.watchlist_size })}</SectionLabel>
               {data.watchlist_size === 0 ? (
-                <span className="text-sm text-slate-500">{tt("adm.noWatch")}</span>
+                <span className="text-meta text-slate-500">{tt("adm.noWatch")}</span>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {data.watchlist.map((e) => (
-                    <span
-                      key={`${e.type}:${e.query}`}
-                      className="inline-flex items-center gap-1 rounded-md border border-ink-500 bg-ink-800 px-2 py-1 text-xs text-slate-300"
-                    >
-                      {e.name}
-                      <span className="font-mono text-[10px] text-slate-500">
-                        {e.type === "ticker" ? "$" : "#"}{e.query}
+                    <Chip key={`${e.type}:${e.query}`} tone="neutral" size="md">
+                      {displayName(e)}
+                      <span className="font-mono text-micro text-slate-500">
+                        {e.type === "ticker" ? "$" : "#"}
+                        {e.query}
                       </span>
-                    </span>
+                    </Chip>
                   ))}
                 </div>
               )}
             </div>
-            <div className="text-xs text-slate-500">
+            <p className="text-micro text-slate-500">
               {tt("adm.registered", { d: fmtDateTime(data.user.created_at) })} ·{" "}
               {tt("adm.lastLoginLine", { d: data.user.last_login_at ? fmtDateTime(data.user.last_login_at) : "—" })}
-            </div>
+            </p>
           </div>
 
-          {/* Zaman çizelgesi — son eylemler */}
           <div>
-            <div className="mb-2 text-[11px] uppercase tracking-wide text-slate-500">{tt("adm.recentActions")}</div>
+            <SectionLabel>{tt("adm.recentActions")}</SectionLabel>
             <div className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
-              {data.recent_events.length === 0 && (
-                <span className="text-sm text-slate-500">{tt("adm.noRecords")}</span>
-              )}
+              {data.recent_events.length === 0 && <span className="text-meta text-slate-500">{tt("adm.noRecords")}</span>}
               {data.recent_events.map((ev, i) => (
-                <div key={i} className="flex items-baseline gap-2 text-sm">
-                  <span className="w-24 shrink-0 text-[11px] tabular-nums text-slate-500">
-                    {timeAgo(ev.created_at)}
-                  </span>
+                <div key={i} className="flex items-baseline gap-3 text-meta">
+                  <span className="w-24 shrink-0 font-mono text-micro tabular-nums text-slate-500">{timeAgo(ev.created_at)}</span>
                   <span className="text-slate-300">
                     {eventLabel(ev.event_type)}
-                    {(ev.detail?.name || ev.detail?.username) && (
-                      <span className="text-slate-500"> · {ev.detail.name || ev.detail.username}</span>
-                    )}
-                    {ev.detail?.ip && (
-                      <span className="text-slate-600"> ({ev.detail.ip})</span>
-                    )}
+                    {(ev.detail?.name || ev.detail?.username) && <span className="text-slate-500"> · {ev.detail.name || ev.detail.username}</span>}
+                    {ev.detail?.ip && <span className="text-slate-500"> ({ev.detail.ip})</span>}
                   </span>
                 </div>
               ))}
@@ -623,6 +551,6 @@ function UserDetail({ userId, onClose }) {
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }

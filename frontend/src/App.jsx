@@ -1,12 +1,12 @@
 // NewsRadar kök bileşeni: durum yükleme, genel görünüm/detay yönlendirme,
 // global yenileme, sağlayıcı uyarıları, footer.
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 import { api, bootstrapSession, getUserToken, logout, setUnauthorizedHandler } from "./api.js";
 import Overview, { OverviewSkeleton } from "./components/Overview.jsx";
 import EntityDetail from "./components/EntityDetail.jsx";
 import AccountModal from "./components/AccountModal.jsx";
 import PrivacyModal from "./components/PrivacyModal.jsx";
-import AdminPanel from "./components/AdminPanel.jsx";
+import { ErrorState, Toast, ToastStack } from "./components/kit.jsx";
 import HowItWorks from "./components/HowItWorks.jsx";
 import FeedbackWidget from "./components/FeedbackWidget.jsx";
 import AppHeader from "./components/AppHeader.jsx";
@@ -16,6 +16,9 @@ import { WRAP } from "./components/NavBar.jsx";
 import { fmtMsg, refreshParts, useI18n } from "./i18n.jsx";
 import { ArrowDown } from "lucide-react";
 import { navigate, usePath } from "./router.js";
+
+// Admin paneli ayrı pakette — yalnızca admin açınca yüklenir.
+const AdminPanel = lazy(() => import("./components/AdminPanel.jsx"));
 
 // Mobil aşağı-çekip-yenile eşiği (px). Bu mesafeyi geçince bırakınca yenilenir.
 const PULL_THRESHOLD = 70;
@@ -33,6 +36,7 @@ export default function App({ setLang }) {
   const [checkingSession, setCheckingSession] = useState(true);
   const [account, setAccount] = useState(null);      // "upgrade" | "login" | null (modal)
   const [showPrivacy, setShowPrivacy] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [view, setView] = useState("dashboard");     // "dashboard" | "admin"
   const [showHow, setShowHow] = useState(false); // "Nasıl çalışır?" anlatımı
   const [focusAdd, setFocusAdd] = useState(0); // "Kendi şirketlerinle dene" → ekleme alanı
@@ -304,9 +308,9 @@ export default function App({ setLang }) {
   // Bootstrap tümden başarısız olduysa (nadir) küçük bir hata göster.
   if (!authed)
     return (
-      <div className="flex min-h-screen items-center justify-center p-6 text-center text-sm text-slate-400">
-        {loadError || t("notice.sessionFailShort")}
-      </div>
+      <main className="flex min-h-screen items-center justify-center p-6">
+        <ErrorState message={t("notice.sessionFailShort")} onRetry={() => window.location.reload()} className="w-full max-w-lg" />
+      </main>
     );
 
   async function handleRefresh() {
@@ -398,16 +402,16 @@ export default function App({ setLang }) {
     setSuggestions((prev) => prev.filter((s) => s.id !== id));
   }
 
-  // Eksik anahtar uyarıları (status'tan).
+  // Teknik sistem uyarıları (eksik anahtar, NewsAPI kotası) — YALNIZCA admin görür.
   const missingKeys = [];
-  if (status) {
-    if (!status.providers.finnhub) missingKeys.push("FINNHUB_API_KEY (ticker haberleri)");
-    if (!status.providers.newsapi) missingKeys.push("NEWSAPI_KEY (keyword haberleri)");
-    if (!status.claude) missingKeys.push("LLM API anahtarı (analiz motoru)");
+  if (status && user?.is_admin) {
+    if (!status.providers.finnhub) missingKeys.push("FINNHUB_API_KEY");
+    if (!status.providers.newsapi) missingKeys.push("NEWSAPI_KEY");
+    if (!status.claude) missingKeys.push("LLM API");
     // FMP opsiyonel: yoksa yalnızca hedef fiyat gösterilmez (tavsiye/haber çalışır).
-    if (status.providers["fmp-target"] === false)
-      missingKeys.push("FMP_API_KEY (analist hedef fiyatı — opsiyonel)");
+    if (status.providers["fmp-target"] === false) missingKeys.push("FMP_API_KEY");
   }
+  const nq = user?.is_admin ? status?.newsapi_quota : null;
 
   return (
     <div
@@ -422,7 +426,7 @@ export default function App({ setLang }) {
           className="pointer-events-none fixed inset-x-0 top-0 z-40 flex justify-center pt-2 md:hidden"
           style={{ transform: `translateY(${pull}px)`, opacity: Math.min(pull / PULL_THRESHOLD, 1) }}
         >
-          <div className="flex items-center gap-2 rounded-full border border-ink-500 bg-ink-800 px-3 py-1.5 text-xs text-slate-400 shadow-card">
+          <div className="flex items-center gap-2 rounded-full bg-raised px-3 py-1.5 text-micro text-slate-400 shadow-raised ring-1 ring-ink-600">
             <ArrowDown className={`h-4 w-4 transition-transform ${pull >= PULL_THRESHOLD ? "rotate-180 text-accent" : ""}`} />
             {pull >= PULL_THRESHOLD ? t("pull.release") : t("pull.pull")}
           </div>
@@ -462,90 +466,32 @@ export default function App({ setLang }) {
         {/* Görünüm geçişi (pano ↔ detay ↔ admin): kısa fade — key değişince yeniden oynar. */}
         <div key={view === "admin" ? "admin" : selected == null ? "overview" : `detail-${selected}`} className="page-in">
         {view === "admin" && user?.is_admin ? (
-          <AdminPanel currentUserId={user?.id} />
+          <Suspense fallback={<OverviewSkeleton />}>
+            <AdminPanel currentUserId={user?.id} />
+          </Suspense>
         ) : (
         <>
-        {loadError && (
-          <div className="mb-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
-            {t("notice.apiFail", { msg: loadError })}
-          </div>
-        )}
-
-
-        {status?.last_summary?.quota_error && (
-          <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-            {t("notice.analysisUnavailable")}
-          </div>
-        )}
-
-        {status?.budget_exceeded && (
-          <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-            {t("notice.budgetExceeded")}
-          </div>
-        )}
-
-        {status?.newsapi_quota?.warn && (
-          <div
-            className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
-              status.newsapi_quota.exhausted
-                ? "border-rose-500/30 bg-rose-500/10 text-rose-300"
-                : "border-amber-500/30 bg-amber-500/10 text-amber-200"
-            }`}
-          >
-            {status.newsapi_quota.exhausted ? (
-              <>
-                NewsAPI kotası doldu ({status.newsapi_quota.used}/{status.newsapi_quota.limit}),{" "}
-                <strong>{status.newsapi_quota.reset_in_hours} saat</strong> sonra sıfırlanır —
-                keyword (şirket/konu) haberleri bu süre boyunca güncellenmeyecek. Ticker'lar etkilenmez.
-              </>
-            ) : (
-              <>
-                NewsAPI kotası doluyor: {status.newsapi_quota.used}/{status.newsapi_quota.limit}{" "}
-                kullanıldı. Kalan {status.newsapi_quota.remaining} istek — dikkatli kullanın.
-              </>
+        {/* Sistem bannerları (sayfa içi, ortak Toast): analiz/bütçe herkese; teknikler admin'e. */}
+        {(status?.last_summary?.quota_error || status?.budget_exceeded || nq?.warn || missingKeys.length > 0) && (
+          <div className="mb-8 space-y-2">
+            {status?.last_summary?.quota_error && <Toast tone="warn" inline>{t("notice.analysisUnavailable")}</Toast>}
+            {status?.budget_exceeded && <Toast tone="warn" inline>{t("notice.budgetExceeded")}</Toast>}
+            {nq?.warn && (
+              <Toast tone={nq.exhausted ? "error" : "warn"} inline>
+                {nq.exhausted
+                  ? t("sys.newsapiExhausted", { used: nq.used, limit: nq.limit, hours: nq.reset_in_hours })
+                  : t("sys.newsapiLow", { used: nq.used, limit: nq.limit, left: nq.remaining })}
+              </Toast>
             )}
-          </div>
-        )}
-
-        {missingKeys.length > 0 && (
-          <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-            ⚠ Eksik anahtar: {missingKeys.join(", ")}. Bu kaynaklar atlanır (uygulama çalışmaya devam eder).
-          </div>
-        )}
-
-        {notice && (
-          <div
-            className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
-              notice.type === "ok"
-                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
-                : "border-amber-500/30 bg-amber-500/10 text-amber-200"
-            }`}
-          >
-            {notice.summary
-              ? t("notice.refreshed", { parts: refreshParts(notice.summary, t).join(" · ") }) +
-                (notice.details?.length ? t("notice.warnings", { n: notice.details.length }) : "")
-              : notice.text}
-            {notice.details?.length > 0 && (
-              <ul className="mt-1 list-disc pl-5 text-xs">
-                {notice.details.slice(0, 6).map((d, i) => (
-                  <li key={i}>{fmtMsg(d, t)}</li>
-                ))}
-              </ul>
-            )}
-            {/* Normal atlamalar (tazelik/kota) — çok soluk, küçük not (hata değil) */}
-            {notice.infos?.length > 0 && (
-              <div className="mt-1.5 text-[11px] text-slate-500">
-                {t("notice.infos", { n: notice.infos.length })}:{" "}
-                {notice.infos.slice(0, 2).map((m) => fmtMsg(m, t)).join(" · ")}
-                {notice.infos.length > 2 ? " …" : ""}
-              </div>
-            )}
+            {missingKeys.length > 0 && <Toast tone="warn" inline>{t("sys.missingKeys", { keys: missingKeys.join(", ") })}</Toast>}
           </div>
         )}
 
         {!loaded && selected == null ? (
           /* İlk yükleme — pano düzenini taklit eden iskelet (layout zıplamasın) */
           <OverviewSkeleton />
+        ) : loadError && selected == null && cards.length === 0 ? (
+          <ErrorState message={t("state.loadFail")} detail={user?.is_admin ? loadError : null} onRetry={loadCards} />
         ) : selected == null ? (
           <Overview
             cards={cards}
@@ -580,25 +526,60 @@ export default function App({ setLang }) {
       )}
       {showPrivacy && <PrivacyModal onClose={() => setShowPrivacy(false)} />}
 
-      <footer className="mx-auto max-w-7xl px-6 pb-10 pt-6 text-center text-xs leading-relaxed text-slate-500">
-        {t("footer.disclaimer")}
-        <button onClick={() => setShowPrivacy(true)} className="ml-1 underline hover:text-slate-300">
-          {t("footer.privacy")}
-        </button>
-        {" · "}
-        <a
-          href="/?welcome"
-          onClick={(e) => { e.preventDefault(); navigate("/?welcome"); }}
-          className="underline hover:text-slate-300"
-        >
-          {t("app.about")}
-        </a>
+      {/* Footer — landing footer'ının sade hali. */}
+      <footer className="border-t border-ink-600">
+        <div className={`${WRAP} flex flex-col gap-3 py-8 text-micro text-slate-500 sm:flex-row sm:items-center sm:justify-between`}>
+          <div>
+            <span className="font-display text-sm font-semibold text-slate-300">{t("land.footer.built", { name: "Sarp Bıçak" })}</span>
+            <p className="mt-1 max-w-2xl">{t("footer.disclaimer")}</p>
+          </div>
+          <nav className="flex flex-wrap gap-x-5 gap-y-2" aria-label={t("footer.nav")}>
+            <a href="/?welcome" onClick={(e) => { e.preventDefault(); navigate("/?welcome"); }} className="link-u text-slate-400 hover:text-slate-200">
+              {t("app.about")}
+            </a>
+            <button type="button" onClick={() => setShowPrivacy(true)} className="link-u text-slate-400 hover:text-slate-200">
+              {t("footer.privacy")}
+            </button>
+            <button type="button" onClick={() => setFeedbackOpen(true)} className="link-u text-slate-400 hover:text-slate-200">
+              {t("fb.button")}
+            </button>
+          </nav>
+        </div>
       </footer>
 
-      {/* Sağ altta sabit geri bildirim butonu (kurucu imzası panel içinde).
-          Mobilde detay sayfasının alt sekme çubuğuyla çakışmasın diye yükseltilir. */}
-      {/* Geri bildirim: panoda sağ altta küçük buton; detay sayfasında (Ask AI ile çakışmasın) yalnızca footer'dan. */}
-      <FeedbackWidget showButton={selected == null} />
+      {/* Toast'lar: yenileme özeti ve işlem uyarıları (sağ üst, header'ın altında). */}
+      <ToastStack>
+        {notice && (
+          <Toast tone={notice.type === "ok" ? "ok" : "warn"} onClose={() => setNotice(null)}>
+            {notice.summary
+              ? t("notice.refreshed", { parts: refreshParts(notice.summary, t).join(" · ") }) +
+                (notice.details?.length ? t("notice.warnings", { n: notice.details.length }) : "")
+              : notice.text}
+            {notice.details?.length > 0 && (
+              <ul className="mt-1 list-disc pl-4 text-micro">
+                {notice.details.slice(0, 6).map((d, i) => (
+                  <li key={i}>{fmtMsg(d, t)}</li>
+                ))}
+              </ul>
+            )}
+            {notice.infos?.length > 0 && (
+              <p className="mt-1 text-micro text-slate-500">
+                {t("notice.infos", { n: notice.infos.length })}: {notice.infos.slice(0, 2).map((m) => fmtMsg(m, t)).join(" · ")}
+                {notice.infos.length > 2 ? " …" : ""}
+              </p>
+            )}
+          </Toast>
+        )}
+        {loadError && (selected != null || cards.length > 0) && (
+          <Toast tone="warn" onClose={() => setLoadError(null)}>
+            {t("state.syncFail")}
+            {user?.is_admin && <span className="mt-1 block font-mono text-micro text-slate-500">{loadError}</span>}
+          </Toast>
+        )}
+      </ToastStack>
+
+      {/* Geri bildirim: panoda sağ altta küçük buton; detay sayfasında (Ask AI ile çakışmasın) footer'dan. */}
+      <FeedbackWidget open={feedbackOpen} onOpenChange={setFeedbackOpen} showButton={selected == null && view === "dashboard"} />
 
       {/* İlk giriş dil seçimi (localStorage'da seçim yoksa) */}
       {showLangModal && (

@@ -1,9 +1,10 @@
 // Hesap modalı: anonim oturumu KALICI hesaba çevir (upgrade) ya da mevcut hesaba GİRİŞ.
 // Genel şifre kapısı YOK — site herkese açık.
 import React, { useState } from "react";
-import { X, UserPlus, LogIn } from "lucide-react";
+import { UserPlus, LogIn } from "lucide-react";
 import { upgradeAccount, userLogin } from "../api.js";
 import { useI18n } from "../i18n.jsx";
+import { Button, Field, Input, Modal, ModalHeader } from "./kit.jsx";
 
 export default function AccountModal({ mode: initialMode, onClose, onDone }) {
   const { t } = useI18n();
@@ -33,58 +34,40 @@ export default function AccountModal({ mode: initialMode, onClose, onDone }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm">
-      <div className="relative w-full max-w-sm rounded-2xl border border-ink-600 bg-ink-800 p-6 shadow-card-hover">
-        <button
-          onClick={onClose}
-          aria-label={t("common.close")}
-          className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-ink-700 hover:text-slate-200"
-        >
-          <X className="h-4 w-4" />
-        </button>
-
-        <div className="mb-1 flex items-center gap-2 font-display text-lg font-bold text-slate-100">
-          {isUpgrade ? <UserPlus className="h-5 w-5 text-accent" /> : <LogIn className="h-5 w-5 text-accent" />}
-          {isUpgrade ? t("acc.upgradeTitle") : t("acc.loginTitle")}
-        </div>
-        <p className="mb-4 text-[13px] leading-relaxed text-slate-400">
-          {isUpgrade ? t("acc.upgradeBody") : t("acc.loginBody")}
-        </p>
-
-        <form onSubmit={submit} className="space-y-2.5">
-          <input
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder={t("acc.username")}
-            autoComplete="username"
-            className="w-full rounded-lg border border-ink-500 bg-ink-900 px-3 py-2 text-base outline-none focus:border-accent"
-          />
-          <input
+    <Modal onClose={onClose} labelledBy="acc-title" size="sm">
+      <ModalHeader id="acc-title" title={isUpgrade ? t("acc.upgradeTitle") : t("acc.loginTitle")} icon={isUpgrade ? UserPlus : LogIn} onClose={onClose}>
+        {isUpgrade ? t("acc.upgradeBody") : t("acc.loginBody")}
+      </ModalHeader>
+      <form onSubmit={submit} className="space-y-3">
+        <Field label={t("acc.username")} htmlFor="acc-user">
+          <Input id="acc-user" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" data-autofocus />
+        </Field>
+        <Field label={t("acc.password")} htmlFor="acc-pass">
+          <Input
+            id="acc-pass"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             type="password"
-            placeholder={t("acc.password")}
             autoComplete={isUpgrade ? "new-password" : "current-password"}
-            className="w-full rounded-lg border border-ink-500 bg-ink-900 px-3 py-2 text-base outline-none focus:border-accent"
           />
-          {err && <p className="text-xs text-rose-400">{err}</p>}
-          <button
-            disabled={busy}
-            className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-fg transition hover:brightness-105 disabled:opacity-60"
-          >
-            {busy ? t("acc.working") : isUpgrade ? t("acc.submitUpgrade") : t("acc.submitLogin")}
-          </button>
-        </form>
-
-        <div className="mt-3 text-center text-xs text-slate-500">
-          <button
-            onClick={() => { setErr(null); setMode(isUpgrade ? "login" : "upgrade"); }}
-            className="text-accent hover:underline"
-          >
-            {isUpgrade ? t("acc.toLogin") : t("acc.toUpgrade")}
-          </button>
-        </div>
+        </Field>
+        {err && <p className="text-meta text-rose-600" role="alert">{err}</p>}
+        <Button type="submit" variant="primary" disabled={busy} className="w-full">
+          {busy ? t("acc.working") : isUpgrade ? t("acc.submitUpgrade") : t("acc.submitLogin")}
+        </Button>
+      </form>
+      <div className="mt-4 text-center">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setErr(null);
+            setMode(isUpgrade ? "login" : "upgrade");
+          }}
+        >
+          {isUpgrade ? t("acc.toLogin") : t("acc.toUpgrade")}
+        </Button>
       </div>
-    </div>
+    </Modal>
   );
 }

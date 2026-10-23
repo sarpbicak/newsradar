@@ -239,30 +239,30 @@ body {
   inset: 0 auto 0 0;
   width: 40%;
   background: linear-gradient(90deg, transparent, rgb(var(--accent) / 0.08), transparent);
-  animation: scan 1.4s ease-in-out infinite;
+  animation: scan var(--dur-shimmer) ease-in-out infinite;
   pointer-events: none;
 }
 
 /* Durum metni değişince yumuşak beliriş (şirket adı geçişi). */
-.nr-name-in { animation: nr-name-in 0.35s ease; }
+.nr-name-in { animation: nr-name-in var(--dur-state) var(--ease); }
 @keyframes nr-name-in {
   from { opacity: 0; transform: translateY(2px); }
   to { opacity: 1; transform: none; }
 }
 /* Tamamlanınca birkaç saniye sonra yumuşak sönme. */
-.nr-strip--fade { animation: nr-strip-fade 0.5s ease forwards; }
+.nr-strip--fade { animation: nr-strip-fade var(--dur-state) var(--ease) forwards; }
 @keyframes nr-strip-fade { to { opacity: 0; } }
 /* "Nasıl çalışır?" — kısa (≤400ms) adım animasyonları. fill-mode both: son hal kalıcı;
    prefers-reduced-motion'da (aşağıdaki genel kural) süre ~0 → animasyonsuz son hal. */
-.hiw-in { animation: hiw-in 0.3s ease both; }
+.hiw-in { animation: hiw-in var(--dur-state) var(--ease) both; }
 @keyframes hiw-in { from { opacity: 0; transform: translateX(14px); } }
-.hiw-pop { animation: hiw-pop 0.25s ease both; }
+.hiw-pop { animation: hiw-pop var(--dur-hover) var(--ease) both; }
 @keyframes hiw-pop { from { opacity: 0; transform: scale(0.8); } }
-.hiw-drop { animation: hiw-drop 0.35s ease both; }
+.hiw-drop { animation: hiw-drop var(--dur-state) var(--ease) both; }
 @keyframes hiw-drop { to { opacity: 0.35; transform: translateY(6px); } }
-.hiw-merge { animation: hiw-merge 0.3s ease both; }
+.hiw-merge { animation: hiw-merge var(--dur-state) var(--ease) both; }
 @keyframes hiw-merge { to { opacity: 0; transform: translateY(18px) scale(0.7); } }
-.hiw-card-in { animation: hiw-card-in 0.3s ease 0.15s both; }
+.hiw-card-in { animation: hiw-card-in var(--dur-state) var(--ease) var(--dur-page) both; }
 @keyframes hiw-card-in { from { opacity: 0; transform: scale(0.96) translateY(-6px); } }
 /* reduced-motion: animasyon YOK, gecikme YOK — doğrudan son hal (statik görsel). Genel
    kural süreyi sıfırlasa da satır içi animation-delay son hali geciktiriyordu. */

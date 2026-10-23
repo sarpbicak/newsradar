@@ -1,5 +1,6 @@
 // Paylaşılan UI atomları: rozetler, göstergeler, çipler.
 import React, { useEffect, useRef, useState } from "react";
+import { ArrowDown, ArrowUp, Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { fmtPct, getLang, tt, timeAgo as _timeAgo } from "../i18n.jsx";
 import { C, cssColor } from "../theme.js";
 
@@ -307,12 +308,11 @@ export function PriceDisplay({ price, changePercent, updatedAt, showTime = true 
 export function RiskDelta({ delta }) {
   if (!delta || !delta.risk_delta) return null;
   const up = delta.risk_delta > 0;
+  const Icon = up ? ArrowUp : ArrowDown;
   return (
-    <span
-      className={`text-xs font-bold ${up ? "text-rose-400" : "text-emerald-400"}`}
-      title="son taramaya göre risk değişimi"
-    >
-      {up ? "▲+" : "▼"}
+    <span className={`inline-flex items-center gap-0.5 font-mono text-micro font-semibold ${up ? "text-rose-600" : "text-emerald-600"}`} title={tt("sum.riskDeltaTitle")}>
+      <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+      {up ? "+" : ""}
       {delta.risk_delta}
     </span>
   );
@@ -357,8 +357,8 @@ export function RiskScore({ score }) {
           {score ?? "–"}
         </span>
       </div>
-      <div className="text-xs text-slate-400 leading-tight">
-        <div className="text-slate-300 font-medium">{tt("sum.riskLabel")}</div>
+      <div className="text-micro leading-tight text-slate-400">
+        <div className="font-medium text-slate-300">{tt("sum.riskLabel")}</div>
         <div>{score == null ? tt("sum.riskNone") : tt("sum.riskScale")}</div>
       </div>
     </div>
@@ -389,12 +389,13 @@ export function SentimentGauge({ value }) {
 
 // --- Trend oku ---
 export function TrendArrow({ trend }) {
-  const icons = { improving: "▲", stable: "▬", deteriorating: "▼" };
-  const clsMap = { improving: "text-emerald-400", stable: "text-slate-400", deteriorating: "text-rose-400" };
+  const icons = { improving: TrendingUp, stable: Minus, deteriorating: TrendingDown };
+  const clsMap = { improving: "text-emerald-600", stable: "text-slate-500", deteriorating: "text-rose-600" };
   const key = icons[trend] ? trend : "stable";
+  const Icon = icons[key];
   return (
-    <span className={`inline-flex items-center gap-1 text-xs ${clsMap[key]}`}>
-      <span>{icons[key]}</span>
+    <span className="inline-flex items-center gap-1 text-micro">
+      <Icon className={`h-3.5 w-3.5 ${clsMap[key]}`} aria-hidden="true" />
       <span className="text-slate-400">{tt(`trend.${key}`)}</span>
     </span>
   );
