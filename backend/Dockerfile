@@ -10,7 +10,8 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
 RUN python -m venv /opt/venv
 ENV PATH=/opt/venv/bin:$PATH
 COPY requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt \
+ && pip uninstall --yes pip
 
 # ---------- 2) Çalışma image'ı: yalnızca venv + uygulama kodu ----------
 FROM python:${PYTHON_VERSION}-slim
@@ -25,9 +26,12 @@ ENV PATH=/opt/venv/bin:$PATH \
 
 # sqlite3 CLI: deploy/backup.sh ve restore.sh canlı DB'yi container İÇİNDE `.backup` ile alır
 # (çalışan WAL veritabanını dosya kopyalamak tutarsız yedek üretebilir).
+# pip çalışma anında gerekmez ve içine gömülü eski kütüphaneler (urllib3, msgpack, setuptools)
+# taramada HIGH bulgu üretir → hem sistem pip'i hem venv pip'i (builder'da) kaldırılır.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends sqlite3 \
- && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/* \
+ && python -m pip uninstall --yes pip
 
 # Root olmayan kullanıcı. /data bu kullanıcıya ait → yeni named volume bu sahipliği devralır.
 RUN groupadd --system --gid 10001 newsradar \
