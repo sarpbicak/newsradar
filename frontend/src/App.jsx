@@ -6,7 +6,7 @@ import Overview, { OverviewSkeleton } from "./components/Overview.jsx";
 import EntityDetail from "./components/EntityDetail.jsx";
 import AccountModal from "./components/AccountModal.jsx";
 import PrivacyModal from "./components/PrivacyModal.jsx";
-import { ErrorState, Toast, ToastStack } from "./components/kit.jsx";
+import { Button, ErrorState, Toast, ToastStack } from "./components/kit.jsx";
 import HowItWorks from "./components/HowItWorks.jsx";
 import FeedbackWidget from "./components/FeedbackWidget.jsx";
 import AppHeader, { refreshQuota, resetText } from "./components/AppHeader.jsx";
@@ -14,7 +14,7 @@ import { LanguageModal } from "./components/LanguageBits.jsx";
 import { useIsMobile } from "./components/ui.jsx";
 import { WRAP } from "./components/NavBar.jsx";
 import { fmtMsg, refreshParts, useI18n } from "./i18n.jsx";
-import { ArrowDown } from "lucide-react";
+import { ArrowDown, RotateCcw } from "lucide-react";
 import { navigate, usePath } from "./router.js";
 
 // Admin paneli ayrı pakette — yalnızca admin açınca yüklenir.
@@ -26,6 +26,8 @@ const PULL_THRESHOLD = 70;
 // Tarama sürerken durum yoklama aralığı — adım metni ("X için haberler çekiliyor…") ve
 // entity içi çubuk akıcı görünsün diye kısa.
 const POLL_MS = 1500;
+// Onaylanan tarama /status'ta bu süre içinde görünmezse "başlatılamadı" denir (normalde anında görünür).
+const START_GRACE_MS = 8000;
 
 export default function App({ setLang }) {
   const { t, lang } = useI18n();
@@ -55,6 +57,10 @@ export default function App({ setLang }) {
   })();
   const setSelected = useCallback((id) => navigate(id == null ? "/app" : `/app/e/${id}`), []);
   const [starting, setStarting] = useState(false); // 'Yenile'ye basıldı, sunucu henüz onaylamadı
+  // Sunucu taramayı onayladı → bitene kadar izle. Polling YALNIZCA onaydan sonra başlar:
+  // onaydan önce giden bir /status "çalışmıyor" der ve göstergeyi söndürürdü.
+  const [tracking, setTracking] = useState(false);
+  const trackRef = useRef(null); // { prevCompleted, at } — bu tıklamanın taramasını tanımak için
   const [loaded, setLoaded] = useState(false); // ilk yükleme tamamlandı mı (skeleton için)
   const [loadError, setLoadError] = useState(null);
   const [notice, setNotice] = useState(null);
@@ -66,7 +72,7 @@ export default function App({ setLang }) {
 
   // Tarama sürüyor mu: sunucu durumu VEYA iyimser 'başlatılıyor' bayrağı.
   const running = !!status?.is_running;
-  const isRefreshing = starting || running;
+  const isRefreshing = starting || tracking || running;
   // Kişisel yenileme hakkı (sayılar /status'tan; admin sınırsız).
   const quota = refreshQuota(status);
 
@@ -194,8 +200,9 @@ export default function App({ setLang }) {
 
   // Bir tarama sürerken her 5 sn'de bir status + kartları yenile (canlı ilerleme).
   // Tarama bitince verileri son bir kez çekip tamamlanma bildirimini göster.
+  const polling = tracking || running;
   useEffect(() => {
-    if (!authed || !isRefreshing) return;
+    if (!authed || !polling) return;
     let cancelled = false;
     let timer;
     async function tick() {
@@ -207,16 +214,29 @@ export default function App({ setLang }) {
         ]);
         if (cancelled) return;
         setCards(c);
-        setStatus(s);
         setSuggestions(sug);
         setLoadError(null);
         if (s.is_running) {
-          setStarting(false); // sunucu çalıştığını doğruladı
+          setStatus(s);
           timer = setTimeout(tick, POLL_MS);
         } else {
+          // İzlenen tarama: bitişi, onay anındaki son tamamlanma zamanından farklı bir
+          // last_completed_at ile tanınır. Henüz görünmüyorsa kısa bir süre daha sor.
+          const tr = trackRef.current;
+          const finished = !tr || (s.last_completed_at && s.last_completed_at !== tr.prevCompleted);
+          if (!finished && Date.now() - tr.at < START_GRACE_MS) {
+            timer = setTimeout(tick, 1000);
+            return;
+          }
+          trackRef.current = null;
+          setTracking(false);
+          setStatus(s);
+          if (!finished) {
+            showRefreshError(t("notice.refreshNotStarted"), true);
+            return;
+          }
           // Tamamlandı → çubuğun kendi içinde "Tamamlandı · N haber · N analiz" göster,
           // birkaç saniye sonra yumuşakça söndür. Uyarı/atlama varsa ayrıca not kutusu.
-          setStarting(false);
           const sm = s.last_summary;
           if (sm) {
             setScanDone(sm);
@@ -249,7 +269,8 @@ export default function App({ setLang }) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [authed, isRefreshing]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authed, polling]);
 
   // Tamamlanma bildirimi ("Yenilendi: …") birkaç saniye sonra kendiliğinden kaybolsun.
   useEffect(() => {
@@ -310,22 +331,40 @@ export default function App({ setLang }) {
       </main>
     );
 
+  // Yenileme başlatılamadı → her zaman açık bir not (gerekirse "Tekrar dene"). Sessiz kalınmaz.
+  function showRefreshError(msg, retry) {
+    setNotice({ type: "warn", text: t("notice.refreshFail", { msg }), details: [], retry });
+  }
+
   async function handleRefresh() {
     setNotice(null);
-    setStarting(true); // iyimser: polling hemen başlasın
+    setStarting(true); // buton hemen "Başlatılıyor…" der; polling onaydan sonra
+    const prevCompleted = status?.last_completed_at ?? null;
+    let ack;
     try {
-      await api.refresh(); // anında döner; tarama arka planda
-      const s = await api.status();
-      setStatus(s);
+      ack = await api.refresh(); // anında döner; tarama arka planda
     } catch (e) {
       setStarting(false);
-      // Kota mesajı zaten kendini açıklıyor → olduğu gibi göster; değilse önekle.
-      const isQuota = /limit/i.test(e.message);
-      setNotice({
-        type: "warn",
-        text: isQuota ? e.message : t("notice.refreshFail", { msg: e.message }),
-        details: [],
-      });
+      if (e.status === 429) {
+        // Kota doldu: sunucunun sayılarıyla göstergeyi tazele, ne zaman döneceğini söyle.
+        const s = await api.status().catch(() => null);
+        if (s) setStatus(s);
+        showRefreshError(t("notice.refreshQuotaShort", { when: resetText(t, refreshQuota(s || status)) }), false);
+      } else {
+        showRefreshError(e instanceof TypeError ? t("notice.refreshNetwork") : e.message, true);
+      }
+      return;
+    }
+    setStarting(false);
+    if (ack.started || ack.reason === "running") {
+      trackRef.current = { prevCompleted, at: Date.now() };
+      setTracking(true);
+    } else if (ack.reason === "empty") {
+      showRefreshError(t("notice.refreshEmpty"), false);
+    } else if (ack.reason === "busy") {
+      showRefreshError(t("notice.refreshBusy"), true);
+    } else {
+      showRefreshError(ack.message, true);
     }
   }
 
@@ -548,6 +587,11 @@ export default function App({ setLang }) {
               ? t("notice.refreshed", { parts: refreshParts(notice.summary, t).join(" · ") }) +
                 (notice.details?.length ? t("notice.warnings", { n: notice.details.length }) : "")
               : notice.text}
+            {notice.retry && (
+              <Button size="sm" variant="secondary" icon={RotateCcw} onClick={handleRefresh} className="mt-2">
+                {t("state.retry")}
+              </Button>
+            )}
             {notice.details?.length > 0 && (
               <ul className="mt-1 list-disc pl-4 text-micro">
                 {notice.details.slice(0, 6).map((d, i) => (

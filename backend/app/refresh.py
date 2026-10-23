@@ -197,6 +197,7 @@ def run_refresh(
     manual: bool = False,
     entity_ids: set[int] | None = None,
     user_id: int | None = None,
+    _lock_held: bool = False,
 ) -> RefreshSummary:
     """İzleme listesi için çeker ve (anahtar varsa) analiz eder (senkron çekirdek).
 
@@ -206,7 +207,8 @@ def run_refresh(
     """
     summary = RefreshSummary()
 
-    if not _refresh_lock.acquire(blocking=False):
+    # _lock_held: start_background_refresh kilidi zaten aldı ve durumu "çalışıyor" yaptı.
+    if not _lock_held and not _refresh_lock.acquire(blocking=False):
         logger.info("Yenileme atlandı: zaten çalışıyor.")
         summary.warnings.append(msg("refresh_running"))
         return summary
@@ -326,12 +328,23 @@ def start_background_refresh(
 
     entity_ids: kişisel elle yenilemede kullanıcının kendi entity id'leri (None → tüm havuz).
     Zaten çalışıyorsa False döner.
+
+    Kilit ve "çalışıyor" durumu thread başlamadan, BURADA alınır: /refresh yanıtı döndüğü an
+    /status da çalıştığını gösterir. (Eskiden thread kendi kilidini alıp durumu biraz sonra
+    yazıyordu; arada gelen /status "çalışmıyor" diyebiliyordu.)
     """
-    if is_running():
+    if not _refresh_lock.acquire(blocking=False):
         return False
+    ids = sorted(entity_ids) if entity_ids is not None else []
+    _set_running(True, total=len(ids), user_id=user_id, entity_ids=ids)
     thread = threading.Thread(
         target=run_refresh, args=(lookback_hours, manual, entity_ids, user_id),
-        name="refresh", daemon=True,
+        kwargs={"_lock_held": True}, name="refresh", daemon=True,
     )
-    thread.start()
+    try:
+        thread.start()
+    except Exception:
+        _set_running(False)
+        _refresh_lock.release()
+        raise
     return True

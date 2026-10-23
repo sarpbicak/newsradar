@@ -14,7 +14,7 @@ from ..db.database import get_db
 from ..db.models import UsageEvent, User
 from ..providers import provider_status
 from ..quota import newsapi_usage
-from ..refresh import get_state, is_running, start_background_refresh
+from ..refresh import get_state, start_background_refresh
 from ..watchlist import user_entity_ids
 from .routes_auth import get_current_user
 from .schemas import NewsApiQuotaOut, ProviderStatusOut, RefreshAck
@@ -82,7 +82,8 @@ def refresh(
     if not my_ids:
         return RefreshAck(
             started=False,
-            is_running=is_running(),
+            is_running=False,
+            reason="empty",
             message="İzleme listeniz boş — önce bir şirket ekleyin.",
         )
 
@@ -99,10 +100,16 @@ def refresh(
     started = start_background_refresh(hours, entity_ids=my_ids, user_id=user.id)
     if started:
         record_event(db, user.id, "refresh", None)
+        return RefreshAck(started=True, is_running=True, message="Yenileme başlatıldı.")
+    # Başlamadı: aynı anda tek tarama çalışır. Çalışan bu kullanıcınınsa onu izlemesi yeter;
+    # başkasının (ya da zamanlayıcının) taramasıysa kullanıcıya "meşgul" denir — sessiz kalınmaz.
+    st = get_state()
+    mine = st["is_running"] and st["user_id"] == user.id
     return RefreshAck(
-        started=started,
-        is_running=True,
-        message="Yenileme başlatıldı." if started else "Yenileme zaten çalışıyor.",
+        started=False,
+        is_running=mine,
+        reason="running" if mine else "busy",
+        message="Yenileme zaten çalışıyor." if mine else "Şu an başka bir yenileme sürüyor, birazdan tekrar deneyin.",
     )
 
 

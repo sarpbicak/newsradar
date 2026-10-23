@@ -27,3 +27,9 @@ dist/
 
 # deploy betiklerinin yerel çıktıları (dry-run yedekleri, restore öncesi kopyalar)
 deploy/local-backups/
+
+# Playwright (e2e): sertifikalar, derlemeler, raporlar
+frontend/e2e/.certs/
+frontend/e2e/.dist-*/
+frontend/test-results/
+frontend/playwright-report/

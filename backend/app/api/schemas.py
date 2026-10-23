@@ -397,7 +397,10 @@ class RefreshAck(BaseModel):
     """/refresh anında döner: tarama arka planda başladı mı."""
 
     started: bool          # bu çağrı yeni bir tarama başlattı mı
-    is_running: bool       # şu an bir tarama çalışıyor mu
+    is_running: bool       # BU KULLANICININ taraması şu an çalışıyor mu
+    # Başlamadıysa neden: "empty" (liste boş) · "running" (kendi taraması zaten sürüyor,
+    # izlemesi yeter) · "busy" (başka bir tarama sürüyor). Başladıysa None.
+    reason: str | None = None
     message: str
 
 

@@ -70,6 +70,7 @@ async function apiError(res) {
   const msg = key ? tt(key, { name: dup?.display_name || dup?.name || "" }) : body?.detail || res.statusText;
   const err = new Error(typeof msg === "string" ? msg : res.statusText);
   err.code = body?.code;
+  err.status = res.status;
   err.data = body;
   return err;
 }

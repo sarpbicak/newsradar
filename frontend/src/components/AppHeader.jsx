@@ -125,6 +125,7 @@ function RefreshButton({ refresh, compact = false }) {
     <span className="relative inline-flex" onMouseEnter={() => tipText && setTip(true)} onMouseLeave={() => setTip(false)}>
       <Button
         variant="primary"
+        data-testid="refresh"
         onClick={onClick}
         onPointerDown={onPointerDown}
         onPointerUp={onPointerEnd}
