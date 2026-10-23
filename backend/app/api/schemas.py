@@ -447,6 +447,11 @@ class ProviderStatusOut(BaseModel):
     refresh_limit: int = 0
     refresh_used: int = 0
     refresh_is_admin: bool = False
+    # Ayarlardaki günlük haklar (NEWSRADAR_MAX_REFRESH_ANON / _REGISTERED) — arayüz açıklaması için.
+    refresh_limit_anon: int = 0
+    refresh_limit_registered: int = 0
+    # Hak dolduysa bir hakkın geri geleceği an (UTC); dolmadıysa None.
+    refresh_resets_at: datetime | None = None
     # Sistem-geneli günlük USD bütçesi (maliyet güvencesi).
     budget_exceeded: bool = False          # dolduysa yeni analiz durur
     cost_today_usd: float = 0.0

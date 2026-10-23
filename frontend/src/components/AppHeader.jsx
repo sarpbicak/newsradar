@@ -3,9 +3,9 @@
 // Hesap oluştur) · en sağda "Yenile" (birincil). Yenileme sırasında buton "Yenileniyor 3/12";
 // ilerleme header'ın alt kenarında ince bir çizgi (içeriği itmez) + küçük durum metni.
 // Mobil: logo · Yenile · menü → tam ekran çekmece (dil, tema, nasıl çalışır, hesap).
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
 import { HelpCircle, LayoutDashboard, LogIn, LogOut, Menu as MenuIcon, RefreshCw, ShieldCheck, UserPlus, X } from "lucide-react";
-import { refreshParts, useI18n } from "../i18n.jsx";
+import { fmtTime, parseUtc, refreshParts, useI18n } from "../i18n.jsx";
 import { navigate } from "../router.js";
 import { Button, Menu, MenuItem, Modal, cx } from "./kit.jsx";
 import { LanguageSwitcher } from "./LanguageBits.jsx";
@@ -53,28 +53,115 @@ function ScanProgress({ scan }) {
   );
 }
 
+// Yenileme hakkı: sayılar backend'den (/status ← NEWSRADAR_MAX_REFRESH_ANON / _REGISTERED);
+// frontend'de sabit sayı yok. Admin (limit 0) → sayı gösterilmez.
+export function refreshQuota(status) {
+  if (!status || status.refresh_is_admin || !(status.refresh_limit > 0)) return { admin: true, left: null, exhausted: false };
+  const left = Math.max(0, status.refresh_limit - status.refresh_used);
+  return { admin: false, left, exhausted: left === 0, resetsAt: status.refresh_resets_at ? parseUtc(status.refresh_resets_at) : null };
+}
+
+// Hak dolduysa ne zaman geri gelir: kayan 24 saat — bugünse saat, değilse "yarın".
+export function resetText(t, q) {
+  const d = q.resetsAt;
+  if (!d || d.toDateString() !== new Date().toDateString()) return t("header.resetsTomorrow");
+  return t("header.resetsAt", { time: fmtTime(d) });
+}
+
+function refreshTip(t, status, anonymous) {
+  const a = status?.refresh_limit_anon;
+  const r = status?.refresh_limit_registered;
+  if (!a && !r) return null;
+  return anonymous ? t("header.refreshTipAnon", { a, r, n: a }) : t("header.refreshTipReg", { r, n: r });
+}
+
 function RefreshButton({ refresh, compact = false }) {
   const { t } = useI18n();
-  const { isRefreshing, running, status, quotaLabel, onRefresh, attn } = refresh;
+  const { isRefreshing, running, status, onRefresh, attn, anonymous } = refresh;
+  const q = refreshQuota(status);
+  const [tip, setTip] = useState(false);
+  const press = useRef({ timer: null, long: false });
+  const tipId = useId();
+  const tipText = q.admin ? null : refreshTip(t, status, anonymous);
   const counting = isRefreshing && running && status?.progress_total > 0;
   const text = isRefreshing
     ? running
       ? t("header.refreshing", { done: status.progress_done, total: status.progress_total })
       : t("header.starting")
-    : quotaLabel
-    ? `${t("header.refresh")} ${quotaLabel}`
-    : t("header.refresh");
+    : q.admin
+    ? t("header.refresh")
+    : q.exhausted
+    ? resetText(t, q)
+    : t("header.refreshLeft", { n: q.left });
+
+  // Dokunmatik: uzun basış açıklamayı gösterir (yenileme başlatmaz); hak yokken dokunuş da gösterir.
+  function onPointerDown(e) {
+    if (e.pointerType !== "touch" || !tipText) return;
+    press.current.long = false;
+    press.current.timer = setTimeout(() => {
+      press.current.long = true;
+      setTip(true);
+    }, 450);
+  }
+  function onPointerEnd() {
+    clearTimeout(press.current.timer);
+  }
+  function onClick(e) {
+    if (press.current.long) {
+      press.current.long = false;
+      e.preventDefault();
+      setTimeout(() => setTip(false), 2500);
+      return;
+    }
+    if (q.exhausted) {
+      setTip(true);
+      setTimeout(() => setTip(false), 3000);
+      return;
+    }
+    onRefresh();
+  }
+
   return (
-    <Button
-      variant="primary"
-      onClick={onRefresh}
-      disabled={isRefreshing}
-      aria-label={compact ? text : undefined}
-      className={cx("nav-text disabled:opacity-80", attn && "attn", compact && "px-3")}
-    >
-      <RefreshCw className={cx("h-4 w-4", isRefreshing && "animate-spin")} aria-hidden="true" />
-      {compact ? counting && <span className="font-mono text-micro tabular-nums">{status.progress_done}/{status.progress_total}</span> : <span className="tabular-nums">{text}</span>}
-    </Button>
+    <span className="relative inline-flex" onMouseEnter={() => tipText && setTip(true)} onMouseLeave={() => setTip(false)}>
+      <Button
+        variant="primary"
+        onClick={onClick}
+        onPointerDown={onPointerDown}
+        onPointerUp={onPointerEnd}
+        onPointerCancel={onPointerEnd}
+        onFocus={() => tipText && setTip(true)}
+        onBlur={() => setTip(false)}
+        disabled={isRefreshing}
+        aria-disabled={q.exhausted || undefined}
+        aria-label={compact ? text : undefined}
+        aria-describedby={tipText ? tipId : undefined}
+        className={cx("nav-text disabled:opacity-80", q.exhausted && "cursor-not-allowed opacity-60 hover:translate-y-0 hover:shadow-none", attn && !q.exhausted && "attn", compact && "px-3")}
+      >
+        <RefreshCw className={cx("h-4 w-4", isRefreshing && "animate-spin")} aria-hidden="true" />
+        {compact ? (
+          counting ? (
+            <span className="font-mono text-micro tabular-nums">{status.progress_done}/{status.progress_total}</span>
+          ) : (
+            !q.admin && !q.exhausted && <span className="font-mono text-micro tabular-nums">{q.left}</span>
+          )
+        ) : (
+          <span className="tabular-nums">{text}</span>
+        )}
+      </Button>
+      {tipText && (
+        <span
+          id={tipId}
+          role="tooltip"
+          className={cx(
+            "pointer-events-none absolute right-0 top-full z-50 mt-2 w-64 rounded-control bg-raised px-3 py-2 text-micro text-slate-300 shadow-raised ring-1 ring-ink-600 transition-opacity duration-hover ease-std",
+            tip ? "opacity-100" : "sr-only opacity-0"
+          )}
+        >
+          {tipText}
+          {q.exhausted && <span className="mt-1 block text-slate-500">{resetText(t, q)}</span>}
+        </span>
+      )}
+    </span>
   );
 }
 

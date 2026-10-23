@@ -9,7 +9,7 @@ import PrivacyModal from "./components/PrivacyModal.jsx";
 import { ErrorState, Toast, ToastStack } from "./components/kit.jsx";
 import HowItWorks from "./components/HowItWorks.jsx";
 import FeedbackWidget from "./components/FeedbackWidget.jsx";
-import AppHeader from "./components/AppHeader.jsx";
+import AppHeader, { refreshQuota, resetText } from "./components/AppHeader.jsx";
 import { LanguageModal } from "./components/LanguageBits.jsx";
 import { useIsMobile } from "./components/ui.jsx";
 import { WRAP } from "./components/NavBar.jsx";
@@ -67,11 +67,8 @@ export default function App({ setLang }) {
   // Tarama sürüyor mu: sunucu durumu VEYA iyimser 'başlatılıyor' bayrağı.
   const running = !!status?.is_running;
   const isRefreshing = starting || running;
-  // Kişisel yenileme kotası etiketi (admin/limitsiz → gösterme). Örn "(3/5)".
-  const refreshQuotaLabel =
-    status && !status.refresh_is_admin && status.refresh_limit > 0
-      ? `(${Math.max(0, status.refresh_limit - status.refresh_used)}/${status.refresh_limit})`
-      : "";
+  // Kişisel yenileme hakkı (sayılar /status'tan; admin sınırsız).
+  const quota = refreshQuota(status);
 
   // Herhangi bir istek 401 dönerse (token süresi doldu) YENİ anon oturum başlat
   // (cihaz cookie'si varsa aynı kullanıcıya döner; yoksa yeni misafir).
@@ -334,9 +331,6 @@ export default function App({ setLang }) {
 
   // ── Mobil aşağı-çekip-yenile (pull-to-refresh) ──
   // Yalnızca mobilde, pano en üstteyken (scrollY=0) ve tarama yokken.
-  const refreshExhausted =
-    status && !status.refresh_is_admin && status.refresh_limit > 0 &&
-    status.refresh_used >= status.refresh_limit;
   const canPull = isMobile && view === "dashboard" && selected == null && !isRefreshing;
 
   function onTouchStart(e) {
@@ -359,12 +353,8 @@ export default function App({ setLang }) {
     setPull(0);
     if (!triggered) return;
     // Kota dolmuşsa boşuna istek atma — net mesaj göster (spec 2f).
-    if (refreshExhausted) {
-      setNotice({
-        type: "warn",
-        text: t("notice.refreshQuotaFull", { label: refreshQuotaLabel }),
-        details: [],
-      });
+    if (quota.exhausted) {
+      setNotice({ type: "warn", text: t("notice.refreshQuotaFull", { when: resetText(t, quota) }), details: [] });
       return;
     }
     handleRefresh();
@@ -441,7 +431,7 @@ export default function App({ setLang }) {
         onAccount={setAccount}
         onAdmin={() => setView((v) => (v === "admin" ? "dashboard" : "admin"))}
         onLogout={handleLogout}
-        refresh={{ isRefreshing, running, status, quotaLabel: refreshQuotaLabel, onRefresh: handleRefresh, attn: refreshAttn }}
+        refresh={{ isRefreshing, running, status, onRefresh: handleRefresh, attn: refreshAttn, anonymous: !!user?.is_anonymous }}
         scan={
           isRefreshing || scanDone
             ? {

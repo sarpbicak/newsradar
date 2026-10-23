@@ -1,0 +1,87 @@
+"""/status yenileme hakkı alanları — sayılar KODDAN değil ayarlardan gelir (izole temp DB).
+
+Doğrular:
+  (A) refresh_limit_anon / refresh_limit_registered = NEWSRADAR_MAX_REFRESH_ANON / _REGISTERED
+  (B) misafirin kendi limiti anon ayarı; hak dolmadan refresh_resets_at yok
+  (C) hak dolunca refresh_resets_at = penceredeki en eski yenileme + 24 saat
+  (D) admin: limit 0 (sınırsız), refresh_is_admin, resets_at yok
+Çalıştır: python test_refresh_status.py
+"""
+import os
+import tempfile
+from datetime import datetime, timedelta, timezone
+
+_db = os.path.join(tempfile.gettempdir(), "nr_test_refresh_status.db")
+for sfx in ("", "-wal", "-shm"):
+    try:
+        os.remove(_db + sfx)
+    except FileNotFoundError:
+        pass
+os.environ.update(
+    NEWSRADAR_DB=_db, APP_PASSWORD="genelsifre", APP_SECRET="rs-secret-1234567890",
+    ADMIN_USERNAME="rootadmin", NEWSRADAR_SCHEDULER="off", NEWSRADAR_SEED_ON_START="off",
+    NEWSRADAR_MAX_USERS="0", NEWSRADAR_TRUSTED_PROXY="render", NEWSRADAR_COOKIE_SECURE="off",
+    NEWSRADAR_COOKIE_SAMESITE="lax",
+    # Varsayılanlardan (1 / 3) farklı sayılar: değerin ayardan okunduğunu gösterir.
+    NEWSRADAR_MAX_REFRESH_ANON="2", NEWSRADAR_MAX_REFRESH_REGISTERED="7",
+)
+
+from fastapi.testclient import TestClient  # noqa: E402
+
+from app.api.main import app  # noqa: E402
+from app.db.database import SessionLocal  # noqa: E402
+from app.db.models import UsageEvent  # noqa: E402
+
+PASS = FAIL = 0
+
+
+def check(cond, msg):
+    global PASS, FAIL
+    if cond:
+        PASS += 1; print(f"  ✓ {msg}")
+    else:
+        FAIL += 1; print(f"  ✗ FAIL: {msg}")
+
+
+def parse(ts):
+    d = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+
+
+with TestClient(app) as c:
+    # İlk kayıt = admin.
+    gt = c.post("/auth/login", json={"password": "genelsifre"}).json()["token"]
+    adm = c.post("/users/register", json={"username": "rootadmin", "password": "parola12345"},
+                 headers={"Authorization": f"Bearer {gt}"}).json()["token"]
+    c.cookies.clear()
+    anon = c.post("/session/bootstrap", headers={"X-Forwarded-For": "198.51.100.7"}).json()
+    AH = {"Authorization": f"Bearer {anon['token']}"}
+    uid = c.get("/users/me", headers=AH).json()["id"]
+
+    print("== A/B: ayardaki sayılar, hak dolmadan")
+    st = c.get("/status", headers=AH).json()
+    check(st["refresh_limit_anon"] == 2 and st["refresh_limit_registered"] == 7,
+          f"ayarlar: anon={st['refresh_limit_anon']}, kayıtlı={st['refresh_limit_registered']}")
+    check(st["refresh_limit"] == 2 and st["refresh_used"] == 0 and not st["refresh_is_admin"], "misafirin limiti anon ayarı")
+    check(st["refresh_resets_at"] is None, "hak dolmadan resets_at yok")
+
+    print("== C: hak dolunca dönüş zamanı = en eski yenileme + 24 saat")
+    now = datetime.now(timezone.utc)
+    oldest = now - timedelta(hours=5)
+    with SessionLocal() as db:
+        db.add(UsageEvent(user_id=uid, event_type="refresh", detail={}, created_at=oldest))
+        db.add(UsageEvent(user_id=uid, event_type="refresh", detail={}, created_at=now - timedelta(hours=1)))
+        db.commit()
+    st = c.get("/status", headers=AH).json()
+    check(st["refresh_used"] == 2, f"kullanılan 2 ({st['refresh_used']})")
+    got = parse(st["refresh_resets_at"]) if st["refresh_resets_at"] else None
+    check(got is not None and abs((got - (oldest + timedelta(hours=24))).total_seconds()) < 2,
+          f"resets_at ≈ en eski + 24s ({got})")
+
+    print("== D: admin")
+    st = c.get("/status", headers={"Authorization": f"Bearer {adm}"}).json()
+    check(st["refresh_is_admin"] and st["refresh_limit"] == 0 and st["refresh_resets_at"] is None, "admin sınırsız, resets_at yok")
+
+print("=" * 50)
+print(f"SONUÇ: {PASS} geçti, {FAIL} başarısız")
+raise SystemExit(1 if FAIL else 0)

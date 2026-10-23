@@ -13,6 +13,13 @@ const STR = {
   "app.subtitle": { tr: "haber akışı · risk paneli", en: "news feed · risk panel" },
   "header.refresh": { tr: "Yenile", en: "Refresh" },
   "header.refreshing": { tr: "Yenileniyor {done}/{total}", en: "Refreshing {done}/{total}" },
+  "header.refreshLeft": { tr: "Yenile · {n} hak", en: "Refresh · {n} left" },
+  "header.resetsTomorrow": { tr: "Yarın yenilenir", en: "Resets tomorrow" },
+  "header.resetsAt": { tr: "{time} itibarıyla yenilenir", en: "Resets at {time}" },
+  "header.refreshTipAnon": { tr: "Günde {a} yenileme hakkın var. Hesap oluşturursan günde {r} olur.", en: "{a} refreshes a day. Create an account for {r}." },
+  "header.refreshTipAnon_one": { tr: "Günde 1 yenileme hakkın var. Hesap oluşturursan günde {r} olur.", en: "1 refresh a day. Create an account for {r}." },
+  "header.refreshTipReg": { tr: "Günde {r} yenileme hakkın var.", en: "{r} refreshes a day." },
+  "header.refreshTipReg_one": { tr: "Günde 1 yenileme hakkın var.", en: "1 refresh a day." },
   "header.starting": { tr: "Başlatılıyor…", en: "Starting…" },
   "header.howItWorks": { tr: "Nasıl çalışır", en: "How it works" },
   "header.admin": { tr: "Admin", en: "Admin" },
@@ -232,7 +239,7 @@ const STR = {
   "notice.sessionFail": { tr: "Oturum başlatılamadı: {msg}", en: "Couldn't start session: {msg}" },
   "notice.sessionFailShort": { tr: "Oturum başlatılamadı. Sayfayı yenileyin.", en: "Couldn't start session. Refresh the page." },
   "notice.apiFail": { tr: "API'ye bağlanılamadı: {msg}. Backend çalışıyor mu?", en: "Couldn't reach the API: {msg}. Is the backend running?" },
-  "notice.refreshQuotaFull": { tr: "Günlük yenileme hakkın doldu {label}. Yarın tekrar deneyebilirsin.", en: "Your daily refresh limit is used up {label}. Try again tomorrow." },
+  "notice.refreshQuotaFull": { tr: "Yenileme hakkın doldu. {when}.", en: "You're out of refreshes. {when}." },
   "notice.entityAdded": { tr: "{name} izleme listesine eklendi — bir sonraki yenilemede analiz edilecek.", en: "{name} added to your watchlist — it'll be analyzed on the next refresh." },
   "pull.pull": { tr: "Yenilemek için çek", en: "Pull to refresh" },
   "pull.release": { tr: "Bırak → yenile", en: "Release → refresh" },
@@ -697,6 +704,9 @@ const LOCALE = () => (_lang === "tr" ? "tr-TR" : "en-US");
 export function fmtDate(iso) {
   if (!iso) return "—";
   return parseUtc(iso).toLocaleDateString(LOCALE(), { day: "2-digit", month: "short" });
+}
+export function fmtTime(d) {
+  return parseUtc(d).toLocaleTimeString(LOCALE(), { hour: "2-digit", minute: "2-digit" });
 }
 export function fmtDateTime(iso) {
   if (!iso) return "—";

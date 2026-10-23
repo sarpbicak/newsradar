@@ -23,6 +23,16 @@ from .usage import record_event
 router = APIRouter(tags=["refresh"])
 
 
+def _refresh_window(db: Session, user: User):
+    """Son 24 saatteki elle yenileme olayları (rolling pencere) için sorgu koşulları."""
+    since = datetime.now(timezone.utc) - timedelta(hours=24)
+    return (
+        UsageEvent.user_id == user.id,
+        UsageEvent.event_type == "refresh",
+        UsageEvent.created_at >= since,
+    )
+
+
 def _refresh_quota(db: Session, user: User) -> tuple[bool, int, int]:
     """Kullanıcının elle yenileme kotası (rolling 24s). Admin muaf.
 
@@ -31,15 +41,20 @@ def _refresh_quota(db: Session, user: User) -> tuple[bool, int, int]:
     limit = get_settings().refresh_limit_for(user)
     if limit <= 0:  # 0 = sınırsız (admin)
         return True, limit, 0
-    since = datetime.now(timezone.utc) - timedelta(hours=24)
-    used = db.scalar(
-        select(func.count()).select_from(UsageEvent).where(
-            UsageEvent.user_id == user.id,
-            UsageEvent.event_type == "refresh",
-            UsageEvent.created_at >= since,
-        )
-    ) or 0
+    used = db.scalar(select(func.count()).select_from(UsageEvent).where(*_refresh_window(db, user))) or 0
     return used < limit, limit, used
+
+
+def _refresh_resets_at(db: Session, user: User, limit: int, used: int) -> datetime | None:
+    """Hak dolduysa bir hakkın geri geleceği an: penceredeki en eski yenileme + 24 saat."""
+    if limit <= 0 or used < limit:
+        return None
+    oldest = db.scalar(select(func.min(UsageEvent.created_at)).where(*_refresh_window(db, user)))
+    if oldest is None:
+        return None
+    if oldest.tzinfo is None:  # SQLite naive datetime döndürür (UTC yazılır)
+        oldest = oldest.replace(tzinfo=timezone.utc)
+    return oldest + timedelta(hours=24)
 
 
 @router.post("/refresh", response_model=RefreshAck)
@@ -131,6 +146,10 @@ def status(
         refresh_limit=r_limit,
         refresh_used=r_used,
         refresh_is_admin=user.is_admin,
+        # Arayüzdeki açıklama metni için iki ayar (sayılar koddan değil ayarlardan).
+        refresh_limit_anon=settings.max_refresh_anon,
+        refresh_limit_registered=settings.max_refresh_registered,
+        refresh_resets_at=_refresh_resets_at(db, user, r_limit, r_used),
         budget_exceeded=budget.is_budget_exceeded(),
         cost_today_usd=round(budget.daily_cost_usd(), 4),
         daily_budget_usd=settings.daily_budget_usd,
