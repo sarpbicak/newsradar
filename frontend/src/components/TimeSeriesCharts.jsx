@@ -21,10 +21,12 @@ import {
 } from "recharts";
 import { tt, parseUtc } from "../i18n.jsx";
 import { C } from "../theme.js";
+import { Button, Card, Tabs } from "./kit.jsx";
 
 const DAY = 86400000;
-// Renkler temaya bağlı CSS değişkenleri (src/index.css) — iki temada okunur.
-const NAVY = C.accent;    // vurgu — grafik ana çizgisi
+// Renkler token'lardan (src/index.css): ana çizgi nötr ve net (--chart-line; vurgu rengi
+// grafikte kullanılmaz), ızgara ve eksen çok soluk.
+const NAVY = C.line;      // grafik ana çizgisi
 const GRID = C.grid;      // çok soluk yatay ızgara
 const ZERO = C.subtle;    // sentiment sıfır çizgisi
 const MUTED = C.muted;    // eksen etiketi / haber havası
@@ -101,19 +103,15 @@ function ChartTip({ active, payload, label }) {
   if (sent != null) parts.push(tt("chart.tipMood", { v: `${sent >= 0 ? "+" : ""}${sent.toFixed(1)}` }));
   if (price != null) parts.push(`$${price.toFixed(2)}`);
   return (
-    <div className="rounded-lg border border-ink-500 bg-ink-800 px-2.5 py-1.5 text-[11px] text-slate-300 shadow-card-hover">
+    <div className="rounded-control bg-raised px-3 py-2 text-micro text-slate-300 shadow-raised ring-1 ring-ink-600">
       <span className="font-medium text-slate-100">{label}</span>
       {parts.length ? ` · ${parts.join(" · ")}` : ""}
     </div>
   );
 }
 
-const Panel = ({ children }) => (
-  <div className="rounded-xl border border-ink-600 bg-ink-800 p-4">{children}</div>
-);
-const Empty = ({ text }) => (
-  <div className="rounded-xl border border-ink-600 bg-ink-800 p-4 text-sm text-slate-500">{text}</div>
-);
+const Panel = ({ children }) => <Card className="p-5">{children}</Card>;
+const Empty = ({ text }) => <Card className="p-5 text-body text-slate-500">{text}</Card>;
 
 // Brush + fare tekerleği zoom + çift tık sıfırla için ortak sarmalayıcı.
 function useZoom(len) {
@@ -151,12 +149,12 @@ function RiskSentimentChart({ data, isMobile }) {
   const hasSent = data.some((d) => d.sentiment != null);
   return (
     <Panel>
-      <div className="mb-1 text-[13px] font-medium text-slate-300">{tt("chart.riskSent")}</div>
+      <h3 className="mb-2 font-display text-sm font-semibold text-slate-200">{tt("chart.riskSent")}</h3>
       <div ref={wrapRef} onDoubleClick={reset} className="relative select-none">
         {/* Çizgi ucu yerine köşe etiketleri (efsane yok) */}
-        <span className="pointer-events-none absolute left-8 top-1 z-10 text-[10px] font-semibold" style={{ color: NAVY }}>{tt("chart.risk")}</span>
+        <span className="pointer-events-none absolute left-8 top-1 z-10 text-micro font-semibold" style={{ color: NAVY }}>{tt("chart.risk")}</span>
         {hasSent && (
-          <span className="pointer-events-none absolute right-7 top-1 z-10 text-[10px] font-semibold" style={{ color: MUTED }}>{tt("chart.newsMood")}</span>
+          <span className="pointer-events-none absolute right-7 top-1 z-10 text-micro font-semibold" style={{ color: MUTED }}>{tt("chart.newsMood")}</span>
         )}
         <ResponsiveContainer width="100%" height={isMobile ? 190 : 210}>
           {/* left: 0 — negatif kenar boşluğu sol eksen alanını SVG dışına itip "100"/"50"
@@ -184,7 +182,7 @@ function RiskSentimentChart({ data, isMobile }) {
         </ResponsiveContainer>
       </div>
       {!hasRisk && (
-        <div className="mt-1 text-[11px] text-slate-500">{tt("chart.riskNeed2")}</div>
+        <div className="mt-1 text-micro text-slate-500">{tt("chart.riskNeed2")}</div>
       )}
     </Panel>
   );
@@ -196,7 +194,7 @@ function PriceChart({ data, updatedNote }) {
   const lastPt = [...data].reverse().find((d) => d.price != null);
   return (
     <Panel>
-      <div className="mb-1 text-[13px] font-medium text-slate-300">{tt("chart.price")}</div>
+      <h3 className="mb-2 font-display text-sm font-semibold text-slate-200">{tt("chart.price")}</h3>
       <div ref={wrapRef} onDoubleClick={reset} className="select-none">
         <ResponsiveContainer width="100%" height={180}>
           <LineChart data={data} margin={{ top: 8, right: 42, bottom: 0, left: -6 }} syncId="ts">
@@ -219,7 +217,7 @@ function PriceChart({ data, updatedNote }) {
           </LineChart>
         </ResponsiveContainer>
       </div>
-      <div className="mt-2 text-[10px] text-slate-500">
+      <div className="mt-2 text-micro text-slate-500">
         {tt("chart.priceNote")}
         {updatedNote}
       </div>
@@ -246,24 +244,17 @@ export default function TimeSeriesCharts({ riskHistory, priceHistory, articles, 
   }, [daily, rangeDays]);
   const windowedHasData = windowed.some((d) => d.risk != null || d.sentiment != null || d.price != null);
 
-  // Seçici (her iki grafiğe birden uygulanır)
+  // Seçici (her iki grafiğe birden uygulanır) — ortak Tabs (pill).
   const selector = (
-    <div className="flex items-center gap-1">
-      <span className="mr-1 text-[11px] text-slate-500">{tt("chart.range")}</span>
-      {RANGES.map(([label, days]) => {
-        const on = rangeDays === days;
-        return (
-          <button
-            key={label}
-            onClick={() => setRangeDays(days)}
-            className={`min-h-[32px] rounded-md px-2.5 text-[12px] font-medium transition ${
-              on ? "bg-accent text-accent-fg" : "text-slate-500 hover:bg-ink-700 hover:text-slate-300"
-            }`}
-          >
-            {tt(label)}
-          </button>
-        );
-      })}
+    <div className="flex items-center gap-3">
+      <span className="text-micro text-slate-500">{tt("chart.range")}</span>
+      <Tabs
+        variant="pill"
+        label={tt("chart.range")}
+        value={String(rangeDays)}
+        onChange={(k) => setRangeDays(k === "Infinity" ? Infinity : Number(k))}
+        items={RANGES.map(([label, days]) => ({ key: String(days), label: tt(label) }))}
+      />
     </div>
   );
 
@@ -284,12 +275,9 @@ export default function TimeSeriesCharts({ riskHistory, priceHistory, articles, 
       {isTicker && <PriceChart data={windowed} />}
       {(showCombo || !isTicker) && <RiskSentimentChart data={windowed} isMobile />}
       {isTicker && (
-        <button
-          onClick={() => setShowCombo((v) => !v)}
-          className="min-h-[44px] w-full rounded-lg border border-ink-500 bg-ink-800 text-sm font-medium text-slate-300 transition hover:bg-ink-700"
-        >
+        <Button onClick={() => setShowCombo((v) => !v)} className="w-full">
           {showCombo ? tt("chart.hideRiskSent") : tt("chart.showRiskSent")}
-        </button>
+        </Button>
       )}
     </div>
   ) : (

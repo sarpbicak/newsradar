@@ -50,19 +50,21 @@ export function AnalystBar({ a, className = "" }) {
 }
 
 // Fiyat satırı: şimdi → analist hedefi (kart ve detay aynı dil).
-export function PriceRow({ entity, size = "md" }) {
+// muted: hedef verisi eski (detay) — renkler soluk ama AA (slate-500), opaklık değil.
+export function PriceRow({ entity, size = "md", muted = false }) {
   const price = entity.price;
   const chg = entity.change_percent;
   const target = entity.analyst?.target_mean;
   const upside = entity.analyst?.upside_percent;
   if (price == null) return <p className="text-meta text-slate-500">{tt("card.noPrice")} · {tt("card.newsOnly")}</p>;
-  const num = size === "lg" ? "text-title" : "text-body";
+  const num = cx(size === "lg" ? "text-title" : "text-body", muted && "!text-slate-500");
+  const tone = (v) => (muted ? "text-slate-500" : v >= 0 ? "text-emerald-600" : "text-rose-600");
   return (
     <div className="flex items-start gap-3">
       <div>
         <div className={cx("flex items-baseline gap-2 font-mono font-semibold tabular-nums text-slate-100", num)}>
           <AnimatedNumber value={price} decimals={2} prefix="$" />
-          {chg != null && <span className={cx("text-meta font-medium", chg >= 0 ? "text-emerald-600" : "text-rose-600")}>{fmtPct(chg, { digits: 2 })}</span>}
+          {chg != null && <span className={cx("text-meta font-medium", tone(chg))}>{fmtPct(chg, { digits: 2 })}</span>}
         </div>
         <div className="text-micro text-slate-500">{tt("card.now")}</div>
       </div>
@@ -72,7 +74,7 @@ export function PriceRow({ entity, size = "md" }) {
           <div>
             <div className={cx("flex items-baseline gap-2 font-mono font-semibold tabular-nums text-slate-100", num)}>
               ${target.toFixed(0)}
-              {upside != null && <span className={cx("text-meta font-medium", upside >= 0 ? "text-emerald-600" : "text-rose-600")}>{fmtPct(upside)}</span>}
+              {upside != null && <span className={cx("text-meta font-medium", tone(upside))}>{fmtPct(upside)}</span>}
             </div>
             <div className="text-micro text-slate-500">{tt("card.analystTarget")}</div>
           </div>

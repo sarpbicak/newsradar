@@ -5,6 +5,7 @@
 import React from "react";
 import { fmtPct, tt } from "../i18n.jsx";
 import { C, cssColor } from "../theme.js";
+import { Card } from "./kit.jsx";
 
 // Veri yokken gösterilecek açıklama (boşluk bir eksiklik değil, bir açıklama gibi görünsün).
 function noDataNote(type, hasPrice) {
@@ -32,7 +33,7 @@ function consensusLabel(a) {
 function Bar({ analyst }) {
   const total = analyst.total || 1;
   return (
-    <div className="flex h-2 w-full overflow-hidden rounded-full bg-black/10">
+    <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-ink-700">
       {SEGMENTS.map((s) => {
         const n = analyst[s.key] || 0;
         if (!n) return null;
@@ -53,11 +54,11 @@ function TargetRangeBar({ low, high, mean, price }) {
   const pos = (v) => `${((v - lo) / span) * 100}%`;
   return (
     <div className="mb-3">
-      <div className="relative h-2 rounded-full bg-ink-700">
+      <div className="relative h-1.5 rounded-full bg-ink-700">
         {/* düşük–yüksek analist aralığı */}
         <div
-          className="absolute top-0 h-2 rounded-full"
-          style={{ left: pos(low), width: `${((high - low) / span) * 100}%`, background: cssColor("accent", 0.3) }}
+          className="absolute top-0 h-1.5 rounded-full"
+          style={{ left: pos(low), width: `${((high - low) / span) * 100}%`, background: cssColor("slate-500", 0.45) }}
         />
         {/* güncel fiyat işareti (dikey çizgi) */}
         {price != null && (
@@ -70,13 +71,13 @@ function TargetRangeBar({ low, high, mean, price }) {
         {/* ortalama hedef işareti (nokta) */}
         <div
           className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-ink-800"
-          style={{ left: pos(mean), background: C.accent }}
+          style={{ left: pos(mean), background: C.line }}
           title={`${tt("an.avgTarget")} $${mean.toFixed(2)}`}
         />
       </div>
-      <div className="mt-1 flex justify-between text-[10px] tabular-nums text-slate-500">
+      <div className="mt-2 flex justify-between font-mono text-micro tabular-nums text-slate-500">
         <span>{tt("an.low")} ${low.toFixed(0)}</span>
-        <span className="font-semibold text-slate-300">{tt("an.avg")} ${mean.toFixed(0)}</span>
+        <span className="font-semibold text-slate-200">{tt("an.avg")} ${mean.toFixed(0)}</span>
         <span>{tt("an.high")} ${high.toFixed(0)}</span>
       </div>
     </div>
@@ -104,7 +105,8 @@ function TargetLine({ price, mean, upside, compact }) {
   );
 }
 
-export default function AnalystConsensus({ analyst, price, type, compact = false }) {
+// stale: veri 30 günden eski → barlar soluk + tarih notu (metin AA kalır).
+export default function AnalystConsensus({ analyst, price, type, compact = false, stale = false }) {
   const hasRec = analyst && analyst.total > 0;
   const hasTarget = analyst && analyst.target_mean != null;
 
@@ -112,12 +114,10 @@ export default function AnalystConsensus({ analyst, price, type, compact = false
   if (!hasRec && !hasTarget) {
     if (compact) return null;
     return (
-      <div className="rounded-xl border border-ink-600 bg-ink-800 p-4">
-        <div className="mb-1 flex items-center gap-1 text-[11px] uppercase text-slate-500">
-          {tt("an.title")}
-        </div>
-        <p className="text-sm leading-relaxed text-slate-400">{noDataNote(type, price != null)}</p>
-      </div>
+      <Card className="p-5">
+        <h3 className="mb-1 font-display text-sm font-semibold text-slate-200">{tt("an.title")}</h3>
+        <p className="text-body text-slate-400">{noDataNote(type, price != null)}</p>
+      </Card>
     );
   }
 
@@ -130,15 +130,15 @@ export default function AnalystConsensus({ analyst, price, type, compact = false
       <div className="flex flex-col gap-1.5">
         {hasRec && (
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-semibold" style={{ color: lean.color }}>{lean.text}</span>
+            <span className="text-micro font-semibold" style={{ color: lean.color }}>{lean.text}</span>
             <div className="min-w-[60px] flex-1"><Bar analyst={analyst} /></div>
-            <span className="text-[10px] tabular-nums text-slate-500">{tt("card.analysts", { n: analyst.total })}</span>
+            <span className="text-micro tabular-nums text-slate-500">{tt("card.analysts", { n: analyst.total })}</span>
           </div>
         )}
         {hasTarget && (
           <>
             <TargetLine price={curPrice} mean={analyst.target_mean} upside={analyst.upside_percent} compact />
-            <span className="text-[10px] text-slate-500">
+            <span className="text-micro text-slate-500">
               {hasRec ? `${tt("card.analysts", { n: analyst.total })} · ` : ""}{tt("an.targetConsensus")}
             </span>
           </>
@@ -150,45 +150,34 @@ export default function AnalystConsensus({ analyst, price, type, compact = false
   // ---- DETAY (full): aralık barı + tavsiye dağılımı + kaynak. Fiyat → hedef satırı YOK —
   // detay başlığında zaten gösteriliyor (bilgi tek yerde). ----
   return (
-    <div className="rounded-xl border border-ink-600 bg-ink-800 p-4">
-      <div className="mb-2 flex items-baseline justify-between">
-        <span className="inline-flex items-center gap-1 text-[11px] uppercase text-slate-500">
-          {tt("an.title")}
-        </span>
+    <Card className="p-5">
+      <div className="mb-4 flex items-baseline justify-between gap-3">
+        <h3 className="font-display text-sm font-semibold text-slate-200">{tt("an.title")}</h3>
         {hasRec && (
-          <span className="text-xs font-semibold" style={{ color: lean.color }}>{lean.text}</span>
+          <span className="text-meta font-medium" style={{ color: lean.color }}>
+            {lean.text} · <span className="font-mono">{tt("card.analysts", { n: analyst.total })}</span>
+          </span>
         )}
       </div>
-
-      {/* GERÇEK hedef fiyat aralığı (FMP): düşük / ortalama / yüksek */}
-      {hasTarget && (
-        <TargetRangeBar
-          low={analyst.target_low}
-          high={analyst.target_high}
-          mean={analyst.target_mean}
-          price={curPrice}
-        />
-      )}
-
-      {/* Tavsiye dağılımı (Finnhub) */}
-      {hasRec && (
-        <>
-          <Bar analyst={analyst} />
-          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] tabular-nums">
-            {SEGMENTS.map((s) => (
-              <span key={s.key} className="flex items-center gap-1 text-slate-400">
-                <span className="h-2 w-2 rounded-full" style={{ background: s.color }} />
-                {tt(s.tkey)} <span className="font-semibold text-slate-200">{analyst[s.key] || 0}</span>
-              </span>
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* Net kaynak etiketi — bu rakamlar Claude'dan değil, gerçek analistlerden gelir. */}
-      <div className="mt-3 text-[10px] leading-relaxed text-slate-500">
-        {tt("an.source", { period: analyst.period ? ` · ${analyst.period}` : "" })}
+      <div className={stale ? "opacity-50" : ""}>
+        {/* GERÇEK hedef fiyat aralığı (FMP): düşük / ortalama / yüksek + güncel fiyat */}
+        {hasTarget && <TargetRangeBar low={analyst.target_low} high={analyst.target_high} mean={analyst.target_mean} price={curPrice} />}
+        {/* Tavsiye dağılımı (Finnhub) */}
+        {hasRec && <Bar analyst={analyst} />}
       </div>
-    </div>
+      {hasRec && (
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-micro">
+          {SEGMENTS.map((s) => (
+            <span key={s.key} className="flex items-center gap-1.5 text-slate-400">
+              <span className="h-2 w-2 rounded-full" style={{ background: s.color }} aria-hidden="true" />
+              {tt(s.tkey)} <span className="font-mono font-semibold tabular-nums text-slate-200">{analyst[s.key] || 0}</span>
+            </span>
+          ))}
+        </div>
+      )}
+      {stale && <p className="mt-3 text-micro text-slate-500">{tt("detail.targetStale")}</p>}
+      {/* Net kaynak: bu rakamlar AI'dan değil, gerçek analistlerden gelir. */}
+      <p className="mt-4 text-micro text-slate-500">{tt("an.source", { period: analyst.period ? ` · ${analyst.period}` : "" })}</p>
+    </Card>
   );
 }

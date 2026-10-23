@@ -109,7 +109,9 @@ const STR = {
   "sig.overall": { tr: "Genel sinyal", en: "Overall signal" },
 
   // ---- Detay ----
-  "detail.back": { tr: "genel görünüm", en: "overview" },
+  "detail.back": { tr: "Pano", en: "Dashboard" },
+  "detail.errorBody": { tr: "Bu şirketin ayrıntıları yüklenemedi.", en: "Couldn't load this company's details." },
+  "detail.tabsLabel": { tr: "Ayrıntı sekmeleri", en: "Detail tabs" },
   "detail.tabSummary": { tr: "Özet", en: "Summary" },
   "detail.tabCharts": { tr: "Grafikler", en: "Charts" },
   "detail.tabNews": { tr: "Haberler", en: "News" },
@@ -133,7 +135,7 @@ const STR = {
 
   // ---- Özet sekmesi ----
   "sum.aiTake": { tr: "AI ne düşünüyor?", en: "What the AI thinks" },
-  "sum.aiDisclaimer": { tr: "Bu bir yorum, yatırım tavsiyesi değil — kararlar sana ait.", en: "This is a view, not investment advice — decisions are yours." },
+  "sum.aiDisclaimer": { tr: "Bu bir görüş, yatırım tavsiyesi değil.", en: "This is an opinion, not investment advice." },
   "sum.basedOn": { tr: "{n} habere dayalı", en: "based on {n} news" },
   "sum.previous": { tr: "önceki: {v}", en: "previous: {v}" },
   "sum.drivers": { tr: "Ana etkenler", en: "Key drivers" },
@@ -163,7 +165,7 @@ const STR = {
   "chart.tipMood": { tr: "havası {v}", en: "mood {v}" },
 
   // ---- Sohbet ----
-  "chat.title": { tr: "{name} — haberleri AI ile konuş", en: "{name} — discuss the news with AI" },
+  "chat.title": { tr: "AI'ya sor · {name}", en: "Ask AI · {name}" },
   "chat.placeholderHint": { tr: "Bu varlığın haber akışını sor: “Şu an nasıl konumlanmalıyım?”, “En büyük risk ne?”", en: "Ask about this item's news: “How should I position now?”, “What's the biggest risk?”" },
   "chat.send": { tr: "Gönder", en: "Send" },
   "chat.thinking": { tr: "Düşünüyor…", en: "Thinking…" },
@@ -453,6 +455,7 @@ const STR = {
   "art.rationale": { tr: "Gerekçe", en: "Rationale" },
   "art.noSource": { tr: "kaynak yok", en: "no source" },
   "art.sources": { tr: "{n} kaynak", en: "{n} sources" },
+  "art.sourcesTitle": { tr: "Bu haber {n} kaynakta çıktı — önem sinyali (kopyalar tek sayıldı)", en: "This story ran in {n} sources — a signal of importance (copies counted once)" },
   "sent.pos": { tr: "olumlu", en: "positive" },
   "sent.neg": { tr: "olumsuz", en: "negative" },
   "sent.neu": { tr: "nötr", en: "neutral" },

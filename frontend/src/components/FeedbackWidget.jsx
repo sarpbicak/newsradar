@@ -33,7 +33,7 @@ function FounderSignature() {
   );
 }
 
-export default function FeedbackWidget({ raised = false }) {
+export default function FeedbackWidget({ showButton = true }) {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [contact, setContact] = useState("");
@@ -75,11 +75,11 @@ export default function FeedbackWidget({ raised = false }) {
   return (
     <>
       {/* Sağ altta sabit buton — mobilde alt sekme çubuğu varken yukarı kalkar */}
-      {!open && (
+      {!open && showButton && (
         <button
           onClick={() => setOpen(true)}
           className={`fixed right-4 z-40 inline-flex min-h-[44px] items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-4 text-sm font-medium text-accent shadow-card backdrop-blur-sm transition hover:bg-accent/20 md:right-6 ${
-            raised ? "bottom-[68px] md:bottom-6" : "bottom-4 md:bottom-6"
+            "bottom-4 md:bottom-6"
           }`}
           aria-label={t("fb.button")}
         >

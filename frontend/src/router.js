@@ -1,4 +1,4 @@
-// Minimal istemci yönlendirmesi (yalnızca iki sayfa: "/" landing, "/app" pano) — ek bağımlılık yok.
+// Minimal istemci yönlendirmesi ("/" landing, "/app" pano, "/app/e/<id>" detay) — ek bağımlılık yok.
 // CloudFront'ta bilinmeyen yol → index.html (SPA hata yanıtları), yerelde Vite aynısını yapar.
 import { useEffect, useState } from "react";
 

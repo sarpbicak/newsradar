@@ -1,63 +1,25 @@
-// Analiz edilmiş haberler — masaüstünde tablo, MOBİLDE kart (yatay kaydırma YOK).
-// risk_flag ve event_type filtreleriyle.
+// Haberler sekmesi — her satırda ortak etiket çipi (olumlu/olumsuz/nötr), başlık, kaynak,
+// zaman; gerekçe açılır-kapanır. Tablo yerine tek liste düzeni (mobilde yatay kaydırma yok).
+// risk_flag ve event_type filtreleriyle (ortak Select).
 import React, { useMemo, useState } from "react";
-import { ExternalLink } from "lucide-react";
-import { FlagChip, eventLabel, flagLabel } from "./ui.jsx";
-import { tt, useI18n, fmtDate, fmtDateTime } from "../i18n.jsx";
-import { C } from "../theme.js";
+import { ChevronRight, ExternalLink } from "lucide-react";
+import { eventLabel, flagLabel } from "./ui.jsx";
+import { tt, useI18n, fmtDateTime } from "../i18n.jsx";
+import { Button, Card, Chip, LabelChip, Select } from "./kit.jsx";
 
 const RISK_FLAGS = ["regulatory","competition","financial","legal","product","supply_chain","macro","reputation"];
 const EVENT_TYPES = ["earnings","product","regulation","lawsuit","partnership","funding","macro","leadership","other"];
 
-function sentimentColor(v) {
-  if (v == null) return C.neutral;
-  return v > 0.15 ? C.pos : v < -0.15 ? C.neg : C.neutral;
-}
-function sentimentLabel(v) {
-  if (v == null) return "—";
-  return tt(v > 0.15 ? "sent.pos" : v < -0.15 ? "sent.neg" : "sent.neu");
+// Duygu → ortak haber etiketi (olumlu / olumsuz / nötr); sayısal değer title'da.
+function labelOf(v) {
+  if (v == null) return "neutral";
+  return v > 0.15 ? "positive" : v < -0.15 ? "negative" : "neutral";
 }
 
-// Duygu rozeti — renkli nokta + etiket (mobil kart + tablo ortak).
-function SentimentBadge({ value }) {
-  const c = sentimentColor(value);
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium"
-      style={{ background: `${c}14`, color: c }}
-    >
-      <span className="h-1.5 w-1.5 rounded-full" style={{ background: c }} />
-      {sentimentLabel(value)}
-      {value != null && <span className="font-mono text-[10px] font-normal">{value.toFixed(2)}</span>}
-    </span>
-  );
-}
-
-// "N kaynak" rozeti — aynı haber birden çok kaynakta çıktıysa (önem sinyali).
+// "N kaynak" — aynı haber birden çok kaynakta çıktıysa (önem sinyali).
 function SourceCount({ n }) {
   if (!n || n <= 1) return null;
-  return (
-    <span
-      className="inline-flex items-center rounded-full bg-ink-700 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500"
-      title={`Bu haber ${n} kaynakta çıktı — önem sinyali (kopyalar tek sayıldı)`}
-    >
-      {tt("art.sources", { n })}
-    </span>
-  );
-}
-
-function Title({ a }) {
-  return (
-    <a
-      href={a.url}
-      target="_blank"
-      rel="noreferrer"
-      className="group inline-flex items-start gap-1 font-medium text-slate-200 hover:text-accent"
-    >
-      <span>{a.title}</span>
-      <ExternalLink className="mt-0.5 h-3 w-3 shrink-0 opacity-0 transition group-hover:opacity-60" />
-    </a>
-  );
+  return <span title={tt("art.sourcesTitle", { n })}> · {tt("art.sources", { n })}</span>;
 }
 
 export default function ArticleTable({ articles }) {
@@ -65,121 +27,82 @@ export default function ArticleTable({ articles }) {
   const [flag, setFlag] = useState("");
   const [event, setEvent] = useState("");
 
-  const rows = useMemo(() => {
-    return articles.filter((a) => {
-      if (flag && !(a.risk_flags || []).includes(flag)) return false;
-      if (event && a.event_type !== event) return false;
-      return true;
-    });
-  }, [articles, flag, event]);
-
-  const selectCls =
-    "min-h-[40px] rounded-lg border border-ink-500 bg-ink-800 px-2 py-2 text-slate-300 outline-none focus:border-accent";
+  const rows = useMemo(
+    () =>
+      articles.filter((a) => {
+        if (flag && !(a.risk_flags || []).includes(flag)) return false;
+        if (event && a.event_type !== event) return false;
+        return true;
+      }),
+    [articles, flag, event]
+  );
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
-        <span className="text-slate-500">{t("art.filter")}</span>
-        <select value={flag} onChange={(e) => setFlag(e.target.value)} className={selectCls}>
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Select value={flag} onChange={(e) => setFlag(e.target.value)} aria-label={t("art.allFlags")} wrapClassName="w-full sm:w-auto" className="sm:w-48">
           <option value="">{t("art.allFlags")}</option>
           {RISK_FLAGS.map((f) => (
             <option key={f} value={f}>{flagLabel(f)}</option>
           ))}
-        </select>
-        <select value={event} onChange={(e) => setEvent(e.target.value)} className={selectCls}>
+        </Select>
+        <Select value={event} onChange={(e) => setEvent(e.target.value)} aria-label={t("art.allEvents")} wrapClassName="w-full sm:w-auto" className="sm:w-48">
           <option value="">{t("art.allEvents")}</option>
           {EVENT_TYPES.map((e) => (
             <option key={e} value={e}>{eventLabel(e)}</option>
           ))}
-        </select>
+        </Select>
         {(flag || event) && (
-          <button
-            onClick={() => { setFlag(""); setEvent(""); }}
-            className="min-h-[40px] px-2 text-slate-500 hover:text-slate-300"
-          >
+          <Button variant="ghost" size="sm" onClick={() => { setFlag(""); setEvent(""); }}>
             {t("art.clear")}
-          </button>
+          </Button>
         )}
-        <span className="ml-auto text-slate-500">{t("art.count", { n: rows.length })}</span>
+        <span className="ml-auto text-micro text-slate-500">{t("art.count", { n: rows.length })}</span>
       </div>
 
-      {rows.length === 0 && (
-        <div className="rounded-xl border border-ink-600 bg-ink-800 px-4 py-6 text-center text-sm text-slate-500">
-          {t("art.none")}
-        </div>
-      )}
-
-      {/* MOBİL: kart listesi (tablo değil → yatay kaydırma yok) */}
-      <div className="space-y-3 md:hidden">
-        {rows.map((a) => (
-          <div key={a.id} className="rounded-xl border border-ink-600 bg-ink-800 p-4 shadow-card">
-            <Title a={a} />
-            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
-              <span>{a.source || t("art.noSource")}</span>
-              <SourceCount n={a.source_count} />
-              {a.published_at && (
-                <>
-                  <span className="text-slate-600">·</span>
-                  <span>{fmtDate(a.published_at)}</span>
-                </>
-              )}
-              <span className="text-slate-600">·</span>
-              <span>{eventLabel(a.event_type)}</span>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <SentimentBadge value={a.sentiment} />
-              {(a.risk_flags || []).map((f) => (
-                <FlagChip key={f} flag={f} />
-              ))}
-            </div>
-            {a.rationale && (
-              <p className="mt-3 text-sm leading-relaxed text-slate-400">{a.rationale}</p>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* MASAÜSTÜ: tablo */}
-      <div className="hidden overflow-hidden rounded-xl border border-ink-600 md:block">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-ink-600 bg-ink-700/50 text-left text-[11px] uppercase tracking-wide text-slate-500">
-              <th className="px-4 py-3 font-medium">{t("art.title")}</th>
-              <th className="px-4 py-3 font-medium">{t("art.source")}</th>
-              <th className="px-4 py-3 font-medium">{t("art.sentiment")}</th>
-              <th className="px-4 py-3 font-medium">{t("art.event")}</th>
-              <th className="px-4 py-3 font-medium">{t("art.risks")}</th>
-              <th className="px-4 py-3 font-medium">{t("art.rationale")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((a) => (
-              <tr key={a.id} className="border-b border-ink-700 align-top last:border-0 hover:bg-ink-700/40">
-                <td className="max-w-[280px] px-4 py-3">
-                  <Title a={a} />
-                  {a.published_at && (
-                    <div className="mt-0.5 text-[10px] text-slate-500">
-                      {fmtDateTime(a.published_at)}
+      {rows.length === 0 ? (
+        <Card className="p-6 text-center text-body text-slate-500">{t("art.none")}</Card>
+      ) : (
+        <ul className="space-y-1">
+          {rows.map((a) => (
+            <li key={a.id} className="rounded-control px-3 py-4 transition-colors duration-hover ease-std hover:bg-ink-800 sm:px-4">
+              <div className="flex items-start gap-3">
+                <span title={a.sentiment != null ? a.sentiment.toFixed(2) : undefined} className="pt-0.5">
+                  <LabelChip label={labelOf(a.sentiment)} t={t} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <a href={a.url} target="_blank" rel="noreferrer" className="group inline font-medium text-slate-100 transition-colors duration-hover ease-std hover:text-accent">
+                    {a.title}
+                    <ExternalLink className="ml-1 inline h-3 w-3 align-baseline opacity-0 transition-opacity group-hover:opacity-60" aria-hidden="true" />
+                  </a>
+                  <p className="mt-1 text-micro text-slate-500">
+                    {a.source || t("art.noSource")}
+                    <SourceCount n={a.source_count} />
+                    {a.published_at && <> · {fmtDateTime(a.published_at)}</>}
+                    {a.event_type && <> · {eventLabel(a.event_type)}</>}
+                  </p>
+                  {(a.risk_flags || []).length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {a.risk_flags.map((f) => (
+                        <Chip key={f} tone="neutral">{flagLabel(f)}</Chip>
+                      ))}
                     </div>
                   )}
-                </td>
-                <td className="px-4 py-3 text-slate-400">
-                  <span className="inline-flex items-center gap-1.5">{a.source || "–"}<SourceCount n={a.source_count} /></span>
-                </td>
-                <td className="px-4 py-3"><SentimentBadge value={a.sentiment} /></td>
-                <td className="px-4 py-3 text-slate-400">{eventLabel(a.event_type)}</td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-wrap gap-1">
-                    {(a.risk_flags || []).map((f) => <FlagChip key={f} flag={f} />)}
-                    {(!a.risk_flags || a.risk_flags.length === 0) && <span className="text-slate-600">–</span>}
-                  </div>
-                </td>
-                <td className="max-w-[240px] px-4 py-3 text-slate-400">{a.rationale || "–"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                  {a.rationale && (
+                    <details className="group mt-2">
+                      <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-micro font-medium text-slate-400 transition-colors hover:text-slate-200 [&::-webkit-details-marker]:hidden">
+                        <ChevronRight className="h-3.5 w-3.5 transition-transform duration-hover ease-std group-open:rotate-90" aria-hidden="true" />
+                        {t("art.rationale")}
+                      </summary>
+                      <p className="mt-1.5 max-w-3xl text-meta leading-relaxed text-slate-400">{a.rationale}</p>
+                    </details>
+                  )}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

@@ -15,7 +15,7 @@ import { useIsMobile } from "./components/ui.jsx";
 import { WRAP } from "./components/NavBar.jsx";
 import { fmtMsg, refreshParts, useI18n } from "./i18n.jsx";
 import { ArrowDown } from "lucide-react";
-import { navigate } from "./router.js";
+import { navigate, usePath } from "./router.js";
 
 // Mobil aşağı-çekip-yenile eşiği (px). Bu mesafeyi geçince bırakınca yenilenir.
 const PULL_THRESHOLD = 70;
@@ -43,7 +43,13 @@ export default function App({ setLang }) {
   const [cards, setCards] = useState([]);
   const [status, setStatus] = useState(null);
   const [suggestions, setSuggestions] = useState([]);
-  const [selected, setSelected] = useState(null); // entity id | null
+  // Detay sayfası URL'de: /app/e/<id> (paylaşılabilir; tarayıcının geri tuşu çalışır).
+  const path = usePath();
+  const selected = (() => {
+    const m = path.match(/^\/app\/e\/(\d+)/);
+    return m ? Number(m[1]) : null;
+  })();
+  const setSelected = useCallback((id) => navigate(id == null ? "/app" : `/app/e/${id}`), []);
   const [starting, setStarting] = useState(false); // 'Yenile'ye basıldı, sunucu henüz onaylamadı
   const [loaded, setLoaded] = useState(false); // ilk yükleme tamamlandı mı (skeleton için)
   const [loadError, setLoadError] = useState(null);
@@ -591,7 +597,8 @@ export default function App({ setLang }) {
 
       {/* Sağ altta sabit geri bildirim butonu (kurucu imzası panel içinde).
           Mobilde detay sayfasının alt sekme çubuğuyla çakışmasın diye yükseltilir. */}
-      <FeedbackWidget raised={isMobile && view === "dashboard" && selected != null} />
+      {/* Geri bildirim: panoda sağ altta küçük buton; detay sayfasında (Ask AI ile çakışmasın) yalnızca footer'dan. */}
+      <FeedbackWidget showButton={selected == null} />
 
       {/* İlk giriş dil seçimi (localStorage'da seçim yoksa) */}
       {showLangModal && (

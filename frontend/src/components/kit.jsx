@@ -55,9 +55,13 @@ const CHIP_TONE = {
 };
 const CHIP_SIZE = { sm: "px-2.5 py-1 text-micro", md: "px-3 py-1 text-meta" };
 
-export function Chip({ tone = "neutral", size = "sm", icon: Icon, className = "", children, ...rest }) {
+// wrap: uzun metin satır kırar (ör. ana etkenler); varsayılan tek satır.
+export function Chip({ tone = "neutral", size = "sm", icon: Icon, wrap = false, className = "", children, ...rest }) {
   return (
-    <span className={cx("inline-flex items-center gap-1.5 whitespace-nowrap rounded-full font-medium", CHIP_SIZE[size], CHIP_TONE[tone], className)} {...rest}>
+    <span
+      className={cx("inline-flex items-center gap-1.5 font-medium", wrap ? "rounded-control text-left" : "whitespace-nowrap rounded-full", CHIP_SIZE[size], CHIP_TONE[tone], className)}
+      {...rest}
+    >
       {Icon && <Icon className="h-3.5 w-3.5" aria-hidden="true" />}
       {children}
     </span>
@@ -190,7 +194,7 @@ export function Tabs({ items, value, onChange, variant = "underline", label, cla
                   )
             }
           >
-            {Icon && <Icon className="h-4 w-4" aria-hidden="true" />}
+            {Icon && <Icon className="hidden h-4 w-4 sm:block" aria-hidden="true" />}
             {it.label}
           </button>
         );
