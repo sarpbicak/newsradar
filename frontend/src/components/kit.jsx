@@ -163,7 +163,12 @@ export function Tabs({ items, value, onChange, variant = "underline", label, cla
   function onKey(e, i) {
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
     e.preventDefault();
-    const n = (i + (e.key === "ArrowRight" ? 1 : -1) + items.length) % items.length;
+    // Pasif (disabled) öğeler atlanır.
+    let n = i;
+    for (let k = 0; k < items.length; k++) {
+      n = (n + (e.key === "ArrowRight" ? 1 : -1) + items.length) % items.length;
+      if (!items[n].disabled) break;
+    }
     onChange(items[n].key);
     refs.current[n]?.focus();
   }
@@ -181,8 +186,10 @@ export function Tabs({ items, value, onChange, variant = "underline", label, cla
             role="tab"
             aria-selected={on}
             tabIndex={on ? 0 : -1}
-            onClick={() => onChange(it.key)}
+            onClick={() => !it.disabled && onChange(it.key)}
             onKeyDown={(e) => onKey(e, i)}
+            disabled={it.disabled}
+            aria-disabled={it.disabled || undefined}
             className={
               underline
                 ? cx(
@@ -192,7 +199,8 @@ export function Tabs({ items, value, onChange, variant = "underline", label, cla
                   )
                 : cx(
                     "tap inline-flex h-8 items-center whitespace-nowrap rounded-[4px] px-3 text-meta font-medium transition-colors duration-hover ease-std",
-                    on ? "bg-ink-700 text-slate-100" : "text-slate-500 hover:text-slate-200"
+                    on ? "bg-ink-700 text-slate-100" : "text-slate-500 hover:text-slate-200",
+                    "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-slate-500"
                   )
             }
           >

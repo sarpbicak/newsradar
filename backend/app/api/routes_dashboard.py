@@ -60,6 +60,8 @@ def entity_dashboard(
         entity=entity_card(db, entity, language),
         articles=[article_out(a) for a in articles],
         article_status=status,
-        risk_history=risk_history(db, entity_id, limit=30, language=language),
-        price_history=price_history(db, entity_id, limit=30),
+        # Grafik aralıkları 7/30/90 gün/tümü: fiyat snapshot'ları tarama başına (günde birkaç
+        # tane) olduğundan daha geniş pencere; frontend günlüğe indirir.
+        risk_history=risk_history(db, entity_id, limit=90, language=language),
+        price_history=price_history(db, entity_id, limit=400),
     )

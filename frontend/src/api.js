@@ -180,7 +180,8 @@ export const api = {
   createEntity: (payload) =>
     req("/entities", { method: "POST", body: JSON.stringify(payload) }),
   deleteEntity: (id) => req(`/entities/${id}`, { method: "DELETE" }),
-  dashboard: (id) => req(`/entities/${id}/dashboard?lang=${getLang()}`),
+  // limit=200: grafikler 90 günlük günlük duygu için daha çok haber ister (liste aynı veriyi kullanır).
+  dashboard: (id) => req(`/entities/${id}/dashboard?lang=${getLang()}&limit=200`),
   refresh: () => req("/refresh", { method: "POST" }),
   searchSymbols: (q) => req(`/symbol-search?q=${encodeURIComponent(q)}`),
   // Öneriler (co-mentioned şirketler)
