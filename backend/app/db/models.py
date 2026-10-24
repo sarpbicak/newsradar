@@ -526,6 +526,9 @@ class EntityAnalysis(Base):
     risk_score: Mapped[int] = mapped_column(Integer, nullable=False)           # 0..100
     sentiment_trend: Mapped[str] = mapped_column(String(20), nullable=False)
     top_drivers: Mapped[list] = mapped_column(JSON, nullable=False)            # list[str], TR
+    # top_drivers ile aynı sırada "up" | "down" | null (etken şirket için olumlu/olumsuz).
+    # Eski kayıtlarda None → yön gösterilmez.
+    driver_directions: Mapped[list | None] = mapped_column(JSON, nullable=True)
     summary: Mapped[str] = mapped_column(Text, nullable=False)                 # TR
     stance: Mapped[str] = mapped_column(String(10), nullable=False)           # bullish/neutral/bearish
     conviction: Mapped[str] = mapped_column(String(10), nullable=False)       # low/medium/high

@@ -131,6 +131,7 @@ def analysis_out(a: EntityAnalysis | None) -> AnalysisOut | None:
         risk_score=a.risk_score,
         sentiment_trend=a.sentiment_trend,
         top_drivers=a.top_drivers or [],
+        driver_directions=a.driver_directions,
         summary=a.summary,
         stance=a.stance,
         conviction=a.conviction,

@@ -146,6 +146,17 @@ grams = repeated_ngrams({
 check("news flow leans" in grams and sorted(grams["news flow leans"]) == ["Nvidia", "Tesla"],
       f"tekrar eden öbek yakalandı: {list(grams)}")
 
+print("\n== Etken yönleri (top_driver_directions): sıra korunur, geçersiz → None")
+_base = {"headline_verdict": "A.", "summary": "B.", "invalidation": "C."}
+d = sanitize_entity_analysis({**_base, "top_drivers": ["a.", "", "b.", "c."],
+                              "top_driver_directions": ["up", "down", "down", "up"]})
+check(d["top_drivers"] == ["a.", "b.", "c."] and d["driver_directions"] == ["up", "down", "up"],
+      f"boş etken atılınca yönler kaymaz: {d['driver_directions']}")
+check(sanitize_entity_analysis({**_base, "top_drivers": ["a."]})["driver_directions"] is None,
+      "yön alanı yoksa None (eski kayıt gibi)")
+check(sanitize_entity_analysis({**_base, "top_drivers": ["a.", "b."], "top_driver_directions": ["yan", "down"]})["driver_directions"] == [None, "down"],
+      "geçersiz yön None, geçerli olan kalır")
+
 print("== E: 'daha kısa yaz' tekrar denemesi ==")
 LONG = " ".join(["çok"] * 35) + "."
 SHORT = "Azure güçlü, İngiltere incelemesi ise risk."

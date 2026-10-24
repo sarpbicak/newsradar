@@ -221,6 +221,16 @@ ENTITY_ANALYSIS_TOOL = {
                 ),
                 "items": {"type": "string"},
             },
+            # top_drivers ile AYNI SIRADA yön: etken şirket için olumluysa "up", olumsuzsa "down".
+            # Eksik/yanlış gelirse sanitize None yapar; yön gösterilmez.
+            "top_driver_directions": {
+                "type": "array",
+                "description": (
+                    "top_drivers ile aynı sırada ve aynı sayıda: her etken şirket için olumluysa "
+                    "'up', olumsuzsa 'down'."
+                ),
+                "items": {"type": "string", "enum": ["up", "down"]},
+            },
             "summary": {"type": "string", "description": "2-3 tam cümle özet, istenen çıkış dilinde; nokta ile biter."},
             "stance": {"type": "string", "enum": list(STANCES)},
             "conviction": {"type": "string", "enum": list(CONVICTIONS)},
@@ -238,7 +248,7 @@ ENTITY_ANALYSIS_TOOL = {
             },
         },
         "required": [
-            "headline_verdict", "ai_take", "risk_score", "sentiment_trend", "top_drivers",
+            "headline_verdict", "ai_take", "risk_score", "sentiment_trend", "top_drivers", "top_driver_directions",
             "summary", "stance", "conviction", "what_to_verify", "invalidation",
         ],
         "additionalProperties": False,
@@ -338,8 +348,12 @@ def sanitize_entity_analysis(item: dict, language: str = "tr") -> dict:
     trend = item.get("sentiment_trend")
     stance = item.get("stance")
     conviction = item.get("conviction")
-    drivers = [clip("top_drivers", d)
-               for d in _as_list(item.get("top_drivers"), "top_drivers") if str(d).strip()]
+    # Etken ile yönü birlikte süz (boş etken atılınca yönler kaymasın).
+    raw_dirs = item.get("top_driver_directions") if isinstance(item.get("top_driver_directions"), list) else []
+    pairs = [(clip("top_drivers", d), raw_dirs[i] if i < len(raw_dirs) else None)
+             for i, d in enumerate(_as_list(item.get("top_drivers"), "top_drivers")) if str(d).strip()][:3]
+    drivers = [d for d, _ in pairs]
+    directions = [x if x in ("up", "down") else None for _, x in pairs]
     verify = [clip("what_to_verify", v)
               for v in _as_list(item.get("what_to_verify"), "what_to_verify") if str(v).strip()]
     verdict = clip("headline_verdict", item.get("headline_verdict", ""))
@@ -350,6 +364,8 @@ def sanitize_entity_analysis(item: dict, language: str = "tr") -> dict:
         "risk_score": int(clamp(float(item.get("risk_score", 50)), 0, 100)),
         "sentiment_trend": trend if trend in SENTIMENT_TRENDS else "stable",
         "top_drivers": drivers[:3],
+        # Hiç geçerli yön yoksa None (eski kayıtlarla aynı: yön gösterilmez).
+        "driver_directions": directions if any(directions) else None,
         "summary": clip("summary", item.get("summary", "")),
         "stance": stance if stance in STANCES else "neutral",
         "conviction": conviction if conviction in CONVICTIONS else "low",

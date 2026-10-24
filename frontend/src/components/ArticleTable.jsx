@@ -3,7 +3,7 @@
 // risk_flag ve event_type filtreleriyle (ortak Select).
 import React, { useMemo, useState } from "react";
 import { ChevronRight, ExternalLink } from "lucide-react";
-import { RelTime, eventLabel, flagLabel } from "./ui.jsx";
+import { RelTime, eventLabel, flagLabel, sentimentLabel } from "./ui.jsx";
 import { tt, useI18n } from "../i18n.jsx";
 import { Button, Card, Chip, LabelChip, Select } from "./kit.jsx";
 
@@ -11,10 +11,7 @@ const RISK_FLAGS = ["regulatory","competition","financial","legal","product","su
 const EVENT_TYPES = ["earnings","product","regulation","lawsuit","partnership","funding","macro","leadership","other"];
 
 // Duygu → ortak haber etiketi (olumlu / olumsuz / nötr); sayısal değer title'da.
-function labelOf(v) {
-  if (v == null) return "neutral";
-  return v > 0.15 ? "positive" : v < -0.15 ? "negative" : "neutral";
-}
+const labelOf = sentimentLabel;
 
 // "N kaynak" — aynı haber birden çok kaynakta çıktıysa (önem sinyali).
 function SourceCount({ n }) {

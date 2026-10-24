@@ -57,6 +57,7 @@ def init_db() -> None:
     _ensure_column("entity_analyses", "avg_sentiment", "FLOAT")
     _ensure_column("entity_analyses", "headline_verdict", "TEXT")
     _ensure_column("entity_analyses", "ai_take", "TEXT")
+    _ensure_column("entity_analyses", "driver_directions", "JSON")
     _ensure_column("entities", "language", "VARCHAR(5) NOT NULL DEFAULT 'en'")
     _ensure_column("suggestions", "source_language", "VARCHAR(5) NOT NULL DEFAULT 'en'")
     _ensure_column("suggestions", "country", "VARCHAR(60)")

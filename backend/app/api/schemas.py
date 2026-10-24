@@ -205,6 +205,7 @@ class AnalysisOut(BaseModel):
     risk_score: int
     sentiment_trend: str
     top_drivers: list[str]
+    driver_directions: list[str | None] | None = None  # top_drivers ile aynı sıra: up/down/null
     summary: str
     stance: str
     conviction: str

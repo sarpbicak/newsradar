@@ -281,6 +281,12 @@ export function PriceDisplay({ price, changePercent, updatedAt, showTime = true 
 
 // --- Risk değişim rozeti (son taramaya göre) ---
 // Risk için ARTIŞ kötü (kırmızı ▲), AZALIŞ iyi (yeşil ▼). Değişim yoksa gizli.
+// Haber duygusu (-1..1) → etiket. Eşik ±0.15 (haber listesi, özet dağılımı, grafikler ortak).
+export function sentimentLabel(v) {
+  if (v == null) return "neutral";
+  return v > 0.15 ? "positive" : v < -0.15 ? "negative" : "neutral";
+}
+
 // RİSK DEĞİŞİMİ KURALI (tek yer): |değişim| < 5 → yalnızca "sabit"; değilse yalnızca ok + fark.
 // Risk ARTIŞI kırmızı (kötü), AZALIŞI yeşil. Ok ile "sabit" asla aynı anda görünmez.
 export const RISK_STABLE_BAND = 5;

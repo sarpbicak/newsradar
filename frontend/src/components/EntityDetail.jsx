@@ -6,14 +6,15 @@
 //   mobilde "AI'ya sor" → alttan açılan sayfa (ortak Modal).
 // Grafikler (Recharts) ayrı pakette, yalnızca sekme açılınca yüklenir.
 import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
-import { BarChart3, ChevronLeft, FileText, Lock, MessageSquare, Newspaper, Sparkles, TrendingUp, Zap } from "lucide-react";
+import { ArrowDown, ArrowUp, BarChart3, ChevronLeft, Eye, FileText, Lock, MessageSquare, Minus, Newspaper, Sparkles, TrendingUp } from "lucide-react";
 import { api } from "../api.js";
-import { RelTime, RiskChange, RiskScore, SignalPill, horizonLabel, stanceLabel, useIsMobile } from "./ui.jsx";
+import { RelTime, RiskChange, SignalPill, horizonLabel, riskColor, sentimentLabel, stanceLabel, useIsMobile } from "./ui.jsx";
+import { C } from "../theme.js";
 import ArticleTable from "./ArticleTable.jsx";
 import ChatPanel from "./ChatPanel.jsx";
 import AnalystConsensus from "./AnalystConsensus.jsx";
 import { PriceRow, displayName, symbolOf } from "./EntityCard.jsx";
-import { Button, Card, Chip, ErrorState, Modal, Skeleton, Tabs } from "./kit.jsx";
+import { Button, Card, ErrorState, Modal, Skeleton, Tabs } from "./kit.jsx";
 import { tt, fmtDate, fmtInt, parseUtc } from "../i18n.jsx";
 
 const TimeSeriesCharts = lazy(() => import("./TimeSeriesCharts.jsx"));
@@ -151,7 +152,7 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
   const stale = targetIsStale(entity.analyst);
 
   return (
-    <div className={isDesktop && a && chatOpen ? "grid grid-cols-[minmax(0,1fr)_380px] items-start gap-8" : ""}>
+    <div className={isDesktop && a && chatOpen ? "grid grid-cols-[minmax(0,1fr)_360px] items-start gap-8" : ""}>
       <div className="min-w-0 space-y-8 pb-24 lg:pb-0">
         {back}
 
@@ -205,7 +206,7 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
               <Tabs items={tabs} value={activeTab} onChange={changeTab} label={tt("detail.tabsLabel")} />
             </div>
             <div key={activeTab} className="tab-fade pt-6" role="tabpanel">
-              {activeTab === "summary" && <SummaryTab a={a} entity={entity} />}
+              {activeTab === "summary" && <SummaryTab a={a} entity={entity} riskHistory={risk_history} articles={articles} analyzedCount={st?.analyzed} />}
               {activeTab === "charts" && (
                 <Suspense fallback={<Skeleton className="h-72 w-full" />}>
                   <TimeSeriesCharts riskHistory={risk_history} priceHistory={price_history} articles={articles} isTicker={isTicker} isMobile={isMobile} />
@@ -221,7 +222,8 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
       {/* ---- ASK AI ---- */}
       {a && isDesktop && chatOpen && (
         <aside className="sticky top-24">
-          <ChatPanel entityId={entity.id} entityName={name} suggestions={suggestions} onClose={() => toggleChat(false)} className="h-[calc(100dvh-8rem)]" />
+          {/* Yükseklik içeriğe göre (boş panelde büyük boşluk yok); uzayınca ekranla sınırlanır ve kayar. */}
+          <ChatPanel entityId={entity.id} entityName={name} suggestions={suggestions} onClose={() => toggleChat(false)} className="max-h-[calc(100dvh-8rem)]" />
         </aside>
       )}
       {a && isDesktop && !chatOpen && (
@@ -245,11 +247,65 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
   );
 }
 
-// Özet sekmesi: (özel şirket notu) · "AI ne düşünüyor" · risk + özet + ana etkenler · doğrulanacaklar · geçersiz kılan.
-function SummaryTab({ a, entity }) {
-  const isPrivate = entity.type !== "ticker";
+// AI yorumu tek blok: ai_take + summary birleşir, tekrar eden cümleler atılır, en fazla 5 cümle.
+// (Backend iki alanı ayrı üretir; alan yapısı korunur, birleştirme yalnızca gösterimde.)
+const SENT_SPLIT = /(?<=[.!?…])\s+(?=[A-ZÇĞİÖŞÜ0-9"“(])/u;
+function words(s) {
+  return new Set(s.toLocaleLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).filter((w) => w.length > 2));
+}
+function similar(x, y) {
+  const a = words(x);
+  const b = words(y);
+  if (!a.size || !b.size) return false;
+  let common = 0;
+  a.forEach((w) => b.has(w) && common++);
+  return common / Math.min(a.size, b.size) >= 0.6;
+}
+export function mergeTake(take, summary, max = 5) {
+  const out = [];
+  for (const part of [take, summary]) {
+    for (const s of String(part || "").split(SENT_SPLIT).map((x) => x.trim()).filter(Boolean)) {
+      if (out.length < max && !out.some((o) => similar(o, s))) out.push(s);
+    }
+  }
+  return out.join(" ");
+}
+
+// Son N değerlendirmenin risk mini çizgisi (0–100 dikey ölçek sabit, kıyaslanabilir).
+function Sparkline({ values, color }) {
+  if (!values || values.length < 2) return null;
+  const w = 84;
+  const h = 26;
+  const pts = values.map((v, i) => `${((i / (values.length - 1)) * w).toFixed(1)},${(h - 2 - (v / 100) * (h - 4)).toFixed(1)}`).join(" ");
   return (
-    <div className="space-y-6">
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="shrink-0" aria-hidden="true">
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function Indicator({ label, children }) {
+  return (
+    <div className="min-w-0 px-5 py-4">
+      <div className="text-micro font-medium text-slate-500">{label}</div>
+      <div className="mt-2">{children}</div>
+    </div>
+  );
+}
+
+// Özet sekmesi: (özel şirket notu) · AI yorumu · 3 gösterge · etkenler + takip edilecekler.
+function SummaryTab({ a, entity, riskHistory = [], articles = [], analyzedCount }) {
+  const isPrivate = entity.type !== "ticker";
+  const take = mergeTake(a.ai_take, a.summary);
+  const spark = riskHistory.slice(-7).map((p) => p.risk_score);
+  const scored = articles.filter((x) => x.analyzed && x.sentiment != null);
+  const dist = { positive: 0, neutral: 0, negative: 0 };
+  scored.forEach((x) => dist[sentimentLabel(x.sentiment)]++);
+  const pct = (n) => (scored.length ? Math.round((n / scored.length) * 100) : 0);
+  const follow = [...(a.what_to_verify || []), ...(a.invalidation ? [a.invalidation] : [])];
+  const dirs = a.driver_directions || [];
+  return (
+    <div className="space-y-8">
       {isPrivate && (
         <p className="flex items-start gap-2.5 text-meta text-slate-400">
           <Lock className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
@@ -259,69 +315,93 @@ function SummaryTab({ a, entity }) {
         </p>
       )}
 
-      {/* "AI ne düşünüyor?" — yükseltilmiş yüzey, solda ince vurgu çizgisi, rahat okunur metin. */}
-      {a.ai_take && (
-        <section className="relative overflow-hidden rounded-card bg-raised p-6 ring-1 ring-ink-600">
+      {take && (
+        <section className="relative rounded-card bg-ink-800 p-6 ring-1 ring-inset ring-ink-600">
           <span className="absolute inset-y-0 left-0 w-0.5 bg-accent" aria-hidden="true" />
           <h2 className="mb-3 flex items-center gap-2 font-display text-sm font-medium text-slate-200">
             <Sparkles className="h-4 w-4 text-accent" aria-hidden="true" /> {tt("sum.aiTake")}
           </h2>
-          <p className="max-w-3xl text-base leading-relaxed text-slate-100">{a.ai_take}</p>
+          <p className="max-w-3xl text-base leading-relaxed text-slate-100">{take}</p>
           <p className="mt-4 text-micro text-slate-500">{tt("sum.aiDisclaimer")}</p>
         </section>
       )}
 
-      <div className="grid gap-6 md:grid-cols-3">
-        <section className="md:col-span-2">
-          <div className="mb-4 flex flex-wrap items-center gap-4">
-            <RiskScore score={a.risk_score} />
-            <RiskChange delta={entity.delta} />
-            {entity.delta?.stance_changed && (
-              <Chip tone="warn" icon={Zap}>
-                {stanceLabel(entity.delta.previous_stance)} → {stanceLabel(a.stance)}
-              </Chip>
-            )}
-          </div>
-          <p className="text-body text-slate-200">{a.summary}</p>
-          <p className="mt-2 text-micro text-slate-500">
-            {tt("sum.basedOn", { n: a.articles_considered })} · <RelTime iso={a.created_at} />
-            {entity.previous_analysis && <> · {tt("sum.previous", { v: entity.previous_analysis.risk_score })}</>}
-          </p>
-          {a.top_drivers?.length > 0 && (
-            <div className="mt-5">
-              <h3 className="mb-2 text-micro font-medium text-slate-500">{tt("sum.drivers")}</h3>
-              <div className="flex flex-wrap gap-2">
-                {a.top_drivers.map((d, i) => (
-                  <Chip key={i} tone="neutral" size="md" wrap>
-                    {d}
-                  </Chip>
-                ))}
-              </div>
+      {/* Gösterge satırı: tek panel, ince dikey çizgilerle ayrılmış üç sütun (mobilde alt alta). */}
+      <section className="grid divide-y divide-ink-600 rounded-card ring-1 ring-inset ring-ink-600 sm:grid-cols-3 sm:divide-x sm:divide-y-0" aria-label={tt("sum.indicators")}>
+        <Indicator label={tt("sum.indRisk")}>
+          <div className="flex items-end justify-between gap-3">
+            <div className="flex items-baseline gap-2">
+              <span className="font-display text-3xl font-medium tabular-nums" style={{ color: riskColor(a.risk_score) }}>{a.risk_score}</span>
+              <span className="text-meta tabular-nums text-slate-500">/100</span>
+              <RiskChange delta={entity.delta} />
             </div>
+            <span title={tt("sum.riskTrendTitle")}><Sparkline values={spark} color={riskColor(a.risk_score)} /></span>
+          </div>
+        </Indicator>
+        <Indicator label={tt("sum.indSentiment")}>
+          {scored.length ? (
+            <>
+              <div className="flex h-2 w-full overflow-hidden rounded-[2px] bg-ink-700" aria-hidden="true">
+                <span style={{ width: `${pct(dist.positive)}%`, background: C.pos }} />
+                <span style={{ width: `${pct(dist.neutral)}%`, background: C.neutral, opacity: 0.45 }} />
+                <span style={{ width: `${pct(dist.negative)}%`, background: C.neg }} />
+              </div>
+              <p className="mt-2 text-micro tabular-nums text-slate-400">
+                <span className="text-emerald-600">{tt("sum.sentPos")} %{pct(dist.positive)}</span> · {tt("sum.sentNeu")} %{pct(dist.neutral)} ·{" "}
+                <span className="text-rose-600">{tt("sum.sentNeg")} %{pct(dist.negative)}</span>
+              </p>
+            </>
+          ) : (
+            <p className="text-meta text-slate-500">{tt("sum.noSentiment")}</p>
           )}
-        </section>
+        </Indicator>
+        <Indicator label={tt("sum.indCoverage")}>
+          <div className="flex items-baseline gap-2">
+            <span className="font-display text-3xl font-medium tabular-nums text-slate-100">{fmtInt(analyzedCount ?? a.articles_considered)}</span>
+            <span className="text-meta text-slate-500">{tt("sum.newsAnalyzed")}</span>
+          </div>
+          <p className="mt-1 text-micro text-slate-500">
+            {tt("sum.updated")} <RelTime iso={a.created_at} />
+          </p>
+        </Indicator>
+      </section>
 
-        <div className="space-y-6">
-          {a.what_to_verify?.length > 0 && (
-            <section>
-              <h3 className="mb-2 text-micro font-medium text-amber-600">{tt("sum.verify")}</h3>
-              <ul className="space-y-2 text-meta text-slate-300">
-                {a.what_to_verify.map((v, i) => (
-                  <li key={i} className="flex gap-2">
-                    <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-amber-500" aria-hidden="true" />
-                    <span>{v}</span>
+      <div className="grid gap-8 md:grid-cols-2">
+        {a.top_drivers?.length > 0 && (
+          <section>
+            <h3 className="border-b border-ink-600 pb-2 font-display text-base font-medium text-slate-100">{tt("sum.drivers")}</h3>
+            <ul className="divide-y divide-ink-600">
+              {a.top_drivers.map((d, i) => {
+                const dir = dirs[i];
+                const Icon = dir === "up" ? ArrowUp : dir === "down" ? ArrowDown : Minus;
+                const cls = dir === "up" ? "text-emerald-600" : dir === "down" ? "text-rose-600" : "text-slate-500";
+                return (
+                  <li key={i} className="flex gap-3 py-3 text-body text-slate-200">
+                    <Icon className={`mt-1 h-4 w-4 shrink-0 ${cls}`} aria-hidden="true" />
+                    <span>
+                      {dir && <span className="sr-only">{tt(dir === "up" ? "sum.dirUp" : "sum.dirDown")}: </span>}
+                      {d}
+                    </span>
                   </li>
-                ))}
-              </ul>
-            </section>
-          )}
-          {a.invalidation && (
-            <section>
-              <h3 className="mb-2 text-micro font-medium text-slate-500">{tt("sum.invalidation")}</h3>
-              <p className="text-meta text-slate-300">{a.invalidation}</p>
-            </section>
-          )}
-        </div>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+        {follow.length > 0 && (
+          <section>
+            <h3 className="border-b border-ink-600 pb-2 font-display text-base font-medium text-slate-100">{tt("sum.follow")}</h3>
+            <p className="mt-2 text-micro text-slate-500">{tt("sum.followNote")}</p>
+            <ul className="divide-y divide-ink-600">
+              {follow.map((v, i) => (
+                <li key={i} className="flex gap-3 py-3 text-body text-slate-200">
+                  <Eye className="mt-1 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
+                  <span>{v}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
     </div>
   );
