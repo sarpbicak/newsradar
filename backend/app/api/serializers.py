@@ -11,6 +11,7 @@ from ..db.models import AnalystSnapshot, Article, Entity, EntityAnalysis, PriceS
 from .schemas import (
     AnalysisOut,
     AnalystOut,
+    AnalystPeriodOut,
     ArticleOut,
     DeltaOut,
     EntityCardOut,
@@ -120,6 +121,28 @@ def price_history(session: Session, entity_id: int, limit: int = 30) -> list[Pri
         .limit(limit)
     ).all()
     return [PricePointOut(fetched_at=r.fetched_at, price=r.price) for r in reversed(rows)]
+
+
+def analyst_history(session: Session, entity_id: int, periods: int = 6) -> list[AnalystPeriodOut]:
+    """Tavsiye dağılımının dönemlere göre geçmişi (eski → yeni): her dönemin (Finnhub period,
+    aylık) EN SON snapshot'ı; tavsiyesi olmayan (toplam 0) snapshot'lar atlanır."""
+    rows = session.scalars(
+        select(AnalystSnapshot)
+        .where(AnalystSnapshot.entity_id == entity_id, AnalystSnapshot.period.is_not(None))
+        .order_by(AnalystSnapshot.fetched_at.desc())
+    ).all()
+    seen: dict[str, AnalystSnapshot] = {}
+    for r in rows:
+        total = r.strong_buy + r.buy + r.hold + r.sell + r.strong_sell
+        if total and r.period not in seen:
+            seen[r.period] = r
+        if len(seen) >= periods:
+            break
+    return [
+        AnalystPeriodOut(period=p, strong_buy=r.strong_buy, buy=r.buy, hold=r.hold, sell=r.sell,
+                         strong_sell=r.strong_sell)
+        for p, r in sorted(seen.items())
+    ]
 
 
 def analysis_out(a: EntityAnalysis | None) -> AnalysisOut | None:

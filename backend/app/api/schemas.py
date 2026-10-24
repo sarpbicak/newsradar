@@ -359,12 +359,24 @@ class ArticleStatusOut(BaseModel):
     expired: int = 0  # lookback dışına düştüğü için analiz edilmeyecek (LLM'e gönderilmez)
 
 
+class AnalystPeriodOut(BaseModel):
+    """Bir tavsiye dönemindeki (Finnhub, aylık) al/tut/sat dağılımı — dönemin son snapshot'ı."""
+
+    period: str
+    strong_buy: int
+    buy: int
+    hold: int
+    sell: int
+    strong_sell: int
+
+
 class DashboardOut(BaseModel):
     entity: EntityCardOut
     articles: list[ArticleOut]
     article_status: ArticleStatusOut
     risk_history: list[RiskPointOut] = []
     price_history: list[PricePointOut] = []
+    analyst_history: list[AnalystPeriodOut] = []  # eski → yeni, en fazla 6 dönem
 
 
 class MessageOut(BaseModel):

@@ -213,7 +213,9 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
                 </Suspense>
               )}
               {activeTab === "news" && <ArticleTable articles={articles} />}
-              {activeTab === "analysts" && isTicker && <AnalystConsensus analyst={entity.analyst} price={entity.price} type={entity.type} stale={stale} />}
+              {activeTab === "analysts" && isTicker && (
+                <AnalystConsensus analyst={entity.analyst} price={entity.price} type={entity.type} stale={stale} history={data.analyst_history || []} />
+              )}
             </div>
           </div>
         )}

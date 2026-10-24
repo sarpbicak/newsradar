@@ -11,7 +11,7 @@ from ..db.models import Article, Entity, User
 from ..watchlist import in_watchlist
 from .routes_auth import get_current_user
 from .schemas import ArticleStatusOut, DashboardOut
-from .serializers import article_out, content_language, entity_card, price_history, risk_history
+from .serializers import analyst_history, article_out, content_language, entity_card, price_history, risk_history
 from .usage import record_event
 
 router = APIRouter(tags=["dashboard"])
@@ -64,4 +64,5 @@ def entity_dashboard(
         # tane) olduğundan daha geniş pencere; frontend günlüğe indirir.
         risk_history=risk_history(db, entity_id, limit=90, language=language),
         price_history=price_history(db, entity_id, limit=400),
+        analyst_history=analyst_history(db, entity_id) if entity.type == "ticker" else [],
     )
