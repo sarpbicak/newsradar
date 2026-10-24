@@ -76,18 +76,18 @@ async function loginAsNewUser(page, apiURL) {
   await page.evaluate((t) => localStorage.setItem("newsradar_user_token", t), tok);
 }
 
-// Tek tıklama → POST /refresh başladı → arayüz taramayı gösterir (çalışıyor ya da bitti),
-// hata notu yok, hak sayacı sunucudakiyle aynı (bayat sayı kalmaz).
+// Tek tıklama → POST /refresh kabul edildi (başladı ya da önceki testin taraması sürüyorsa
+// sıraya alındı) → arayüz taramayı gösterir ve tamamlanır; hata notu yok; hak sayacı
+// sunucudakiyle aynı (bayat sayı kalmaz). Sahte tarama ~3 sn.
 async function clickOnceAndExpectStarted(page, { leftAfter }) {
   const btn = refreshBtn(page);
   const ack = page.waitForResponse((r) => /\/refresh(\?|$)/.test(r.url()) && r.request().method() === "POST");
   await btn.click();
   const res = await ack;
   expect(res.status()).toBe(200);
-  expect(await res.json()).toMatchObject({ started: true });
-  // Anahtarsız tarama çok hızlı biter: "Yenileniyor…" ya da bitiş satırı "Tamamlandı" görünmeli.
-  await expect(page.getByText(/Yenileniyor|Başlatılıyor|Tamamlandı/).first()).toBeVisible();
-  await page.waitForTimeout(SLOW_ENTITIES_MS * 3);
+  expect(await res.json()).toMatchObject({ accepted: true });
+  await expect(btn).toHaveText(/Yenileniyor|Başlatılıyor|Sıradasın/);
+  await expect(page.getByText(/Tamamlandı/).first()).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(/Yenileme başlatılamadı/)).toHaveCount(0);
   await expect(btn).toHaveText(leftAfter, { timeout: 10_000 });
 }
@@ -135,7 +135,7 @@ test("sunucu hatası: not + Tekrar dene ile yenileme başlar", async ({ page, ap
   fail = false;
   const ack = page.waitForResponse((r) => /\/refresh(\?|$)/.test(r.url()) && r.request().method() === "POST");
   await alert.getByRole("button", { name: "Tekrar dene" }).click();
-  expect(await (await ack).json()).toMatchObject({ started: true });
+  expect(await (await ack).json()).toMatchObject({ accepted: true });
   await expect(page.getByText(/Yenileme başlatılamadı/)).toHaveCount(0);
 });
 

@@ -89,6 +89,9 @@ function startApi(t) {
       NEWSRADAR_MAX_USERS: "0",
       NEWSRADAR_ANON_SESSIONS_PER_IP_HOUR: "0",
       NEWSRADAR_TRUSTED_PROXY: "render",
+      // Sahte tarama (yalnızca test): gerçek çekme/LLM yok; her yenileme ~3 sn sürer ki kuyruk
+      // (ikinci kullanıcı "sırada") gözlenebilsin.
+      NEWSRADAR_FAKE_REFRESH_SECONDS: process.env.NEWSRADAR_FAKE_REFRESH_SECONDS || "3",
       FRONTEND_URL: t.web,
     },
   });
