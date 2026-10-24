@@ -3,8 +3,8 @@
 // risk_flag ve event_type filtreleriyle (ortak Select).
 import React, { useMemo, useState } from "react";
 import { ChevronRight, ExternalLink } from "lucide-react";
-import { eventLabel, flagLabel } from "./ui.jsx";
-import { tt, useI18n, fmtDateTime } from "../i18n.jsx";
+import { RelTime, eventLabel, flagLabel } from "./ui.jsx";
+import { tt, useI18n } from "../i18n.jsx";
 import { Button, Card, Chip, LabelChip, Select } from "./kit.jsx";
 
 const RISK_FLAGS = ["regulatory","competition","financial","legal","product","supply_chain","macro","reputation"];
@@ -78,7 +78,7 @@ export default function ArticleTable({ articles }) {
                   <p className="mt-1 text-micro text-slate-500">
                     {a.source || t("art.noSource")}
                     <SourceCount n={a.source_count} />
-                    {a.published_at && <> · {fmtDateTime(a.published_at)}</>}
+                    {a.published_at && <> · <RelTime iso={a.published_at} /></>}
                     {a.event_type && <> · {eventLabel(a.event_type)}</>}
                   </p>
                   {(a.risk_flags || []).length > 0 && (

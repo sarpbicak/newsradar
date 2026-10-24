@@ -157,6 +157,8 @@ const STR = {
   "sum.invalidation": { tr: "Bu görüşü ne değiştirir", en: "What would change this view" },
   "sum.riskLabel": { tr: "Risk", en: "Risk" },
   "sum.riskDeltaTitle": { tr: "son taramaya göre risk değişimi", en: "risk change since the last scan" },
+  "sum.riskStable": { tr: "sabit", en: "stable" },
+  "sum.riskStableTitle": { tr: "Son taramaya göre değişim ±5'in altında", en: "Change since the last scan is under ±5" },
   "sum.riskScale": { tr: "0–100", en: "0–100" },
   "sum.riskNone": { tr: "analiz yok", en: "no analysis" },
 
@@ -287,7 +289,7 @@ const STR = {
   "msg.entity_error": { tr: "Analiz sırasında beklenmeyen hata, bu şirket atlandı.", en: "Unexpected error during analysis, this company was skipped." },
 
   // ---- Detay başlığı + sohbet yan paneli ----
-  "detail.targetAsOf": { tr: "analist hedefi, {date}", en: "analyst target, {date}" },
+  "detail.targetAsOf": { tr: "analist verisi {date} güncellendi", en: "analyst data updated {date}" },
   "detail.targetStale": { tr: "Analist hedefi 30 günden eski", en: "Analyst target is older than 30 days" },
   "detail.metaHorizon": { tr: "{h} vade", en: "{h} horizon" },
   "detail.metaArticles": { tr: "{count} haber analiz edildi", en: "{count} articles analyzed" },
@@ -493,7 +495,7 @@ const STR = {
   "an.high": { tr: "yüksek", en: "high" },
   "an.curPrice": { tr: "Güncel fiyat", en: "Current price" },
   "an.avgTarget": { tr: "Ortalama hedef", en: "Average target" },
-  "an.source": { tr: "Analist tavsiyeleri Finnhub, hedef fiyat FMP verisidir{period}. NewsRadar tahmini değildir.", en: "Analyst ratings come from Finnhub and the target price from FMP{period}. This isn't a NewsRadar forecast." },
+  "an.source": { tr: "Analist puanları Finnhub ({period} dönemi), hedef fiyat FMP verisidir. Güncellendi: {date}. NewsRadar tahmini değildir.", en: "Analyst ratings come from Finnhub ({period} period) and the target price from FMP. Updated: {date}. This isn't a NewsRadar forecast." },
   "an.noKeyword": { tr: "Bu şirket borsada işlem görmüyor (özel şirket), bu yüzden hedef fiyat ve analist verisi yok. Değerlendirme sadece haberlere dayanıyor.", en: "This company isn't publicly traded (private), so there's no target price or analyst data. The assessment relies only on the news." },
   "an.noExchange": { tr: "Bu borsa için fiyat ve analist verisi kaynağımızda yok (ör. Türkiye/Avrupa borsaları). Değerlendirme haber akışına dayanıyor.", en: "We don't have price or analyst data for this exchange (e.g. Turkish/European exchanges). The assessment relies on the news flow." },
   "an.noAnalyst": { tr: "Bu şirket için analist tavsiyesi ve hedef fiyatı şu an kaynağımızda yok. Değerlendirme haber akışına dayanıyor.", en: "We currently have no analyst ratings or target price for this company. The assessment relies on the news flow." },
@@ -724,12 +726,20 @@ export function fmtDateTime(iso) {
   if (!iso) return "—";
   return parseUtc(iso).toLocaleString(LOCALE());
 }
+// Göreli zaman, dile uygun ("2 saat önce" / "2 hours ago", "dün" / "yesterday"); 30 günden
+// eskiyse kısa tarih. Tam tarih için fmtDateTime (ör. title).
 export function timeAgo(iso) {
   if (!iso) return _lang === "tr" ? "hiç" : "never";
   const diff = (Date.now() - parseUtc(iso).getTime()) / 1000;
-  const tr = _lang === "tr";
-  if (diff < 60) return tr ? "az önce" : "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}${tr ? " dk önce" : "m ago"}`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}${tr ? " sa önce" : "h ago"}`;
-  return `${Math.floor(diff / 86400)}${tr ? " gün önce" : "d ago"}`;
+  if (diff < 60) return _lang === "tr" ? "az önce" : "just now";
+  if (diff > 30 * 86400) return fmtDate(iso);
+  const rtf = new Intl.RelativeTimeFormat(LOCALE(), { numeric: "auto" });
+  if (diff < 3600) return rtf.format(-Math.floor(diff / 60), "minute");
+  if (diff < 86400) return rtf.format(-Math.floor(diff / 3600), "hour");
+  return rtf.format(-Math.floor(diff / 86400), "day");
+}
+// Ay + yıl ("Ekim 2026" / "October 2026") — Finnhub tavsiye dönemi aylıktır (gün hep 1).
+export function fmtMonth(iso) {
+  if (!iso) return "—";
+  return parseUtc(iso).toLocaleDateString(LOCALE(), { month: "long", year: "numeric", timeZone: "UTC" });
 }

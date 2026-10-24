@@ -1,7 +1,7 @@
 // Paylaşılan UI atomları: rozetler, göstergeler, çipler.
 import React, { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Minus, TrendingDown, TrendingUp } from "lucide-react";
-import { fmtPct, getLang, tt, timeAgo as _timeAgo } from "../i18n.jsx";
+import { fmtDateTime, fmtPct, getLang, tt, timeAgo as _timeAgo } from "../i18n.jsx";
 import { C, cssColor } from "../theme.js";
 
 // timeAgo dil-farkında sürümü i18n'de; geriye uyum için buradan da dışa aç.
@@ -281,16 +281,43 @@ export function PriceDisplay({ price, changePercent, updatedAt, showTime = true 
 
 // --- Risk değişim rozeti (son taramaya göre) ---
 // Risk için ARTIŞ kötü (kırmızı ▲), AZALIŞ iyi (yeşil ▼). Değişim yoksa gizli.
-export function RiskDelta({ delta }) {
-  if (!delta || !delta.risk_delta) return null;
-  const up = delta.risk_delta > 0;
+// RİSK DEĞİŞİMİ KURALI (tek yer): |değişim| < 5 → yalnızca "sabit"; değilse yalnızca ok + fark.
+// Risk ARTIŞI kırmızı (kötü), AZALIŞI yeşil. Ok ile "sabit" asla aynı anda görünmez.
+export const RISK_STABLE_BAND = 5;
+export function riskChange(delta) {
+  const d = delta?.risk_delta;
+  if (d == null) return null;
+  if (Math.abs(d) < RISK_STABLE_BAND) return { kind: "stable", diff: d };
+  return { kind: d > 0 ? "up" : "down", diff: d };
+}
+export function RiskChange({ delta }) {
+  const ch = riskChange(delta);
+  if (!ch) return null;
+  if (ch.kind === "stable")
+    return (
+      <span className="inline-flex items-center gap-1 text-micro font-medium text-slate-500" title={tt("sum.riskStableTitle")}>
+        <Minus className="h-3.5 w-3.5" aria-hidden="true" />
+        {tt("sum.riskStable")}
+      </span>
+    );
+  const up = ch.kind === "up";
   const Icon = up ? ArrowUp : ArrowDown;
   return (
     <span className={`inline-flex items-center gap-0.5 text-micro font-semibold tabular-nums ${up ? "text-rose-600" : "text-emerald-600"}`} title={tt("sum.riskDeltaTitle")}>
       <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-      {up ? "+" : ""}
-      {delta.risk_delta}
+      {up ? "+" : "−"}
+      {Math.abs(ch.diff)}
     </span>
+  );
+}
+
+// Göreli zaman ("2 saat önce"); üzerine gelince dile uygun tam tarih/saat.
+export function RelTime({ iso, className = "" }) {
+  if (!iso) return null;
+  return (
+    <time dateTime={iso} title={fmtDateTime(iso)} className={className}>
+      {_timeAgo(iso)}
+    </time>
   );
 }
 

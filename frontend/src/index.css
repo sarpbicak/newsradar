@@ -173,6 +173,11 @@ body,
 #root {
   height: 100%;
 }
+/* Sticky header (64px + güvenli alan): odak, çapa ve scrollIntoView kaydırmaları içeriği
+   header'ın ALTINA park etsin, arkasına değil. */
+html {
+  scroll-padding-top: calc(4.5rem + env(safe-area-inset-top));
+}
 
 body {
   margin: 0;

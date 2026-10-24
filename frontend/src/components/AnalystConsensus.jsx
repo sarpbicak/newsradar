@@ -3,7 +3,7 @@
 // olmadığını düz Türkçe açıklayan bir not gösterilir (özel şirket / desteklenmeyen borsa).
 // compact=true: kart için kısa gösterim. false: detay için tam gösterim + hedef aralık barı.
 import React from "react";
-import { fmtPct, tt } from "../i18n.jsx";
+import { fmtDate, fmtMonth, fmtPct, tt } from "../i18n.jsx";
 import { C, cssColor } from "../theme.js";
 import { Card } from "./kit.jsx";
 
@@ -177,7 +177,7 @@ export default function AnalystConsensus({ analyst, price, type, compact = false
       )}
       {stale && <p className="mt-3 text-micro text-slate-500">{tt("detail.targetStale")}</p>}
       {/* Net kaynak: bu rakamlar AI'dan değil, gerçek analistlerden gelir. */}
-      <p className="mt-4 text-micro text-slate-500">{tt("an.source", { period: analyst.period ? ` · ${analyst.period}` : "" })}</p>
+      <p className="mt-4 text-micro text-slate-500">{tt("an.source", { period: fmtMonth(analyst.period), date: fmtDate(analyst.fetched_at) })}</p>
     </Card>
   );
 }

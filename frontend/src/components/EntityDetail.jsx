@@ -5,16 +5,16 @@
 //   Ask AI: masaüstünde (≥1024px) sağda sabit panel (kapatılabilir, tercih localStorage'da);
 //   mobilde "AI'ya sor" → alttan açılan sayfa (ortak Modal).
 // Grafikler (Recharts) ayrı pakette, yalnızca sekme açılınca yüklenir.
-import React, { Suspense, lazy, useEffect, useState } from "react";
+import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { BarChart3, ChevronLeft, FileText, Lock, MessageSquare, Newspaper, Sparkles, TrendingUp, Zap } from "lucide-react";
 import { api } from "../api.js";
-import { RiskDelta, RiskScore, SignalPill, TrendArrow, horizonLabel, stanceLabel, useIsMobile } from "./ui.jsx";
+import { RelTime, RiskChange, RiskScore, SignalPill, horizonLabel, stanceLabel, useIsMobile } from "./ui.jsx";
 import ArticleTable from "./ArticleTable.jsx";
 import ChatPanel from "./ChatPanel.jsx";
 import AnalystConsensus from "./AnalystConsensus.jsx";
 import { PriceRow, displayName, symbolOf } from "./EntityCard.jsx";
 import { Button, Card, Chip, ErrorState, Modal, Skeleton, Tabs } from "./kit.jsx";
-import { tt, fmtDate, fmtDateTime, fmtInt, parseUtc } from "../i18n.jsx";
+import { tt, fmtDate, fmtInt, parseUtc } from "../i18n.jsx";
 
 const TimeSeriesCharts = lazy(() => import("./TimeSeriesCharts.jsx"));
 
@@ -86,6 +86,23 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
   const toggleChat = (open) => {
     setChatOpen(open);
     writeChatPref(open);
+  };
+
+  // Başka bir şirkete geçince sayfanın başından başla (üst satırlar header'ın altında kalmasın).
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [entityId]);
+
+  // Sekme değişince: sekme çubuğu header'a yapışmışsa (kaydırılmış sayfa) içeriğin başı onun
+  // hemen altına gelsin; yeni sekme yarıdan başlamasın.
+  const tabsRef = useRef(null);
+  const changeTab = (k) => {
+    setTab(k);
+    const el = tabsRef.current;
+    if (!el) return;
+    const top = el.getBoundingClientRect().top;
+    const stick = parseFloat(getComputedStyle(el).top) || 0;
+    if (top <= stick + 1) window.scrollTo({ top: window.scrollY + top - stick, behavior: "instant" });
   };
 
   // entityId ya da DİL değişince yeniden çek — AI içeriği yeni dilde gelsin.
@@ -183,8 +200,9 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
           </Card>
         ) : (
           <div>
-            <div className="-mx-5 overflow-x-auto px-5 sm:mx-0 sm:px-0">
-              <Tabs items={tabs} value={activeTab} onChange={setTab} label={tt("detail.tabsLabel")} />
+            {/* Sekmeler header'ın hemen altına yapışır (header 64px + güvenli alan). */}
+            <div ref={tabsRef} className="sticky top-[calc(4rem+env(safe-area-inset-top))] z-30 -mx-5 overflow-x-auto bg-ink-900 px-5 sm:mx-0 sm:px-0">
+              <Tabs items={tabs} value={activeTab} onChange={changeTab} label={tt("detail.tabsLabel")} />
             </div>
             <div key={activeTab} className="tab-fade pt-6" role="tabpanel">
               {activeTab === "summary" && <SummaryTab a={a} entity={entity} />}
@@ -257,8 +275,7 @@ function SummaryTab({ a, entity }) {
         <section className="md:col-span-2">
           <div className="mb-4 flex flex-wrap items-center gap-4">
             <RiskScore score={a.risk_score} />
-            <RiskDelta delta={entity.delta} />
-            <TrendArrow trend={a.sentiment_trend} />
+            <RiskChange delta={entity.delta} />
             {entity.delta?.stance_changed && (
               <Chip tone="warn" icon={Zap}>
                 {stanceLabel(entity.delta.previous_stance)} → {stanceLabel(a.stance)}
@@ -267,7 +284,7 @@ function SummaryTab({ a, entity }) {
           </div>
           <p className="text-body text-slate-200">{a.summary}</p>
           <p className="mt-2 text-micro text-slate-500">
-            {tt("sum.basedOn", { n: a.articles_considered })} · {fmtDateTime(a.created_at)}
+            {tt("sum.basedOn", { n: a.articles_considered })} · <RelTime iso={a.created_at} />
             {entity.previous_analysis && <> · {tt("sum.previous", { v: entity.previous_analysis.risk_score })}</>}
           </p>
           {a.top_drivers?.length > 0 && (
