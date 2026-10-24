@@ -67,7 +67,7 @@ function Headline({ mean, price }) {
 // Etiketli hedef aralığı: en düşük → en yüksek; "Şimdi" ince nötr çizgi + etiket (üstte),
 // "Ortalama" vurgu renginde nokta + etiket (altta) → etiketler hiç çakışmaz. Şimdi ile
 // ortalama arası hafif vurgulu. Kenara yakın etiketler içeri hizalanır (taşmaz).
-function LabeledRange({ low, high, mean, price }) {
+function LabeledRange({ low, high, mean, price, dim = false }) {
   if (low == null || high == null || high <= low) return null;
   const lo = Math.min(low, price ?? low);
   const hi = Math.max(high, price ?? high);
@@ -84,7 +84,7 @@ function LabeledRange({ low, high, mean, price }) {
             {tt("an.now")} <span className="font-mono tabular-nums text-slate-100">{usd(price)}</span>
           </span>
         )}
-        <div className="absolute inset-x-0 top-7 h-2 rounded-[2px] bg-ink-700">
+        <div className={`absolute inset-x-0 top-7 h-2 rounded-[2px] bg-ink-700 ${dim ? "opacity-50" : ""}`}>
           <div className="absolute inset-y-0 rounded-[2px]" style={{ left: `${p(low)}%`, width: `${p(high) - p(low)}%`, background: cssColor("slate-500", 0.35) }} />
           <div className="absolute inset-y-0" style={{ left: `${a}%`, width: `${b - a}%`, background: cssColor("accent", 0.35) }} />
           {price != null && <div className="absolute -top-2 h-6 w-px -translate-x-1/2 bg-slate-100" style={{ left: `${p(price)}%` }} />}
@@ -105,10 +105,10 @@ function LabeledRange({ low, high, mean, price }) {
 }
 
 // Tavsiye dağılımı: tek yığılmış bar, sığan segmentte yüzde; sığmıyorsa yalnızca ipucu.
-function StackedBar({ analyst }) {
+function StackedBar({ analyst, dim = false }) {
   const total = analyst.total || 1;
   return (
-    <div className="mt-3 flex h-7 w-full overflow-hidden rounded-[4px] bg-ink-700">
+    <div className={`mt-3 flex h-7 w-full overflow-hidden rounded-[4px] bg-ink-700 ${dim ? "opacity-50" : ""}`}>
       {SEGMENTS.map((sg) => {
         const n = analyst[sg.key] || 0;
         if (!n) return null;
@@ -120,7 +120,7 @@ function StackedBar({ analyst }) {
             style={{ width: `${pct}%`, background: sg.color, color: C.onStrong }}
             title={`${tt(sg.tkey)}: ${n} (${Math.round(pct)}%)`}
           >
-            {pct >= 9 ? `${Math.round(pct)}%` : ""}
+            {pct >= 9 && !dim ? `${Math.round(pct)}%` : ""}
           </div>
         );
       })}
@@ -223,17 +223,18 @@ export default function AnalystConsensus({ analyst, price, type, compact = false
         )}
       </section>
 
-      <div className={stale ? "opacity-60" : ""}>
+      {/* Veri eskiyse (30 gün+) yalnızca çubuklar soluk; metin tam renkte kalır (AA). */}
+      <div>
         {hasTarget && (
           <section className="border-t border-ink-600 pt-5">
             <h4 className="text-meta font-medium text-slate-300">{tt("an.rangeTitle")}</h4>
-            <LabeledRange low={analyst.target_low} high={analyst.target_high} mean={analyst.target_mean} price={curPrice} />
+            <LabeledRange low={analyst.target_low} high={analyst.target_high} mean={analyst.target_mean} price={curPrice} dim={stale} />
           </section>
         )}
         {hasRec && (
           <section className="mt-8 border-t border-ink-600 pt-5">
             <h4 className="text-meta font-medium text-slate-300">{tt("an.distTitle")}</h4>
-            <StackedBar analyst={analyst} />
+            <StackedBar analyst={analyst} dim={stale} />
             <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-micro text-slate-400">
               {SEGMENTS.map((sg) => (
                 <span key={sg.key} className="inline-flex items-center gap-1.5">
