@@ -49,15 +49,16 @@ function Dial({ angle, active }) {
   );
 }
 
+// Sabit yükseklik (13rem): veri, font ya da alt satır gelince alan büyüyüp altını itmesin (CLS).
 function Gauge({ title, label, sub, angle, active, aria }) {
   return (
-    <div role="img" aria-label={aria} className="flex min-w-0 flex-col items-center px-5 py-5 text-center">
+    <div role="img" aria-label={aria} className="flex h-52 min-w-0 flex-col items-center overflow-hidden px-5 py-5 text-center">
       <div className="text-micro font-medium text-slate-500">{title}</div>
       <div className="mt-3">
         <Dial angle={angle} active={active} />
       </div>
-      <div className="mt-1 text-body text-slate-100">{label}</div>
-      {sub && <div className="mt-1 text-micro tabular-nums text-slate-500">{sub}</div>}
+      <div className="mt-1 h-6 text-body leading-6 text-slate-100">{label}</div>
+      <div className="mt-1 h-4 truncate text-micro leading-4 tabular-nums text-slate-500">{sub}</div>
     </div>
   );
 }

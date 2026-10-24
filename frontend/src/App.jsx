@@ -48,6 +48,9 @@ export default function App({ setLang }) {
   const authed = !!user;
   const [cards, setCards] = useState([]);
   const [status, setStatus] = useState(null);
+  // İlk /status yanıtı geldi mi? Sistem bannerları içeriğin ÜSTÜNDE; içerik onlardan önce
+  // görünürse banner gelince her şey aşağı kayıyordu (mobil detayda CLS 0,11).
+  const [statusKnown, setStatusKnown] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   // Detay sayfası URL'de: /app/e/<id> (paylaşılabilir; tarayıcının geri tuşu çalışır).
   const path = usePath();
@@ -138,14 +141,14 @@ export default function App({ setLang }) {
   }, []);
 
   const loadCards = useCallback(async () => {
-    try {
-      const [c, s, sug] = await Promise.all([
-        api.listEntities(),
-        api.status(),
-        api.listSuggestions(),
-      ]);
-      setCards(c);
+    // /status ayrı ve önce işlenir (hızlı, tek sorgu): bannerlar içerikten önce yerini alsın.
+    const statusP = api.status().then((s) => {
       setStatus(s);
+      return s;
+    }).finally(() => setStatusKnown(true));
+    try {
+      const [c, , sug] = await Promise.all([api.listEntities(), statusP, api.listSuggestions()]);
+      setCards(c);
       setSuggestions(sug);
       setLoadError(null);
     } catch (e) {
@@ -565,6 +568,9 @@ export default function App({ setLang }) {
           </div>
         )}
 
+        {/* İlk /status gelene dek içerik yerleşir ama görünmez: banner sonradan eklenince görünen
+            hiçbir şey kaymaz (veri istekleri yine paralel). */}
+        <div style={statusKnown ? undefined : { visibility: "hidden" }}>
         {!loaded && selected == null ? (
           /* İlk yükleme — pano düzenini taklit eden iskelet (layout zıplamasın) */
           <OverviewSkeleton />
@@ -588,6 +594,7 @@ export default function App({ setLang }) {
         ) : (
           <EntityDetail entityId={selected} lang={lang} isAdmin={!!user?.is_admin} onBack={() => setSelected(null)} />
         )}
+        </div>
         </>
         )}
         </div>
