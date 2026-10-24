@@ -9,13 +9,14 @@ import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, BarChart3, ChevronLeft, Eye, FileText, GitFork, Lock, MessageSquare, Minus, Newspaper, Sparkles, TrendingUp } from "lucide-react";
 import { api } from "../api.js";
 import {
-  HorizonToggle, InfoTip, NewsPill, RelTime, RiskChange, divergenceText, hasHorizons, horizonName, horizonOf, newsSignal, riskColor,
+  HorizonToggle, InfoTip, NewsPill, RelTime, RiskChange, divergence, hasHorizons, horizonName, horizonOf, newsSignal, riskColor,
   sentimentLabel, targetOf, useHorizon, useIsMobile, verdictInfo,
 } from "./ui.jsx";
 import { C } from "../theme.js";
 import ArticleTable from "./ArticleTable.jsx";
 import ChatPanel from "./ChatPanel.jsx";
 import AnalystConsensus from "./AnalystConsensus.jsx";
+import Gauges from "./Gauges.jsx";
 import { PriceRow, displayName, noAnalysisText, symbolOf } from "./EntityCard.jsx";
 import { Button, Card, ErrorState, Modal, Skeleton, Tabs } from "./kit.jsx";
 import { tt, fmtDate, fmtInt, parseUtc } from "../i18n.jsx";
@@ -385,15 +386,20 @@ function SummaryTab({ a, entity, riskHistory = [], articles = [], analyzedCount,
   const follow = [...(a.what_to_verify || []), ...(a.invalidation ? [a.invalidation] : [])];
   const dirs = a.driver_directions || [];
   const horizons = hasHorizons(a);
-  const diverge = divergenceText(a, entity.evidence_strength, entity.analyst, horizon);
+  const div = divergence(a, entity.evidence_strength, entity.analyst, horizon);
+  const divNote = [div.horizons && tt("div.horizons"), div.vsAnalysts && tt("gauge.diverge")].filter(Boolean).join(" ");
   return (
     <div className="space-y-8">
-      {diverge && (
-        <p className="flex items-center gap-2 text-meta text-slate-400">
-          <GitFork className="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
-          {diverge}
-        </p>
-      )}
+      {/* Göstergeler + (ayrışma varsa) tek nötr not — kart notunun detaydaki karşılığı. */}
+      <div className="space-y-3">
+        <Gauges a={a} entity={entity} horizon={horizon} />
+        {divNote && (
+          <p className="flex items-start gap-2 text-meta text-slate-400">
+            <GitFork className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+            {divNote}
+          </p>
+        )}
+      </div>
       {isPrivate && (
         <p className="flex items-start gap-2.5 text-meta text-slate-400">
           <Lock className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />

@@ -271,14 +271,18 @@ export function analystLevel(an) {
   return { level, score, label: levelLabel(level) };
 }
 
-// Ayrışma notu (tek satır): kısa↔uzun vade ve/veya haber↔analist yönleri ZIT ise.
-export function divergenceText(a, evidence, analyst, horizon) {
+// Ayrışma: kısa↔uzun vade ve/veya haber↔analist yönleri ZIT mı (nötr ayrışma sayılmaz)?
+export function divergence(a, evidence, analyst, horizon) {
   const s = verdictInfo(a?.short_term).level;
   const l = verdictInfo(a?.long_term).level;
-  const horizons = s != null && l != null && s * l < 0;
   const news = newsSignal(a, evidence, horizon).level;
   const al = analystLevel(analyst)?.level;
-  const vsAnalysts = news != null && al != null && news * al < 0;
+  return { horizons: s != null && l != null && s * l < 0, vsAnalysts: news != null && al != null && news * al < 0 };
+}
+
+// Ayrışma notu (tek satır; kart). Detayda göstergelerin altındaki not kullanılır.
+export function divergenceText(a, evidence, analyst, horizon) {
+  const { horizons, vsAnalysts } = divergence(a, evidence, analyst, horizon);
   if (horizons && vsAnalysts) return tt("div.both");
   if (horizons) return tt("div.horizons");
   if (vsAnalysts) return tt("div.newsAnalysts");
