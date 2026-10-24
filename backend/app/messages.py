@@ -12,6 +12,7 @@ from __future__ import annotations
 _TR = {
     # yenileme
     "refresh_running": "Yenileme zaten çalışıyor.",
+    "few_news": "Son {days} günde yeterli haber bulunamadı; yeni haber çıktıkça güncellenecek.",
     "llm_key_missing": "Analiz motorunun anahtarı tanımlı değil: {detail}",
     "budget_exceeded": "Günlük analiz bütçesi dolu — yeni analiz yapılmadı.",
     "budget_stopped": "Günlük analiz bütçesi tarama sırasında doldu — kalan analizler atlandı.",

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import math
 from collections import Counter
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from ..config import get_settings
 from ..db.models import AnalystSnapshot, Article, Entity, EntityAnalysis, PriceSnapshot
 from .schemas import (
     AnalysisOut,
@@ -295,6 +297,15 @@ def entity_card(session: Session, entity: Entity, language: str = "tr") -> Entit
     # Kullanıcının dilinde analiz yok ama başka dilde var → başka dile DÜŞME; arayüz
     # "Bu dilde henüz analiz yok, bir sonraki yenilemede gelecek" der.
     missing_language = latest is None and _has_other_language_analysis(session, entity.id, language)
+    no_reason = None
+    if latest is None and not missing_language:
+        pending = session.scalar(
+            select(func.count()).select_from(Article).where(
+                Article.entity_id == entity.id, Article.analyzed.is_(False),
+                Article.prefiltered.is_(False), Article.expired.is_(False),
+            )
+        ) or 0
+        no_reason = "pending" if pending else "few_news"
     previous = _previous_analysis(session, entity.id, language) if latest else None
     delta = _delta_out(latest, previous)
     horizon, evidence_strength, evidence_count = _horizon_and_evidence(session, entity.id, latest)
@@ -324,6 +335,8 @@ def entity_card(session: Session, entity: Entity, language: str = "tr") -> Entit
         id=entity.id,
         name=entity.name,
         display_name=entity.display_name,
+        no_analysis_reason=no_reason,
+        news_window_days=max(1, math.ceil(get_settings().lookback_hours / 24)),
         type=entity.type,
         query=entity.query,
         language=entity.language,

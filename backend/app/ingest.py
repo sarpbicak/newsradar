@@ -37,6 +37,7 @@ class IngestResult:
     fetched: int = 0          # sağlayıcıdan gelen toplam
     new_articles: list[Article] = field(default_factory=list)
     duplicates: int = 0       # zaten DB'de olan
+    too_old: int = 0          # pencereden (lookback) eski → kaydedilmedi (analiz edilmeyecekti)
     warnings: list[dict] = field(default_factory=list)  # GERÇEK sorunlar — messages.msg(...)
     infos: list[dict] = field(default_factory=list)     # NORMAL bilgi (tazelik/kota atlaması)
 
@@ -135,6 +136,13 @@ def fetch_for_entity(
             result.duplicates += 1
             continue
         seen_this_batch.add(h)
+        # Finnhub `from` parametresi yalnızca GÜN alır (saat yok): pencere başlangıcının günündeki
+        # daha eski haberler de gelir. Bunlar kaydedilse bile aynı yenilemede "expired" olup hiç
+        # analiz edilmezdi (expire_stale_pending) → kaydetme, sayaçta tut.
+        pub = _utc(fa.published_at)
+        if pub is not None and pub < since:
+            result.too_old += 1
+            continue
         article = Article(
             entity_id=entity.id,
             url=fa.url,
@@ -143,7 +151,7 @@ def fetch_for_entity(
             source=fa.source,
             description=fa.description,
             image_url=fa.image_url,
-            published_at=_utc(fa.published_at),
+            published_at=pub,
             provider=outcome.provider,
         )
         session.add(article)

@@ -250,6 +250,36 @@ def _record_completion(summary: RefreshSummary, status: str = "done") -> None:
     record_user_result(uid, status, summary if status == "done" else None)
 
 
+def _few_news_messages(entity_ids: set[int] | None) -> list[dict]:
+    """Kişisel yenilemede: hiç değerlendirmesi olmayan VE analiz bekleyen haberi de olmayan
+    şirketler için açık bildirim ("son N günde yeterli haber yok") — sessiz kalınmaz.
+    Zamanlayıcı (entity_ids=None) için üretilmez (kimse görmez)."""
+    if not entity_ids:
+        return []
+    import math
+
+    from sqlalchemy import exists, select
+
+    from .config import get_settings
+    from .db.models import Article, Entity, EntityAnalysis
+    from .entity_names import display_name_for
+
+    days = max(1, math.ceil(get_settings().lookback_hours / 24))
+    out: list[dict] = []
+    with session_scope() as s:
+        rows = s.execute(
+            select(Entity.id, Entity.display_name, Entity.name).where(Entity.id.in_(entity_ids))
+        ).all()
+        for eid, dname, name in rows:
+            has_analysis = s.scalar(select(exists().where(EntityAnalysis.entity_id == eid)))
+            has_pending = s.scalar(select(exists().where(
+                Article.entity_id == eid, Article.analyzed.is_(False),
+                Article.prefiltered.is_(False), Article.expired.is_(False))))
+            if not has_analysis and not has_pending:
+                out.append(msg("few_news", dname or display_name_for(name) or name, days=days))
+    return out
+
+
 def _queued_count(entity_ids: set[int] | None) -> int:
     """Tarama sonunda hâlâ analiz bekleyen makale (aktif, kapsamdaki entity'ler)."""
     from sqlalchemy import func, select
@@ -365,6 +395,7 @@ def run_refresh(
         summary.queued = _queued_count(entity_ids)
         summary.expired = totals.expired
         summary.warnings.extend(totals.warnings)
+        summary.warnings.extend(_few_news_messages(entity_ids))
         summary.quota_error = totals.quota_error
 
         calls_made = _calls() - base_calls

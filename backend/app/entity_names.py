@@ -60,9 +60,46 @@ def _norm(text: str) -> str:
     return " ".join(words)
 
 
+# Tamamı büyük harf gelen resmi adlarda (sembol araması: "OCUGEN INC") büyük kalacak kısaltmalar.
+# 3 harf ve altı kelimeler de kısaltma sayılır (AMD, IBM, BP); bağlaçlar küçük yazılır.
+_KEEP_UPPER = {"NVIDIA", "ASML", "TSMC", "HSBC", "AT&T", "SAP", "BYD", "UBS", "BMW", "AIG", "ING"}
+_SMALL = {"of", "and", "the", "de", "la", "du", "von", "van", "&"}
+
+
+def _is_shouty(name: str) -> bool:
+    """Harflerin hepsi büyük mü ve "bağıran" bir resmi ad mı (tek kısa kısaltma değil)."""
+    letters = [c for c in name if c.isalpha()]
+    return len(letters) >= 4 and not any(c.islower() for c in letters) and (len(name.split()) > 1 or len(letters) > 4)
+
+
+def readable_name(name: str) -> str:
+    """"OCUGEN INC" → "Ocugen", "ADVANCED MICRO DEVICES INC" → "Advanced Micro Devices".
+    Şirket ekleri ve hisse sınıfı atılır, kelimeler baş harfi büyük yazılır; kısaltmalar
+    (≤3 harf ya da _KEEP_UPPER) bozulmaz. Bağıran ad değilse olduğu gibi döner."""
+    raw = (name or "").strip()
+    if not _is_shouty(raw):
+        return raw
+    t = _PARENS.sub(" ", raw)
+    t = re.sub(r"\b(?:CLASS|CL)\s+[A-C]\b", " ", t, flags=re.IGNORECASE)
+    words = [w.strip(",.") for w in t.replace(",", " ").split() if w.strip(",.")]
+    while len(words) > 1 and (_NON_WORD.sub("", words[-1]).lower() in _SUFFIXES or words[-1].lower() in ("&", "and")):
+        words.pop()
+    out = []
+    for i, w in enumerate(words):
+        core = w.upper()
+        if core in _KEEP_UPPER or (len(core) <= 3 and core.isalpha() and core.lower() not in _SMALL):
+            out.append(core)
+        elif i > 0 and w.lower() in _SMALL:
+            out.append(w.lower())
+        else:
+            out.append("-".join(p[:1].upper() + p[1:].lower() for p in w.split("-")))
+    return " ".join(out) or raw
+
+
 def display_name_for(name: str) -> str | None:
-    """Bilinen uzun ad için kısa görünen ad; bilinmiyorsa ya da adla aynıysa None."""
-    short = KNOWN_DISPLAY_NAMES.get(_norm(name))
+    """Bilinen uzun ad için kısa görünen ad; tamamı büyük harf resmi ad için okunur biçim
+    ("OCUGEN INC" → "Ocugen"); ikisi de yoksa ya da adla aynıysa None."""
+    short = KNOWN_DISPLAY_NAMES.get(_norm(name)) or readable_name(name)
     if not short or short == (name or "").strip():
         return None
     return short

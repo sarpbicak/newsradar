@@ -67,7 +67,7 @@ check('en: " 1 warning."' in i18n and 'en: " {n} warnings."' in i18n, "EN: '1 wa
 print("== B: render() ==")
 sample = {"type": "x", "hours": 2, "used": 100, "limit": 100, "error": "E", "key": "K",
           "source": "fmp_target", "status": 403, "symbol": "AAPL", "message": "m",
-          "batches": 2, "article_id": 7, "count": 3, "lang": "tr", "detail": "d"}
+          "batches": 2, "article_id": 7, "count": 3, "lang": "tr", "detail": "d", "days": 2}
 bad = [c for c in CODES if "{" in render(msg(c, "Tesla", **sample)).split("] ", 1)[-1]]
 check(not bad, f"tüm kodlar parametreyle doldu (doldurulmayan: {bad})")
 check(render(msg("http_error", "Apple", source="fmp_target", status=403, symbol="AAPL"))

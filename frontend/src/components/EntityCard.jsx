@@ -13,6 +13,14 @@ import { Card, Chip, cx } from "./kit.jsx";
 import { tt, fmtPct } from "../i18n.jsx";
 import { C } from "../theme.js";
 
+// Analiz yoksa NEDEN: dil eksik · bekleyen haber var (yenileme işe yarar) · pencerede haber yok
+// (yenileme işe yaramaz; yeni haber çıkınca kendiliğinden güncellenir). short: liste satırı.
+export function noAnalysisText(card, short = false) {
+  if (card.analysis_missing_language) return tt("card.langMissing");
+  if (card.no_analysis_reason === "few_news") return tt("card.fewNews", { days: card.news_window_days ?? 2 });
+  return short ? tt("card.noAnalysisYet") : tt("card.pressRefresh", { refresh: tt("header.refresh") });
+}
+
 export const displayName = (e) => e.display_name || e.name;
 export const symbolOf = (e) => `${e.type === "ticker" ? "$" : "#"}${e.query}`;
 
@@ -170,7 +178,7 @@ export default function EntityCard({ card, onOpen }) {
       ) : (
         // Kullanıcının dilinde analiz yoksa diğer dili sessizce göstermek yerine açık not.
         <p className="mt-auto text-body text-slate-400">
-          {card.analysis_missing_language ? tt("card.langMissing") : tt("card.pressRefresh", { refresh: tt("header.refresh") })}
+          {noAnalysisText(card)}
         </p>
       )}
     </Card>
@@ -184,7 +192,7 @@ export function EntityRow({ card, onOpen }) {
   const a = card.analysis;
   const edge = a ? overallSignal(a.stance, card.evidence_strength).color : C.subtle;
   const changed = a && card.delta?.stance_changed;
-  const verdict = a ? a.headline_verdict || a.summary : tt(card.analysis_missing_language ? "card.langMissing" : "card.noAnalysisYet");
+  const verdict = a ? a.headline_verdict || a.summary : noAnalysisText(card, true);
   return (
     <button
       type="button"

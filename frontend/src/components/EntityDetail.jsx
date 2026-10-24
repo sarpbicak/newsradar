@@ -13,7 +13,7 @@ import { C } from "../theme.js";
 import ArticleTable from "./ArticleTable.jsx";
 import ChatPanel from "./ChatPanel.jsx";
 import AnalystConsensus from "./AnalystConsensus.jsx";
-import { PriceRow, displayName, symbolOf } from "./EntityCard.jsx";
+import { PriceRow, displayName, noAnalysisText, symbolOf } from "./EntityCard.jsx";
 import { Button, Card, ErrorState, Modal, Skeleton, Tabs } from "./kit.jsx";
 import { tt, fmtDate, fmtInt, parseUtc } from "../i18n.jsx";
 
@@ -210,7 +210,9 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
 
         {!a ? (
           <Card className="p-6 text-body text-slate-400">
-            {entity.analysis_missing_language ? tt("card.langMissing") : tt("detail.noAnalysisBox", { refresh: tt("header.refresh") })}
+            {entity.analysis_missing_language || entity.no_analysis_reason === "few_news"
+              ? noAnalysisText(entity)
+              : tt("detail.noAnalysisBox", { refresh: tt("header.refresh") })}
           </Card>
         ) : (
           <div>
@@ -373,7 +375,7 @@ function SummaryTab({ a, entity, riskHistory = [], articles = [], analyzedCount 
         <Indicator label={tt("sum.indCoverage")}>
           <div className="flex items-baseline gap-2">
             <span className="font-display text-3xl font-medium tabular-nums text-slate-100">{fmtInt(analyzedCount ?? a.articles_considered)}</span>
-            <span className="text-meta text-slate-500">{tt("sum.newsAnalyzed")}</span>
+            <span className="text-meta text-slate-500">{tt("sum.newsAnalyzed", { n: analyzedCount ?? a.articles_considered })}</span>
           </div>
           <p className="mt-1 text-micro text-slate-500">
             {tt("sum.updated")} <RelTime iso={a.created_at} />

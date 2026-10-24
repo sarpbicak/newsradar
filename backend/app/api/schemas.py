@@ -278,6 +278,10 @@ class EntityCardOut(BaseModel):
     # "Bu dilde henüz analiz yok, bir sonraki yenilemede gelecek" gösterir. Hiç analiz yoksa
     # (yeni entity) False kalır — o durum "henüz analiz yok" boş halidir.
     analysis_missing_language: bool = False
+    # Analiz yoksa neden: "pending" (analiz bekleyen haber var → yenileme işe yarar) ·
+    # "few_news" (pencerede analiz edilecek haber yok → yeni haber çıkınca güncellenir).
+    no_analysis_reason: str | None = None
+    news_window_days: int = 2                # haber penceresi (lookback) gün olarak
     # Kart hiyerarşisi için türetilmiş "3 saniyelik" alanlar (analiz varsa dolu).
     horizon: str | None = None            # çoğunluk vade: short | medium | long
     evidence_strength: str | None = None  # strong | medium | weak

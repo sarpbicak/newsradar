@@ -46,6 +46,7 @@ OLD_ROWS = [
     ("NVIDIA Corporation", "ticker", "NVDA"),
     ("Tesla", "ticker", "TSLA"),
     ("Bilinmeyen Girişim", "keyword", "Bilinmeyen Girişim"),
+    ("OCUGEN INC", "ticker", "OCGN"),  # tamamı büyük harf → bir kerelik okunur ad
 ]
 con = sqlite3.connect(_db)
 con.execute(
@@ -86,6 +87,7 @@ check(dm["Alphabet Inc."] == "Google", "Alphabet Inc. → Google")
 check(dm["NVIDIA Corporation"] == "NVIDIA", "NVIDIA Corporation → NVIDIA")
 check(dm["Tesla"] is None, "zaten kısa ad (Tesla) → NULL")
 check(dm["Bilinmeyen Girişim"] is None, "bilinmeyen ad → NULL")
+check(dm["OCUGEN INC"] == "Ocugen", f"mevcut kayıt: OCUGEN INC → Ocugen ({dm['OCUGEN INC']})")
 
 # Elle verilen değer korunur; ikinci init_db idempotent (hata yok, değer değişmez).
 with session_scope() as s:
@@ -110,6 +112,13 @@ check(display_name_for("Space Exploration Technologies Corp.") == "SpaceX", "…
 check(display_name_for("SpaceX") is None, "kısa ad = ad → None")
 check(display_name_for("Anthropic") is None, "bilinmeyen → None")
 check(display_name_for("") is None, "boş → None")
+# Tamamı büyük harf resmi adlar okunur hale gelir; kısaltmalar ve karışık harfli adlar korunur.
+check(display_name_for("OCUGEN INC") == "Ocugen", f"OCUGEN INC → Ocugen ({display_name_for('OCUGEN INC')})")
+check(display_name_for("BANK OF AMERICA CORP") == "Bank of America", "bağlaç küçük, ek atılır")
+check(display_name_for("PROCTER & GAMBLE CO") == "Procter & Gamble", "& korunur, sondaki Co atılır")
+check(display_name_for("AT&T INC") == "AT&T", "AT&T kısaltma olarak kalır")
+check(display_name_for("IBM") is None and display_name_for("AMD") is None, "kısa kısaltma = ad → None")
+check(display_name_for("Plug Power") is None, "karışık harfli ad dokunulmaz")
 
 print("== C: API ==")
 from app.api.main import app  # noqa: E402
