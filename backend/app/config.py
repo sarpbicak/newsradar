@@ -118,6 +118,14 @@ class Settings:
         self.scheduler_enabled: bool = _env("NEWSRADAR_SCHEDULER", "on").lower() == "on"
         # Otomatik yenileme aralığı (saat). Saatlik çok agresif; varsayılan 6.
         self.scheduler_hours: int = max(1, int(_env("NEWSRADAR_SCHEDULER_HOURS", "6")))
+        # YENİLEME KUYRUĞU (app/refresh_queue.py): aynı anda tek tarama çalışır, diğer
+        # kullanıcıların isteği sıraya girer. Sırada bekleyebilecek en fazla kullanıcı işi
+        # (çalışan iş ve zamanlayıcı işi hariç). Dolunca POST /refresh reason="queue_full".
+        self.refresh_queue_max: int = max(1, int(_env("NEWSRADAR_REFRESH_QUEUE_MAX", "20")))
+        # YALNIZCA TEST/E2E: > 0 ise kuyruk işçisi gerçek taramayı (ağ + LLM) ÇAĞIRMAZ;
+        # işin entity'leri üzerinde toplam bu kadar saniye süren sahte bir tarama yapar
+        # (ilerleme bildirir, sıfırlı özet döner). Üretimde 0 (kapalı) kalmalı.
+        self.fake_refresh_seconds: float = max(0.0, float(_env("NEWSRADAR_FAKE_REFRESH_SECONDS", "0")))
         # NewsAPI ücretsiz katman günlük istek sınırı (rolling 24s).
         self.newsapi_daily_limit: int = int(_env("NEWSAPI_DAILY_LIMIT", "100"))
 

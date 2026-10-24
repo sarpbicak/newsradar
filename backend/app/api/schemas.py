@@ -407,12 +407,16 @@ class RefreshSummaryOut(BaseModel):
 
 
 class RefreshAck(BaseModel):
-    """/refresh anında döner: tarama arka planda başladı mı."""
+    """/refresh anında döner: iş çalışıyor mu, sırada mı (yenileme kuyruğu)."""
 
-    started: bool          # bu çağrı yeni bir tarama başlattı mı
-    is_running: bool       # BU KULLANICININ taraması şu an çalışıyor mu
-    # Başlamadıysa neden: "empty" (liste boş) · "running" (kendi taraması zaten sürüyor,
-    # izlemesi yeter) · "busy" (başka bir tarama sürüyor). Başladıysa None.
+    accepted: bool         # çağrıdan sonra bu kullanıcının bir işi çalışıyor YA DA sırada mı
+    started: bool          # BU çağrının işi şu an çalışıyor mu (sıra boştu, hemen başladı)
+    queued: bool = False   # kullanıcının işi sırada mı bekliyor
+    queue_position: int | None = None  # sıradaysa 1 tabanlı konum (bekleyenler arasında)
+    is_running: bool       # BU KULLANICININ işi şu an çalışıyor mu
+    # None: yeni iş kabul edildi (çalışıyor ya da sırada) · "empty" (liste boş, kabul yok) ·
+    # "running" (kendi işi zaten çalışıyor, izlemesi yeter) · "queued" (kendi işi zaten
+    # sırada) · "queue_full" (sıra dolu, kabul yok) · "budget" (günlük bütçe dolu, kabul yok).
     reason: str | None = None
     message: str
 
@@ -457,8 +461,18 @@ class ProviderStatusOut(BaseModel):
     step_count: int | None = None
     progress_fraction: float = 0.0
     skipped_entity: str | None = None  # "X atlandı, yeni veri yok" (~3 sn)
+    # KİŞİSEL son sonuç: last_completed_at yalnızca veri gerçekten tazelendiyse (done|merged);
+    # last_summary yalnızca done'da. last_result_*: her durum için (done|merged|failed|
+    # budget|canceled), Türkçe kısa mesaj ve bitiş anı.
     last_completed_at: datetime | None = None
     last_summary: RefreshSummaryOut | None = None
+    last_result_status: str | None = None
+    last_result_message: str | None = None
+    last_result_at: datetime | None = None
+    # Yenileme kuyruğu (kişisel): sırada mı, kaçıncı (1 tabanlı), sırada kaç kullanıcı işi var.
+    queued: bool = False
+    queue_position: int | None = None
+    queue_length: int = 0
     # Kişisel elle yenileme kotası (rolling 24s). refresh_limit=0 → sınırsız.
     refresh_limit: int = 0
     refresh_used: int = 0

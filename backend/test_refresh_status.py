@@ -5,9 +5,10 @@ Doğrular:
   (B) misafirin kendi limiti anon ayarı; hak dolmadan refresh_resets_at yok
   (C) hak dolunca refresh_resets_at = penceredeki en eski yenileme + 24 saat
   (D) admin: limit 0 (sınırsız), refresh_is_admin, resets_at yok
-  (E) POST /refresh onayı: liste boşsa reason="empty"; başlayınca /status HEMEN is_running=true
-      (onay ile durum arasında boşluk yok); aynı kullanıcı tekrar → reason="running" (izle);
-      başka kullanıcı → reason="busy" (sessiz kalmaz)
+  (E) POST /refresh onayı (yenileme kuyruğu): liste boşsa reason="empty"; başlayınca /status
+      HEMEN is_running=true (onay ile durum arasında boşluk yok); aynı kullanıcı tekrar →
+      reason="running" (izle); başka kullanıcı → sıraya girer (queued, queue_position=1),
+      tekrar → reason="queued"; aynı entity bekleyen tarafından tazelendiyse → "merged"
 Çalıştır: python test_refresh_status.py
 """
 import os
@@ -98,29 +99,45 @@ with TestClient(app) as c:
         a2 = c.post("/session/bootstrap", headers={"X-Forwarded-For": "198.51.100.8"}).json()
         A2 = {"Authorization": f"Bearer {a2['token']}"}
         ack = c.post("/refresh", headers=A2).json()
-        check(ack["started"] is False and ack["reason"] == "empty" and ack["is_running"] is False, f"boş liste → empty ({ack})")
+        check(ack["started"] is False and ack["accepted"] is False and ack["reason"] == "empty"
+              and ack["is_running"] is False, f"boş liste → empty ({ack})")
         r = c.post("/entities", headers=A2, json={"name": "Tesla", "type": "ticker", "query": "TSLA", "language": "en"})
         check(r.status_code in (200, 201), f"şirket eklendi ({r.status_code})")
         ack = c.post("/refresh", headers=A2).json()
-        check(ack["started"] is True and ack["reason"] is None, f"başladı ({ack})")
+        check(ack["started"] is True and ack["accepted"] is True and ack["reason"] is None, f"başladı ({ack})")
         st = c.get("/status", headers=A2).json()
-        check(st["is_running"] is True, "onaydan hemen sonra /status is_running=true")
+        check(st["is_running"] is True and st["queued"] is False, "onaydan hemen sonra /status is_running=true")
         ack = c.post("/refresh", headers=A2).json()
-        check(ack["started"] is False and ack["reason"] == "running" and ack["is_running"] is True, f"kendi taraması sürüyor → running ({ack})")
+        check(ack["started"] is False and ack["accepted"] is True and ack["reason"] == "running"
+              and ack["is_running"] is True, f"kendi taraması sürüyor → running ({ack})")
         ack = c.post("/refresh", headers={"Authorization": f"Bearer {adm}"}).json()
-        check(ack["started"] is False and ack["reason"] in ("busy", "empty"), f"başka kullanıcı: sessiz değil ({ack})")
+        check(ack["started"] is False and ack["reason"] == "empty", f"başka kullanıcı, boş liste → empty ({ack})")
         c.post("/entities", headers={"Authorization": f"Bearer {adm}"}, json={"name": "Tesla", "type": "ticker", "query": "TSLA", "language": "en"})
         ack = c.post("/refresh", headers={"Authorization": f"Bearer {adm}"}).json()
-        check(ack["started"] is False and ack["reason"] == "busy" and ack["is_running"] is False, f"başka kullanıcının taraması → busy ({ack})")
+        check(ack["accepted"] is True and ack["queued"] is True and ack["queue_position"] == 1
+              and ack["started"] is False and ack["is_running"] is False and ack["reason"] is None,
+              f"başka kullanıcının taraması sürüyor → sıraya girdi ({ack})")
+        st = c.get("/status", headers={"Authorization": f"Bearer {adm}"}).json()
+        check(st["queued"] is True and st["queue_position"] == 1 and st["queue_length"] == 1
+              and st["is_running"] is False, "onaydan hemen sonra /status queued=true, sıra 1/1")
+        ack = c.post("/refresh", headers={"Authorization": f"Bearer {adm}"}).json()
+        check(ack["accepted"] is True and ack["reason"] == "queued" and ack["queue_position"] == 1,
+              f"sıradaki kullanıcı tekrar → queued ({ack})")
     finally:
         gate.set()
         refresh_mod.refresh_prices = orig_prices
-    for _ in range(100):
-        if not refresh_mod.is_running():
+    AD = {"Authorization": f"Bearer {adm}"}
+    for _ in range(200):
+        sa, sb = c.get("/status", headers=A2).json(), c.get("/status", headers=AD).json()
+        if not (sa["is_running"] or sa["queued"] or sb["is_running"] or sb["queued"]):
             break
         threading.Event().wait(0.05)
     st = c.get("/status", headers=A2).json()
-    check(st["is_running"] is False and st["last_completed_at"], "tarama bitti, bitiş zamanı görünür")
+    check(st["is_running"] is False and st["last_completed_at"] and st["last_result_status"] == "done",
+          f"tarama bitti, bitiş zamanı görünür ({st['last_result_status']})")
+    st = c.get("/status", headers=AD).json()
+    check(st["last_result_status"] == "merged" and st["last_completed_at"],
+          f"aynı şirket beklerken tazelendi → merged ({st['last_result_status']})")
 
 print("=" * 50)
 print(f"SONUÇ: {PASS} geçti, {FAIL} başarısız")

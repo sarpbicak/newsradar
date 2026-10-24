@@ -100,6 +100,11 @@ async def lifespan(_app: FastAPI):
             _log.info("Watchlist migration: %d entity admin'in listesine devredildi.", moved)
     except Exception:  # noqa: BLE001 — migration hatası açılışı çökertmesin
         _log.exception("Watchlist backfill migration başarısız (atlandı).")
+    # Yenileme kuyruğu işçisi (daemon thread; ilk işte de tembel başlar). Kuyruk ve
+    # "çalışıyor" durumu yalnızca bellekte: açılışta temizlenecek kalıcı bir işaret yok.
+    from .. import refresh_queue
+
+    refresh_queue.ensure_worker()
     scheduler.start()
     yield
     scheduler.shutdown()

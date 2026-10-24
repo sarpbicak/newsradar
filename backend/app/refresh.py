@@ -1,8 +1,11 @@
 """Yenileme orkestrasyonu: çek → (ön-filtre + paralel) analiz et.
 
-`/refresh` ucu (arka planda) ve saatlik zamanlayıcı bunu çağırır. Süreç durumu
-(is_running, ilerleme, son tamamlanma) modül içinde tutulur ve `/status` ile okunur.
-Her adım kendi hatasını yönetir; tek bir kaynak/entity hatası yenilemeyi çökertmez.
+`/refresh` ucu ve zamanlayıcı işi doğrudan değil, YENİLEME KUYRUĞU üzerinden
+(app/refresh_queue.py) çalıştırır: kuyruğun tek işçi thread'i işleri sırayla buradaki
+`run_refresh`'e verir. Süreç durumu (is_running, ilerleme, kullanıcı başı son sonuç) ve
+entity başı "en son ne zaman tazelendi" kaydı (kuyruk birleştirmesi için) modül içinde
+tutulur ve `/status` ile okunur. Her adım kendi hatasını yönetir; tek bir kaynak/entity
+hatası yenilemeyi çökertmez.
 """
 
 from __future__ import annotations
@@ -26,7 +29,8 @@ from .quota import prune as prune_quota
 
 logger = logging.getLogger("newsradar.refresh")
 
-# Elle 'Yenile' ile saatlik zamanlayıcının aynı anda çalışmasını engelleyen kilit.
+# Aynı anda tek taramanın çalışmasını garanti eden kilit. Sunucuda kuyruk işçisi alır
+# (iş zaten sırayla gelir); CLI/eval gibi doğrudan run_refresh çağrılarına karşı da korur.
 _refresh_lock = threading.Lock()
 
 
@@ -81,6 +85,68 @@ class _State:
 
 _state = _State()
 _state_lock = threading.Lock()
+
+# KULLANICI BAŞI SON SONUÇ (kuyruk: herkes kendi son işinin sonucunu görür, başkasınınki
+# onu ezmez). user_id → {status, summary (dict|None), finished_at (UTC), message}.
+# status: done | merged | failed | budget | canceled. Bellekte; yeniden başlatmada sıfırlanır.
+_results: dict[int, dict] = {}
+
+# KUYRUK BİRLEŞTİRMESİ: entity_id → işlenmesinin BİTTİĞİ an (time.monotonic). HERHANGİ bir
+# işte (kullanıcı ya da zamanlayıcı) entity bitince güncellenir. Sırada bekleyen iş başlarken
+# kendi enqueued_at'inden sonra tazelenen entity'leri atlar (analiz havuzu ortak).
+_entity_refreshed_at: dict[int, float] = {}
+
+# Sonuç durumlarına karşılık gelen kısa kullanıcı mesajları (Türkçe; uzun tire yok).
+RESULT_MESSAGES = {
+    "done": "Yenileme tamamlandı.",
+    "merged": ("Listenizdeki şirketler siz sırada beklerken başka bir yenilemede güncellendi, "
+               "hakkınızdan düşülmedi."),
+    "failed": "Yenileme beklenmeyen bir hatayla durdu, hakkınız iade edildi.",
+    "budget": ("Günlük analiz bütçesi doldu, yenilemeniz başlatılmadı. Hakkınızdan düşülmedi, "
+               "yarın tekrar deneyin."),
+    "canceled": "Sıradaki yenilemeniz iptal edildi.",
+}
+
+
+def record_user_result(user_id: int | None, status: str, summary: RefreshSummary | None = None,
+                       message: str | None = None) -> None:
+    """Kullanıcının son iş sonucunu yazar (zamanlayıcı işi user_id=None → kaydedilmez)."""
+    if user_id is None:
+        return
+    with _state_lock:
+        _results[user_id] = {
+            "status": status,
+            "summary": asdict(summary) if summary else None,
+            "finished_at": datetime.now(timezone.utc),
+            "message": message or RESULT_MESSAGES.get(status, ""),
+        }
+
+
+def get_user_result(user_id: int) -> dict | None:
+    """Kullanıcının son iş sonucunun kopyası (yoksa None)."""
+    with _state_lock:
+        r = _results.get(user_id)
+        return dict(r) if r else None
+
+
+def mark_entities_refreshed(entity_ids, not_before: float | None = None) -> None:
+    """Entity'leri "şimdi tazelendi" diye işaretler (birleştirme kaydı).
+
+    not_before verilirse o andan SONRA zaten işaretlenmiş entity'ler ellenmez (adım
+    bildiriminden gelen gerçek bitiş zamanı, iş sonundaki toplu işaretle ötelenmesin)."""
+    now = time.monotonic()
+    with _state_lock:
+        for eid in entity_ids:
+            cur = _entity_refreshed_at.get(eid)
+            if not_before is not None and cur is not None and cur >= not_before:
+                continue
+            _entity_refreshed_at[eid] = now
+
+
+def refreshed_since(entity_ids, since: float) -> set[int]:
+    """since (monotonic) anında ya da sonrasında işlenmesi biten entity id'leri."""
+    with _state_lock:
+        return {eid for eid in entity_ids if _entity_refreshed_at.get(eid, float("-inf")) >= since}
 
 
 def get_state() -> dict:
@@ -146,6 +212,10 @@ def _report_step(entity_id: int | None, name: str | None, step: str,
         if entity_id is not None and frac is not None:
             cur = _state.entity_progress.get(entity_id, 0.0)
             _state.entity_progress[entity_id] = max(cur, min(1.0, frac))
+            # Entity dilimi doldu (done/skipped) → birleştirme kaydı: bu entity şimdi tazelendi.
+            # Hattaki her bitiş yolu (kota/bütçe atlaması, entity hatası dahil) frac=1.0 bildirir.
+            if frac >= 1.0:
+                _entity_refreshed_at[entity_id] = time.monotonic()
         _state.progress_done = sum(1 for v in _state.entity_progress.values() if v >= 1.0)
 
 
@@ -167,13 +237,17 @@ def _set_current_entity(name: str | None) -> None:
         _state.current_entity = name
 
 
-def _record_completion(summary: RefreshSummary) -> None:
+def _record_completion(summary: RefreshSummary, status: str = "done") -> None:
+    """Tarama bitti: genel son özet + başlatan kullanıcının kişisel son sonucu.
+    status="failed" → özet kullanıcıya gösterilmez (yarım kalmış tarama)."""
     with _state_lock:
+        uid = _state.user_id
         _state.last_completed_at = datetime.now(timezone.utc)
         _state.last_summary = summary
-        _state.last_user_id = _state.user_id
+        _state.last_user_id = uid
         _state.user_id = None
         _state.current_entity = None
+    record_user_result(uid, status, summary if status == "done" else None)
 
 
 def _queued_count(entity_ids: set[int] | None) -> int:
@@ -204,14 +278,16 @@ def run_refresh(
     entity_ids verilirse YALNIZCA o entity'ler işlenir (kişisel elle yenileme —
     kullanıcının kendi listesi); None ise tüm aktif havuz (scheduler). user_id, /status'un
     ilerlemeyi kişiselleştirmesi için taşınır. Aynı anda tek refresh çalışır.
+    _lock_held=True: kilidi ÇAĞIRAN aldı ve kendisi bırakır (kuyruk işçisi).
     """
     summary = RefreshSummary()
 
-    # _lock_held: start_background_refresh kilidi zaten aldı ve durumu "çalışıyor" yaptı.
     if not _lock_held and not _refresh_lock.acquire(blocking=False):
         logger.info("Yenileme atlandı: zaten çalışıyor.")
         summary.warnings.append(msg("refresh_running"))
         return summary
+    release_lock = not _lock_held
+    failed = False
 
     # İlerleme toplamı için (scoped) aktif entity'leri baştan al (UI 0/Y gösterebilsin).
     try:
@@ -312,39 +388,56 @@ def run_refresh(
         for w in summary.warnings:
             logger.warning("[yenileme uyarısı] %s", render(w))
         return summary
-    finally:
-        _record_completion(summary)
-        _set_running(False)
-        _refresh_lock.release()
-
-
-def start_background_refresh(
-    lookback_hours: int | None = None,
-    manual: bool = True,
-    entity_ids: set[int] | None = None,
-    user_id: int | None = None,
-) -> bool:
-    """Yenilemeyi arka plan thread'inde başlatır (elle Yenile → manual=True).
-
-    entity_ids: kişisel elle yenilemede kullanıcının kendi entity id'leri (None → tüm havuz).
-    Zaten çalışıyorsa False döner.
-
-    Kilit ve "çalışıyor" durumu thread başlamadan, BURADA alınır: /refresh yanıtı döndüğü an
-    /status da çalıştığını gösterir. (Eskiden thread kendi kilidini alıp durumu biraz sonra
-    yazıyordu; arada gelen /status "çalışmıyor" diyebiliyordu.)
-    """
-    if not _refresh_lock.acquire(blocking=False):
-        return False
-    ids = sorted(entity_ids) if entity_ids is not None else []
-    _set_running(True, total=len(ids), user_id=user_id, entity_ids=ids)
-    thread = threading.Thread(
-        target=run_refresh, args=(lookback_hours, manual, entity_ids, user_id),
-        kwargs={"_lock_held": True}, name="refresh", daemon=True,
-    )
-    try:
-        thread.start()
-    except Exception:
-        _set_running(False)
-        _refresh_lock.release()
+    except BaseException:
+        failed = True  # kuyruk hakkı iade eder; kişisel sonuç "failed" yazılır
         raise
-    return True
+    finally:
+        _record_completion(summary, "failed" if failed else "done")
+        _set_running(False)
+        if release_lock:
+            _refresh_lock.release()
+
+
+# ------------------- SAHTE TARAMA (YALNIZCA TEST/E2E) ------------------- #
+def run_fake_refresh(entity_ids: set[int] | None, user_id: int | None,
+                     seconds: float) -> RefreshSummary:
+    """YALNIZCA TEST/E2E İÇİN: gerçek akış yerine ağ/LLM çağrısı YAPMAYAN sahte tarama.
+
+    NEWSRADAR_FAKE_REFRESH_SECONDS > 0 iken kuyruk işçisi run_refresh yerine bunu çağırır.
+    Her entity için gerçek akış gibi adım/ilerleme bildirir (UI "Yenileniyor i/N" görsün),
+    entity başına seconds/len(ids) bekler, entity'yi tazelendi işaretler (birleştirme kaydı)
+    ve sıfırlı bir RefreshSummary döner. Kilidi ÇAĞIRAN (kuyruk işçisi) tutar.
+    Üretimde bu ayar 0 (kapalı) kalmalıdır.
+    """
+    from sqlalchemy import select
+
+    from .db.models import Entity
+
+    summary = RefreshSummary()
+    failed = False
+    try:
+        with session_scope() as session:  # yalnızca yerel DB okuması (ağ yok)
+            q = select(Entity.id, Entity.name).where(Entity.active.is_(True))
+            if entity_ids is not None:
+                q = q.where(Entity.id.in_(entity_ids))
+            rows = [(i, n) for i, n in session.execute(q.order_by(Entity.id)).all()]
+    except Exception:  # noqa: BLE001
+        rows = []
+    _set_running(True, total=len(rows), user_id=user_id, entity_ids=[i for i, _ in rows])
+    try:
+        per = seconds / len(rows) if rows else 0.0
+        _report_step(None, None, "prices")
+        for eid, name in rows:
+            _set_current_entity(name)
+            _report_step(eid, name, "fetch", frac=_FETCH_START)
+            time.sleep(per / 2)
+            _report_step(eid, name, "analyze", n=0, frac=0.5)
+            time.sleep(per / 2)
+            _report_step(eid, name, "done", frac=1.0)  # → birleştirme kaydı
+        return summary
+    except BaseException:
+        failed = True
+        raise
+    finally:
+        _record_completion(summary, "failed" if failed else "done")
+        _set_running(False)

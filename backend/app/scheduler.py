@@ -1,6 +1,7 @@
 """APScheduler tabanlı saatlik yenileme — açık/kapalı bayrağıyla.
 
-Zamanlayıcı bir arka plan thread'inde çalışır. `enabled()` durumu runtime'da
+Zamanlayıcı bir arka plan thread'inde çalışır; yenileme işini yenileme kuyruğuna
+(app/refresh_queue.py) bırakır. `enabled()` durumu runtime'da
 `/refresh` ucu üzerinden değiştirilebilir (in-memory bayrak).
 """
 
@@ -10,8 +11,8 @@ import logging
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
+from . import refresh_queue
 from .config import get_settings
-from .refresh import run_refresh
 
 logger = logging.getLogger("newsradar.scheduler")
 
@@ -21,12 +22,15 @@ _JOB_ID = "hourly_refresh"
 
 
 def _job() -> None:
+    """Zamanlanmış yenileme: doğrudan çalıştırmaz, KUYRUĞA en düşük öncelikle girer
+    (kullanıcı işlerinin arkasında; sırada en fazla bir zamanlayıcı işi)."""
     if not _enabled:
         return
     try:
-        run_refresh()
+        if not refresh_queue.enqueue_scheduler():
+            logger.info("Zamanlanmış yenileme atlandı: sırada zaten bir zamanlayıcı işi var.")
     except Exception:  # noqa: BLE001 — zamanlayıcı thread'i asla çökmesin
-        logger.exception("Zamanlanmış yenileme başarısız")
+        logger.exception("Zamanlanmış yenileme kuyruğa alınamadı")
 
 
 def _prune_ip_job() -> None:

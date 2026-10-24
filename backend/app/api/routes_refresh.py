@@ -1,10 +1,11 @@
-"""Yenileme uçları: POST /refresh (asenkron) + GET /status (süreç durumu dahil)."""
+"""Yenileme uçları: POST /refresh (kuyruğa al) + DELETE /refresh (sıradakini iptal) +
+GET /status (süreç + kuyruk durumu dahil)."""
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -14,11 +15,11 @@ from ..db.database import get_db
 from ..db.models import UsageEvent, User
 from ..providers import provider_status
 from ..quota import newsapi_usage
-from ..refresh import get_state, start_background_refresh
+from .. import refresh_queue
+from ..refresh import get_user_result
 from ..watchlist import user_entity_ids
 from .routes_auth import get_current_user
 from .schemas import NewsApiQuotaOut, ProviderStatusOut, RefreshAck
-from .usage import record_event
 
 router = APIRouter(tags=["refresh"])
 
@@ -57,6 +58,31 @@ def _refresh_resets_at(db: Session, user: User, limit: int, used: int) -> dateti
     return oldest + timedelta(hours=24)
 
 
+# Kuyruk onay mesajları (Türkçe, kısa; uzun tire yok).
+_MSG_STARTED = "Yenileme başlatıldı."
+_MSG_RUNNING = "Yenilemeniz zaten çalışıyor."
+_MSG_EMPTY = "İzleme listeniz boş, önce bir şirket ekleyin."
+_MSG_QUEUE_FULL = "Yenileme sırası şu an dolu, birkaç dakika sonra tekrar deneyin."
+_MSG_BUDGET = "Günlük analiz bütçesi doldu, yenileme şu an başlatılamıyor. Yarın tekrar deneyin."
+
+
+def _msg_queued(pos: int | None, already: bool) -> str:
+    head = "Yenilemeniz zaten sırada" if already else "Yenilemeniz sıraya alındı"
+    return f"{head}: sıranız {pos}." if pos else f"{head}."
+
+
+def _ack_existing(view: dict) -> RefreshAck | None:
+    """Kullanıcının etkin (çalışan/sıradaki) işi varsa onun durumunu döner (yeni iş yok)."""
+    if view["running"]:
+        return RefreshAck(accepted=True, started=False, queued=False, is_running=True,
+                          reason="running", message=_MSG_RUNNING)
+    if view["queued"]:
+        return RefreshAck(accepted=True, started=False, queued=True,
+                          queue_position=view["queue_position"], is_running=False,
+                          reason="queued", message=_msg_queued(view["queue_position"], True))
+    return None
+
+
 @router.post("/refresh", response_model=RefreshAck)
 def refresh(
     hours: int | None = Query(None, description="Geriye dönük pencere (saat)"),
@@ -66,11 +92,12 @@ def refresh(
     db: Session = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> RefreshAck:
-    """Yenilemeyi ARKA PLANDA başlatır ve hemen döner (tarama 1-2 dk sürebilir).
+    """Yenilemeyi KUYRUĞA alır ve hemen döner (tarama 1-2 dk sürebilir).
 
-    Frontend, ilerlemeyi /status'u yoklayarak takip eder. Zaten bir tarama
-    çalışıyorsa yenisi başlatılmaz. Elle yenileme kullanıcıya kaydedilir
-    (scheduler'ın otomatik yenilemesi kullanıcıya bağlı değildir, kaydedilmez).
+    Sıra boşsa iş hemen başlar (started=true); değilse sıraya girer (queued=true,
+    queue_position). Frontend /status'u yoklayarak takip eder. Kullanıcı başı en fazla 1
+    etkin iş: ikinci istek mevcut işin durumunu döner. Hak (UsageEvent) sıraya girerken
+    DEĞİL, iş gerçekten başlarken düşülür (kuyruk işçisi); zamanlayıcı işi kaydedilmez.
     """
     if scheduler_enabled is not None:
         scheduler.set_enabled(scheduler_enabled)
@@ -80,15 +107,16 @@ def refresh(
     # Havuzun geri kalanını scheduler zaten 6 saatte bir tazeliyor.
     my_ids = user_entity_ids(db, user.id)
     if not my_ids:
-        return RefreshAck(
-            started=False,
-            is_running=False,
-            reason="empty",
-            message="İzleme listeniz boş — önce bir şirket ekleyin.",
-        )
+        return RefreshAck(accepted=False, started=False, is_running=False,
+                          reason="empty", message=_MSG_EMPTY)
 
-    # Kişi başı günlük elle yenileme kotası (admin muaf). Zaten çalışan bir
-    # yenileme kota harcamaz (started=False → event yok); yalnızca YENİ başlatma sayılır.
+    # Zaten etkin işi varsa (çalışan/sıradaki) onu döndür: kota ve bütçe kontrolünden ÖNCE,
+    # yoksa hakkı az kullanıcı kendi çalışan işi için 429 görürdü.
+    existing = _ack_existing(refresh_queue.snapshot(user.id))
+    if existing:
+        return existing
+
+    # Kişi başı günlük elle yenileme kotası (admin muaf). Hak dolduysa sıraya bile girmez.
     ok, limit, used = _refresh_quota(db, user)
     if not ok:
         raise HTTPException(
@@ -97,20 +125,43 @@ def refresh(
                     "Otomatik güncelleme arka planda 6 saatte bir çalışıyor."),
         )
 
-    started = start_background_refresh(hours, entity_ids=my_ids, user_id=user.id)
-    if started:
-        record_event(db, user.id, "refresh", None)
-        return RefreshAck(started=True, is_running=True, message="Yenileme başlatıldı.")
-    # Başlamadı: aynı anda tek tarama çalışır. Çalışan bu kullanıcınınsa onu izlemesi yeter;
-    # başkasının (ya da zamanlayıcının) taramasıysa kullanıcıya "meşgul" denir — sessiz kalınmaz.
-    st = get_state()
-    mine = st["is_running"] and st["user_id"] == user.id
-    return RefreshAck(
-        started=False,
-        is_running=mine,
-        reason="running" if mine else "busy",
-        message="Yenileme zaten çalışıyor." if mine else "Şu an başka bir yenileme sürüyor, birazdan tekrar deneyin.",
-    )
+    from .. import budget
+    if budget.is_budget_exceeded():
+        return RefreshAck(accepted=False, started=False, is_running=False,
+                          reason="budget", message=_MSG_BUDGET)
+
+    outcome, view = refresh_queue.enqueue_user(user.id, my_ids, hours)
+    if outcome == "started":
+        return RefreshAck(accepted=True, started=True, queued=False, is_running=True,
+                          message=_MSG_STARTED)
+    if outcome == "queued":
+        return RefreshAck(accepted=True, started=False, queued=True,
+                          queue_position=view["queue_position"], is_running=False,
+                          message=_msg_queued(view["queue_position"], False))
+    if outcome == "queue_full":
+        return RefreshAck(accepted=False, started=False, is_running=False,
+                          reason="queue_full", message=_MSG_QUEUE_FULL)
+    # running / already_queued: snapshot ile enqueue arasında (aynı kullanıcının eşzamanlı
+    # isteği) iş eklendi → mevcut işi döndür.
+    if outcome == "already_queued":
+        return RefreshAck(accepted=True, started=False, queued=True,
+                          queue_position=view["queue_position"], is_running=False,
+                          reason="queued", message=_msg_queued(view["queue_position"], True))
+    return RefreshAck(accepted=True, started=False, queued=False, is_running=True,
+                      reason="running", message=_MSG_RUNNING)
+
+
+@router.delete("/refresh", status_code=204)
+def cancel_refresh(user: User = Depends(get_current_user)) -> Response:
+    """Kullanıcının SIRADAKİ yenilemesini iptal eder (hak henüz düşülmemişti).
+
+    204: iptal edildi · 409: işi zaten çalışıyor (durdurulamaz) · 404: etkin işi yok."""
+    outcome = refresh_queue.cancel_user(user.id)
+    if outcome == "running":
+        raise HTTPException(status_code=409, detail="Yenilemeniz zaten çalışıyor, iptal edilemez.")
+    if outcome == "none":
+        raise HTTPException(status_code=404, detail="Sırada bekleyen bir yenilemeniz yok.")
+    return Response(status_code=204)
 
 
 @router.get("/status", response_model=ProviderStatusOut)
@@ -119,7 +170,8 @@ def status(
     user: User = Depends(get_current_user),
 ) -> ProviderStatusOut:
     """Sağlayıcı/LLM/zamanlayıcı + yenileme süreci + NewsAPI kotası + KİŞİSEL yenileme kotası."""
-    st = get_state()
+    view = refresh_queue.snapshot(user.id)  # süreç + kuyruk, tek kilit altında (boşluk yok)
+    st = view["state"]
     settings = get_settings()
     quota = None
     if settings.newsapi_available:
@@ -129,8 +181,15 @@ def status(
     # KİŞİSEL durum: is_running/ilerleme/son özet YALNIZCA bu kullanıcının başlattığı
     # taramaya aittir. Başka kullanıcının (ya da scheduler'ın user_id=None) taraması
     # bu kullanıcıya "çalışıyor" ya da yabancı uyarılar olarak sızmaz (izolasyon).
-    mine_running = st["is_running"] and st["user_id"] == user.id
-    mine_last = st["last_user_id"] == user.id
+    # Son sonuç kullanıcı başı tutulur: başkasının işi bitince kendi sonucu ezilmez.
+    mine_running = view["running"]
+    last = get_user_result(user.id)
+    if last is None and st["last_user_id"] == user.id:
+        # Geriye uyum: kişisel sonuç kaydı yoksa genel son tarama bu kullanıcınınsa onu göster.
+        last = {"status": "done", "summary": st["last_summary"],
+                "finished_at": st["last_completed_at"], "message": None}
+    last = last or {}
+    fresh_data = last.get("status") in ("done", "merged")
 
     from .. import budget
     from ..watchlist import watchlist_count
@@ -148,8 +207,14 @@ def status(
         step_count=st["step_count"] if mine_running else None,
         progress_fraction=st["progress_fraction"] if mine_running else 0.0,
         skipped_entity=st["skipped_entity"] if mine_running else None,
-        last_completed_at=st["last_completed_at"] if mine_last else None,
-        last_summary=st["last_summary"] if mine_last else None,
+        last_completed_at=last.get("finished_at") if fresh_data else None,
+        last_summary=last.get("summary") if last.get("status") == "done" else None,
+        last_result_status=last.get("status"),
+        last_result_message=last.get("message"),
+        last_result_at=last.get("finished_at"),
+        queued=view["queued"],
+        queue_position=view["queue_position"],
+        queue_length=view["queue_length"],
         refresh_limit=r_limit,
         refresh_used=r_used,
         refresh_is_admin=user.is_admin,
