@@ -178,7 +178,7 @@ function Footer({ onPrivacy }) {
     <footer className="border-t border-ink-600">
       <div className={`${WRAP} flex flex-col gap-6 py-10 sm:flex-row sm:items-end sm:justify-between`}>
         <div>
-          <div className="font-display text-lg font-semibold text-slate-100">{t("land.footer.built", { name: "Sarp Bıçak" })}</div>
+          <div className="font-display text-lg font-medium text-slate-100">{t("land.footer.built", { name: "Sarp Bıçak" })}</div>
           <p className="mt-2 text-sm text-slate-500">
             {t("land.footer.note")}{" "}
             <button onClick={onPrivacy} className="link-u -mx-1 -my-3.5 inline-block px-1 py-3.5 text-slate-400 hover:text-slate-200">

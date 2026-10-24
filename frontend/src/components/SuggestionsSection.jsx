@@ -22,7 +22,7 @@ export default function SuggestionsSection({ suggestions, onAdd, onDismiss, embe
 
   return (
     <div className={embedded ? "" : "rounded-card bg-ink-800 p-5"}>
-      {!embedded && <div className="mb-1 font-display text-base font-semibold text-slate-100">{t("sug.title")}</div>}
+      {!embedded && <div className="mb-1 font-display text-base font-medium text-slate-100">{t("sug.title")}</div>}
       <p className="mb-4 text-meta text-slate-500">{t("sug.subtitle")}</p>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -32,7 +32,7 @@ export default function SuggestionsSection({ suggestions, onAdd, onDismiss, embe
             <Card key={s.id} className="flex flex-col gap-3 p-4">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex flex-wrap items-baseline gap-2">
-                  <span className="font-display text-base font-semibold text-slate-100">{s.name}</span>
+                  <span className="font-display text-base font-medium text-slate-100">{s.name}</span>
                   {s.ticker && <span className="font-mono text-micro text-slate-500">${s.ticker}</span>}
                 </div>
                 <Chip tone="neutral">{t("sug.mentioned", { n: s.mention_count })}</Chip>

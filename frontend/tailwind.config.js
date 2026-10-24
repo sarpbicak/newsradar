@@ -41,7 +41,7 @@ export default {
       fontFamily: {
         sans: ["Inter", "system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"],
         // Başlıklar ve hüküm cümleleri (landing + uygulama). Serif yok.
-        display: ["Space Grotesk", "Inter", "system-ui", "sans-serif"],
+        display: ["Inter Display", "Inter", "system-ui", "sans-serif"],
         mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
       },
       // Uygulama yazı ölçeği (index.css --fs-*): sayfa 30 · hüküm 28 · kart 21 · gövde 15 · yardımcı 13 · etiket 12

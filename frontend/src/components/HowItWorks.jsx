@@ -48,14 +48,14 @@ export function MiniCard({ entity, t, animate }) {
   return (
     <div className={`rounded-card bg-ink-800 ring-1 ring-slate-100/5 p-4 shadow-card ${animate ? "hiw-card-in" : ""}`}>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-display text-base font-bold text-slate-100">{entity.name}</span>
+        <span className="font-display text-base font-medium text-slate-100">{entity.name}</span>
         <span className="font-mono text-xs text-slate-500">
           {entity.type === "ticker" ? "$" : "#"}{entity.query}
         </span>
         {a && <StatusTag stance={a.stance} evidence={entity.evidence_strength} />}
       </div>
       {a?.headline_verdict && (
-        <p className="mt-2 font-display text-body font-semibold leading-snug text-slate-100">{a.headline_verdict}</p>
+        <p className="mt-2 font-display text-body font-medium leading-snug text-slate-100">{a.headline_verdict}</p>
       )}
       {entity.price != null && (
         <p className="mt-2 flex flex-wrap items-baseline gap-x-1.5 text-xs">

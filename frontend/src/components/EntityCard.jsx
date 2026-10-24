@@ -1,6 +1,6 @@
 // Pano kartı — landing hero'daki canlı karar kartının dili (araç ölçeğinde):
 //  1) durum etiketi (dolgulu, anlamsal) + varsa ikincil bilgi çipi · sağda kısa ad + sembol
-//  2) hüküm cümlesi (Space Grotesk ~21px, kesilmez)
+//  2) hüküm cümlesi (Inter Display ~21px, kesilmez)
 //  3) fiyat satırı: $212.21 → $339 +60% (çerçevesiz; altında "şimdi / analist hedefi")
 //  4) analist dağılımı: "Analistler: alım yönlü" + ince bar + analist sayısı
 //  5) meta (vade · haber sayısı · yön değişti) — en alta yapışır; kartlar aynı yükseklikte.
@@ -44,7 +44,7 @@ export function AnalystBar({ a, className = "" }) {
           return n ? <div key={s.key} style={{ width: `${(n / total) * 100}%`, background: s.color }} /> : null;
         })}
       </div>
-      <span className="whitespace-nowrap font-mono tabular-nums text-slate-500">{tt("card.analysts", { n: a.total })}</span>
+      <span className="whitespace-nowrap tabular-nums text-slate-500">{tt("card.analysts", { n: a.total })}</span>
     </div>
   );
 }
@@ -144,7 +144,7 @@ export default function EntityCard({ card, onOpen }) {
           {card.priority_reason && <PriorityChip reason={card.priority_reason} />}
         </div>
         <div className="min-w-0 basis-2/5 text-right">
-          <div className="break-words font-display text-base font-semibold leading-tight text-slate-100">{displayName(card)}</div>
+          <div className="break-words font-display text-base font-medium leading-tight text-slate-100">{displayName(card)}</div>
           <div className="mt-1 font-mono text-micro text-slate-500">{symbolOf(card)}</div>
         </div>
       </div>
@@ -195,7 +195,7 @@ export function EntityRow({ card, onOpen }) {
       <span className="h-9 w-0.5 shrink-0 self-center rounded-full" style={{ background: edge }} aria-hidden="true" />
       <span className="min-w-0 flex-1 md:flex md:items-center md:gap-4">
         <span className="flex items-baseline gap-2 md:w-56 md:shrink-0">
-          <span className="break-words font-display text-sm font-semibold text-slate-100">{displayName(card)}</span>
+          <span className="break-words font-display text-sm font-medium text-slate-100">{displayName(card)}</span>
           <span className="shrink-0 font-mono text-micro text-slate-500">{symbolOf(card)}</span>
         </span>
         <span className="mt-0.5 line-clamp-2 text-meta text-slate-400 md:mt-0 md:line-clamp-1 md:flex-1">{verdict}</span>

@@ -115,7 +115,7 @@ export default function AnalystConsensus({ analyst, price, type, compact = false
     if (compact) return null;
     return (
       <Card className="p-5">
-        <h3 className="mb-1 font-display text-sm font-semibold text-slate-200">{tt("an.title")}</h3>
+        <h3 className="mb-1 font-display text-sm font-medium text-slate-200">{tt("an.title")}</h3>
         <p className="text-body text-slate-400">{noDataNote(type, price != null)}</p>
       </Card>
     );
@@ -152,10 +152,10 @@ export default function AnalystConsensus({ analyst, price, type, compact = false
   return (
     <Card className="p-5">
       <div className="mb-4 flex items-baseline justify-between gap-3">
-        <h3 className="font-display text-sm font-semibold text-slate-200">{tt("an.title")}</h3>
+        <h3 className="font-display text-sm font-medium text-slate-200">{tt("an.title")}</h3>
         {hasRec && (
           <span className="text-meta font-medium" style={{ color: lean.color }}>
-            {lean.text} · <span className="font-mono">{tt("card.analysts", { n: analyst.total })}</span>
+            {lean.text} · <span className="tabular-nums">{tt("card.analysts", { n: analyst.total })}</span>
           </span>
         )}
       </div>

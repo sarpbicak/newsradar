@@ -138,7 +138,7 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
 
   return (
     <div className={embedded ? "" : "rounded-card bg-ink-800 p-5"}>
-      {!embedded && <h3 className="mb-4 font-display text-base font-semibold text-slate-100">{t("wl.title")}</h3>}
+      {!embedded && <h3 className="mb-4 font-display text-base font-medium text-slate-100">{t("wl.title")}</h3>}
 
       <form onSubmit={submit} className="grid gap-3 md:grid-cols-[12rem_minmax(0,1fr)_8rem_auto] md:items-end">
         <Field label={t("wl.type")} htmlFor="wl-type">

@@ -39,7 +39,7 @@ export function AppWindow({ children, className = "" }) {
 function StepText({ n, t, pinned = false }) {
   return (
     <>
-      <div className="lx-step-num lx-num text-sm font-medium">0{n}</div>
+      <div className="lx-step-num text-sm font-medium tabular-nums">0{n}</div>
       <h3 className={`lx-display ${pinned ? "mt-2 text-[clamp(1.75rem,1rem+2.6vh,3rem)]" : "mt-3 text-[2rem]"}`}>{t(`land.step${n}.title`)}</h3>
       <p className={`lx-step-body mt-3 max-w-md ${pinned ? "text-[clamp(1rem,0.55rem+1.25vh,1.25rem)] leading-relaxed" : "lx-body"}`}>
         {t(`land.step${n}.body`)}

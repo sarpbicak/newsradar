@@ -310,7 +310,7 @@ export function RiskDelta({ delta }) {
   const up = delta.risk_delta > 0;
   const Icon = up ? ArrowUp : ArrowDown;
   return (
-    <span className={`inline-flex items-center gap-0.5 font-mono text-micro font-semibold ${up ? "text-rose-600" : "text-emerald-600"}`} title={tt("sum.riskDeltaTitle")}>
+    <span className={`inline-flex items-center gap-0.5 text-micro font-semibold tabular-nums ${up ? "text-rose-600" : "text-emerald-600"}`} title={tt("sum.riskDeltaTitle")}>
       <Icon className="h-3.5 w-3.5" aria-hidden="true" />
       {up ? "+" : ""}
       {delta.risk_delta}

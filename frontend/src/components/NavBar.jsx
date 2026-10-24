@@ -24,7 +24,7 @@ export function Brand({ href, onClick, label }) {
       href={href}
       onClick={onClick}
       aria-label={label}
-      className="tap inline-flex h-10 items-center gap-2 rounded-lg font-display text-lg font-semibold tracking-tight text-slate-100"
+      className="tap inline-flex h-10 items-center gap-2 rounded-lg font-display text-lg font-medium tracking-tight text-slate-100"
     >
       <Logo className="h-5 w-5 text-accent" />
       NewsRadar

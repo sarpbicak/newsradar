@@ -149,7 +149,7 @@ function RiskSentimentChart({ data, isMobile }) {
   const hasSent = data.some((d) => d.sentiment != null);
   return (
     <Panel>
-      <h3 className="mb-2 font-display text-sm font-semibold text-slate-200">{tt("chart.riskSent")}</h3>
+      <h3 className="mb-2 font-display text-sm font-medium text-slate-200">{tt("chart.riskSent")}</h3>
       <div ref={wrapRef} onDoubleClick={reset} className="relative select-none">
         {/* Çizgi ucu yerine köşe etiketleri (efsane yok) */}
         <span className="pointer-events-none absolute left-8 top-1 z-10 text-micro font-semibold" style={{ color: NAVY }}>{tt("chart.risk")}</span>
@@ -194,7 +194,7 @@ function PriceChart({ data, updatedNote }) {
   const lastPt = [...data].reverse().find((d) => d.price != null);
   return (
     <Panel>
-      <h3 className="mb-2 font-display text-sm font-semibold text-slate-200">{tt("chart.price")}</h3>
+      <h3 className="mb-2 font-display text-sm font-medium text-slate-200">{tt("chart.price")}</h3>
       <div ref={wrapRef} onDoubleClick={reset} className="select-none">
         <ResponsiveContainer width="100%" height={180}>
           <LineChart data={data} margin={{ top: 8, right: 42, bottom: 0, left: -6 }} syncId="ts">

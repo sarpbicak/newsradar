@@ -65,7 +65,7 @@ export default function ChatPanel({ entityId, entityName, suggestions = [], onCl
     <div className={cx("flex min-h-0 flex-col", !bare && "rounded-card bg-raised shadow-card ring-1 ring-ink-600", className)}>
       <div className="flex items-center gap-2 border-b border-ink-600 px-4 py-3">
         <MessageSquare className="h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
-        <h2 className="min-w-0 flex-1 truncate font-display text-sm font-semibold text-slate-100">{t("chat.title", { name: entityName })}</h2>
+        <h2 className="min-w-0 flex-1 truncate font-display text-sm font-medium text-slate-100">{t("chat.title", { name: entityName })}</h2>
         {onClose && <Button variant="ghost" size="sm" iconOnly icon={X} onClick={onClose} aria-label={t("chat.hide")} title={t("chat.hide")} />}
       </div>
 

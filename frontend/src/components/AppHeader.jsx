@@ -141,9 +141,9 @@ function RefreshButton({ refresh, compact = false }) {
         <RefreshCw className={cx("h-4 w-4", isRefreshing && "animate-spin")} aria-hidden="true" />
         {compact ? (
           counting ? (
-            <span className="font-mono text-micro tabular-nums">{status.progress_done}/{status.progress_total}</span>
+            <span className="text-micro tabular-nums">{status.progress_done}/{status.progress_total}</span>
           ) : (
-            !q.admin && !q.exhausted && <span className="font-mono text-micro tabular-nums">{q.left}</span>
+            !q.admin && !q.exhausted && <span className="text-micro tabular-nums">{q.left}</span>
           )
         ) : (
           <span className="tabular-nums">{text}</span>
@@ -183,7 +183,7 @@ function UserMenu({ user, view, onAdmin, onLogout }) {
           aria-expanded={open}
           className="tap inline-flex h-10 items-center gap-2 rounded-full pl-1 pr-3 text-sm text-slate-300 transition-colors duration-hover ease-std hover:bg-ink-700 hover:text-slate-100"
         >
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-ink-700 font-display text-sm font-semibold text-slate-100" aria-hidden="true">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-ink-700 font-display text-sm font-medium text-slate-100" aria-hidden="true">
             {initials(user.username)}
           </span>
           <span className="nav-text max-w-36 truncate">{user.username}</span>

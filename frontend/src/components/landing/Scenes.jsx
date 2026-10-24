@@ -182,7 +182,7 @@ export function SceneVerdict({ data, p }) {
       <div className="relative">
         <div className="rounded-xl border border-ink-600 bg-ink-800 p-5 shadow-card" style={{ ...shown(card), transform: `scale(${0.96 + 0.04 * card})` }}>
           <div className="flex flex-wrap items-center gap-2.5">
-            <span className="font-display text-xl font-bold text-slate-100">{e.name}</span>
+            <span className="font-display text-xl font-semibold text-slate-100">{e.name}</span>
             <span className="font-mono text-sm text-slate-500">{symbolOf(e)}</span>
             {e.analysis && <SignalPill stance={a.stance} evidence={e.evidence_strength} />}
           </div>

@@ -18,7 +18,7 @@ function eventLabel(t) {
 function SectionLabel({ children, aside }) {
   return (
     <div className="mb-3 flex items-center justify-between gap-3">
-      <h3 className="font-display text-sm font-semibold text-slate-200">{children}</h3>
+      <h3 className="font-display text-sm font-medium text-slate-200">{children}</h3>
       {aside}
     </div>
   );
@@ -61,7 +61,7 @@ export function HealthBanner({ health }) {
         <span className={cx("h-2 w-2 rounded-full", dot)} aria-hidden="true" />
         {tt("adm.healthTitle")}
       </div>
-      <div className="mt-1.5 font-display text-base font-semibold text-slate-100">{title}</div>
+      <div className="mt-1.5 font-display text-base font-medium text-slate-100">{title}</div>
       <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-micro text-slate-500">
         <span>
           {tt("adm.healthLastOk")}: <span className="text-slate-300">{h.last_ok_at ? timeAgo(h.last_ok_at) : tt("adm.healthNever")}</span>
@@ -284,7 +284,7 @@ export default function AdminPanel({ currentUserId }) {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="p-5">
-          <SectionLabel aside={<span className="font-mono text-micro text-slate-500">{tt("adm.poolUniqueN", { n: stats.total_entities })}</span>}>
+          <SectionLabel aside={<span className="text-micro tabular-nums text-slate-500">{tt("adm.poolUniqueN", { n: stats.total_entities })}</span>}>
             {tt("adm.mostFollowed")}
           </SectionLabel>
           {stats.most_followed.length === 0 ? (
@@ -295,7 +295,7 @@ export default function AdminPanel({ currentUserId }) {
                 <Chip key={`${e.type}:${e.name}`} tone="neutral" size="md">
                   <span className="font-mono text-micro text-slate-500">{e.type === "ticker" ? "$" : "#"}</span>
                   {displayName(e)}
-                  <span className="font-mono text-micro text-slate-500">{tt("adm.person", { n: e.followers })}</span>
+                  <span className="text-micro tabular-nums text-slate-500">{tt("adm.person", { n: e.followers })}</span>
                 </Chip>
               ))}
             </div>
@@ -419,7 +419,7 @@ function FeedbackInbox({ items, onMarkRead, onDelete }) {
   const unread = items.filter((f) => !f.is_read).length;
   return (
     <Card className="p-5">
-      <SectionLabel aside={<span className="font-mono text-micro text-slate-500">{tt("adm.totalN", { n: items.length })}</span>}>
+      <SectionLabel aside={<span className="text-micro tabular-nums text-slate-500">{tt("adm.totalN", { n: items.length })}</span>}>
         <span className="flex items-center gap-2">
           {tt("adm.feedbackTitle")}
           {unread > 0 && <Chip tone="accent">{tt("adm.unread", { n: unread })}</Chip>}
@@ -542,7 +542,7 @@ function UserDetail({ userId, onClose }) {
               {data.recent_events.length === 0 && <span className="text-meta text-slate-500">{tt("adm.noRecords")}</span>}
               {data.recent_events.map((ev, i) => (
                 <div key={i} className="flex items-baseline gap-3 text-meta">
-                  <span className="w-24 shrink-0 font-mono text-micro tabular-nums text-slate-500">{timeAgo(ev.created_at)}</span>
+                  <span className="w-24 shrink-0 text-micro tabular-nums text-slate-500">{timeAgo(ev.created_at)}</span>
                   <span className="text-slate-300">
                     {eventLabel(ev.event_type)}
                     {(ev.detail?.name || ev.detail?.username) && <span className="text-slate-500"> · {ev.detail.name || ev.detail.username}</span>}

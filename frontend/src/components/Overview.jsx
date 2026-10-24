@@ -111,7 +111,7 @@ function MoreStarters({ cards, onCreate }) {
   return (
     <Card as="section" className="p-5" aria-labelledby="more-starters-title">
       <div className="flex items-center justify-between gap-3">
-        <h2 id="more-starters-title" className="font-display text-lg font-semibold text-slate-100">
+        <h2 id="more-starters-title" className="font-display text-lg font-medium text-slate-100">
           {tt("ov.moreTitle")}
         </h2>
         <Button variant="ghost" size="sm" iconOnly icon={X} onClick={dismiss} title={tt("ov.moreDismiss")} aria-label={tt("ov.moreDismiss")} className="-mr-2" />
@@ -135,14 +135,14 @@ const SORTS = {
 function SectionTitle({ children, aside }) {
   return (
     <div className="mb-3 flex items-center justify-between gap-3">
-      <h2 className="font-display text-base font-semibold text-slate-100">{children}</h2>
+      <h2 className="font-display text-base font-medium text-slate-100">{children}</h2>
       {aside}
     </div>
   );
 }
 
 // Katlanabilir bölüm (öneriler, izleme listesi): kapalıyken de bölüm gibi görünür (yüzey tonu +
-// iç boşluk), başlık Space Grotesk ~18px + sayı rozeti + ok. Açık/kapalı durumu bu cihazda saklanır.
+// iç boşluk), başlık Inter Display ~18px + sayı rozeti + ok. Açık/kapalı durumu bu cihazda saklanır.
 function readOpen(key) {
   try {
     return localStorage.getItem(`nr_section_${key}`) === "1";
@@ -174,8 +174,8 @@ function Collapsible({ id, title, count, children, openSignal = 0 }) {
         aria-controls={panelId}
         className="flex w-full items-center gap-3 rounded-card px-5 py-4 text-left transition-colors duration-hover ease-std hover:bg-ink-700/50"
       >
-        <span className="font-display text-lg font-semibold text-slate-100">{title}</span>
-        <Chip tone="neutral" className="font-mono">{count}</Chip>
+        <span className="font-display text-lg font-medium text-slate-100">{title}</span>
+        <Chip tone="neutral" className="tabular-nums">{count}</Chip>
         <ChevronRight className={cx("ml-auto h-5 w-5 text-slate-500 transition-transform duration-hover ease-std", open && "rotate-90")} aria-hidden="true" />
       </button>
       {open && (

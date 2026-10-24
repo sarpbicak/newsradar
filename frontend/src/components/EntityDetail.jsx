@@ -170,7 +170,7 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
             </p>
           )}
           {isAdmin && st && (
-            <p className="font-mono text-micro text-slate-500" title={tt("detail.pipelineAdmin")}>
+            <p className="text-micro tabular-nums text-slate-500" title={tt("detail.pipelineAdmin")}>
               {tt("detail.pipelineAdmin")}: {tt("detail.articlesN", { n: st.total })} · {tt("detail.analyzedN", { n: st.analyzed })} ·{" "}
               {tt("detail.prefilteredN", { n: st.prefiltered })} · {tt("detail.pendingN", { n: st.pending })} · {tt("detail.expiredN", { n: st.expired ?? 0 })}
             </p>
@@ -245,7 +245,7 @@ function SummaryTab({ a, entity }) {
       {a.ai_take && (
         <section className="relative overflow-hidden rounded-card bg-raised p-6 shadow-card ring-1 ring-ink-600">
           <span className="absolute inset-y-0 left-0 w-0.5 bg-accent" aria-hidden="true" />
-          <h2 className="mb-3 flex items-center gap-2 font-display text-sm font-semibold text-slate-200">
+          <h2 className="mb-3 flex items-center gap-2 font-display text-sm font-medium text-slate-200">
             <Sparkles className="h-4 w-4 text-accent" aria-hidden="true" /> {tt("sum.aiTake")}
           </h2>
           <p className="max-w-3xl text-base leading-relaxed text-slate-100">{a.ai_take}</p>

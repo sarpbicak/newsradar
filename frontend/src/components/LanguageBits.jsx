@@ -55,7 +55,7 @@ export function LanguageModal({ onSelect }) {
       className="tap flex h-14 w-full items-center gap-3 rounded-control bg-ink-800 px-4 text-left ring-1 ring-ink-600 transition duration-hover ease-std hover:bg-ink-700 hover:ring-accent/50"
     >
       <Flag lang={lang} className="h-6 w-9" />
-      <span className="font-display text-base font-semibold text-slate-100">{name}</span>
+      <span className="font-display text-base font-medium text-slate-100">{name}</span>
     </button>
   );
   return (

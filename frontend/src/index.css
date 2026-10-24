@@ -2,11 +2,25 @@
 @import "@fontsource/inter/400.css";
 @import "@fontsource/inter/500.css";
 @import "@fontsource/inter/600.css";
-@import "@fontsource/space-grotesk/500.css";
-@import "@fontsource/space-grotesk/600.css";
-@import "@fontsource/space-grotesk/700.css";
 @import "@fontsource/jetbrains-mono/400.css";
 @import "@fontsource/jetbrains-mono/500.css";
+
+/* Başlık fontu: Inter Display (OFL, kendi sunucumuzda). Yalnızca 500 ve 600; Latin + Türkçe alt
+   kümesi (~22 KB/ağırlık). General Sans/Satoshi lisansı herkese açık depoda dağıtıma izin vermiyor. */
+@font-face {
+  font-family: "Inter Display";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./assets/fonts/InterDisplay-Medium-subset.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter Display";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./assets/fonts/InterDisplay-SemiBold-subset.woff2") format("woff2");
+}
 
 @tailwind base;
 @tailwind components;
@@ -174,7 +188,8 @@ body {
 
 /* Teknik/mono ve display fontları için yardımcı sınıflar */
 .font-display {
-  font-family: "Space Grotesk", Inter, system-ui, sans-serif;
+  font-family: "Inter Display", Inter, system-ui, sans-serif;
+  letter-spacing: -0.012em;
 }
 
 /* NOT: Arka plan "aurora" katmanı (sürekli çalışan blur+transform animasyonu)
@@ -380,21 +395,22 @@ html.lenis, html.lenis body { height: auto; }
   mask-image: radial-gradient(ellipse 80% 70% at 60% 40%, #000 30%, transparent 75%);
 }
 
-/* Tipografi: başlık Space Grotesk (akışkan, sıkı), metin Inter 18–20px, rakam JetBrains Mono. */
+/* Tipografi: başlık Inter Display (akışkan, sıkı; büyük boyutta 500, kalın değil), metin Inter
+   18–20px. Mono yalnızca fiyat, sembol ve tablo rakamında; büyük sayaçlar başlık fontuyla. */
 .lx-display {
-  font-family: "Space Grotesk", Inter, system-ui, sans-serif;
-  font-weight: 600;
-  line-height: 0.95;
-  letter-spacing: -0.035em;
+  font-family: "Inter Display", Inter, system-ui, sans-serif;
+  font-weight: 500;
+  line-height: 0.98;
+  letter-spacing: -0.032em;
 }
 .lx-h1 { font-size: clamp(3.25rem, 1rem + 6.2vw, 8rem); }
 .lx-h2 { font-size: clamp(2.5rem, 1.25rem + 3.6vw, 4.5rem); }
 .lx-mega { font-size: clamp(2.25rem, 0.75rem + 5vw, 5.5rem); line-height: 1.04; }
 .lx-body { font-size: clamp(1.125rem, 1.05rem + 0.3vw, 1.25rem); line-height: 1.6; }
 .lx-num {
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: "Inter Display", Inter, system-ui, sans-serif;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.03em;
 }
 /* Maskeli satır: iç span aşağıdan çıkar. Pay: Türkçe aksanlar ve alt uzantılar kırpılmasın. */
 .lx-line {
@@ -463,9 +479,9 @@ html.lenis, html.lenis body { height: auto; }
 .link-u:hover .lx-arrow { transform: translate3d(0, 3px, 0); }
 
 /* Nav metni (bağlantılar, nav butonları, kullanıcı adı): başlıklarla aynı karakter —
-   Space Grotesk Medium, 15px, hafif negatif harf aralığı. Landing ve uygulama ortak. */
+   Inter Display Medium, 15px, hafif negatif harf aralığı. Landing ve uygulama ortak. */
 .nav-text {
-  font-family: "Space Grotesk", Inter, system-ui, sans-serif;
+  font-family: "Inter Display", Inter, system-ui, sans-serif;
   font-weight: 500;
   font-size: var(--fs-body);
   letter-spacing: -0.01em;
