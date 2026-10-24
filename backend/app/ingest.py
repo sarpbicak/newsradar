@@ -17,7 +17,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from .config import get_settings
-from .db.models import Article, Entity, url_hash
+from .db.models import Article, Entity, EntityAnalysis, url_hash
 from .messages import msg, render
 from .providers import get_provider_for
 from .quota import newsapi_usage, record_call
@@ -38,6 +38,7 @@ class IngestResult:
     new_articles: list[Article] = field(default_factory=list)
     duplicates: int = 0       # zaten DB'de olan
     too_old: int = 0          # pencereden (lookback) eski → kaydedilmedi (analiz edilmeyecekti)
+    backfilled: int = 0       # yeni şirkette bir kerelik doldurmayla eklenen eski haber
     warnings: list[dict] = field(default_factory=list)  # GERÇEK sorunlar — messages.msg(...)
     infos: list[dict] = field(default_factory=list)     # NORMAL bilgi (tazelik/kota atlaması)
 
@@ -75,7 +76,12 @@ def fetch_for_entity(
     """
     settings = get_settings()
     hours = lookback_hours if lookback_hours is not None else settings.lookback_hours
-    since = datetime.now(timezone.utc) - timedelta(hours=hours)
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(hours=hours)
+    # Yeni şirket (hiç değerlendirmesi yok, daha önce doldurulmadı): bir kerelik daha geniş
+    # pencere. Pencere dışındaki (lookback'ten eski) haberlerden yalnızca en yeni M tanesi kalır.
+    backfill = _needs_backfill(session, entity, settings)
+    fetch_since = now - timedelta(days=settings.backfill_days) if backfill else since
 
     result = IngestResult(entity_id=entity.id, entity_name=entity.name)
 
@@ -100,7 +106,7 @@ def fetch_for_entity(
             logger.info("[%s] %s", entity.name, render(m))
             return result
 
-    outcome = provider.fetch(entity, since)
+    outcome = provider.fetch(entity, fetch_since)
 
     # NewsAPI'ye gerçekten gidildiyse kotadan düş; ham 429'u anlaşılır mesaja çevir.
     if is_newsapi and provider.is_available():
@@ -130,6 +136,7 @@ def fetch_for_entity(
     seen_this_batch: set[str] = set()
 
     pending: list[Article] = []
+    older: list[tuple[datetime, object, str]] = []  # doldurma adayları (lookback'ten eski)
     for fa in outcome.articles:
         h = url_hash(fa.url)
         if h in existing or h in seen_this_batch:
@@ -141,21 +148,24 @@ def fetch_for_entity(
         # analiz edilmezdi (expire_stale_pending) → kaydetme, sayaçta tut.
         pub = _utc(fa.published_at)
         if pub is not None and pub < since:
-            result.too_old += 1
+            if backfill and pub >= fetch_since:
+                older.append((pub, fa, h))
+            else:
+                result.too_old += 1
             continue
-        article = Article(
-            entity_id=entity.id,
-            url=fa.url,
-            url_hash=h,
-            title=fa.title,
-            source=fa.source,
-            description=fa.description,
-            image_url=fa.image_url,
-            published_at=pub,
-            provider=outcome.provider,
-        )
-        session.add(article)
-        pending.append(article)
+        pending.append(_new_article(session, entity, fa, h, pub, outcome.provider))
+    if backfill:
+        older.sort(key=lambda x: x[0], reverse=True)
+        keep = older[: max(0, settings.backfill_max_articles)]
+        result.too_old += len(older) - len(keep)
+        result.backfilled = len(keep)
+        for pub, fa, h in keep:
+            pending.append(_new_article(session, entity, fa, h, pub, outcome.provider, backfill=True))
+        # Sağlayıcı hatasında işaretleme: bir sonraki yenileme yeniden dener.
+        if not outcome.warning:
+            entity.backfilled_at = now
+            logger.info("[%s] geriye dönük doldurma (%d gün): %d eski haber eklendi",
+                        entity.name, settings.backfill_days, len(keep))
 
     # Entity başına commit: kısmi ilerleme korunur (bir sonraki entity'de yazma
     # hatası olsa bile buraya kadar çekilenler kalıcı olur). Bu entity'nin
@@ -180,6 +190,32 @@ def fetch_for_entity(
         f" UYARI: {'; '.join(render(w) for w in result.warnings)}" if result.warnings else "",
     )
     return result
+
+
+def _needs_backfill(session: Session, entity: Entity, settings) -> bool:
+    """Bir kerelik geriye dönük doldurma gerekli mi: açık, daha önce yapılmamış ve şirketin
+    hiç değerlendirmesi yok."""
+    if settings.backfill_days <= 0 or settings.backfill_max_articles <= 0 or entity.backfilled_at is not None:
+        return False
+    return session.scalar(select(EntityAnalysis.id).where(EntityAnalysis.entity_id == entity.id).limit(1)) is None
+
+
+def _new_article(session: Session, entity: Entity, fa, h: str, pub, provider: str,
+                 backfill: bool = False) -> Article:
+    article = Article(
+        entity_id=entity.id,
+        url=fa.url,
+        url_hash=h,
+        title=fa.title,
+        source=fa.source,
+        description=fa.description,
+        image_url=fa.image_url,
+        published_at=pub,
+        provider=provider,
+        backfill=backfill,
+    )
+    session.add(article)
+    return article
 
 
 def fetch_all(

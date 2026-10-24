@@ -264,13 +264,17 @@ def _few_news_messages(entity_ids: set[int] | None) -> list[dict]:
     from .db.models import Article, Entity, EntityAnalysis
     from .entity_names import display_name_for
 
-    days = max(1, math.ceil(get_settings().lookback_hours / 24))
+    settings = get_settings()
+    window = max(1, math.ceil(settings.lookback_hours / 24))
     out: list[dict] = []
     with session_scope() as s:
         rows = s.execute(
-            select(Entity.id, Entity.display_name, Entity.name).where(Entity.id.in_(entity_ids))
+            select(Entity.id, Entity.display_name, Entity.name, Entity.backfilled_at)
+            .where(Entity.id.in_(entity_ids))
         ).all()
-        for eid, dname, name in rows:
+        for eid, dname, name, backfilled_at in rows:
+            # Geriye dönük doldurma yapıldıysa gerçekten bakılan süre o (ör. 7 gün).
+            days = max(window, settings.backfill_days) if backfilled_at else window
             has_analysis = s.scalar(select(exists().where(EntityAnalysis.entity_id == eid)))
             has_pending = s.scalar(select(exists().where(
                 Article.entity_id == eid, Article.analyzed.is_(False),

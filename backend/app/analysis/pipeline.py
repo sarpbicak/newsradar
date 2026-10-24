@@ -405,6 +405,8 @@ def expire_stale_pending(lookback_hours: int | None = None) -> int:
                 Article.prefiltered.is_(False),
                 Article.expired.is_(False),
                 func.coalesce(Article.published_at, Article.fetched_at) < cutoff,
+                # Geriye dönük doldurma haberi çekildikten sonra bir lookback süresi bekler.
+                ~(Article.backfill.is_(True) & (Article.fetched_at >= cutoff)),
             )
             .values(expired=True)
             .execution_options(synchronize_session=False)

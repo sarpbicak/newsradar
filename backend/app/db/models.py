@@ -111,6 +111,8 @@ class Entity(Base):
     language: Mapped[str] = mapped_column(String(5), default="en", nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+    # Bir kerelik geriye dönük doldurma yapıldığı an (ingest; yapılmadıysa None).
+    backfilled_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
     articles: Mapped[list["Article"]] = relationship(
         back_populates="entity", cascade="all, delete-orphan"
@@ -168,6 +170,9 @@ class Article(Base):
     published_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     provider: Mapped[str] = mapped_column(String(40), default="", nullable=False)
     fetched_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+    # Geriye dönük doldurmayla gelen (lookback'ten eski) haber: çekildiği andan itibaren bir
+    # lookback süresi boyunca expire edilmez (analiz şansı olsun).
+    backfill: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Ön-filtre: entity adı/ticker'ı başlık+açıklamada hiç geçmiyorsa Claude'a
     # gönderilmeden elenir ve burada işaretlenir (tekrar değerlendirilmez, ayrıca

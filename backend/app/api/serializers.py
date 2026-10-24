@@ -299,6 +299,13 @@ def _priority(analysis, delta, change_percent, analyst) -> tuple[int, str | None
     return score, reason
 
 
+def _news_window_days(entity: Entity) -> int:
+    """'Son N günde yeterli haber yok' notundaki N: geriye dönük doldurma yapıldıysa o süre."""
+    s = get_settings()
+    window = max(1, math.ceil(s.lookback_hours / 24))
+    return max(window, s.backfill_days) if entity.backfilled_at else window
+
+
 def entity_card(session: Session, entity: Entity, language: str = "tr") -> EntityCardOut:
     """Overview kartı için entity özetini toplar (kullanıcı diline göre değerlendirme)."""
     article_count = session.scalar(
@@ -370,7 +377,7 @@ def entity_card(session: Session, entity: Entity, language: str = "tr") -> Entit
         name=entity.name,
         display_name=entity.display_name,
         no_analysis_reason=no_reason,
-        news_window_days=max(1, math.ceil(get_settings().lookback_hours / 24)),
+        news_window_days=_news_window_days(entity),
         type=entity.type,
         query=entity.query,
         language=entity.language,

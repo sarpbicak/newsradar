@@ -115,6 +115,11 @@ class Settings:
         # OpenAI-uyumlu endpoint anahtarı (OpenRouter/NVIDIA/… — hangisini kullanıyorsan).
         self.llm_api_key: str = os.getenv("NEWSRADAR_LLM_API_KEY", "").strip()
         self.lookback_hours: int = int(_env("NEWSRADAR_LOOKBACK_HOURS", "48"))
+        # Yeni şirket (hiç değerlendirmesi yok) için BİR KERELİK geriye dönük doldurma: lookback
+        # dışındaki son N günün en yeni M haberi de kaydedilir (az haberli şirket ilk gün
+        # değerlendirme alabilsin). 0 = kapalı. Genel lookback penceresi değişmez.
+        self.backfill_days: int = int(_env("NEWSRADAR_BACKFILL_DAYS", "7"))
+        self.backfill_max_articles: int = int(_env("NEWSRADAR_BACKFILL_MAX_ARTICLES", "20"))
         self.scheduler_enabled: bool = _env("NEWSRADAR_SCHEDULER", "on").lower() == "on"
         # Otomatik yenileme aralığı (saat). Saatlik çok agresif; varsayılan 6.
         self.scheduler_hours: int = max(1, int(_env("NEWSRADAR_SCHEDULER_HOURS", "6")))

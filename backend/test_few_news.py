@@ -21,7 +21,7 @@ for sfx in ("", "-wal", "-shm"):
     except FileNotFoundError:
         pass
 os.environ.update(NEWSRADAR_DB=_db, NEWSRADAR_SCHEDULER="off", NEWSRADAR_SEED_ON_START="off",
-                  NEWSRADAR_LOOKBACK_HOURS="48")
+                  NEWSRADAR_LOOKBACK_HOURS="48", NEWSRADAR_BACKFILL_DAYS="0")  # doldurma: test_backfill.py
 
 import app.ingest as ingest  # noqa: E402
 from app.api.serializers import entity_card  # noqa: E402
