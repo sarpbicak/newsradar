@@ -400,6 +400,12 @@ const STR = {
   "land.stack.nightly": { tr: "Gece yedeği", en: "Nightly backup" },
   "land.stack.verdict": { tr: "Değerlendirme", en: "Verdict" },
   "land.stack.deploy": { tr: "Yayın + geri alma", en: "Deploy + rollback" },
+  // "Neden yaptım" — metni Sarp yazacak. Boş dilde bölüm hiç görünmez (her dil ayrı).
+  // TODO(sarp): kendi metnim
+  "land.why.title": { tr: "Neden yaptım", en: "Why I built this" },
+  "land.why.body": { tr: "", en: "" },
+  "land.why.photoAlt": { tr: "Sarp Bıçak", en: "Sarp Bıçak" },
+  "land.footer.place": { tr: "Furtwangen, 2026", en: "Furtwangen, 2026" },
   "land.cta.title": { tr: "Takip ettiğin bir şirketle dene.", en: "Try it with a company you follow." },
   "land.footer.built": { tr: "Geliştiren: {name}", en: "Built by {name}" },
   "land.footer.note": {

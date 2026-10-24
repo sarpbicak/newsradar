@@ -563,6 +563,7 @@ export default function App({ setLang }) {
         <div className={`${WRAP} flex flex-col gap-3 py-8 text-micro text-slate-500 sm:flex-row sm:items-center sm:justify-between`}>
           <div>
             <span className="font-display text-sm font-medium text-slate-300">{t("land.footer.built", { name: "Sarp Bıçak" })}</span>
+            <span className="ml-2 text-micro text-slate-500">{t("land.footer.place")}</span>
             <p className="mt-1 max-w-2xl">{t("footer.disclaimer")}</p>
           </div>
           <nav className="flex flex-wrap gap-x-5 gap-y-2" aria-label={t("footer.nav")}>

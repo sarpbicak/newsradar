@@ -156,6 +156,39 @@ function Stack() {
   );
 }
 
+// "Neden yaptım": kapanıştan önce kısa kişisel not. Metin i18n'de (land.why.body, TR/EN ayrı);
+// boşsa bölüm hiç çizilmez. /sarp.jpg varsa yanında küçük yuvarlak fotoğraf, yoksa gizlenir.
+// TODO(sarp): kendi metnim
+function Why() {
+  const { t } = useI18n();
+  const [photo, setPhoto] = useState(true);
+  const body = t("land.why.body").trim();
+  if (!body) return null;
+  return (
+    <section className="border-t border-ink-600 py-24 lg:py-32" aria-labelledby="why-title">
+      <div className={`${WRAP} grid gap-8 md:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] md:gap-12`}>
+        <h2 id="why-title" className="font-display text-2xl font-medium text-slate-100">{t("land.why.title")}</h2>
+        <div className="flex items-start gap-5">
+          {photo && (
+            <img
+              src="/sarp.jpg"
+              alt={t("land.why.photoAlt")}
+              width="64"
+              height="64"
+              loading="lazy"
+              onError={() => setPhoto(false)}
+              className="h-16 w-16 shrink-0 rounded-full object-cover ring-1 ring-ink-600"
+            />
+          )}
+          <div className="lx-body max-w-2xl space-y-4 text-slate-300">
+            {body.split(/\n\s*\n/).map((p, i) => <p key={i}>{p}</p>)}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function Closing() {
   const { t } = useI18n();
   return (
@@ -178,7 +211,10 @@ function Footer({ onPrivacy }) {
     <footer className="border-t border-ink-600">
       <div className={`${WRAP} flex flex-col gap-6 py-10 sm:flex-row sm:items-end sm:justify-between`}>
         <div>
-          <div className="font-display text-lg font-medium text-slate-100">{t("land.footer.built", { name: "Sarp Bıçak" })}</div>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="font-display text-lg font-medium text-slate-100">{t("land.footer.built", { name: "Sarp Bıçak" })}</span>
+            <span className="text-sm text-slate-500">{t("land.footer.place")}</span>
+          </div>
           <p className="mt-2 text-sm text-slate-500">
             {t("land.footer.note")}{" "}
             <button onClick={onPrivacy} className="link-u -mx-1 -my-3.5 inline-block px-1 py-3.5 text-slate-400 hover:text-slate-200">
@@ -259,6 +295,7 @@ export default function Landing({ lang, setLang }) {
               <Walkthrough demo={demo} />
               <Stats />
               <Stack />
+              <Why />
               <Closing />
             </>
           )}
