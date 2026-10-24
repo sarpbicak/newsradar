@@ -22,7 +22,7 @@ const STEP_KEYS = {
 // Yenileme durumunun tek satırlık metni (backend adımı yayınlar; kullanıcının dilinde).
 function scanLabel(t, scan) {
   const { phase, step, stepEntity, stepCount, currentEntity, skippedEntity, summary, queuePos } = scan;
-  if (phase === "queued") return queuePos ? t("notice.queuedPos", { n: queuePos }) : t("notice.queued");
+  if (phase === "queued") return queuePos === 1 ? t("notice.queuedNext") : queuePos ? t("notice.queuedPos", { n: queuePos }) : t("notice.queued");
   if (phase === "done") return summary ? t("notice.scanDone", { parts: refreshParts(summary, t).slice(0, 2).join(" · ") }) : "";
   if (phase === "starting") return t("notice.scanStarting");
   if (skippedEntity) return t("notice.stepSkipped", { name: skippedEntity });
@@ -100,7 +100,9 @@ function RefreshButton({ refresh, compact = false }) {
   const tipText = q.admin ? null : refreshTip(t, status, anonymous);
   const counting = isRefreshing && running && status?.progress_total > 0;
   const text = queued
-    ? status?.queue_position
+    ? status?.queue_position === 1
+      ? t("header.queuedNext")
+      : status?.queue_position
       ? t("header.queuedPos", { n: status.queue_position })
       : t("header.queued")
     : isRefreshing
@@ -163,7 +165,7 @@ function RefreshButton({ refresh, compact = false }) {
             <span className="text-micro tabular-nums">{status.progress_done}/{status.progress_total}</span>
           ) : (
             queued ? (
-              <span className="text-micro tabular-nums">#{status?.queue_position ?? ""}</span>
+              <span className="text-micro tabular-nums">{status?.queue_position === 1 ? t("header.queuedNext") : `#${status?.queue_position ?? ""}`}</span>
             ) : (
               !q.admin && !q.exhausted && <span className="text-micro tabular-nums">{q.left}</span>
             )

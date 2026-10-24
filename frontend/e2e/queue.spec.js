@@ -50,9 +50,10 @@ test("iki kullanıcı aynı anda: ikincisi sırada bekler, sonra kendi yenilemes
   const bodyB = await (await ackB).json();
   expect(bodyB).toMatchObject({ accepted: true, queued: true, queue_position: 1 });
 
-  // B sırada: buton ve şerit "Sıradasın", hak henüz düşmedi (başlayınca düşer).
-  await expect(refreshBtn(b.page)).toHaveText(/Sıradasın/);
-  await expect(b.page.getByText(/Sıradasın: 1\. sıra/)).toBeVisible();
+  // B 1. sırada: buton ve şerit "Sıradaki sensin" (2+ sırada "Sıradasın: N. sıra"); hak henüz
+  // düşmedi (başlayınca düşer).
+  await expect(refreshBtn(b.page)).toHaveText(/Sıradaki sensin/);
+  await expect(b.page.getByRole("status").getByText("Sıradaki sensin")).toBeVisible();
 
   // A biter, sonra B'nin sırası gelir: "Yenileniyor" → "Tamamlandı"; B'nin hakkı başlayınca düşer.
   await expect(a.page.getByText(/Tamamlandı/).first()).toBeVisible({ timeout: 20_000 });
@@ -72,7 +73,7 @@ test("sıradan vazgeç: hak düşmez", async ({ browser, apiURL }) => {
   await refreshBtn(a.page).click();
   await expect(refreshBtn(a.page)).toHaveText(/Yenileniyor|Başlatılıyor/);
   await refreshBtn(b.page).click();
-  await expect(b.page.getByText(/Sıradasın: \d+\. sıra/)).toBeVisible();
+  await expect(b.page.getByText(/Sıradaki sensin|Sıradasın: \d+\. sıra/).last()).toBeVisible();
   const del = b.page.waitForResponse((r) => /\/refresh(\?|$)/.test(r.url()) && r.request().method() === "DELETE");
   await b.page.getByRole("button", { name: "Vazgeç" }).click();
   expect((await del).status()).toBe(204);

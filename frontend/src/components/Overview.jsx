@@ -282,7 +282,7 @@ export default function Overview({
   useFlip(listRef, [listRows.map((c) => c.id).join(",")]);
 
   const cardGrid = (
-    <div data-count={bigCards.length} className={cx("card-grid stagger", scanning && "scan-host rounded-card")}>
+    <div data-count={bigCards.length} className="card-grid stagger">
       {bigCards.map((c) => (
         <EntityCard key={c.id} card={c} onOpen={onOpen} />
       ))}

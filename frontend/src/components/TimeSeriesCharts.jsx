@@ -4,6 +4,8 @@
 //     duygusu çubukları (olumlu yukarı yeşil, olumsuz aşağı kırmızı; opaklık haber sayısıyla).
 //     İki panel syncId ile tek dikey imleç ve tek ipucu paylaşır.
 // (2) "Risk geçmişi": ~120px, 0–100, basamak çizgi; arkada 0–33 / 33–66 / 66–100 bantları.
+//     Fiyat grafiğiyle AYNI günlük satırları kullanır (aynı x başlangıç/bitiş); değerlendirme
+//     olmayan günde çizgi yok (tek kalan nokta küçük işaretle görünür).
 // Aralık seçici (7g/30g/90g/Tümü): yalnızca VERİ OLAN günler gösterilir (boş gün satırı yok);
 // veri olmayan aralık pasif; eksen verinin başladığı günden başlar ("Veri … beri" notu).
 // Fırça (brush) ve çift eksen yok. Eksen/ızgara çok soluk, rakamlar mono. Her grafiğin kısa
@@ -60,12 +62,17 @@ function sinceText(ts) {
 
 // Günlük satırlar: fiyat (günün son snapshot'ı), günlük değişim, haber duygusu dağılımı ve
 // günün en önemli başlığı (en çok kaynakta çıkan, eşitse en güçlü duygu).
-function buildDays(priceHistory, articles) {
+function buildDays(priceHistory, articles, riskHistory) {
   const map = new Map();
   const row = (ts) => {
-    if (!map.has(ts)) map.set(ts, { ts, price: null, pos: 0, neg: 0, neu: 0, n: 0, top: null, topScore: -1 });
+    if (!map.has(ts)) map.set(ts, { ts, price: null, pos: 0, neg: 0, neu: 0, n: 0, top: null, topScore: -1, risk: null, stance: null });
     return map.get(ts);
   };
+  (riskHistory || []).forEach((r) => {
+    const d = row(dayStart(r.created_at)); // günün SON değerlendirmesi (liste eski → yeni)
+    d.risk = r.risk_score;
+    d.stance = r.stance;
+  });
   [...(priceHistory || [])]
     .sort((a, b) => parseUtc(a.fetched_at) - parseUtc(b.fetched_at))
     .forEach((p) => (row(dayStart(p.fetched_at)).price = p.price));
@@ -107,6 +114,17 @@ function buildEvents(riskHistory) {
     if (list.length) out.set(ts, list);
   });
   return out;
+}
+
+// Yalnızca komşusu boş (tek kalmış) risk noktasına küçük işaret: çizgi kopuk olduğundan
+// aksi halde görünmezdi. Ardışık günler düz basamak çizgisi olarak kalır.
+function isolatedDot(rows) {
+  return ({ cx, cy, index }) => {
+    const v = rows[index]?.risk;
+    if (v == null || cx == null) return null;
+    const lone = rows[index - 1]?.risk == null && rows[index + 1]?.risk == null;
+    return lone ? <circle key={index} cx={cx} cy={cy} r={2.5} fill={C.line} stroke="none" /> : null;
+  };
 }
 
 function inRange(ts, days) {
@@ -183,32 +201,27 @@ function ChartCard({ title, summary, children, note }) {
 }
 
 export default function TimeSeriesCharts({ riskHistory = [], priceHistory = [], articles = [], isTicker, isMobile }) {
-  const allDays = useMemo(() => buildDays(isTicker ? priceHistory : [], articles), [priceHistory, articles, isTicker]);
+  const allDays = useMemo(() => buildDays(isTicker ? priceHistory : [], articles, riskHistory), [priceHistory, articles, riskHistory, isTicker]);
   const events = useMemo(() => buildEvents(riskHistory), [riskHistory]);
-  const riskRows = useMemo(() => {
-    const m = new Map();
-    riskHistory.forEach((r) => m.set(dayStart(r.created_at), r)); // günün son değerlendirmesi
-    return [...m.entries()].map(([ts, r]) => ({ ts, label: fmtDay(ts), risk: r.risk_score, stance: r.stance }));
-  }, [riskHistory]);
 
   // Hangi aralıkta veri var: fiyatta ≥2 gün ya da en az 1 duygu günü / risk noktası.
   const has = (days) => {
     const d = allDays.filter((r) => inRange(r.ts, days));
     const prices = d.filter((r) => r.price != null).length;
-    return prices >= 2 || d.some((r) => r.n > 0) || riskRows.some((r) => inRange(r.ts, days));
+    return prices >= 2 || d.some((r) => r.n > 0 || r.risk != null);
   };
   const available = RANGES.filter((r) => has(r.days)).map((r) => r.key);
   const [range, setRange] = useState(() => (available.includes("30") ? "30" : available[available.length - 1] || "all"));
   const days = RANGES.find((r) => r.key === range)?.days ?? Infinity;
   const rows = allDays.filter((r) => inRange(r.ts, days));
-  const risk = riskRows.filter((r) => inRange(r.ts, days));
+  const risk = rows.filter((r) => r.risk != null);
   const withPrice = rows.filter((r) => r.price != null);
 
-  if (!allDays.length && !riskRows.length) {
+  if (!allDays.length) {
     return <EmptyState icon={BarChart3} title={tt("chart.noData")} body={tt("chart.need2days")} />;
   }
 
-  const first = Math.min(...[...rows, ...risk].map((r) => r.ts));
+  const first = Math.min(...rows.map((r) => r.ts));
   const rangeStart = days === Infinity ? null : Date.now() - (days - 1) * DAY;
   const showSince = Number.isFinite(first) && (rangeStart == null || first > rangeStart + DAY);
   const maxN = Math.max(1, ...rows.map((r) => r.n));
@@ -229,7 +242,7 @@ export default function TimeSeriesCharts({ riskHistory = [], priceHistory = [], 
         {showSince && <span className="text-micro text-slate-500">{sinceText(first)}</span>}
       </div>
 
-      {rows.length > 0 && (
+      {rows.some((r) => r.price != null || r.n > 0) && (
         <ChartCard
           title={isTicker ? tt("chart.mainTitle") : tt("chart.newsTitle")}
           summary={priceSummary(rows)}
@@ -306,24 +319,33 @@ export default function TimeSeriesCharts({ riskHistory = [], priceHistory = [], 
         >
           <div role="img" aria-label={`${tt("chart.riskTitle")}. ${tt("chart.sumRisk", { a: risk[0].risk, b: risk[risk.length - 1].risk, n: risk.length })}`}>
             <ResponsiveContainer width="100%" height={120}>
-              <LineChart data={risk} margin={{ top: 6, right: 64, bottom: 0, left: 0 }}>
+              <LineChart data={rows} margin={{ top: 6, right: 64, bottom: 0, left: 0 }}>
                 <ReferenceArea y1={0} y2={33} fill={C.pos} fillOpacity={0.06} ifOverflow="hidden" />
                 <ReferenceArea y1={33} y2={66} fill={C.warn} fillOpacity={0.06} ifOverflow="hidden" />
                 <ReferenceArea y1={66} y2={100} fill={C.neg} fillOpacity={0.06} ifOverflow="hidden" />
-                <XAxis dataKey="label" tick={MONO} tickLine={false} axisLine={{ stroke: C.grid }} interval="preserveStartEnd" />
+                <XAxis dataKey="label" tick={MONO} tickLine={false} axisLine={{ stroke: C.grid }} interval={tickEvery} />
                 <YAxis domain={[0, 100]} ticks={[0, 33, 66, 100]} tick={MONO} tickLine={false} axisLine={false} width={52} />
                 <Tooltip
                   isAnimationActive={false}
                   cursor={{ stroke: C.muted, strokeWidth: 1 }}
                   content={({ active, payload }) =>
-                    active && payload?.length ? (
+                    active && payload?.length && payload[0].payload.risk != null ? (
                       <div className="rounded-control bg-raised px-3 py-2 text-micro text-slate-300 ring-1 ring-ink-500">
                         <span className="font-medium text-slate-100">{fmtDay(payload[0].payload.ts)}</span> · {tt("chart.tipRisk", { v: payload[0].payload.risk })} · {stanceLabel(payload[0].payload.stance)}
                       </div>
                     ) : null
                   }
                 />
-                <Line type="stepAfter" dataKey="risk" stroke={C.line} strokeWidth={1.75} dot={false} activeDot={{ r: 3 }} isAnimationActive={false} />
+                <Line
+                  type="stepAfter"
+                  dataKey="risk"
+                  stroke={C.line}
+                  strokeWidth={1.75}
+                  connectNulls={false}
+                  dot={isolatedDot(rows)}
+                  activeDot={{ r: 3 }}
+                  isAnimationActive={false}
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>

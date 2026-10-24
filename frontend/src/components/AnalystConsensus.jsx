@@ -137,8 +137,9 @@ function PeriodColumns({ history }) {
         const total = SEGMENTS.reduce((t, sg) => t + (h[sg.key] || 0), 0) || 1;
         const label = parseUtc(h.period).toLocaleDateString(loc, { month: "short", timeZone: "UTC" });
         return (
-          <div key={h.period} className="flex w-10 flex-col items-center gap-1.5" title={`${label}: ${total}`}>
-            <div className="flex h-20 w-6 flex-col-reverse overflow-hidden rounded-[2px] bg-ink-700">
+          <div key={h.period} className="flex w-16 flex-col items-center gap-1.5" title={`${label}: ${total}`}>
+            <span className="font-mono text-micro tabular-nums text-slate-300">{total}</span>
+            <div className="flex h-24 w-11 flex-col-reverse overflow-hidden rounded-[2px] bg-ink-700">
               {SEGMENTS.map((sg) => (h[sg.key] ? <div key={sg.key} style={{ height: `${(h[sg.key] / total) * 100}%`, background: sg.color }} /> : null))}
             </div>
             <span className="text-micro text-slate-500">{label}</span>
@@ -245,7 +246,7 @@ export default function AnalystConsensus({ analyst, price, type, compact = false
             </p>
           </section>
         )}
-        {history.length >= 2 && (
+        {history.length >= 3 && (
           <section className="mt-8 border-t border-ink-600 pt-5">
             <h4 className="text-meta font-medium text-slate-300">{tt("an.overTime")}</h4>
             <PeriodColumns history={history} />

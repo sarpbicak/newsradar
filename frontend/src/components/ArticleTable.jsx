@@ -4,7 +4,7 @@
 import React, { useMemo, useState } from "react";
 import { ChevronRight, ExternalLink } from "lucide-react";
 import { RelTime, eventLabel, flagLabel, sentimentLabel } from "./ui.jsx";
-import { tt, useI18n } from "../i18n.jsx";
+import { getLang, tt, useI18n } from "../i18n.jsx";
 import { Button, Card, Chip, LabelChip, Select } from "./kit.jsx";
 
 const RISK_FLAGS = ["regulatory","competition","financial","legal","product","supply_chain","macro","reputation"];
@@ -18,6 +18,9 @@ function SourceCount({ n }) {
   if (!n || n <= 1) return null;
   return <span title={tt("art.sourcesTitle", { n })}> · {tt("art.sources", { n })}</span>;
 }
+
+// Seçenek metnini cümle başı büyük harfle göster ("Tüm risk bayrakları", "Makro").
+const cap = (s) => (s ? s.charAt(0).toLocaleUpperCase(getLang() === "tr" ? "tr-TR" : "en-US") + s.slice(1) : s);
 
 export default function ArticleTable({ articles }) {
   const { t } = useI18n();
@@ -38,15 +41,15 @@ export default function ArticleTable({ articles }) {
     <div>
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Select value={flag} onChange={(e) => setFlag(e.target.value)} aria-label={t("art.allFlags")} wrapClassName="w-full sm:w-auto" className="sm:w-48">
-          <option value="">{t("art.allFlags")}</option>
+          <option value="">{cap(t("art.allFlags"))}</option>
           {RISK_FLAGS.map((f) => (
-            <option key={f} value={f}>{flagLabel(f)}</option>
+            <option key={f} value={f}>{cap(flagLabel(f))}</option>
           ))}
         </Select>
         <Select value={event} onChange={(e) => setEvent(e.target.value)} aria-label={t("art.allEvents")} wrapClassName="w-full sm:w-auto" className="sm:w-48">
-          <option value="">{t("art.allEvents")}</option>
+          <option value="">{cap(t("art.allEvents"))}</option>
           {EVENT_TYPES.map((e) => (
-            <option key={e} value={e}>{eventLabel(e)}</option>
+            <option key={e} value={e}>{cap(eventLabel(e))}</option>
           ))}
         </Select>
         {(flag || event) && (
@@ -60,11 +63,16 @@ export default function ArticleTable({ articles }) {
       {rows.length === 0 ? (
         <Card className="p-6 text-center text-body text-slate-500">{t("art.none")}</Card>
       ) : (
-        <ul className="space-y-1">
-          {rows.map((a) => (
-            <li key={a.id} className="rounded-control px-3 py-4 transition-colors duration-hover ease-std hover:bg-ink-800 sm:px-4">
+        <ul className="divide-y divide-ink-600 border-y border-ink-600">
+          {rows.map((a) => {
+            // Olay tipiyle aynı adı taşıyan risk bayrağı ikinci kez gösterilmez (ör. "makro").
+            const ev = a.event_type ? eventLabel(a.event_type) : null;
+            const flags = (a.risk_flags || []).filter((f) => !ev || flagLabel(f).toLocaleLowerCase() !== ev.toLocaleLowerCase());
+            return (
+            <li key={a.id} className="px-2 py-4 transition-colors duration-hover ease-std hover:bg-ink-800 sm:px-3">
               <div className="flex items-start gap-3">
-                <span title={a.sentiment != null ? a.sentiment.toFixed(2) : undefined} className="pt-0.5">
+                {/* Sabit genişlikli duygu sütunu: başlıklar aynı hizadan başlar. */}
+                <span title={a.sentiment != null ? a.sentiment.toFixed(2) : undefined} className="w-[5.5rem] shrink-0 pt-0.5">
                   <LabelChip label={labelOf(a.sentiment)} t={t} />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -76,11 +84,11 @@ export default function ArticleTable({ articles }) {
                     {a.source || t("art.noSource")}
                     <SourceCount n={a.source_count} />
                     {a.published_at && <> · <RelTime iso={a.published_at} /></>}
-                    {a.event_type && <> · {eventLabel(a.event_type)}</>}
+                    {ev && <> · {ev}</>}
                   </p>
-                  {(a.risk_flags || []).length > 0 && (
+                  {flags.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      {a.risk_flags.map((f) => (
+                      {flags.map((f) => (
                         <Chip key={f} tone="neutral">{flagLabel(f)}</Chip>
                       ))}
                     </div>
@@ -97,7 +105,8 @@ export default function ArticleTable({ articles }) {
                 </div>
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>

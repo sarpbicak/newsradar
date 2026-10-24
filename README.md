@@ -4,7 +4,7 @@
 
 NewsRadar collects financial news for a watchlist of companies, has an LLM read and filter every article, and turns the results into a dashboard of risk scores, sentiment trends and a clear, reasoned verdict you can question in a chat. It works for public tickers and for private companies such as startups.
 
-> Portfolio project, not affiliated with newsradar.com.tr.
+> Portfolio project.
 
 | | Light theme | Dark theme |
 |---|---|---|

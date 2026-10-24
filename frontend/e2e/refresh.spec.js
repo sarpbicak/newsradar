@@ -86,7 +86,7 @@ async function clickOnceAndExpectStarted(page, { leftAfter }) {
   const res = await ack;
   expect(res.status()).toBe(200);
   expect(await res.json()).toMatchObject({ accepted: true });
-  await expect(btn).toHaveText(/Yenileniyor|Başlatılıyor|Sıradasın/);
+  await expect(btn).toHaveText(/Yenileniyor|Başlatılıyor|Sıradasın|Sıradaki sensin/);
   await expect(page.getByText(/Tamamlandı/).first()).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(/Yenileme başlatılamadı/)).toHaveCount(0);
   await expect(btn).toHaveText(leftAfter, { timeout: 10_000 });
