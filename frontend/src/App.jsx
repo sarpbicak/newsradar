@@ -72,7 +72,8 @@ export default function App({ setLang }) {
 
   // Tarama sürüyor mu: sunucu durumu VEYA iyimser 'başlatılıyor' bayrağı.
   const running = !!status?.is_running;
-  const isRefreshing = starting || tracking || running;
+  const queued = !running && !!status?.queued; // sırada bekliyor (başka bir yenileme sürüyor)
+  const isRefreshing = starting || tracking || running || queued;
   // Kişisel yenileme hakkı (sayılar /status'tan; admin sınırsız).
   const quota = refreshQuota(status);
 
@@ -200,7 +201,7 @@ export default function App({ setLang }) {
 
   // Bir tarama sürerken her 5 sn'de bir status + kartları yenile (canlı ilerleme).
   // Tarama bitince verileri son bir kez çekip tamamlanma bildirimini göster.
-  const polling = tracking || running;
+  const polling = tracking || running || queued;
   useEffect(() => {
     if (!authed || !polling) return;
     let cancelled = false;
@@ -216,14 +217,15 @@ export default function App({ setLang }) {
         setCards(c);
         setSuggestions(sug);
         setLoadError(null);
-        if (s.is_running) {
+        if (s.is_running || s.queued) {
           setStatus(s);
           timer = setTimeout(tick, POLL_MS);
         } else {
-          // İzlenen tarama: bitişi, onay anındaki son tamamlanma zamanından farklı bir
-          // last_completed_at ile tanınır. Henüz görünmüyorsa kısa bir süre daha sor.
+          // İzlenen tarama: bitişi, onay anındaki son SONUÇ zamanından farklı bir last_result_at
+          // (eski backend'de last_completed_at) ile tanınır. Henüz görünmüyorsa kısa süre daha sor.
           const tr = trackRef.current;
-          const finished = !tr || (s.last_completed_at && s.last_completed_at !== tr.prevCompleted);
+          const resultAt = s.last_result_at ?? s.last_completed_at ?? null;
+          const finished = !tr || (resultAt && resultAt !== tr.prevResult);
           if (!finished && Date.now() - tr.at < START_GRACE_MS) {
             timer = setTimeout(tick, 1000);
             return;
@@ -235,6 +237,22 @@ export default function App({ setLang }) {
             showRefreshError(t("notice.refreshNotStarted"), true);
             return;
           }
+          // Kuyruk sonucu: birleşti (başka bir yenileme zaten güncelledi) · başarısız (hak iade) ·
+          // bütçe doldu · vazgeçildi. "done" ya da sonuç alanı olmayan eski backend → özet akışı.
+          const rs = s.last_result_status;
+          if (rs === "merged") {
+            setNotice({ type: "ok", text: t("notice.queueMerged"), details: [] });
+            return;
+          }
+          if (rs === "failed") {
+            showRefreshError(t("notice.refreshFailedRun"), true);
+            return;
+          }
+          if (rs === "budget") {
+            showRefreshError(t("notice.queueBudget"), false);
+            return;
+          }
+          if (rs === "canceled") return;
           // Tamamlandı → çubuğun kendi içinde "Tamamlandı · N haber · N analiz" göster,
           // birkaç saniye sonra yumuşakça söndür. Uyarı/atlama varsa ayrıca not kutusu.
           const sm = s.last_summary;
@@ -339,7 +357,7 @@ export default function App({ setLang }) {
   async function handleRefresh() {
     setNotice(null);
     setStarting(true); // buton hemen "Başlatılıyor…" der; polling onaydan sonra
-    const prevCompleted = status?.last_completed_at ?? null;
+    const prevResult = status?.last_result_at ?? status?.last_completed_at ?? null;
     let ack;
     try {
       ack = await api.refresh(); // anında döner; tarama arka planda
@@ -356,16 +374,35 @@ export default function App({ setLang }) {
       return;
     }
     setStarting(false);
-    if (ack.started || ack.reason === "running") {
-      trackRef.current = { prevCompleted, at: Date.now() };
+    // accepted: yenileme başladı ya da sıraya alındı (ya da zaten sürüyor/sırada) → izle.
+    if (ack.accepted ?? (ack.started || ack.reason === "running")) {
+      trackRef.current = { prevResult, at: Date.now() };
       setTracking(true);
+      if (ack.queued) setStatus((s) => (s ? { ...s, queued: true, queue_position: ack.queue_position } : s));
     } else if (ack.reason === "empty") {
       showRefreshError(t("notice.refreshEmpty"), false);
+    } else if (ack.reason === "queue_full") {
+      showRefreshError(t("notice.queueFull"), true);
+    } else if (ack.reason === "budget") {
+      showRefreshError(t("notice.queueBudget"), false);
     } else if (ack.reason === "busy") {
       showRefreshError(t("notice.refreshBusy"), true);
     } else {
       showRefreshError(ack.message, true);
     }
+  }
+
+  // Sıradaki yenilemeden vazgeç (hak zaten düşmemişti; başlayınca düşer).
+  async function handleCancelQueue() {
+    try {
+      await api.cancelRefresh();
+    } catch {
+      /* 409: bu arada başladı · 404: sırada yok — durum yoklaması gerçeği gösterir */
+    }
+    trackRef.current = null;
+    setTracking(false);
+    const s = await api.status().catch(() => null);
+    if (s) setStatus(s);
   }
 
   // ── Mobil aşağı-çekip-yenile (pull-to-refresh) ──
@@ -471,11 +508,13 @@ export default function App({ setLang }) {
         onAdmin={() => setView((v) => (v === "admin" ? "dashboard" : "admin"))}
         onLogout={handleLogout}
         onFeedback={() => setFeedbackOpen(true)}
-        refresh={{ isRefreshing, running, status, onRefresh: handleRefresh, attn: refreshAttn, anonymous: !!user?.is_anonymous }}
+        refresh={{ isRefreshing, running, queued, status, onRefresh: handleRefresh, attn: refreshAttn, anonymous: !!user?.is_anonymous }}
         scan={
           isRefreshing || scanDone
             ? {
-                phase: scanDone ? "done" : running ? "running" : "starting",
+                phase: scanDone ? "done" : running ? "running" : queued ? "queued" : "starting",
+                queuePos: queued ? status.queue_position : null,
+                onCancel: queued ? handleCancelQueue : null,
                 currentEntity: running ? status.current_entity : null,
                 step: running ? status.step : null,
                 stepEntity: running ? status.step_entity : null,

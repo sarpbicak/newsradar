@@ -21,7 +21,8 @@ const STEP_KEYS = {
 
 // Yenileme durumunun tek satırlık metni (backend adımı yayınlar; kullanıcının dilinde).
 function scanLabel(t, scan) {
-  const { phase, step, stepEntity, stepCount, currentEntity, skippedEntity, summary } = scan;
+  const { phase, step, stepEntity, stepCount, currentEntity, skippedEntity, summary, queuePos } = scan;
+  if (phase === "queued") return queuePos ? t("notice.queuedPos", { n: queuePos }) : t("notice.queued");
   if (phase === "done") return summary ? t("notice.scanDone", { parts: refreshParts(summary, t).slice(0, 2).join(" · ") }) : "";
   if (phase === "starting") return t("notice.scanStarting");
   if (skippedEntity) return t("notice.stepSkipped", { name: skippedEntity });
@@ -34,20 +35,34 @@ function scanLabel(t, scan) {
 // Header'ın alt kenarındaki ince ilerleme çizgisi + sağda küçük durum metni (yer kaplamaz).
 function ScanProgress({ scan }) {
   const { t } = useI18n();
-  const { phase, fraction, done, total, fading } = scan;
-  const pct = phase === "done" ? 1 : fraction > 0 ? fraction : total > 0 ? done / total : 0.04;
+  const { phase, fraction, done, total, fading, onCancel } = scan;
+  const pct = phase === "done" ? 1 : phase === "queued" ? 0 : fraction > 0 ? fraction : total > 0 ? done / total : 0.04;
   const label = scanLabel(t, scan);
   return (
     <div className={cx("pointer-events-none absolute inset-x-0 top-full", fading && "nr-strip--fade")} role="status" aria-live="polite">
       <div className="h-0.5 overflow-hidden bg-accent/15">
         <div className={cx("nav-progress h-full bg-accent", phase !== "done" && (phase === "starting" || !fraction) && "animate-pulse")} style={{ transform: `scaleX(${pct})` }} />
       </div>
-      {label && (
+      {label && phase === "queued" ? (
+        // Sırada: mobilde de görünür, "Vazgeç" tıklanabilir (şeridin geri kalanı tıklamayı geçirir).
         <div className="mx-auto flex w-full max-w-[1360px] justify-end px-5 sm:px-8 lg:px-10">
-          <span key={label} className="nr-name-in mt-2 hidden max-w-md truncate rounded-control bg-raised px-3 py-1 text-micro text-slate-400 ring-1 ring-ink-600 md:inline-block">
+          <span className="nr-name-in pointer-events-auto mt-2 inline-flex items-center gap-3 rounded-control bg-raised py-1 pl-3 pr-1 text-micro text-slate-300 ring-1 ring-ink-500">
             {label}
+            {onCancel && (
+              <Button variant="ghost" size="sm" onClick={onCancel} className="h-7">
+                {t("common.cancel")}
+              </Button>
+            )}
           </span>
         </div>
+      ) : (
+        label && (
+          <div className="mx-auto flex w-full max-w-[1360px] justify-end px-5 sm:px-8 lg:px-10">
+            <span key={label} className="nr-name-in mt-2 hidden max-w-md truncate rounded-control bg-raised px-3 py-1 text-micro text-slate-400 ring-1 ring-ink-600 md:inline-block">
+              {label}
+            </span>
+          </div>
+        )
       )}
     </div>
   );
@@ -77,14 +92,18 @@ function refreshTip(t, status, anonymous) {
 
 function RefreshButton({ refresh, compact = false }) {
   const { t } = useI18n();
-  const { isRefreshing, running, status, onRefresh, attn, anonymous } = refresh;
+  const { isRefreshing, running, queued, status, onRefresh, attn, anonymous } = refresh;
   const q = refreshQuota(status);
   const [tip, setTip] = useState(false);
   const press = useRef({ timer: null, long: false });
   const tipId = useId();
   const tipText = q.admin ? null : refreshTip(t, status, anonymous);
   const counting = isRefreshing && running && status?.progress_total > 0;
-  const text = isRefreshing
+  const text = queued
+    ? status?.queue_position
+      ? t("header.queuedPos", { n: status.queue_position })
+      : t("header.queued")
+    : isRefreshing
     ? running
       ? t("header.refreshing", { done: status.progress_done, total: status.progress_total })
       : t("header.starting")
@@ -143,7 +162,11 @@ function RefreshButton({ refresh, compact = false }) {
           counting ? (
             <span className="text-micro tabular-nums">{status.progress_done}/{status.progress_total}</span>
           ) : (
-            !q.admin && !q.exhausted && <span className="text-micro tabular-nums">{q.left}</span>
+            queued ? (
+              <span className="text-micro tabular-nums">#{status?.queue_position ?? ""}</span>
+            ) : (
+              !q.admin && !q.exhausted && <span className="text-micro tabular-nums">{q.left}</span>
+            )
           )
         ) : (
           <span className="tabular-nums">{text}</span>

@@ -183,6 +183,7 @@ export const api = {
   // limit=200: grafikler 90 günlük günlük duygu için daha çok haber ister (liste aynı veriyi kullanır).
   dashboard: (id) => req(`/entities/${id}/dashboard?lang=${getLang()}&limit=200`),
   refresh: () => req("/refresh", { method: "POST" }),
+  cancelRefresh: () => req("/refresh", { method: "DELETE" }), // sıradaki yenilemeden vazgeç
   searchSymbols: (q) => req(`/symbol-search?q=${encodeURIComponent(q)}`),
   // Öneriler (co-mentioned şirketler)
   listSuggestions: () => req("/suggestions"),
