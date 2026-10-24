@@ -146,6 +146,28 @@ grams = repeated_ngrams({
 check("news flow leans" in grams and sorted(grams["news flow leans"]) == ["Nvidia", "Tesla"],
       f"tekrar eden öbek yakalandı: {list(grams)}")
 
+print("\n== Birinci tekil şahıs ve sınır anlatan kapanış yakalanır; şirket cümleleri temiz")
+for t, lang in [
+    ("Bu veriyle kısa vadeli fiyatı değerlendiremiyorum.", "tr"),
+    ("Bence talep güçlü kalacak.", "tr"),
+    ("Bu bir yatırım tavsiyesi değildir.", "tr"),
+    ("Bunu kesin söyleyemem.", "tr"),
+    ("I cannot predict the stock price.", "en"),
+    ("I'm not able to judge the valuation.", "en"),
+    ("In my view the demand looks strong.", "en"),
+    ("This is not financial advice.", "en"),
+    ("As an AI, I only see headlines.", "en"),
+]:
+    check(hits(t, lang) != [], f"yakalandı: {t!r} → {hits(t, lang)}")
+for t, lang in [
+    ("Şirket talebi karşılayamıyor iddiası yalanlandı.", "tr"),  # 3. şahıs (-amıyor, -um değil)
+    ("Tamamen yeni bir çip serisi duyuruldu.", "tr"),
+    ("Phase II trials and Series I bonds were mentioned.", "en"),
+    ("Investors can now buy the new shares.", "en"),
+    ("The company said it cannot meet demand.", "en"),
+]:
+    check(hits(t, lang) == [], f"temiz: {t!r} → {hits(t, lang)}")
+
 print("\n== Etken yönleri (top_driver_directions): sıra korunur, geçersiz → None")
 _base = {"headline_verdict": "A.", "summary": "B.", "invalidation": "C."}
 d = sanitize_entity_analysis({**_base, "top_drivers": ["a.", "", "b.", "c."],

@@ -86,7 +86,10 @@ Kategorik alanlar (event_type, impact_horizon, stance, conviction, sentiment_tre
 YALNIZCA verilen enum değerlerinden seçilecek — yeni kategori UYDURMA.
 
 ÜSLUP (kullanıcıya görünen tüm metin alanları, her dilde): uzun tire (—) KULLANMA; yerine virgül, \
-nokta ya da iki nokta kullan. Slogan, üçlü kalıp ve pazarlama dili yok; kısa, sade cümleler.
+nokta ya da iki nokta kullan. Slogan, üçlü kalıp ve pazarlama dili yok; kısa, sade cümleler. \
+Birinci tekil şahıs KULLANMA (ben/bence, "değerlendiremiyorum", "I can't", "my view"); kendi \
+sınırlarını ya da yatırım tavsiyesi olmadığını anlatan kapanış cümlesi YAZMA (bu not arayüzde \
+zaten var). Yalnızca şirket ve haberler hakkında yaz.
 """
 
 

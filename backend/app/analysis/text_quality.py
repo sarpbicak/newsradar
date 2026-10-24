@@ -59,12 +59,16 @@ BANNED_PHRASES = {
         "genel olarak olumlu/olumsuz",
         "ağırlıklı olarak/çoğunlukla/büyük ölçüde/genel olarak iyimser/kötümser",
         "haberler karışık", "haber akışı karışık", "karışık haber(ler)", "haber akışı dengeli",
+        "birinci tekil şahıs (ben/bence/benim, -(y)emiyorum/-(y)amıyorum: değerlendiremiyorum)",
+        "sınır anlatan kapanış (yatırım tavsiyesi değil(dir), yapay zeka olarak, söyleyemem/bilemem)",
     ],
     "en": [
         "largely/mostly/predominantly/broadly/generally positive/negative/bullish/bearish/"
         "upbeat/downbeat/optimistic/pessimistic",
         "news flow leans positive/negative", "news flow is mixed", "news is mixed",
         "mixed news", "… is mixed: / … is mixed,", "news is balanced / news balanced",
+        "first person (I/I'm/I can't/my view/in my opinion)",
+        "self-limiting closers (not financial/investment advice, as an AI)",
     ],
 }
 _GAP = r"(?:\s+[^\W\d_]+)?\s+"  # en fazla bir ara kelime
@@ -78,6 +82,12 @@ BANNED_PATTERNS = {
         # I/ı/İ/i eşdeğerliğini de kapsar: "KARIŞIK HABER").
         re.compile(r"\bkarışık\s+haber\w*", re.IGNORECASE),
         re.compile(r"\bhaber\s+akışı" + _GAP + r"dengeli\w*", re.IGNORECASE),
+        # Birinci tekil şahıs + kendi sınırını anlatan kapanış (bu not arayüzde zaten var).
+        re.compile(r"\b(?:ben|bence|benim)\b", re.IGNORECASE),
+        re.compile(r"\b\w+(?:yemiyorum|yamıyorum|emiyorum|amıyorum)\b", re.IGNORECASE),
+        re.compile(r"\b(?:söyleyemem|bilemem|diyemem|edemem|veremem)\b", re.IGNORECASE),
+        re.compile(r"\byatırım\s+tavsiyesi\b", re.IGNORECASE),
+        re.compile(r"\byapay\s+zek[aâ]\s+olarak\b", re.IGNORECASE),
     ],
     "en": [
         re.compile(r"\b(?:largely|mostly|predominantly|broadly|generally)" + _GAP
@@ -91,6 +101,12 @@ BANNED_PATTERNS = {
         re.compile(r"\bmixed\s+news\b", re.IGNORECASE),
         re.compile(r"\bis\s+mixed[:,]", re.IGNORECASE),
         re.compile(r"\bnews\s+(?:is\s+)?balanced\b", re.IGNORECASE),
+        # Birinci tekil şahıs (zamir "I" büyük harf: IGNORECASE YOK) + sınır anlatan kapanış.
+        re.compile(r"\bI(?:'m|’m|'ve|’ve|'d|’d|'ll|’ll)?\s+(?:am|cannot|can't|can’t|can|do|don't|don’t|would|think|believe|have|could|won't|must|need)\b"),
+        re.compile(r"\bI(?:'m|’m)\b"),
+        re.compile(r"\b(?:my|in\s+my)\s+(?:view|opinion|assessment|analysis|knowledge|data)\b", re.IGNORECASE),
+        re.compile(r"\b(?:not|isn't|isn’t|is\s+not)\s+(?:financial|investment)\s+advice\b", re.IGNORECASE),
+        re.compile(r"\bas\s+an\s+AI\b", re.IGNORECASE),
     ],
 }
 
