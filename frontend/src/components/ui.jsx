@@ -296,8 +296,8 @@ export function NewsPill({ a, evidence, horizon }) {
   return <TagShell st={st}>{sig.text}</TagShell>;
 }
 
-// Kısa / uzun vade seçici (iki düğme, aria-pressed). Kart bir role=button olduğundan tık ve
-// klavye olayları karta taşmaz. compact: kartta "Kısa | Uzun".
+// Kısa / uzun vade seçici (iki düğme, aria-pressed). Tık ve klavye olayları karta taşmaz
+// (kart tıklayınca detayı açar). compact: kartta "Kısa | Uzun".
 export function HorizonToggle({ value, onChange, compact = false, className = "" }) {
   return (
     <div role="group" aria-label={tt("hz.toggle")} className={`inline-flex shrink-0 rounded-control border border-ink-600 p-0.5 ${className}`}>

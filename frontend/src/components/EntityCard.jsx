@@ -137,19 +137,18 @@ export default function EntityCard({ card, onOpen }) {
   const priority = diverge && card.priority_reason === "divergence" ? null : card.priority_reason;
   const open = () => onOpen(card.id);
   return (
-    <Card
-      interactive
-      role="button"
-      tabIndex={0}
-      onClick={open}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
+    // Kart düz bir kutu: fareyle her yeri açar; klavye/ekran okuyucu için tüm kartı kaplayan TEK
+    // açma düğmesi var. Vade seçici bu düğmenin üstünde (iç içe etkileşimli öğe yok — axe).
+    <Card interactive onClick={open} className="card-cq relative flex h-full flex-col gap-4 overflow-hidden p-5 text-left md:p-6">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
           open();
-        }
-      }}
-      className="card-cq relative flex h-full flex-col gap-4 overflow-hidden p-5 text-left md:p-6"
-    >
+        }}
+        aria-label={tt("card.openDetail", { name: displayName(card) })}
+        className="absolute inset-0 rounded-card focus-visible:[outline-offset:-2px]"
+      />
       <span className="absolute inset-x-0 top-0 h-0.5" style={{ background: edge }} aria-hidden="true" />
 
       {/* Başlık: sabit en az yükseklik (iki satırlık ad + sembol) → hüküm her kartta aynı hizada. */}
@@ -166,7 +165,7 @@ export default function EntityCard({ card, onOpen }) {
       {a && (
         <div className="-mt-1 flex flex-wrap items-center justify-between gap-2">
           <NewsPill a={a} evidence={card.evidence_strength} horizon={horizon} />
-          {hasHorizons(a) && <HorizonToggle value={horizon} onChange={setHorizon} compact />}
+          {hasHorizons(a) && <HorizonToggle value={horizon} onChange={setHorizon} compact className="relative z-10" />}
         </div>
       )}
 

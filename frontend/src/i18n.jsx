@@ -93,6 +93,7 @@ const STR = {
   "card.buyLean": { tr: "Analistler: alım yönlü", en: "Analysts: buy-leaning" },
   "card.sellLean": { tr: "Analistler: satış yönlü", en: "Analysts: sell-leaning" },
   "card.holdLean": { tr: "Analistler: karışık", en: "Analysts: mixed" },
+  "card.openDetail": { tr: "{name} ayrıntılarını aç", en: "Open {name} details" },
   "card.newsCount": { tr: "{n} haber", en: "{n} articles" },
   "card.stanceChanged": { tr: "yön değişti", en: "stance changed" },
   // Katman 1 kartındaki "neden önemli" rozeti (backend kanonik anahtar döndürür)
