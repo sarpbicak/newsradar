@@ -54,11 +54,11 @@ with session_scope() as s:
         s.add(Article(entity_id=bid, url=f"http://b/{i}", url_hash=f"b{i}", source="s",
                       title=f"{words[i]} {words[(i + 3) % 10]}{i} story{i * 13}", description="d",
                       provider="t", analyzed=False, prefiltered=False, published_at=now - timedelta(hours=i + 1)))
-    # Quiet: taze değerlendirmesi var, yeni makale yok → atlanmalı
-    for lang in ("tr", "en"):
-        s.add(EntityAnalysis(entity_id=qid, language=lang, risk_score=40, sentiment_trend="stable",
-                             top_drivers=[], summary="s.", stance="neutral", conviction="low",
-                             what_to_verify=[], invalidation="i.", created_at=now))
+    # Quiet: taze tek kaynak değerlendirmesi (iki dilin metniyle) var, yeni makale yok → atlanmalı
+    s.add(EntityAnalysis(entity_id=qid, language="all", risk_score=40, sentiment_trend="stable",
+                         top_drivers=[], summary="s.", stance="neutral", conviction="low",
+                         what_to_verify=[], invalidation="i.", created_at=now,
+                         texts={"en": {"summary": "s."}, "tr": {"summary": "ö."}}))
 
 
 class Client:

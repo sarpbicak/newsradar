@@ -53,6 +53,8 @@ RISK_FLAGS = (
 IMPACT_HORIZONS = ("short", "medium", "long")
 STANCES = ("bullish", "neutral", "bearish")
 CONVICTIONS = ("low", "medium", "high")
+# Tek kaynak değerlendirme kaydının dil değeri (metinler entity_analyses.texts içinde).
+ALL_LANGUAGES = "all"
 SENTIMENT_TRENDS = ("improving", "stable", "deteriorating")
 
 
@@ -516,8 +518,9 @@ class EntityAnalysis(Base):
         ForeignKey("entities.id", ondelete="CASCADE"), nullable=False, index=True
     )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
-    # Bu değerlendirmenin dili ("tr" | "en"). Aynı taramada her iki dilde birer satır
-    # üretilir; kullanıcı diline göre ilgili satır gösterilir. Eski kayıtlar "tr".
+    # Dil: "all" = TEK KAYNAK (yeni): hüküm/risk/yönler/takip listesi bir kez üretilir, metinler
+    # `texts` içinde dil başına ({"en": {...}, "tr": {...}}); kolonlardaki metin kaynak dildedir.
+    # "tr" | "en" = eski dil başına kayıtlar (ayrı çağrılar) — okunmaya devam eder.
     language: Mapped[str] = mapped_column(String(5), default="tr", nullable=False, index=True)
 
     # Finans bilmeyen için tek cümlelik düz hüküm (kartın başında). Eski
@@ -541,6 +544,8 @@ class EntityAnalysis(Base):
     # summary}. Aynı değerlendirme çağrısında üretilir. Eski kayıtlarda None → tek etiket.
     short_term: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     long_term: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # language="all" kayıtlarında dil başına metinler (bkz. analysis.schemas.localizable_texts).
+    texts: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     articles_considered: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     # Bu snapshot anındaki ortalama duygu (-1..1) — değişim (delta) hesabı için saklanır.
     avg_sentiment: Mapped[float | None] = mapped_column(Float, nullable=True)

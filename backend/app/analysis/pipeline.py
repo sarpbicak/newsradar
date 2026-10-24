@@ -31,8 +31,8 @@ from ..config import get_settings
 from ..messages import msg
 from ..db.database import session_scope
 from ..db.models import (
-    PREFILTER_VERSION, Article, DiscardedArticle, Entity, EntityAnalysis, PriceSnapshot,
-    Suggestion,
+    ALL_LANGUAGES, PREFILTER_VERSION, Article, DiscardedArticle, Entity, EntityAnalysis,
+    PriceSnapshot, Suggestion,
 )
 from ..analyst import analyst_context_for
 from ..prices import price_context_for
@@ -42,6 +42,7 @@ from .prompts import (
     SYSTEM_PROMPT,
     build_article_batch_prompt,
     build_entity_prompt,
+    build_translation_prompt,
 )
 from .text_quality import (
     BANNED_PHRASES, PROMPT_LIMITS, banned_phrase_hits, hard_cap, has_markup_leak,
@@ -52,11 +53,14 @@ from .schemas import (
     ENTITY_ANALYSIS_TOOL,
     HORIZON_FIELDS,
     RELEVANCE_THRESHOLD,
+    TRANSLATION_TOOL,
     apply_horizon_floor,
     horizon_consistent,
     horizon_counts,
+    localizable_texts,
     sanitize_article_analysis,
     sanitize_entity_analysis,
+    sanitize_translation,
 )
 
 logger = logging.getLogger("newsradar.analysis")
@@ -88,8 +92,12 @@ _MAX_SPLIT_DEPTH = 6
 ASSESSMENT_READ_CAP = 200
 MAX_ANALYSIS_HISTORY = 100  # entity başına saklanacak en fazla değerlendirme kaydı
 MAX_DISCARDED_PER_ENTITY = 50  # entity başına saklanan elenen-makale kaydı
-# GEREKSİZ DEĞERLENDİRMEYİ ATLA (en büyük maliyet kazancı): entity değerlendirmesi (dil
-# başına) yalnızca (a) son değerlendirmeden sonra yeni analiz edilmiş makale varsa, (b) fiyat
+# TEK KAYNAK: değerlendirme şirket başına BİR KEZ, kaynak dilde (EN: haberlerin çoğu İngilizce,
+# çıktı tokeni Türkçeden az) üretilir; diğer dil yalnızca metin çevirisidir (makale modeli).
+ASSESSMENT_SOURCE_LANG = "en"
+ASSESSMENT_LANGUAGES = ("en", "tr")
+# GEREKSİZ DEĞERLENDİRMEYİ ATLA (en büyük maliyet kazancı): entity değerlendirmesi
+# yalnızca (a) son değerlendirmeden sonra yeni analiz edilmiş makale varsa, (b) fiyat
 # o zamandan beri ≥ |%3| oynadıysa ya da (c) son değerlendirme 24 saatten eskiyse yapılır.
 ASSESSMENT_MAX_AGE_HOURS = 24
 ASSESSMENT_PRICE_MOVE_PCT = 3.0
@@ -699,20 +707,26 @@ def _read_assessment_payload(entity_id: int) -> list[dict]:
         ]
 
 
-def _assessment_due(entity_id: int, language: str) -> str | None:
-    """Bu dilde yeni değerlendirme gerekiyorsa SEBEBİNİ, gerekmiyorsa None döndürür."""
+def _assessment_due(entity_id: int) -> str | None:
+    """Yeni (tek kaynak) değerlendirme gerekiyorsa SEBEBİNİ, gerekmiyorsa None döndürür.
+
+    Dil başına değil ŞİRKET başına: TR ve EN aynı kaydı paylaşır. Yalnızca eski dil başına
+    kayıtları olan şirket ilk yenilemede tek kaynağa geçer; çevirisi eksik kalan kayıt da
+    yeniden üretilir (kullanıcı başka dilin hükmünü hiç görmesin)."""
     now = datetime.now(timezone.utc)
     with session_scope() as session:
-        last_at = session.scalar(
-            select(EntityAnalysis.created_at)
-            .where(EntityAnalysis.entity_id == entity_id, EntityAnalysis.language == language)
+        last = session.scalar(
+            select(EntityAnalysis)
+            .where(EntityAnalysis.entity_id == entity_id, EntityAnalysis.language == ALL_LANGUAGES)
             .order_by(EntityAnalysis.created_at.desc())
             .limit(1)
         )
-        # O DİLDE hiç kayıt yoksa yeni veri olmasa da değerlendir: diğer dilde analiz olsa
-        # bile bu dilin kullanıcısı aksi halde hiç analiz göremez (API başka dile düşmez).
-        if last_at is None:
-            return "bu dilde değerlendirme yok"
+        if last is None:
+            return "tek kaynak değerlendirme yok"
+        missing = [lang for lang in ASSESSMENT_LANGUAGES if lang not in (last.texts or {})]
+        if missing:
+            return f"çeviri eksik ({', '.join(missing)})"
+        last_at = last.created_at
         if now - last_at > timedelta(hours=ASSESSMENT_MAX_AGE_HOURS):
             return f"son değerlendirme {ASSESSMENT_MAX_AGE_HOURS} saatten eski"
         new_articles = session.scalar(
@@ -739,17 +753,88 @@ def _assessment_due(entity_id: int, language: str) -> str | None:
     return None
 
 
-def _assessment_langs(entity_id: int, name: str, force: bool = False) -> list[str]:
-    """Değerlendirilecek diller (tr/en); gereksizler loglanıp atlanır."""
-    langs = []
-    for lang in ("tr", "en"):
-        reason = "zorla" if force else _assessment_due(entity_id, lang)
-        if reason is None:
-            logger.info("[%s] değerlendirme atlandı: yeni veri yok (%s)", name, lang)
-        else:
-            logger.info("[%s] değerlendirme yapılacak (%s): %s", name, lang, reason)
-            langs.append(lang)
-    return langs
+def _assessment_needed(entity_id: int, name: str, force: bool = False) -> bool:
+    """Bu şirket için değerlendirme yapılacak mı (sebep loglanır)?"""
+    reason = "zorla" if force else _assessment_due(entity_id)
+    if reason is None:
+        logger.info("[%s] değerlendirme atlandı: yeni veri yok", name)
+        return False
+    logger.info("[%s] değerlendirme yapılacak: %s", name, reason)
+    return True
+
+
+_TRANSLATE_SYSTEM = (
+    "Sen NewsRadar'ın çevirmenisin. Yalnızca verilen metinleri çevirirsin; yorum eklemez, "
+    "anlamı değiştirmezsin. Sonucu her zaman verilen araçla döndürürsün."
+)
+
+
+def _translation_notes(texts: dict, lang: str) -> list[str]:
+    """Çeviride yeniden istemeyi gerektiren sorunlar (yasaklı ifade, dil sızıntısı)."""
+    flat = []
+    for v in texts.values():
+        flat += v if isinstance(v, list) else [v]
+    joined = " \n ".join(str(x) for x in flat)
+    notes = []
+    hits = banned_phrase_hits(joined, lang)
+    if hits:
+        notes.append(_BANNED_NOTE[lang].format(
+            found=", ".join(f"'{h}'" for h in hits),
+            phrases=", ".join(f"'{p}'" for p in BANNED_PHRASES[lang])))
+    leaks = language_leak_hits(joined, lang)
+    if leaks:
+        notes.append(_LANG_NOTE[lang].format(found=", ".join(f"'{w}'" for w in leaks)))
+    return notes
+
+
+def _translate_texts(client, source: dict, target: str, name: str) -> dict | None:
+    """Tek kaynak değerlendirmenin metinlerini `target` diline çevirir (makale modeli, Haiku).
+    Hüküm/risk/yön istemde yok → değişemez. Geçersiz ya da sorunlu çıktı BİR KEZ notla yeniden
+    istenir; yine geçersizse None (kayıt bu dil olmadan yazılır, sonraki yenileme tamamlar)."""
+    base = build_translation_prompt(source, target)
+    max_tokens = get_settings().max_output_tokens
+    best, best_notes = None, None
+    note = ""
+    for attempt in range(2):
+        try:
+            raw = client.call_tool(system=_TRANSLATE_SYSTEM, user=f"{base}{note}",
+                                   tool=TRANSLATION_TOOL, max_tokens=max_tokens)
+        except ProviderQuotaError:
+            raise
+        except ClaudeError as exc:
+            logger.warning("[%s] çeviri (%s) başarısız: %s", name, target, exc)
+            continue
+        out = sanitize_translation(raw, source, target)
+        if out is None:
+            note = ("\n\nNOT: Önceki yanıtta alan eksikti ya da liste madde sayısı tutmadı. Her alanı "
+                    "doldur; listelerde kaynaktakiyle aynı sayıda madde olsun.")
+            continue
+        notes = _translation_notes(out, target)
+        if best is None or len(notes) < len(best_notes):
+            best, best_notes = out, notes
+        if not notes:
+            break
+        note = "\n\n" + "\n\n".join(notes)
+    if best is None:
+        logger.warning("[%s] çeviri (%s) iki denemede de geçersiz — bu dil yazılmadı.", name, target)
+    elif best_notes:
+        logger.warning("[%s] çeviride kalan sorun (%s): %s", name, target, " | ".join(best_notes))
+    return best
+
+
+def _assess_and_translate(assess_client, translate_client, build_fn, payload, name):
+    """TEK değerlendirme (kaynak dil: EN) + diğer dillere metin çevirisi.
+    (adata, kullanılan_payload, çeviriler{dil: metinler}) döner."""
+    adata, used = _assess_entity_with_recovery(assess_client, build_fn, payload, name, ASSESSMENT_SOURCE_LANG)
+    clean = apply_horizon_floor(sanitize_entity_analysis(adata, ASSESSMENT_SOURCE_LANG), horizon_counts(used))
+    source = localizable_texts(clean)
+    translations = {ASSESSMENT_SOURCE_LANG: source}
+    for lang in ASSESSMENT_LANGUAGES:
+        if lang != ASSESSMENT_SOURCE_LANG:
+            tr = _translate_texts(translate_client, source, lang, name)
+            if tr is not None:
+                translations[lang] = tr
+    return adata, used, translations
 
 
 def _avg_sentiment(payload: list[dict]) -> float | None:
@@ -759,20 +844,25 @@ def _avg_sentiment(payload: list[dict]) -> float | None:
 
 
 def _write_assessment(entity_id: int, data: dict, considered: int,
-                      avg_sentiment: float | None, language: str = "tr",
-                      counts: dict[str, int] | None = None) -> None:
-    """Entity-başı değerlendirmeyi APPEND-ONLY kaydeder (DİL BAŞINA) ve geçmişi sınırlar.
+                      avg_sentiment: float | None, language: str = ASSESSMENT_SOURCE_LANG,
+                      counts: dict[str, int] | None = None,
+                      translations: dict[str, dict] | None = None) -> None:
+    """Entity-başı TEK KAYNAK değerlendirmeyi APPEND-ONLY kaydeder ve geçmişi sınırlar.
 
-    Aynı taramada tr ve en ayrı satır yazılır; geçmiş DİL BAŞINA 100 kayıtla sınırlanır ki
-    delta/risk-geçmişi aynı dildeki kayıtlar arasında tutarlı kalsın."""
+    Hüküm, risk, vade yönleri ve takip listesi tek kayıtta; kolonlardaki metin kaynak dilde
+    (`language`), dil başına metinler `texts` içinde. Kayıt dili "all" — TR ve EN aynı satırı
+    okur. Geçmiş 100 kayıtla sınırlanır."""
     clean = sanitize_entity_analysis(data, language)
     if counts is not None:
         apply_horizon_floor(clean, counts)
     with session_scope() as session:
+        texts = dict(translations or {})
+        texts.setdefault(language, localizable_texts(clean))
         session.add(
             EntityAnalysis(
                 entity_id=entity_id,
-                language=language,
+                language=ALL_LANGUAGES,
+                texts=texts,
                 headline_verdict=clean["headline_verdict"],
                 ai_take=clean["ai_take"],
                 risk_score=clean["risk_score"],
@@ -791,10 +881,10 @@ def _write_assessment(entity_id: int, data: dict, considered: int,
             )
         )
         session.flush()
-        # DB şişmesin: bu DİLDE en yeni 100 dışındaki eski kayıtları temizle.
+        # DB şişmesin: en yeni 100 tek kaynak kaydı dışındakileri temizle.
         stale = session.scalars(
             select(EntityAnalysis.id)
-            .where(EntityAnalysis.entity_id == entity_id, EntityAnalysis.language == language)
+            .where(EntityAnalysis.entity_id == entity_id, EntityAnalysis.language == ALL_LANGUAGES)
             .order_by(EntityAnalysis.created_at.desc())
             .offset(MAX_ANALYSIS_HISTORY)
         ).all()
@@ -810,11 +900,13 @@ async def analyze_all_async(
     entity_ids: set[int] | None = None,
     assess_client=None,
     step_cb=None,
+    translate_client=None,
 ) -> AnalyzeTotals:
     """Aktif entity'ler için ön-filtre + paralel analiz + değerlendirme.
 
     client: makale-batch analizi; assess_client: entity değerlendirmesi (ayrı model
     olabilir — NEWSRADAR_ASSESSMENT_MODEL). Verilmezse ikisi için de `client` kullanılır.
+    translate_client: değerlendirme metinlerinin çevirisi (verilmezse `client`, makale modeli).
     step_cb(entity_id, name, step, n=None, frac=None): adım bazlı ilerleme — step:
     "filter" | "analyze" | "assess" | "skipped" | "done"; frac: entity'nin kendi
     diliminde 0..1 ilerleme (UI çubuğu entity içinde de ilerlesin).
@@ -829,6 +921,7 @@ async def analyze_all_async(
     max_articles = settings.max_articles_per_entity  # 0 = sınırsız (_prefilter yorumlar)
     concurrency = max(1, settings.analysis_concurrency)
     assess_client = assess_client or client
+    translate_client = translate_client or client
 
     # SİSTEM BÜTÇE TAVANI (canlı, USD): her çağrı llm_usage'a anında yazıldığı için bugünkü
     # harcama DB'den okunur; tavana ulaşılırsa YENİ entity/değerlendirme başlatılmaz.
@@ -1039,58 +1132,50 @@ async def analyze_all_async(
             applied["analyzed"], applied["discarded"],
         )
 
-        # 3) Değerlendirme gerekli mi (dil başına: yeni makale / fiyat ≥%3 / 24s)? Gerekliyse
-        #    payload + fiyat bağlamını oku (DB), Claude çağır, yaz.
+        # 3) Değerlendirme gerekli mi (yeni makale / fiyat ≥%3 / 24s)? Gerekliyse payload +
+        #    fiyat bağlamını oku (DB), TEK değerlendirme + çeviri, tek kayıt yaz.
         async with db_lock:
-            langs = await asyncio.to_thread(_assessment_langs, t["id"], t["name"])
-        totals.assessments_skipped += 2 - len(langs)
-        if not langs and not n_batches:
+            needed = await asyncio.to_thread(_assessment_needed, t["id"], t["name"])
+        totals.assessments_skipped += 0 if needed else 1
+        if not needed and not n_batches:
             _step(t["id"], t["name"], "skipped", frac=1.0)  # yeni veri yok — kısa not
-        elif langs:
+        elif needed:
             _step(t["id"], t["name"], "assess", frac=0.85)
         payload = []
-        if langs:
+        if needed:
             async with db_lock:
                 payload = await asyncio.to_thread(_read_assessment_payload, t["id"])
                 price_ctx = await asyncio.to_thread(price_context_for, t["id"])
                 analyst_ctx = await asyncio.to_thread(analyst_context_for, t["id"])
-        if payload:
-            # İKİ DİLDE değerlendirme: arayüzü İngilizce olan kullanıcı içeriği de
-            # İngilizce görsün. Makale analizi tek sefer; bu yalnızca +1 çağrı/dil.
-            for out_lang in langs:
-                if _quota_stopped["flag"]:
-                    break  # kota durdu → dil döngüsünü de kes (yeniden deneme yok)
-                if await asyncio.to_thread(_over_budget):
-                    _note_budget()
-                    break
-                def _build(items, _ol=out_lang):
+        if payload and not _quota_stopped["flag"]:
+            if await asyncio.to_thread(_over_budget):
+                _note_budget()
+            else:
+                def _build(items):
                     return build_entity_prompt(
                         t["name"], t["query"], t["type"], items,
                         price=price_ctx, language=t["language"], analyst=analyst_ctx,
-                        out_lang=_ol,
+                        out_lang=ASSESSMENT_SOURCE_LANG,
                     )
                 try:
                     # Kesilme kurtarmalı (2× token → gerekirse yarı bağlam). Semaphore altında.
                     async with sem:
-                        if _quota_stopped["flag"]:
-                            break
-                        adata, used = await asyncio.to_thread(
-                            _assess_entity_with_recovery, assess_client, _build, payload,
-                            f"{t['name']}/{out_lang}", out_lang,
+                        adata, used, translations = await asyncio.to_thread(
+                            _assess_and_translate, assess_client, translate_client, _build,
+                            payload, t["name"],
                         )
                     async with db_lock:
                         await asyncio.to_thread(
-                            _write_assessment, t["id"], adata, len(used), _avg_sentiment(used), out_lang,
-                            horizon_counts(used),
+                            _write_assessment, t["id"], adata, len(used), _avg_sentiment(used),
+                            ASSESSMENT_SOURCE_LANG, horizon_counts(used), translations,
                         )
                     totals.entity_assessments += 1
-                    run_headlines[out_lang][t["name"]] = (
+                    run_headlines[ASSESSMENT_SOURCE_LANG][t["name"]] = (
                         str(adata.get("headline_verdict") or ""), t.get("aliases") or [t["name"]])
                 except ProviderQuotaError as exc:
                     _note_quota(exc)  # değerlendirme _call'ı kullanmaz → burada işaretle
-                    break
                 except ClaudeError as exc:
-                    totals.warnings.append(msg("assessment_failed", t["name"], lang=out_lang, error=exc))
+                    totals.warnings.append(msg("assessment_failed", t["name"], lang=ASSESSMENT_SOURCE_LANG, error=exc))
 
         done += 1
         _step(t["id"], t["name"], "done", frac=1.0)
@@ -1136,13 +1221,14 @@ def _warn_template_collapse(run_headlines: dict[str, dict[str, tuple[str, list[s
 
 
 def analyze_entity_sync(entity_id: int, client: ClaudeClient, assess_client=None,
-                        force_assessment: bool = False) -> AnalyzeTotals:
+                        force_assessment: bool = False, translate_client=None) -> AnalyzeTotals:
     """CLI/test için tek entity'yi senkron analiz eder (ön-filtre + batch + değerlendirme).
 
     assess_client verilmezse değerlendirme de `client` ile yapılır. Değerlendirme
     yenilemedeki kuralla aynı şekilde atlanabilir; force_assessment=True her iki dili zorlar."""
     settings = get_settings()
     assess_client = assess_client or client
+    translate_client = translate_client or client
     batch_size = max(1, settings.batch_size)
     expire_stale_pending()  # lookback dışı bekleyenler LLM'e gitmesin
     max_articles = settings.max_articles_per_entity  # 0 = sınırsız (_prefilter yorumlar)
@@ -1220,26 +1306,26 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient, assess_client=None
     if batches and applied["returned"] == 0:
         totals.warnings.append(msg("llm_zero", name, batches=len(batches)))
 
-    langs = _assessment_langs(entity_id, name, force=force_assessment)
-    totals.assessments_skipped += 2 - len(langs)
-    payload2 = _read_assessment_payload(entity_id) if langs else []
+    needed = _assessment_needed(entity_id, name, force=force_assessment)
+    totals.assessments_skipped += 0 if needed else 1
+    payload2 = _read_assessment_payload(entity_id) if needed else []
     if payload2:
         _price = price_context_for(entity_id)
         _analyst = analyst_context_for(entity_id)
-        for out_lang in langs:
-            def _build2(items, _ol=out_lang):
-                return build_entity_prompt(
-                    name, query, etype, items, price=_price, language=lang,
-                    analyst=_analyst, out_lang=_ol,
-                )
-            try:
-                # Kesilme kurtarmalı (settings.max_output_tokens → 2× → yarı bağlam).
-                adata, used = _assess_entity_with_recovery(
-                    assess_client, _build2, payload2, f"{name}/{out_lang}", out_lang)
-                _write_assessment(entity_id, adata, len(used), _avg_sentiment(used), out_lang,
-                                  horizon_counts(used))
-                totals.entity_assessments += 1
-            except ClaudeError as exc:
-                totals.warnings.append(msg("assessment_failed", name, lang=out_lang, error=exc))
+
+        def _build2(items):
+            return build_entity_prompt(
+                name, query, etype, items, price=_price, language=lang,
+                analyst=_analyst, out_lang=ASSESSMENT_SOURCE_LANG,
+            )
+        try:
+            # Kesilme kurtarmalı (settings.max_output_tokens → 2× → yarı bağlam) + çeviri.
+            adata, used, translations = _assess_and_translate(
+                assess_client, translate_client, _build2, payload2, name)
+            _write_assessment(entity_id, adata, len(used), _avg_sentiment(used),
+                              ASSESSMENT_SOURCE_LANG, horizon_counts(used), translations)
+            totals.entity_assessments += 1
+        except ClaudeError as exc:
+            totals.warnings.append(msg("assessment_failed", name, lang=ASSESSMENT_SOURCE_LANG, error=exc))
 
     return totals

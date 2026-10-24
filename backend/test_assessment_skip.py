@@ -1,7 +1,7 @@
 """Gereksiz değerlendirmeyi atlama — sahte client (gerçek API yok, izole temp DB).
 
 Doğrular:
-  (A) ilk tarama → TR + EN değerlendirme (2 çağrı)
+  (A) ilk tarama → TEK değerlendirme (EN) + TR metin çevirisi (Haiku) — tek kayıt
   (B) yeni veri yok → 0 değerlendirme çağrısı, log: "[X] değerlendirme atlandı: yeni veri yok"
   (C) fiyat ≥ %3 oynadı → yeniden değerlendirme; %2 → atlanır
   (D) son değerlendirme 24 saatten eski → yeniden değerlendirme
@@ -9,6 +9,7 @@ Doğrular:
 Çalıştır: python test_assessment_skip.py
 """
 import asyncio
+import json
 import logging
 import os
 import tempfile
@@ -29,7 +30,7 @@ os.environ.update(
 from sqlalchemy import update  # noqa: E402
 
 from app.analysis.pipeline import analyze_all_async  # noqa: E402
-from app.analysis.schemas import ENTITY_ANALYSIS_TOOL  # noqa: E402
+from app.analysis.schemas import ENTITY_ANALYSIS_TOOL, TRANSLATION_TOOL  # noqa: E402
 from app.db.database import init_db, session_scope  # noqa: E402
 from app.db.models import Article, Entity, EntityAnalysis, PriceSnapshot  # noqa: E402
 
@@ -54,12 +55,23 @@ lg = logging.getLogger("newsradar.analysis")
 lg.addHandler(cap); lg.setLevel(logging.INFO)
 
 
+def fake_translation(user):
+    """Çeviri istemindeki JSON'u alır, her metni 'TR ' önekiyle döndürür (yapı aynı)."""
+    src, _ = json.JSONDecoder().raw_decode(user.split("JSON:\n", 1)[1])
+    return {k: ([f"TR {x}" for x in v] if isinstance(v, list) else (f"TR {v}" if v else ""))
+            for k, v in src.items()}
+
+
 class FakeClient:
     model = "fake"
     def __init__(self):
         self.assess_calls = 0
         self.article_calls = 0
+        self.translate_calls = 0
     def call_tool(self, *, system, user, tool, max_tokens=4096):
+        if tool["name"] == TRANSLATION_TOOL["name"]:
+            self.translate_calls += 1
+            return fake_translation(user)
         if tool["name"] == ENTITY_ANALYSIS_TOOL["name"]:
             self.assess_calls += 1
             if "CRITICAL RULES" in user:  # EN çıktı istendi → İngilizce (dil sızıntısı yok)
@@ -94,11 +106,16 @@ def run():
 
 print("== A: ilk tarama ==")
 fc, t = run()
-check(fc.assess_calls == 2 and t.entity_assessments == 2, f"TR+EN değerlendirildi ({fc.assess_calls})")
+check(fc.assess_calls == 1 and t.entity_assessments == 1, f"tek değerlendirme ({fc.assess_calls})")
+check(fc.translate_calls == 1, f"TR için tek çeviri çağrısı ({fc.translate_calls})")
+with session_scope() as s:
+    rows = s.query(EntityAnalysis).filter_by(entity_id=eid).all()
+check(len(rows) == 1 and rows[0].language == "all" and set(rows[0].texts) == {"en", "tr"},
+      f"tek kayıt, iki dilin metni ({[(r.language, sorted(r.texts or {})) for r in rows]})")
 
 print("== B: yeni veri yok ==")
 fc, t = run()
-check(fc.assess_calls == 0 and t.assessments_skipped == 2, f"değerlendirme çağrısı yok ({fc.assess_calls})")
+check(fc.assess_calls == 0 and fc.translate_calls == 0 and t.assessments_skipped == 1, f"değerlendirme çağrısı yok ({fc.assess_calls})")
 check(any(m.startswith("[Tesla] değerlendirme atlandı: yeni veri yok") for m in cap.msgs),
       "log: [Tesla] değerlendirme atlandı: yeni veri yok")
 
@@ -110,7 +127,7 @@ check(fc.assess_calls == 0, f"%2 hareket → atlandı ({fc.assess_calls})")
 with session_scope() as s:
     s.add(PriceSnapshot(entity_id=eid, price=103.5, fetched_at=now()))
 fc, _ = run()
-check(fc.assess_calls == 2, f"%3.5 hareket → TR+EN yeniden ({fc.assess_calls})")
+check(fc.assess_calls == 1, f"%3.5 hareket → yeniden ({fc.assess_calls})")
 check(any("fiyat %+3.5 oynadı" in m for m in cap.msgs), "sebep loglandı (fiyat)")
 
 print("== D: 24 saatten eski ==")
@@ -118,7 +135,7 @@ with session_scope() as s:
     s.execute(update(EntityAnalysis).where(EntityAnalysis.entity_id == eid)
               .values(created_at=now() - timedelta(hours=25)))
 fc, _ = run()
-check(fc.assess_calls == 2, f"25 saatlik değerlendirme → yeniden ({fc.assess_calls})")
+check(fc.assess_calls == 1, f"25 saatlik değerlendirme → yeniden ({fc.assess_calls})")
 
 print("== E: yeni analiz edilmiş makale ==")
 fc, _ = run()
@@ -129,7 +146,7 @@ with session_scope() as s:
                   analyzed_at=now() + timedelta(seconds=1), prefiltered=False,
                   sentiment=0.1, event_type="other", relevance=0.9))
 fc, _ = run()
-check(fc.assess_calls == 2, f"yeni makale → TR+EN yeniden ({fc.assess_calls})")
+check(fc.assess_calls == 1, f"yeni makale → yeniden ({fc.assess_calls})")
 
 print("=" * 50)
 print(f"SONUÇ: {PASS} geçti, {FAIL} başarısız")

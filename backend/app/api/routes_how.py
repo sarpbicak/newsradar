@@ -18,7 +18,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..db.database import get_db
-from ..db.models import Article, DiscardedArticle, Entity, EntityAnalysis, User
+from ..db.models import ALL_LANGUAGES, Article, DiscardedArticle, Entity, EntityAnalysis, User
 from ..seed import DEFAULT_WATCHLIST
 from .routes_auth import get_current_user
 from .schemas import HowItWorksOut, HowHeadlineOut
@@ -42,7 +42,7 @@ def _pick_entity(db: Session, language: str) -> Entity | None:
     rows = db.execute(
         select(Entity, func.max(EntityAnalysis.created_at))
         .join(EntityAnalysis, EntityAnalysis.entity_id == Entity.id)
-        .where(Entity.query.in_(queries), EntityAnalysis.language == language,
+        .where(Entity.query.in_(queries), EntityAnalysis.language.in_((language, ALL_LANGUAGES)),
                EntityAnalysis.created_at >= since)
         .group_by(Entity.id)
     ).all()

@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session
 
 from ..analyst import display_target
 from ..config import get_settings
-from ..db.models import AnalystSnapshot, Article, Entity, EntityAnalysis, PriceSnapshot
+from ..analysis.schemas import apply_texts
+from ..db.models import ALL_LANGUAGES, AnalystSnapshot, Article, Entity, EntityAnalysis, PriceSnapshot
 from .schemas import (
     AnalysisOut,
     AnalystOut,
@@ -38,17 +39,26 @@ def content_language(user, lang: str | None = None) -> str:
     return (getattr(user, "language", None) or "tr")
 
 
+def _for_language(q, language: str | None):
+    """Bu dilde okunabilen kayıtlar: tek kaynak ("all") + eski dil başına kayıtlar."""
+    if language:
+        q = q.where(EntityAnalysis.language.in_((language, ALL_LANGUAGES)))
+    return q
+
+
 def _latest_analysis(session: Session, entity_id: int, language: str | None = None) -> EntityAnalysis | None:
     """Kullanıcı dilindeki EN SON değerlendirme. O dilde yoksa None — başka dile DÜŞMEZ.
 
-    Eskiden diğer dile düşülüyordu; Türkçe arayüzde kartta İngilizce hüküm görünüyordu
-    (dil karışması). Artık kart analizsiz döner + `analysis_missing_language=True`; eksik
-    dil bir sonraki yenilemede yeni veri olmasa da üretilir (pipeline._assessment_due).
+    Yeni kayıtlar tek kaynak ("all"): TR ve EN aynı hükmü okur, metin `texts[dil]`'den gelir.
+    En son tek kaynak kaydın bu dilde metni yoksa (çeviri başarısız) None: kart analizsiz döner
+    + `analysis_missing_language=True` — eski dil kaydına düşüp FARKLI bir hüküm göstermez.
+    Eksik çeviri bir sonraki yenilemede tamamlanır (pipeline._assessment_due).
     language=None → dilden bağımsız en son kayıt (yalnızca dil-nötr iç kullanım)."""
-    q = select(EntityAnalysis).where(EntityAnalysis.entity_id == entity_id)
-    if language:
-        q = q.where(EntityAnalysis.language == language)
-    return session.scalar(q.order_by(EntityAnalysis.created_at.desc()))
+    q = _for_language(select(EntityAnalysis).where(EntityAnalysis.entity_id == entity_id), language)
+    row = session.scalar(q.order_by(EntityAnalysis.created_at.desc()))
+    if row is not None and language and row.language == ALL_LANGUAGES and language not in (row.texts or {}):
+        return None
+    return row
 
 
 def _has_other_language_analysis(session: Session, entity_id: int, language: str) -> bool:
@@ -63,9 +73,7 @@ def _has_other_language_analysis(session: Session, entity_id: int, language: str
 def _previous_analysis(session: Session, entity_id: int, language: str | None = None) -> EntityAnalysis | None:
     """Son değerlendirmeden bir öncekini döner — AYNI dilde (delta tr'yi en ile
     karşılaştırmasın). yoksa None → yeterli geçmiş yok."""
-    q = select(EntityAnalysis).where(EntityAnalysis.entity_id == entity_id)
-    if language:
-        q = q.where(EntityAnalysis.language == language)
+    q = _for_language(select(EntityAnalysis).where(EntityAnalysis.entity_id == entity_id), language)
     return session.scalar(q.order_by(EntityAnalysis.created_at.desc()).offset(1).limit(1))
 
 
@@ -104,9 +112,7 @@ def risk_history(session: Session, entity_id: int, limit: int = 30,
     """Son ~N değerlendirmenin risk skoru zaman serisi (eski → yeni). DİL FİLTRELİ:
     her taramada tr+en yazıldığı için filtrelenmezse noktalar İKİYE katlanırdı."""
     def _q(lang):
-        q = select(EntityAnalysis).where(EntityAnalysis.entity_id == entity_id)
-        if lang:
-            q = q.where(EntityAnalysis.language == lang)
+        q = _for_language(select(EntityAnalysis).where(EntityAnalysis.entity_id == entity_id), lang)
         return session.scalars(q.order_by(EntityAnalysis.created_at.desc()).limit(limit)).all()
     rows = _q(language)
     if not rows and language:  # o dilde kayıt yoksa herhangi bir dile düş
@@ -158,23 +164,37 @@ def _horizon_out(raw: dict | None) -> HorizonOut | None:
     return HorizonOut(verdict=raw["verdict"], drivers=drivers, summary=raw.get("summary") or "")
 
 
-def analysis_out(a: EntityAnalysis | None) -> AnalysisOut | None:
+def localized_analysis(a: EntityAnalysis, language: str | None = None) -> dict:
+    """Kaydın görünen alanları: dilden bağımsız alanlar kayıttan, metin (tek kaynak kayıtta)
+    istenen dilin `texts` girdisinden. Eski dil başına kayıt olduğu gibi döner."""
+    base = {
+        "headline_verdict": a.headline_verdict, "ai_take": a.ai_take, "summary": a.summary,
+        "invalidation": a.invalidation, "top_drivers": a.top_drivers or [],
+        "what_to_verify": a.what_to_verify or [], "short_term": a.short_term, "long_term": a.long_term,
+    }
+    if a.language == ALL_LANGUAGES and language:
+        return apply_texts(base, (a.texts or {}).get(language))
+    return base
+
+
+def analysis_out(a: EntityAnalysis | None, language: str | None = None) -> AnalysisOut | None:
     if a is None:
         return None
+    t = localized_analysis(a, language)
     return AnalysisOut(
-        headline_verdict=a.headline_verdict,
-        ai_take=a.ai_take,
+        headline_verdict=t["headline_verdict"],
+        ai_take=t["ai_take"],
         risk_score=a.risk_score,
         sentiment_trend=a.sentiment_trend,
-        top_drivers=a.top_drivers or [],
+        top_drivers=t["top_drivers"],
         driver_directions=a.driver_directions,
-        summary=a.summary,
+        summary=t["summary"],
         stance=a.stance,
         conviction=a.conviction,
-        what_to_verify=a.what_to_verify or [],
-        invalidation=a.invalidation,
-        short_term=_horizon_out(a.short_term),
-        long_term=_horizon_out(a.long_term),
+        what_to_verify=t["what_to_verify"],
+        invalidation=t["invalidation"],
+        short_term=_horizon_out(t["short_term"]),
+        long_term=_horizon_out(t["long_term"]),
         articles_considered=a.articles_considered,
         created_at=a.created_at,
     )
@@ -360,8 +380,9 @@ def entity_card(session: Session, entity: Entity, language: str = "tr") -> Entit
         avg_sentiment=round(avg_sentiment, 3) if avg_sentiment is not None else None,
         top_flags=top_flags,
         last_updated=latest.created_at if latest else None,
-        analysis=analysis_out(latest),
-        analysis_language=latest.language if latest else None,
+        analysis=analysis_out(latest, language),
+        # Tek kaynak kayıtta gösterilen metnin dili istenen dildir.
+        analysis_language=(language if latest.language == ALL_LANGUAGES else latest.language) if latest else None,
         analysis_missing_language=missing_language,
         horizon=horizon,
         evidence_strength=evidence_strength,

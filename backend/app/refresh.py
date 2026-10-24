@@ -360,6 +360,7 @@ def run_refresh(
         try:
             client = get_llm_provider("article")
             assess_client = get_llm_provider("assessment")
+            translate_client = get_llm_provider("translation")  # değerlendirme metni çevirisi
         except MissingAPIKeyError as exc:
             summary.warnings.append(msg("llm_key_missing", detail=str(exc)))
             return summary
@@ -373,7 +374,7 @@ def run_refresh(
 
         # Kullanım çağrı başına llm_usage'a yazılıyor (budget.record_llm_call); burada yalnızca
         # sağlık kaydı için bu taramada başarılı çağrı olup olmadığını sayıyoruz.
-        clients = [client] if assess_client is client else [client, assess_client]
+        clients = [client, assess_client, translate_client]
 
         def _calls() -> int:
             return sum(getattr(c, "call_count", 0) or 0 for c in clients)
@@ -384,6 +385,7 @@ def run_refresh(
             analyze_all_async(
                 client, progress_cb=_set_progress, entity_cb=_set_current_entity,
                 entity_ids=entity_ids, assess_client=assess_client, step_cb=_report_step,
+                translate_client=translate_client,
             )
         )
         summary.prefiltered = totals.prefiltered

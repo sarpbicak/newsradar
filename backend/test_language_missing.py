@@ -6,11 +6,12 @@ Doğrular:
   (B) ?lang=tr|en: arayüzün o anki dili kayıtlı dili ezer (dashboard dahil); geçersiz → kayıtlı dil
   (C) POST /users/me/language yanıttan ÖNCE commit eder (get_db commit'i yanıttan sonra
       çalışıyordu → hemen ardından gelen GET eski dilde kart alıyordu)
-  (D) atlama kuralı: yeni veri YOKKEN bile o dilde hiç analiz yoksa o dil değerlendirilir;
-      diğer (güncel) dil atlanır
+  (D) geçiş: yalnızca eski dil başına kaydı olan şirket, yeni veri YOKKEN bile ilk yenilemede
+      TEK kaynak değerlendirmeye (EN + TR çeviri) geçer; ikinci yenilemede atlanır
 Çalıştır: python test_language_missing.py
 """
 import asyncio
+import json
 import logging
 import os
 import tempfile
@@ -33,7 +34,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import select  # noqa: E402
 
 from app.analysis.pipeline import analyze_all_async  # noqa: E402
-from app.analysis.schemas import ENTITY_ANALYSIS_TOOL  # noqa: E402
+from app.analysis.schemas import ENTITY_ANALYSIS_TOOL, TRANSLATION_TOOL  # noqa: E402
 from app.api.main import app  # noqa: E402
 from app.api.routes_users import LanguageIn, set_language  # noqa: E402
 from app.db.database import SessionLocal, init_db, session_scope  # noqa: E402
@@ -148,6 +149,11 @@ class FakeClient:
         self.langs = []
 
     def call_tool(self, *, system, user, tool, max_tokens=4096):
+        if tool["name"] == TRANSLATION_TOOL["name"]:
+            self.langs.append("çeviri")
+            src, _ = json.JSONDecoder().raw_decode(user.split("JSON:\n", 1)[1])
+            return {k: ([f"TR {x}" for x in v] if isinstance(v, list) else (f"TR {v}" if v else ""))
+                    for k, v in src.items()}
         if tool["name"] == ENTITY_ANALYSIS_TOOL["name"]:
             en = "CRITICAL RULES" in user
             self.langs.append("en" if en else "tr")
@@ -168,13 +174,13 @@ with session_scope() as s:
     s.add(mk(kid, "tr", "Anthropic hükmü.", at=now() - timedelta(hours=1)))
 fc = FakeClient()
 totals = asyncio.run(analyze_all_async(fc, entity_ids={kid}))
-check(fc.langs == ["en"], f"yeni veri yokken yalnızca eksik EN değerlendirildi ({fc.langs})")
-check(totals.assessments_skipped == 1, f"güncel TR atlandı (atlanan={totals.assessments_skipped})")
-check(any("[Anthropic] değerlendirme yapılacak (en): bu dilde değerlendirme yok" in m for m in cap_msgs),
-      "log: eksik dil sebebi yazıldı")
+check(fc.langs == ["en", "çeviri"], f"eski TR kaydı → tek değerlendirme (EN) + TR çevirisi ({fc.langs})")
+check(totals.assessments_skipped == 0, f"atlanan yok (atlanan={totals.assessments_skipped})")
+check(any("[Anthropic] değerlendirme yapılacak: tek kaynak değerlendirme yok" in m for m in cap_msgs),
+      "log: geçiş sebebi yazıldı")
 fc2 = FakeClient()
-asyncio.run(analyze_all_async(fc2, entity_ids={kid}))
-check(fc2.langs == [], f"iki dil de varken yeni veri yok → atlandı ({fc2.langs})")
+totals2 = asyncio.run(analyze_all_async(fc2, entity_ids={kid}))
+check(fc2.langs == [] and totals2.assessments_skipped == 1, f"tek kaynak varken yeni veri yok → atlandı ({fc2.langs})")
 
 print("=" * 50)
 print(f"SONUÇ: {PASS} geçti, {FAIL} başarısız")

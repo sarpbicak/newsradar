@@ -208,6 +208,8 @@ class Settings:
         """Kullanım amacına göre Claude model adı ('article' | 'assessment' | 'chat')."""
         return {
             "article": self.article_model,
+            # Değerlendirme metinlerinin çevirisi: makale modeliyle (Haiku) — hüküm değişmez.
+            "translation": self.article_model,
             "assessment": self.assessment_model,
             "chat": self.chat_model,
         }[purpose]

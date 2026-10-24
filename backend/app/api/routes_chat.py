@@ -20,10 +20,11 @@ from ..analysis.claude_client import ClaudeError, MissingAPIKeyError
 from ..analysis.llm import get_llm_provider
 from ..analysis.prompts import SYSTEM_PROMPT, output_language_directive, utc_context_line
 from ..db.database import get_db
-from ..db.models import Article, Entity, EntityAnalysis, User
+from ..db.models import Article, Entity, User
 from ..watchlist import in_watchlist
 from .routes_auth import get_current_user
 from .schemas import ChatRequest
+from .serializers import _latest_analysis, localized_analysis
 from .usage import record_event
 
 router = APIRouter(tags=["chat"])
@@ -36,31 +37,40 @@ def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-def _build_context(db: Session, entity: Entity) -> str:
-    """Entity'nin son analiz edilmiş makaleleri + son değerlendirmesinden bağlam metni."""
+def _build_context(db: Session, entity: Entity, language: str = "tr") -> str:
+    """Entity'nin son analiz edilmiş makaleleri + son değerlendirmesinden bağlam metni.
+
+    Değerlendirme kartla AYNI kaynaktan: kullanıcının dilinde okunan son kayıt (tek kaynak
+    kayıtta hüküm/risk/vade yönleri dilden bağımsız, metin bu dilde). Sohbet ile kart asla
+    farklı yön söylemez."""
     articles = db.scalars(
         select(Article)
         .where(Article.entity_id == entity.id, Article.analyzed.is_(True))
         .order_by(Article.published_at.desc().nullslast())
         .limit(CONTEXT_ARTICLES)
     ).all()
-    latest = db.scalar(
-        select(EntityAnalysis)
-        .where(EntityAnalysis.entity_id == entity.id)
-        .order_by(EntityAnalysis.created_at.desc())
-    )
+    latest = _latest_analysis(db, entity.id, language)
 
     lines = [
         f"Tartışılan varlık: {entity.name} ({entity.type}:{entity.query}).",
         utc_context_line(),
     ]
     if latest:
+        t = localized_analysis(latest, language)
         lines += [
             "",
-            f"Son değerlendirme: yön={latest.stance}, kanaat={latest.conviction}, "
-            f"risk={latest.risk_score}/100, trend={latest.sentiment_trend}.",
-            f"Özet: {latest.summary}",
+            f"Son değerlendirme (kartta gösterilen; bununla çelişme): yön={latest.stance}, "
+            f"kanaat={latest.conviction}, risk={latest.risk_score}/100, trend={latest.sentiment_trend}.",
         ]
+        for key, label in (("short_term", "Kısa vade (~7 gün)"), ("long_term", "Uzun vade (30-90 gün)")):
+            h = t.get(key)
+            if isinstance(h, dict) and h.get("verdict"):
+                drivers = "; ".join(
+                    f"{'↑' if d.get('direction') == 'up' else '↓' if d.get('direction') == 'down' else '·'} {d.get('text')}"
+                    for d in (h.get("drivers") or []))
+                lines.append(f"{label}: {h['verdict']}" + (f" — {h['summary']}" if h.get("summary") else "")
+                             + (f" Etkenler: {drivers}" if drivers else ""))
+        lines.append(f"Özet: {t['summary']}")
     lines.append("")
     lines.append(f"Son analiz edilmiş {len(articles)} haber:")
     for a in articles:
@@ -99,10 +109,11 @@ def chat(
     if not messages or messages[0]["role"] != "user":
         raise HTTPException(status_code=400, detail="İlk mesaj 'user' olmalı ve boş olamaz.")
 
-    context = _build_context(db, entity)
+    language = getattr(user, "language", "tr") or "tr"
+    context = _build_context(db, entity, language)
     # Sohbet çıktısı kullanıcının arayüz diline uysun (SYSTEM_PROMPT artık dil-nötr).
     system = (
-        f"{SYSTEM_PROMPT}\n\n{output_language_directive(getattr(user, 'language', 'tr'))}"
+        f"{SYSTEM_PROMPT}\n\n{output_language_directive(language)}"
         f"\n\nBAĞLAM (bu varlığın haber akışı):\n{context}"
     )
 

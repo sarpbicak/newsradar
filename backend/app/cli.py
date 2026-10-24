@@ -84,6 +84,7 @@ def cmd_analyze(args: argparse.Namespace) -> None:
     try:
         client = get_llm_provider("article")
         assess_client = get_llm_provider("assessment")
+        translate_client = get_llm_provider("translation")
     except MissingAPIKeyError as exc:
         print(exc)
         sys.exit(1)
@@ -121,7 +122,8 @@ def cmd_analyze(args: argparse.Namespace) -> None:
               f"[{entity.type}:{entity.query!r}] (query len={len(entity.query)})")
 
     totals = analyze_entity_sync(entity_id, client, assess_client=assess_client,
-                                 force_assessment=args.force_assessment)
+                                 force_assessment=args.force_assessment,
+                                 translate_client=translate_client)
     print(f"\n=== {args.query} analizi (entity #{entity_id}) ===")
     # KRİTİK: _prefilter'ın BU analiz yolunda batch'e kaç makale seçtiği. diagnose'un
     # gösterdiği sayı ile karşılaştır — farklıysa iki komut farklı entity'ye çözülüyor.

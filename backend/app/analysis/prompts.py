@@ -9,6 +9,7 @@ yanıtlarını kısa bir "önce doğrula" kontrol listesiyle bitir.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 
 from .schemas import (
@@ -449,4 +450,34 @@ def entity_assessment_rules(out_lang: str) -> str:
         "olumlu hükümde 'up', olumsuz hükümde 'down' etkenler ağır basar. İki vade farklı "
         "çıkabilir; zorla eşitleme. İkisi de fiyat tahmini değildir. Yukarıdaki vade verisi bir "
         "vade için YETERSİZ diyorsa verdict='insufficient_data', etkenler ve summary boş."
+    )
+
+
+# Tek kaynak değerlendirmenin metin çevirisi (Haiku). Yalnızca metin alanları gider; hüküm,
+# risk, yönler ve enum'lar istemde YOKTUR → çeviri onları değiştiremez.
+def build_translation_prompt(texts: dict, target: str = "tr") -> str:
+    payload = json.dumps(texts, ensure_ascii=False, indent=1)
+    if (target or "tr").lower() == "en":
+        return (
+            "Translate every field of the JSON below into natural, plain English and return it "
+            "with the 'record_translation' tool.\n"
+            "RULES: keep the meaning exactly (do not add, drop or soften anything; do not change "
+            "whether something is good or bad for the company); same number of list items in the "
+            "same order; keep names, products, tickers and numbers as they are; every non-empty "
+            "field is a complete sentence ending with '.', '!' or '?'; empty fields stay empty; no "
+            "first person; no jargon; never use these phrases: "
+            + ", ".join(f"'{p}'" for p in BANNED_PHRASES["en"]) + ".\n\nJSON:\n" + payload
+        )
+    return (
+        "Aşağıdaki JSON'daki her alanı doğal, sade Türkçeye çevir ve 'record_translation' aracıyla "
+        "döndür.\n"
+        "KURALLAR: anlamı birebir koru (ekleme, çıkarma, yumuşatma yok; bir gelişmenin şirket için "
+        "olumlu mu olumsuz mu olduğunu değiştirme); listelerde aynı sayıda madde, aynı sırada; "
+        "şirket/ürün/kişi adları, borsa kodları ve rakamlar olduğu gibi kalır; dolu her alan '.', "
+        "'!' ya da '?' ile biten TAM bir cümledir; boş alan boş kalır. Lise öğrencisinin anlayacağı "
+        "günlük Türkçe: 'volatilite', 'momentum', 'konsolidasyon', 'değerleme', 'katalizör' "
+        "kullanma. YALNIZCA Türkçe yaz; İngilizce bağlaç/zarf (already, however, although, "
+        "because, while, still, which, also, the) karıştırma. Birinci tekil şahıs yok. Şu "
+        "ifadeleri asla kullanma: " + ", ".join(f"'{p}'" for p in BANNED_PHRASES["tr"])
+        + ".\n\nJSON:\n" + payload
     )

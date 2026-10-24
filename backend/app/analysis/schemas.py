@@ -464,6 +464,111 @@ def apply_horizon_floor(clean: dict, counts: dict[str, int]) -> dict:
     return clean
 
 
+# --------------------------------------------------------------------------- #
+#  Tek kaynak + çeviri: metin alanları dilden bağımsız alanlardan ayrılır
+# --------------------------------------------------------------------------- #
+# Çevrilen (dile bağlı) alanlar. Hüküm, risk, yönler, enum'lar ÇEVİRİYE GİTMEZ → değişemez.
+TEXT_FIELDS = ("headline_verdict", "ai_take", "summary", "invalidation")
+TEXT_LIST_FIELDS = ("top_drivers", "what_to_verify")
+
+
+def localizable_texts(clean: dict) -> dict:
+    """Temizlenmiş değerlendirmeden yalnızca metinler (düz yapı; çeviri aracıyla aynı)."""
+    out = {f: clean.get(f) or "" for f in TEXT_FIELDS}
+    out.update({f: list(clean.get(f) or []) for f in TEXT_LIST_FIELDS})
+    for h in HORIZON_FIELDS:
+        v = clean.get(h) or {}
+        out[f"{h}_summary"] = v.get("summary") or ""
+        out[f"{h}_drivers"] = [d.get("text") or "" for d in (v.get("drivers") or [])]
+    return out
+
+
+def apply_texts(base: dict, texts: dict | None) -> dict:
+    """Dilden bağımsız alanlar `base`'den, metinler `texts`'ten (yoksa base'deki kalır).
+    Liste uzunluğu tutmazsa o liste için kaynak metin korunur (yön/sıra kaymasın)."""
+    out = dict(base)
+    if not texts:
+        return out
+    for f in TEXT_FIELDS:
+        if texts.get(f):
+            out[f] = texts[f]
+    for f in TEXT_LIST_FIELDS:
+        if isinstance(texts.get(f), list) and len(texts[f]) == len(base.get(f) or []):
+            out[f] = list(texts[f])
+    for h in HORIZON_FIELDS:
+        v = base.get(h)
+        if not isinstance(v, dict):
+            continue
+        v = {**v, "drivers": [dict(d) for d in (v.get("drivers") or [])]}
+        if texts.get(f"{h}_summary"):
+            v["summary"] = texts[f"{h}_summary"]
+        tr = texts.get(f"{h}_drivers")
+        if isinstance(tr, list) and len(tr) == len(v["drivers"]):
+            for d, t in zip(v["drivers"], tr):
+                d["text"] = t
+        out[h] = v
+    return out
+
+
+TRANSLATION_TOOL_NAME = "record_translation"
+_str = {"type": "string"}
+_list = {"type": "array", "items": {"type": "string"}}
+TRANSLATION_TOOL = {
+    "name": TRANSLATION_TOOL_NAME,
+    "description": (
+        "Verilen metin alanlarının çevirisini kaydet. Her alan aynı anlamda, doğal hedef dilde; "
+        "listelerde AYNI sayıda madde, AYNI sırada. Boş alan boş kalır."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            **{f: _str for f in TEXT_FIELDS},
+            **{f: _list for f in TEXT_LIST_FIELDS},
+            **{f"{h}_summary": _str for h in HORIZON_FIELDS},
+            **{f"{h}_drivers": _list for h in HORIZON_FIELDS},
+        },
+        "required": [*TEXT_FIELDS, *TEXT_LIST_FIELDS,
+                     *(f"{h}_{k}" for h in HORIZON_FIELDS for k in ("summary", "drivers"))],
+        "additionalProperties": False,
+    },
+}
+
+
+def sanitize_translation(raw: object, source: dict, language: str) -> dict | None:
+    """Çeviri çıktısını doğrular: her alan var, listeler kaynakla aynı uzunlukta, kaynakta dolu
+    olan alan boş değil. Geçersizse None (çağıran yeniden dener ya da çeviriyi yazmaz)."""
+    if not isinstance(raw, dict):
+        return None
+    lang = "en" if language == "en" else "tr"
+
+    def clip(field: str, value: object) -> str:
+        label = f"{field}/{lang}/çeviri"
+        text = strip_markup_leak(str(value or "").strip(), label)
+        return clip_to_sentence(text, hard_cap(field, lang), label)
+
+    out: dict = {}
+    for key, src in source.items():
+        field = key
+        if key.endswith("_summary") and key.split("_summary")[0] in HORIZON_FIELDS:
+            field = "horizon_summary"
+        elif key.endswith("_drivers"):
+            field = "top_drivers"
+        val = raw.get(key)
+        if isinstance(src, list):
+            items = _as_list(val, f"çeviri.{key}")
+            if len(items) != len(src):
+                logger.warning("[çeviri] %s: %d madde bekleniyordu, %d geldi.", key, len(src), len(items))
+                return None
+            out[key] = [clip(field, x) for x in items]
+            if any(s and not t for s, t in zip(src, out[key])):
+                return None
+        else:
+            out[key] = clip(field, val) if src else ""
+            if src and not out[key]:
+                return None
+    return out
+
+
 def sanitize_entity_analysis(item: dict, language: str = "tr") -> dict:
     """Claude'dan gelen entity değerlendirmesini güvenli değerlere çeker.
 
