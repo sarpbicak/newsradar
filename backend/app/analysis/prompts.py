@@ -11,6 +11,15 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from .schemas import (
+    LONG_TERM_DAYS,
+    MIN_LONG_ARTICLES,
+    MIN_SHORT_ARTICLES,
+    SHORT_TERM_DAYS,
+    _as_utc,
+    horizon_counts,
+    horizon_has_data,
+)
 from .text_quality import BANNED_PHRASES, PROMPT_LIMITS
 
 SYSTEM_PROMPT = """\
@@ -126,7 +135,8 @@ def output_language_directive(out_lang: str) -> str:
     if (out_lang or "tr").lower() == "en":
         return (
             "ÇIKTI DİLİ (KATI): TÜM metin alanları (rationale, summary, ai_take, "
-            "headline_verdict, top_drivers, what_to_verify, invalidation, why_relevant) "
+            "headline_verdict, top_drivers, what_to_verify, invalidation, why_relevant, "
+            "short_term/long_term drivers + summary) "
             "AKICI ve DOĞAL İNGİLİZCE olacak. YALNIZCA İngilizce yaz: Türkçe kelime/bağlaç "
             "(ve, ile, için, ama, ancak, değil, gibi) ve Türkçe harf (ğ, ş, ı, ü, ö, ç) "
             "KULLANMA — kaynak haber ya da gerekçe Türkçe olsa bile çevir. Yalnızca özel adlar "
@@ -136,7 +146,8 @@ def output_language_directive(out_lang: str) -> str:
         )
     return (
         "ÇIKTI DİLİ (KATI): TÜM metin alanları (rationale, summary, ai_take, "
-        "headline_verdict, top_drivers, what_to_verify, invalidation, why_relevant) "
+        "headline_verdict, top_drivers, what_to_verify, invalidation, why_relevant, "
+        "short_term/long_term drivers + summary) "
         "AKICI ve DOĞAL TÜRKÇE olacak. YALNIZCA Türkçe yaz: İngilizce kelime/bağlaç "
         "(already, however, although, because, while, still, which, also, the, thus, "
         "overall, meanwhile) KARIŞTIRMA — kaynak haber İngilizce olsa bile Türkçeye çevir "
@@ -234,15 +245,45 @@ def _analyst_lines(analyst: dict | None) -> list[str]:
         price = analyst.get("current_price")
         up = analyst.get("upside_percent")
         if price is not None and up is not None:
-            yon = "yukarıda" if up >= 0 else "aşağıda"
+            yon = "üstünde" if up >= 0 else "altında"
             target += (
-                f". Güncel fiyat={price}; hedef, güncelin %{abs(up)} {yon}sında. "
+                f". Güncel fiyat={price}; hedef, güncel fiyatın %{abs(up)} {yon}. "
                 "Haber akışı bu hedefle UYUMLU mu yoksa ÇELİŞİYOR mu değerlendir; ayrışma "
                 "varsa bunu headline_verdict'te BU ŞİRKETE ÖZGÜ somut bir detayla belirt: "
                 "hangi iş kolu/ürün/olay ayrışmayı yaratıyor. Hazır kalıp cümle kullanma; "
                 "ayrışmayı o şirketin gerçek durumuyla anlat."
             )
         lines.append(target)
+    return lines
+
+
+def _date_stamp(published_at: object, now: datetime) -> str:
+    """Haber satırı başına tarih damgası: "[2026-10-21, 3 gün önce] " (tarih yoksa boş)."""
+    d = _as_utc(published_at)
+    if d is None:
+        return ""
+    days = max(0, (now - d).days)
+    ago = "bugün" if days == 0 else f"{days} gün önce"
+    return f"[{d:%Y-%m-%d}, {ago}] "
+
+
+def _horizon_lines(analyzed: list[dict]) -> list[str]:
+    """Vade başına haber sayısı + veri yetersizse o vade için açık talimat."""
+    counts = horizon_counts(analyzed)
+    lines = [
+        f"VADE VERİSİ: son {SHORT_TERM_DAYS} günde {counts['short_term']} haber, son "
+        f"{LONG_TERM_DAYS} günde {counts['long_term']} haber."
+    ]
+    if not horizon_has_data("short_term", counts):
+        lines.append(
+            f"Kısa vade için veri YETERSİZ (son {SHORT_TERM_DAYS} günde {MIN_SHORT_ARTICLES}'den az "
+            "haber): short_term.verdict='insufficient_data', drivers=[], summary=''."
+        )
+    if not horizon_has_data("long_term", counts):
+        lines.append(
+            f"Uzun vade için veri YETERSİZ ({MIN_LONG_ARTICLES}'ten az haber): "
+            "long_term.verdict='insufficient_data', drivers=[], summary=''."
+        )
     return lines
 
 
@@ -271,11 +312,13 @@ def build_entity_prompt(
         f"Aşağıda bu varlıkla ilgili, analiz edilmiş {len(analyzed)} haber var "
         "(en yeni önce). Bunlardan haber-akışı bazlı toplu bir değerlendirme üret ve "
         "'record_entity_assessment' aracıyla döndür.",
+        *_horizon_lines(analyzed),
         "",
-        "ANALİZ EDİLMİŞ HABERLER:",
+        "ANALİZ EDİLMİŞ HABERLER (her satırda yayın tarihi ve kaç gün önce):",
     ]
     # Not: Aynı haberin farklı kaynaklardaki kopyaları TEK sayıldı; "N kaynak" = o
     # haberin ÖNEMİ (kaç yayında çıktı), sentiment tekrarı değil.
+    now = datetime.now(timezone.utc)
     multi = any((a.get("source_count") or 1) > 1 for a in analyzed)
     if multi:
         lines.append(
@@ -288,8 +331,8 @@ def build_entity_prompt(
         sc = a.get("source_count") or 1
         src = f", {sc} kaynak" if sc > 1 else ""
         lines.append(
-            f"• (duygu {a['sentiment']:+.2f}, {a['event_type']}, ufuk {a['impact_horizon']}, "
-            f"riskler: {flags}{src}) {a['title']}"
+            f"• {_date_stamp(a.get('published_at'), now)}(duygu {a['sentiment']:+.2f}, {a['event_type']}, "
+            f"ufuk {a['impact_horizon']}, riskler: {flags}{src}) {a['title']}"
         )
         if a.get("rationale"):
             lines.append(f"    gerekçe: {a['rationale']}")
@@ -346,7 +389,17 @@ def entity_assessment_rules(out_lang: str) -> str:
             "shares are still 40% below the IPO price.'\n"
             "10) LANGUAGE: write ONLY in English. No Turkish words or Turkish letters, even "
             "when the source news or the article rationales are Turkish; only proper nouns "
-            "stay as they are."
+            "stay as they are.\n"
+            f"11) TWO HORIZONS. short_term = the next ~{SHORT_TERM_DAYS} days, driven by EVENTS "
+            f"in the recent news (announcements, results, lawsuits, launches); weigh the last "
+            f"{SHORT_TERM_DAYS} days by their dates. long_term = 30-90 days, driven by STRUCTURAL "
+            "factors (business model, market share, costs, regulation, lasting trends). For each: "
+            "verdict (very_negative/negative/neutral/positive/very_positive), 2-3 drivers (a short "
+            "complete sentence + direction up/down for the company) and a one-sentence summary. "
+            "The verdict must MATCH the driver directions: 'up' drivers dominate a positive "
+            "verdict, 'down' drivers a negative one. The two horizons may disagree; do not force "
+            "them to match. Neither is a price forecast. If the data note above says a horizon "
+            "has insufficient data, return verdict='insufficient_data' with empty drivers and summary."
         )
     return (
         "KRİTİK KURALLAR (aynen uygula):\n"
@@ -386,5 +439,14 @@ def entity_assessment_rules(out_lang: str) -> str:
         "testi başarılı geçti, fakat hisse hâlâ halka arz fiyatının yüzde 40 altında.'\n"
         "10) DİL: YALNIZCA Türkçe yaz. Kaynak haber İngilizce olsa bile İngilizce kelime "
         "(already, however, although, because, while, still, which, also, the) kullanma; "
-        "yalnızca özel adlar olduğu gibi kalır."
+        "yalnızca özel adlar olduğu gibi kalır.\n"
+        f"11) İKİ VADE. short_term = önümüzdeki ~{SHORT_TERM_DAYS} gün; son haberlerdeki OLAYLARA "
+        f"(duyuru, sonuç, dava, ürün çıkışı) dayanır, son {SHORT_TERM_DAYS} günün haberlerini "
+        "tarihlerine bakarak tart. long_term = 30-90 gün; YAPISAL etkenlere (iş modeli, pazar "
+        "payı, maliyet, düzenleme, süregelen eğilim) dayanır. Her biri için: verdict "
+        "(very_negative/negative/neutral/positive/very_positive), 2-3 etken (kısa TAM cümle + "
+        "şirket için yön up/down) ve tek cümlelik summary. Hüküm etken yönleriyle UYUMLU olmalı: "
+        "olumlu hükümde 'up', olumsuz hükümde 'down' etkenler ağır basar. İki vade farklı "
+        "çıkabilir; zorla eşitleme. İkisi de fiyat tahmini değildir. Yukarıdaki vade verisi bir "
+        "vade için YETERSİZ diyorsa verdict='insufficient_data', etkenler ve summary boş."
     )

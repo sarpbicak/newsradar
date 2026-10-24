@@ -50,7 +50,11 @@ from .text_quality import (
 from .schemas import (
     ARTICLE_ANALYSIS_TOOL,
     ENTITY_ANALYSIS_TOOL,
+    HORIZON_FIELDS,
     RELEVANCE_THRESHOLD,
+    apply_horizon_floor,
+    horizon_consistent,
+    horizon_counts,
     sanitize_article_analysis,
     sanitize_entity_analysis,
 )
@@ -169,9 +173,31 @@ _LANG_NOTE = {
            "text fields ONLY in English; no Turkish words or Turkish letters (ğ, ş, ı, ü, ö, ç). "
            "Only proper nouns (company/product/person) stay as they are."),
 }
+# Vade hükmü etken yönleriyle çelişiyor → bir kez yeniden iste; yine çelişirse "mixed".
+_HORIZON_NOTE = {
+    "tr": ("NOT: Önceki denemede {fields} hükmü etken yönleriyle çelişti (ör. 'positive' ama "
+           "etkenlerin çoğu 'down'). Hüküm, etkenlerin ağır basan yönüyle uyumlu olsun; "
+           "gerçekten dengeliyse 'neutral' seç."),
+    "en": ("NOTE: In the previous attempt the {fields} verdict contradicted its driver "
+           "directions (e.g. 'positive' while most drivers were 'down'). Make the verdict match "
+           "the dominant driver direction; if truly balanced, choose 'neutral'."),
+}
 _BANNED_FIELDS = ("headline_verdict", "ai_take", "summary")
 _TEXT_FIELDS = ("headline_verdict", "ai_take", "summary", "invalidation")
 _LIST_FIELDS = ("top_drivers", "what_to_verify")
+
+
+def _horizon_texts(data: dict) -> list[str]:
+    """Vade özetleri + etken metinleri (yasaklı ifade / dil / işaretleme denetimi için)."""
+    out = []
+    for f in HORIZON_FIELDS:
+        h = data.get(f)
+        if not isinstance(h, dict):
+            continue
+        out.append(str(h.get("summary") or ""))
+        drivers = h.get("drivers") if isinstance(h.get("drivers"), list) else []
+        out += [str(d.get("text") or "") if isinstance(d, dict) else str(d) for d in drivers]
+    return out
 
 
 def _quality_notes(data: dict, lang: str) -> list[str]:
@@ -180,7 +206,8 @@ def _quality_notes(data: dict, lang: str) -> list[str]:
     n = word_count(str(data.get("headline_verdict") or ""))
     if n > hard_cap("headline_verdict", lang):
         notes.append(_SHORTER_NOTE[lang].format(n=n, limit=PROMPT_LIMITS["headline_verdict"][lang]))
-    text = " ".join(str(data.get(f) or "") for f in _BANNED_FIELDS)
+    horizon_texts = _horizon_texts(data)
+    text = " ".join([*(str(data.get(f) or "") for f in _BANNED_FIELDS), *horizon_texts])
     hits = banned_phrase_hits(text, lang)
     if hits:
         notes.append(_BANNED_NOTE[lang].format(
@@ -190,11 +217,15 @@ def _quality_notes(data: dict, lang: str) -> list[str]:
     for f in _LIST_FIELDS:
         v = data.get(f)
         pieces += [str(x) for x in v] if isinstance(v, list) else [str(v or "")]
+    pieces += horizon_texts
     if any(has_markup_leak(p) for p in pieces):
         notes.append(_MARKUP_NOTE[lang])
     leaks = language_leak_hits(" \n ".join(pieces), lang)
     if leaks:
         notes.append(_LANG_NOTE[lang].format(found=", ".join(f"'{w}'" for w in leaks)))
+    bad = [f for f in HORIZON_FIELDS if not horizon_consistent(data.get(f))]
+    if bad:
+        notes.append(_HORIZON_NOTE[lang].format(fields=" / ".join(bad)))
     return notes
 
 
@@ -662,6 +693,7 @@ def _read_assessment_payload(entity_id: int) -> list[dict]:
                 "risk_flags": a.risk_flags or [],
                 "rationale": a.rationale or "",
                 "source_count": a.source_count or 1,
+                "published_at": a.published_at,
             }
             for a in articles
         ]
@@ -727,12 +759,15 @@ def _avg_sentiment(payload: list[dict]) -> float | None:
 
 
 def _write_assessment(entity_id: int, data: dict, considered: int,
-                      avg_sentiment: float | None, language: str = "tr") -> None:
+                      avg_sentiment: float | None, language: str = "tr",
+                      counts: dict[str, int] | None = None) -> None:
     """Entity-başı değerlendirmeyi APPEND-ONLY kaydeder (DİL BAŞINA) ve geçmişi sınırlar.
 
     Aynı taramada tr ve en ayrı satır yazılır; geçmiş DİL BAŞINA 100 kayıtla sınırlanır ki
     delta/risk-geçmişi aynı dildeki kayıtlar arasında tutarlı kalsın."""
     clean = sanitize_entity_analysis(data, language)
+    if counts is not None:
+        apply_horizon_floor(clean, counts)
     with session_scope() as session:
         session.add(
             EntityAnalysis(
@@ -749,6 +784,8 @@ def _write_assessment(entity_id: int, data: dict, considered: int,
                 conviction=clean["conviction"],
                 what_to_verify=clean["what_to_verify"],
                 invalidation=clean["invalidation"],
+                short_term=clean.get("short_term"),
+                long_term=clean.get("long_term"),
                 articles_considered=considered,
                 avg_sentiment=avg_sentiment,
             )
@@ -1043,7 +1080,8 @@ async def analyze_all_async(
                         )
                     async with db_lock:
                         await asyncio.to_thread(
-                            _write_assessment, t["id"], adata, len(used), _avg_sentiment(used), out_lang
+                            _write_assessment, t["id"], adata, len(used), _avg_sentiment(used), out_lang,
+                            horizon_counts(used),
                         )
                     totals.entity_assessments += 1
                     run_headlines[out_lang][t["name"]] = (
@@ -1198,7 +1236,8 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient, assess_client=None
                 # Kesilme kurtarmalı (settings.max_output_tokens → 2× → yarı bağlam).
                 adata, used = _assess_entity_with_recovery(
                     assess_client, _build2, payload2, f"{name}/{out_lang}", out_lang)
-                _write_assessment(entity_id, adata, len(used), _avg_sentiment(used), out_lang)
+                _write_assessment(entity_id, adata, len(used), _avg_sentiment(used), out_lang,
+                                  horizon_counts(used))
                 totals.entity_assessments += 1
             except ClaudeError as exc:
                 totals.warnings.append(msg("assessment_failed", name, lang=out_lang, error=exc))

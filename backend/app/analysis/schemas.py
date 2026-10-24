@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from datetime import datetime, timedelta, timezone
 
 from ..db.models import (
     CONVICTIONS,
@@ -126,6 +127,98 @@ ARTICLE_ANALYSIS_TOOL = {
         "additionalProperties": False,
     },
 }
+
+# --------------------------------------------------------------------------- #
+#  Kısa / uzun vade (aynı değerlendirme çağrısının parçası — ek LLM çağrısı yok)
+# --------------------------------------------------------------------------- #
+# 5 kademeli haber yönü. "insufficient_data": o vade için yeterli haber yok (model ya da kod
+# koyar). "mixed" YALNIZCA kod koyar: hüküm, etken yönleriyle tekrar denemeden sonra da
+# çelişiyorsa (ör. "olumlu" ama etkenlerin çoğu "down").
+HORIZON_VERDICTS = ("very_negative", "negative", "neutral", "positive", "very_positive")
+NO_DATA_VERDICT = "insufficient_data"
+MIXED_VERDICT = "mixed"
+HORIZON_FIELDS = ("short_term", "long_term")
+SHORT_TERM_DAYS = 7     # kısa vade: son 7 günün olayları
+LONG_TERM_DAYS = 90     # uzun vade: 30-90 günlük yapısal etkenler (son 90 günün haberleri)
+MIN_SHORT_ARTICLES = 2  # bunun altında kısa vade "yetersiz veri"
+MIN_LONG_ARTICLES = 3   # bunun altında uzun vade "yetersiz veri"
+
+
+def _horizon_schema(desc: str) -> dict:
+    return {
+        "type": "object",
+        "description": desc,
+        "properties": {
+            "verdict": {"type": "string", "enum": [*HORIZON_VERDICTS, NO_DATA_VERDICT]},
+            "drivers": {
+                "type": "array",
+                "description": (
+                    "2-3 etken, istenen çıkış dilinde; her biri BU şirkete özgü kısa TAM cümle "
+                    "ve şirket için yönü ('up' olumlu, 'down' olumsuz). insufficient_data ise boş."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "text": {"type": "string"},
+                        "direction": {"type": "string", "enum": ["up", "down"]},
+                    },
+                    "required": ["text", "direction"],
+                    "additionalProperties": False,
+                },
+            },
+            "summary": {
+                "type": "string",
+                "description": "Bu vade için tek TAM cümle, istenen çıkış dilinde. insufficient_data ise boş.",
+            },
+        },
+        "required": ["verdict", "drivers", "summary"],
+        "additionalProperties": False,
+    }
+
+
+def _as_utc(value: object) -> datetime | None:
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    if not isinstance(value, datetime):
+        return None
+    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+
+def horizon_counts(payload: list[dict], now: datetime | None = None) -> dict[str, int]:
+    """Değerlendirme bağlamında vade başına haber sayısı (tarih yoksa sayılmaz)."""
+    now = now or datetime.now(timezone.utc)
+    dates = [d for d in (_as_utc(p.get("published_at")) for p in payload) if d is not None]
+    return {
+        "short_term": sum(1 for d in dates if now - d <= timedelta(days=SHORT_TERM_DAYS)),
+        "long_term": sum(1 for d in dates if now - d <= timedelta(days=LONG_TERM_DAYS)),
+    }
+
+
+def horizon_has_data(field: str, counts: dict[str, int]) -> bool:
+    need = MIN_SHORT_ARTICLES if field == "short_term" else MIN_LONG_ARTICLES
+    return counts.get(field, 0) >= need
+
+
+def horizon_consistent(h: dict | None) -> bool:
+    """Hüküm etken yönleriyle uyumlu mu? Olumlu tarafta 'up', olumsuz tarafta 'down' ağır
+    basmalı; nötr ve yönsüz etkenler denetlenmez."""
+    if not isinstance(h, dict):
+        return True
+    v = h.get("verdict")
+    drivers = h.get("drivers") if isinstance(h.get("drivers"), list) else []
+    dirs = [d.get("direction") for d in drivers if isinstance(d, dict)]
+    up, down = dirs.count("up"), dirs.count("down")
+    if up + down == 0:
+        return True
+    if v in ("positive", "very_positive"):
+        return up > down
+    if v in ("negative", "very_negative"):
+        return down > up
+    return True
+
 
 # --------------------------------------------------------------------------- #
 #  Entity-başı toplu analiz tool'u
@@ -246,10 +339,17 @@ ENTITY_ANALYSIS_TOOL = {
                 "type": "string",
                 "description": "Bu görüşü çürütecek olay/haber — tek TAM cümle, istenen çıkış dilinde; nokta ile biter.",
             },
+            "short_term": _horizon_schema(
+                "KISA VADE (~7 gün): son haberlerdeki OLAYLARA odaklı haber yönü. Fiyat tahmini değil."
+            ),
+            "long_term": _horizon_schema(
+                "UZUN VADE (30-90 gün): YAPISAL etkenlere (iş modeli, pazar, maliyet, düzenleme, "
+                "süregelen eğilim) dayalı haber yönü. Fiyat tahmini değil."
+            ),
         },
         "required": [
             "headline_verdict", "ai_take", "risk_score", "sentiment_trend", "top_drivers", "top_driver_directions",
-            "summary", "stance", "conviction", "what_to_verify", "invalidation",
+            "summary", "stance", "conviction", "what_to_verify", "invalidation", "short_term", "long_term",
         ],
         "additionalProperties": False,
     },
@@ -332,6 +432,38 @@ def _as_list(value: object, label: str) -> list:
     return [p for p in parts if p]
 
 
+def sanitize_horizon(raw: object, clip) -> dict | None:
+    """Tek vadeyi güvenli değerlere çeker; geçersiz/eksikse None (eski kayıt gibi davranır).
+    Tekrar denemeden sonra da hüküm etkenlerle çelişiyorsa hüküm "mixed" olur."""
+    if not isinstance(raw, dict):
+        return None
+    verdict = raw.get("verdict")
+    if verdict not in (*HORIZON_VERDICTS, NO_DATA_VERDICT):
+        return None
+    if verdict == NO_DATA_VERDICT:
+        return {"verdict": NO_DATA_VERDICT, "drivers": [], "summary": ""}
+    drivers = []
+    for d in _as_list(raw.get("drivers"), "horizon.drivers"):
+        text, direction = (d.get("text"), d.get("direction")) if isinstance(d, dict) else (d, None)
+        if str(text or "").strip():
+            drivers.append({"text": clip("top_drivers", text),
+                            "direction": direction if direction in ("up", "down") else None})
+    out = {"verdict": verdict, "drivers": drivers[:3], "summary": clip("horizon_summary", raw.get("summary", ""))}
+    if not horizon_consistent(out):
+        logger.warning("[şema] vade hükmü (%s) etken yönleriyle çelişiyor → mixed.", verdict)
+        out["verdict"] = MIXED_VERDICT
+    return out
+
+
+def apply_horizon_floor(clean: dict, counts: dict[str, int]) -> dict:
+    """Haber sayısı eşiğin altındaki vadeyi (modelin cevabından bağımsız) "yetersiz veri"
+    yapar: 7 günde 1 haberle kısa vade hükmü verilmesin."""
+    for field in HORIZON_FIELDS:
+        if clean.get(field) is not None and not horizon_has_data(field, counts):
+            clean[field] = {"verdict": NO_DATA_VERDICT, "drivers": [], "summary": ""}
+    return clean
+
+
 def sanitize_entity_analysis(item: dict, language: str = "tr") -> dict:
     """Claude'dan gelen entity değerlendirmesini güvenli değerlere çeker.
 
@@ -371,4 +503,7 @@ def sanitize_entity_analysis(item: dict, language: str = "tr") -> dict:
         "conviction": conviction if conviction in CONVICTIONS else "low",
         "what_to_verify": verify[:4],
         "invalidation": clip("invalidation", item.get("invalidation", "")),
+        # Kısa / uzun vade (yoksa None: eski kayıtlar gibi tek etikete düşülür).
+        "short_term": sanitize_horizon(item.get("short_term"), clip),
+        "long_term": sanitize_horizon(item.get("long_term"), clip),
     }

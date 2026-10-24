@@ -58,6 +58,8 @@ def init_db() -> None:
     _ensure_column("entity_analyses", "headline_verdict", "TEXT")
     _ensure_column("entity_analyses", "ai_take", "TEXT")
     _ensure_column("entity_analyses", "driver_directions", "JSON")
+    _ensure_column("entity_analyses", "short_term", "JSON")
+    _ensure_column("entity_analyses", "long_term", "JSON")
     _ensure_column("users", "email", "VARCHAR(254)")
     # E-posta benzersizliği: yalnızca dolu değerler (eski hesaplarda NULL çok olabilir).
     with engine.begin() as conn:

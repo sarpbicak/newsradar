@@ -35,6 +35,7 @@ HARD_CAPS = {
     "ai_take": 180,
     "summary": 120,
     "invalidation": 60,
+    "horizon_summary": 50,   # vade başına tek cümle
     "top_drivers": 40,       # madde başına
     "what_to_verify": 60,    # madde başına
 }

@@ -537,6 +537,10 @@ class EntityAnalysis(Base):
     conviction: Mapped[str] = mapped_column(String(10), nullable=False)       # low/medium/high
     what_to_verify: Mapped[list] = mapped_column(JSON, nullable=False)        # list[str], TR
     invalidation: Mapped[str] = mapped_column(Text, nullable=False)           # TR, tek cümle
+    # Kısa (~7 gün, olay) / uzun (30-90 gün, yapısal) vade: {verdict, drivers:[{text, direction}],
+    # summary}. Aynı değerlendirme çağrısında üretilir. Eski kayıtlarda None → tek etiket.
+    short_term: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    long_term: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     articles_considered: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     # Bu snapshot anındaki ortalama duygu (-1..1) — değişim (delta) hesabı için saklanır.
     avg_sentiment: Mapped[float | None] = mapped_column(Float, nullable=True)

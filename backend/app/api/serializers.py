@@ -18,6 +18,8 @@ from .schemas import (
     ArticleOut,
     DeltaOut,
     EntityCardOut,
+    HorizonDriverOut,
+    HorizonOut,
     PreviousAnalysisOut,
     PricePointOut,
     RiskPointOut,
@@ -148,6 +150,14 @@ def analyst_history(session: Session, entity_id: int, periods: int = 6) -> list[
     ]
 
 
+def _horizon_out(raw: dict | None) -> HorizonOut | None:
+    if not isinstance(raw, dict) or not raw.get("verdict"):
+        return None
+    drivers = [HorizonDriverOut(text=str(d.get("text") or ""), direction=d.get("direction"))
+               for d in (raw.get("drivers") or []) if isinstance(d, dict) and d.get("text")]
+    return HorizonOut(verdict=raw["verdict"], drivers=drivers, summary=raw.get("summary") or "")
+
+
 def analysis_out(a: EntityAnalysis | None) -> AnalysisOut | None:
     if a is None:
         return None
@@ -163,6 +173,8 @@ def analysis_out(a: EntityAnalysis | None) -> AnalysisOut | None:
         conviction=a.conviction,
         what_to_verify=a.what_to_verify or [],
         invalidation=a.invalidation,
+        short_term=_horizon_out(a.short_term),
+        long_term=_horizon_out(a.long_term),
         articles_considered=a.articles_considered,
         created_at=a.created_at,
     )

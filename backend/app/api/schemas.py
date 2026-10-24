@@ -206,6 +206,20 @@ class AdminStatsOut(BaseModel):
 
 
 # --------------------------- Yanıt modelleri --------------------------- #
+class HorizonDriverOut(BaseModel):
+    text: str
+    direction: str | None = None  # "up" | "down" | None
+
+
+class HorizonOut(BaseModel):
+    """Kısa / uzun vade haber yönü. verdict: very_negative..very_positive | mixed |
+    insufficient_data. Fiyat tahmini DEĞİL."""
+
+    verdict: str
+    drivers: list[HorizonDriverOut] = []
+    summary: str = ""
+
+
 class AnalysisOut(BaseModel):
     headline_verdict: str | None = None
     ai_take: str | None = None
@@ -218,6 +232,9 @@ class AnalysisOut(BaseModel):
     conviction: str
     what_to_verify: list[str]
     invalidation: str
+    # Eski kayıtlarda None → arayüz tek etikete (stance) düşer.
+    short_term: HorizonOut | None = None
+    long_term: HorizonOut | None = None
     articles_considered: int
     created_at: datetime
 
