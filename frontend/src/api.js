@@ -180,8 +180,9 @@ export const api = {
   createEntity: (payload) =>
     req("/entities", { method: "POST", body: JSON.stringify(payload) }),
   deleteEntity: (id) => req(`/entities/${id}`, { method: "DELETE" }),
-  // limit=200: grafikler 90 günlük günlük duygu için daha çok haber ister (liste aynı veriyi kullanır).
-  dashboard: (id) => req(`/entities/${id}/dashboard?lang=${getLang()}&limit=200`),
+  // limit: haber sayısı (varsayılan 50). Grafikler 90 günlük günlük duygu için 200 ister —
+  // yalnızca o sekme açılınca (ilk yükleme hafif kalsın).
+  dashboard: (id, limit = 50) => req(`/entities/${id}/dashboard?lang=${getLang()}&limit=${limit}`),
   refresh: () => req("/refresh", { method: "POST" }),
   cancelRefresh: () => req("/refresh", { method: "DELETE" }), // sıradaki yenilemeden vazgeç
   searchSymbols: (q) => req(`/symbol-search?q=${encodeURIComponent(q)}`),

@@ -106,6 +106,18 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
     if (top <= stick + 1) window.scrollTo({ top: window.scrollY + top - stick, behavior: "instant" });
   };
 
+  // Grafikler sekmesi açılınca daha uzun haber geçmişi (200) bir kez çekilir; ilk yükleme 50 haberle hafif.
+  const [chartArticles, setChartArticles] = useState(null);
+  useEffect(() => setChartArticles(null), [entityId, lang]);
+  useEffect(() => {
+    if (tab !== "charts" || chartArticles) return undefined;
+    let alive = true;
+    api.dashboard(entityId, 200).then((d) => alive && setChartArticles(d.articles)).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [tab, entityId, chartArticles]);
+
   // entityId ya da DİL değişince yeniden çek — AI içeriği yeni dilde gelsin.
   useEffect(() => {
     let alive = true;
@@ -209,7 +221,7 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
               {activeTab === "summary" && <SummaryTab a={a} entity={entity} riskHistory={risk_history} articles={articles} analyzedCount={st?.analyzed} />}
               {activeTab === "charts" && (
                 <Suspense fallback={<Skeleton className="h-72 w-full" />}>
-                  <TimeSeriesCharts riskHistory={risk_history} priceHistory={price_history} articles={articles} isTicker={isTicker} isMobile={isMobile} />
+                  <TimeSeriesCharts riskHistory={risk_history} priceHistory={price_history} articles={chartArticles || articles} isTicker={isTicker} isMobile={isMobile} />
                 </Suspense>
               )}
               {activeTab === "news" && <ArticleTable articles={articles} />}
