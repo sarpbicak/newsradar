@@ -160,7 +160,7 @@ def main():
         F = hdr(fid, fh)
         get_settings().daily_entity_add_cap = 2
         r = add_entity(client, F, "CapTest", "captest_new")
-        check(r.status_code == 429 and "kapasite" in r.json().get("detail", "").lower(),
+        check(r.status_code == 429 and "sınır" in r.json().get("detail", "").lower(),
               f"günlük entity ekleme tavanı 429: {r.status_code} {r.json().get('detail','')}")
         get_settings().daily_entity_add_cap = 0
 

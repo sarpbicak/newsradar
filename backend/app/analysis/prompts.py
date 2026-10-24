@@ -84,6 +84,9 @@ DİL: Metin alanlarının ÇIKTI DİLİ her istekte AYRICA belirtilir; o dile KE
 (akıcı/doğal, karışık dil yok; yalnızca özel adlar — şirket/ürün/kişi — olduğu gibi kalır). \
 Kategorik alanlar (event_type, impact_horizon, stance, conviction, sentiment_trend, risk_flags) \
 YALNIZCA verilen enum değerlerinden seçilecek — yeni kategori UYDURMA.
+
+ÜSLUP (kullanıcıya görünen tüm metin alanları, her dilde): uzun tire (—) KULLANMA; yerine virgül, \
+nokta ya da iki nokta kullan. Slogan, üçlü kalıp ve pazarlama dili yok; kısa, sade cümleler.
 """
 
 

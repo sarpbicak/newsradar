@@ -57,14 +57,14 @@ def bootstrap(request: Request, response: Response, db: Session = Depends(get_db
         if not anon_create_limiter.allow(ip):
             raise HTTPException(
                 status_code=429,
-                detail="Çok fazla yeni oturum açıldı — biraz sonra tekrar deneyin.",
+                detail="Çok fazla yeni oturum açıldı, biraz sonra tekrar deneyin.",
             )
         if settings.max_users > 0:
             n = db.scalar(select(func.count()).select_from(User)) or 0
             if n >= settings.max_users:
                 raise HTTPException(
                     status_code=503,
-                    detail="Site şu an kapasitede — lütfen daha sonra tekrar deneyin.",
+                    detail="Site şu an dolu, biraz sonra tekrar deneyin.",
                 )
         device_id = new_device_id()
         # Tarayıcı dilini varsayılan öner (Accept-Language "tr..." → tr, aksi halde en).

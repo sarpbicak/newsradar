@@ -62,7 +62,7 @@ def submit_feedback(
     if not _feedback_limiter.allow(ip):
         raise HTTPException(
             status_code=429,
-            detail="Çok fazla geri bildirim gönderildi — biraz sonra tekrar deneyin.",
+            detail="Çok fazla geri bildirim gönderildi, biraz sonra tekrar deneyin.",
         )
     ua = (request.headers.get("user-agent") or "")[:300] or None
     fb = Feedback(

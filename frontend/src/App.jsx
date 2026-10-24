@@ -90,7 +90,7 @@ export default function App({ setLang }) {
 
   useEffect(() => {
     document.documentElement.lang = lang;
-    document.title = `NewsRadar — ${t("app.subtitle")}`;
+    document.title = `NewsRadar · ${t("app.subtitle")}`;
   }, [lang, t]);
 
   // "Nasıl çalışır?" ilk girişte OTOMATİK açılmaz — header'daki buton ya da boş ekrandaki

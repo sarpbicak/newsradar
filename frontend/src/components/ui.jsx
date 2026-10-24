@@ -119,30 +119,6 @@ export function evidenceColor(e) {
   return { strong: C.pos, medium: C.warn, weak: C.neg }[e] || C.neutral;
 }
 
-// --- Düz Türkçe terim açıklamaları (tooltip metinleri; jargon yok) ---
-export const TERM_HELP = {
-  signal:
-    "Genel sinyal: haberlerin yönünü ve ne kadar güvenilir olduğunu tek bir ölçekte " +
-    "birleştirir — güçlü olumsuzdan güçlü olumluya. Bir fiyat tahmini değil.",
-  direction:
-    "Yön: haberler genel olarak olumlu mu (yükseliş), olumsuz mu (düşüş), yoksa " +
-    "kararsız mı (nötr). Bir fiyat tahmini değil — haberlerin havası.",
-  horizon:
-    "Vade: haberlerin etkisinin ne kadar süreceği. Kısa = günler/haftalar, " +
-    "Orta = birkaç ay, Uzun = daha uzun vade.",
-  evidence:
-    "Kanıt gücü: bu değerlendirmenin kaç habere ve ne kadar tutarlı sinyale " +
-    "dayandığı. Zayıf = az/çelişkili haber, dikkatli ol. Güçlü = çok ve aynı yönde haber.",
-  risk:
-    "Risk skoru: 0 (düşük) – 100 (yüksek). Haberlerdeki risk işaretlerinin " +
-    "(dava, rekabet, düzenleme…) yoğunluğu.",
-  target:
-    "Hedef fiyat: gerçek analistlerin ortalama beklentisi — bizim tahminimiz değil.",
-  analyst:
-    "Analist konsensüsü: gerçek borsa analistlerinin al/tut/sat dağılımı (Finnhub). " +
-    "NewsRadar'ın kendi görüşü değil.",
-};
-
 // --- "?" ipucu — üstüne gelince/dokununca düz Türkçe açıklama gösterir ---
 // Not: kart bir <div role=button> olduğundan içinde <button> kullanmak GEÇERLİDİR.
 export function InfoTip({ text, className = "" }) {

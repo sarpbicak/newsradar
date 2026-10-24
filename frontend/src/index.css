@@ -403,7 +403,7 @@ html.lenis, html.lenis body { height: auto; }
   line-height: 0.98;
   letter-spacing: -0.032em;
 }
-.lx-h1 { font-size: clamp(3.25rem, 1rem + 6.2vw, 8rem); }
+.lx-h1 { font-size: clamp(2.75rem, 0.9rem + 4.6vw, 6.25rem); text-wrap: balance; }
 .lx-h2 { font-size: clamp(2.5rem, 1.25rem + 3.6vw, 4.5rem); }
 .lx-mega { font-size: clamp(2.25rem, 0.75rem + 5vw, 5.5rem); line-height: 1.04; }
 .lx-body { font-size: clamp(1.125rem, 1.05rem + 0.3vw, 1.25rem); line-height: 1.6; }

@@ -188,7 +188,7 @@ function UserMenu({ user, view, onAdmin, onLogout }) {
           </span>
           <span className="nav-text max-w-36 truncate">{user.username}</span>
           {/* Erişilebilir ad görünen metinle başlar (label-content-name-mismatch olmasın). */}
-          <span className="sr-only"> — {t("header.accountMenu")}</span>
+          <span className="sr-only">, {t("header.accountMenu")}</span>
         </button>
       )}
     >

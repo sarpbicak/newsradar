@@ -174,7 +174,7 @@ def create_entity(
         if not _daily_new_entity_ok(db, user):
             raise HTTPException(
                 status_code=429,
-                detail="Bugünkü yeni şirket ekleme kapasitesi doldu — yarın tekrar deneyin.",
+                detail="Bugün için yeni şirket ekleme sınırı doldu, yarın tekrar deneyin.",
             )
 
         entity = Entity(

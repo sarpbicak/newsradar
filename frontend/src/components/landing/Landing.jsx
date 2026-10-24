@@ -227,7 +227,7 @@ export default function Landing({ lang, setLang }) {
 
   useEffect(() => {
     document.documentElement.lang = lang;
-    document.title = `NewsRadar — ${t("land.hero.l1")} ${t("land.hero.l2")} ${t("land.hero.l3")}`;
+    document.title = `NewsRadar · ${[t("land.hero.l1"), t("land.hero.l2"), t("land.hero.l3")].filter(Boolean).join(" ")}`;
   }, [lang, t]);
 
   // "/#how-it-works" ile gelindiyse (ör. uygulamadaki modaldan) o bölüme kaydır.

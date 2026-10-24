@@ -177,7 +177,7 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
                     </span>
                     {!r.us_supported && (
                       <span className="mt-0.5 flex items-center gap-1 text-micro text-amber-600">
-                        <AlertTriangle className="h-3 w-3" aria-hidden="true" /> {r.exchange_name} — {t("wl.nonUsShort")}
+                        <AlertTriangle className="h-3 w-3" aria-hidden="true" /> {r.exchange_name}: {t("wl.nonUsShort")}
                       </span>
                     )}
                   </button>

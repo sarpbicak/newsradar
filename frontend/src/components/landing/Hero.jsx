@@ -141,7 +141,7 @@ export default function Hero({ demo, onAnchor, onApp }) {
     })
   );
 
-  const lines = [t("land.hero.l1"), t("land.hero.l2"), t("land.hero.l3")];
+  const lines = [t("land.hero.l1"), t("land.hero.l2"), t("land.hero.l3")].filter(Boolean);
   return (
     <section ref={ref} className={`relative flex min-h-[100svh] items-center overflow-clip ${paused ? "lx-paused" : ""}`}>
       <div className="grid-bg" aria-hidden="true" />
