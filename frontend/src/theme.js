@@ -30,7 +30,7 @@ export const THEME_KEY = "nr_theme";
 export const THEME_PREFS = ["system", "light", "dark"];
 const media = () => window.matchMedia?.("(prefers-color-scheme: dark)");
 // Tarayıcı arayüzü (adres çubuğu) rengi — sayfa zeminiyle uyumlu.
-const THEME_COLOR = { light: "#F7F5F1", dark: "#0D0D0B" };
+const THEME_COLOR = { light: "#F7F8FA", dark: "#0B0F14" };
 
 export function getPref() {
   try {

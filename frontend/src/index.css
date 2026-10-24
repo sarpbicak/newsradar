@@ -30,76 +30,76 @@
   --r-card: 16px;         /* kart */
   --r-panel: 20px;        /* modal, panel */
   color-scheme: light;
-  --ink-900: 247 245 241;       /* #F7F5F1 */
+  --ink-900: 247 248 250;       /* #F7F8FA */
   --ink-800: 255 255 255;       /* #FFFFFF */
-  --ink-700: 241 238 232;       /* #F1EEE8 */
-  --ink-600: 231 227 218;       /* #E7E3DA */
-  --ink-500: 216 211 199;       /* #D8D3C7 */
-  --slate-100: 26 26 24;     /* #1A1A18 */
-  --slate-200: 42 42 38;     /* #2A2A26 */
-  --slate-300: 69 66 60;     /* #45423C */
-  --slate-400: 92 89 83;     /* #5C5953 */
-  --slate-500: 110 107 101;     /* #6E6B65 */
-  --slate-600: 111 108 102;     /* #6F6C66 */
-  --slate-700: 196 192 182;     /* #C4C0B6 */
-  --accent: 14 116 144;      /* #0E7490 — camgöbeği, metin olarak (AA: kremde 4.9, beyazda 5.3) */
+  --ink-700: 240 242 245;       /* #F0F2F5 */
+  --ink-600: 227 230 235;       /* #E3E6EB */
+  --ink-500: 205 210 218;       /* #CDD2DA */
+  --slate-100: 15 20 25;     /* #0F1419 */
+  --slate-200: 29 36 46;     /* #1D242E */
+  --slate-300: 56 65 77;     /* #38414D */
+  --slate-400: 78 88 101;     /* #4E5865 */
+  --slate-500: 90 100 114;     /* #5A6472 */
+  --slate-600: 95 105 118;     /* #5F6976 */
+  --slate-700: 188 195 204;     /* #BCC3CC */
+  --accent: 14 116 144;      /* #0E7490 */
   --accent-hover: 21 94 117;  /* #155E75 */
   --accent-fg: 255 255 255;     /* #FFFFFF */
-  --pos: 13 116 64;           /* #0D7440 */
-  --pos-strong: 10 97 54;    /* #0A6136 */
-  --neg: 184 37 37;           /* #B82525 */
-  --neg-strong: 154 28 28;    /* #9A1C1C */
+  --pos: 11 122 69;           /* #0B7A45 */
+  --pos-strong: 8 102 56;    /* #086638 */
+  --neg: 192 38 45;           /* #C0262D */
+  --neg-strong: 160 29 35;    /* #A01D23 */
   --on-strong: 255 255 255;     /* #FFFFFF */
-  --warn: 167 77 8;          /* #A74D08 */
-  --info: 37 98 233;          /* #2562E9 */
-  --info-strong: 29 78 216;   /* #1D4ED8 */
-  --neutral: 102 100 94;       /* #66645E */
-  --chart-grid: 237 234 227;    /* #EDEAE3 */
-  --brush-stroke: 203 198 187;  /* #CBC6BB */
-  --brush-fill: 250 248 244;    /* #FAF8F4 */
+  --warn: 161 78 6;          /* #A14E06 */
+  --info: 37 87 214;          /* #2557D6 */
+  --info-strong: 29 70 184;   /* #1D46B8 */
+  --neutral: 95 105 118;       /* #5F6976 */
+  --chart-grid: 232 235 239;    /* #E8EBEF */
+  --brush-stroke: 199 205 213;  /* #C7CDD5 */
+  --brush-fill: 244 246 248;    /* #F4F6F8 */
   --shadow-card: 0 1px 3px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.04);
   --shadow-card-hover: 0 2px 6px rgb(0 0 0 / 0.06), 0 14px 32px rgb(var(--accent) / 0.10);
   /* TEK vurgu = camgöbeği (radar). --signal: birincil buton dolgusu; --signal-fg: üstündeki
      metin (koyu, AA); --signal-ink: metin olarak (= --accent); --glow — ışıma ve ince çizgiler.
-     Zemin her yerde --ink-900 (koyu: sıcak, neredeyse siyah; açık: krem). */
-  --signal: 6 182 212;        /* #06B6D4 — dolgu (üstünde #083344: 5.5:1) */
+     Zemin her yerde --ink-900 (koyu: soğuk lacivert-siyah #0B0F14; açık: soğuk açık gri #F7F8FA). */
+  --signal: 6 182 212;        /* #06B6D4 */
   --signal-ink: 14 116 144;   /* #0E7490 */
   --signal-fg: 8 51 68;       /* #083344 */
-  --glow: 6 182 212;          /* #06B6D4 — ışıma, ince çizgiler */
+  --glow: 6 182 212;          /* #06B6D4 */
   --signal-ink-fg: 255 255 255; /* #FFFFFF */
-  --raised: 255 255 255;      /* #FFFFFF yükseltilmiş yüzey (modal, panel) */
-  --chart-line: 42 42 38;     /* #2A2A26 grafik ana çizgisi (nötr, net) */
+  --raised: 255 255 255;      /* #FFFFFF */
+  --chart-line: 29 36 46;     /* #1D242E */
   --shadow-raised: 0 2px 8px rgb(0 0 0 / 0.06), 0 24px 60px -12px rgb(0 0 0 / 0.18);
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --ink-900: 13 13 11;       /* #0D0D0B zemin (landing ile aynı) */
-  --ink-800: 23 23 21;       /* #171715 yüzey (kart) */
-  --ink-700: 35 34 31;       /* #23221F hover / iç yüzey */
-  --ink-600: 45 44 40;       /* #2D2C28 ince ayırıcı */
-  --ink-500: 64 62 57;       /* #403E39 */
-  --slate-100: 242 240 235;     /* #F2F0EB */
-  --slate-200: 228 225 218;     /* #E4E1DA */
-  --slate-300: 207 203 194;     /* #CFCBC2 */
-  --slate-400: 179 175 166;     /* #B3AFA6 */
-  --slate-500: 160 156 147;     /* #A09C93 */
-  --slate-600: 143 139 131;     /* #8F8B83 */
-  --slate-700: 94 91 85;     /* #5E5B55 */
-  --accent: 34 211 238;         /* #22D3EE — camgöbeği (koyu kartta 9.9:1) */
+  --ink-900: 11 15 20;       /* #0B0F14 */
+  --ink-800: 18 24 33;       /* #121821 */
+  --ink-700: 25 33 44;       /* #19212C */
+  --ink-600: 35 44 56;       /* #232C38 */
+  --ink-500: 51 64 80;       /* #334050 */
+  --slate-100: 232 237 243;     /* #E8EDF3 */
+  --slate-200: 211 218 227;     /* #D3DAE3 */
+  --slate-300: 181 191 203;     /* #B5BFCB */
+  --slate-400: 152 163 177;     /* #98A3B1 */
+  --slate-500: 138 150 165;     /* #8A96A5 */
+  --slate-600: 128 140 155;     /* #808C9B */
+  --slate-700: 74 86 102;     /* #4A5666 */
+  --accent: 34 211 238;         /* #22D3EE */
   --accent-hover: 103 232 249;  /* #67E8F9 */
-  --accent-fg: 8 51 68;     /* #083344 (7.4:1) */
+  --accent-fg: 8 51 68;     /* #083344 */
   --pos: 74 222 128;           /* #4ADE80 */
   --pos-strong: 52 211 153;    /* #34D399 */
   --neg: 248 113 113;           /* #F87171 */
   --neg-strong: 251 113 133;    /* #FB7185 */
-  --on-strong: 17 17 16;     /* #111110 */
+  --on-strong: 11 15 20;     /* #0B0F14 */
   --warn: 251 191 36;          /* #FBBF24 */
   --info: 96 165 250;          /* #60A5FA */
   --info-strong: 147 197 253;   /* #93C5FD */
-  --neutral: 168 164 155;       /* #A8A49B */
-  --chart-grid: 34 33 31;    /* #22211F */
-  --brush-stroke: 74 72 67;  /* #4A4843 */
-  --brush-fill: 34 34 31;    /* #22221F */
+  --neutral: 152 163 177;       /* #98A3B1 */
+  --chart-grid: 25 33 44;    /* #19212C */
+  --brush-stroke: 58 70 86;  /* #3A4656 */
+  --brush-fill: 25 33 44;    /* #19212C */
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.45), 0 8px 24px rgb(0 0 0 / 0.30);
   --shadow-card-hover: 0 2px 6px rgb(0 0 0 / 0.50), 0 14px 32px rgb(var(--accent) / 0.12);
   --signal: 34 211 238;       /* #22D3EE */
@@ -107,40 +107,40 @@
   --signal-fg: 8 51 68;       /* #083344 */
   --signal-ink-fg: 8 51 68;   /* #083344 */
   --glow: 34 211 238;         /* #22D3EE */
-  --raised: 30 30 27;         /* #1E1E1B yükseltilmiş yüzey (modal, panel) */
-  --chart-line: 228 225 218;  /* #E4E1DA grafik ana çizgisi (nötr, net) */
+  --raised: 21 28 38;         /* #151C26 */
+  --chart-line: 211 218 227;  /* #D3DAE3 */
   --shadow-raised: 0 2px 8px rgb(0 0 0 / 0.5), 0 24px 60px -12px rgb(0 0 0 / 0.6);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     color-scheme: dark;
-    --ink-900: 13 13 11;       /* #0D0D0B zemin (landing ile aynı) */
-    --ink-800: 23 23 21;       /* #171715 yüzey (kart) */
-    --ink-700: 35 34 31;       /* #23221F hover / iç yüzey */
-    --ink-600: 45 44 40;       /* #2D2C28 ince ayırıcı */
-    --ink-500: 64 62 57;       /* #403E39 */
-    --slate-100: 242 240 235;     /* #F2F0EB */
-    --slate-200: 228 225 218;     /* #E4E1DA */
-    --slate-300: 207 203 194;     /* #CFCBC2 */
-    --slate-400: 179 175 166;     /* #B3AFA6 */
-    --slate-500: 160 156 147;     /* #A09C93 */
-    --slate-600: 143 139 131;     /* #8F8B83 */
-    --slate-700: 94 91 85;     /* #5E5B55 */
-    --accent: 34 211 238;         /* #22D3EE — camgöbeği (koyu kartta 9.9:1) */
+    --ink-900: 11 15 20;       /* #0B0F14 */
+    --ink-800: 18 24 33;       /* #121821 */
+    --ink-700: 25 33 44;       /* #19212C */
+    --ink-600: 35 44 56;       /* #232C38 */
+    --ink-500: 51 64 80;       /* #334050 */
+    --slate-100: 232 237 243;     /* #E8EDF3 */
+    --slate-200: 211 218 227;     /* #D3DAE3 */
+    --slate-300: 181 191 203;     /* #B5BFCB */
+    --slate-400: 152 163 177;     /* #98A3B1 */
+    --slate-500: 138 150 165;     /* #8A96A5 */
+    --slate-600: 128 140 155;     /* #808C9B */
+    --slate-700: 74 86 102;     /* #4A5666 */
+    --accent: 34 211 238;         /* #22D3EE */
     --accent-hover: 103 232 249;  /* #67E8F9 */
-    --accent-fg: 8 51 68;     /* #083344 (7.4:1) */
+    --accent-fg: 8 51 68;     /* #083344 */
     --pos: 74 222 128;           /* #4ADE80 */
     --pos-strong: 52 211 153;    /* #34D399 */
     --neg: 248 113 113;           /* #F87171 */
     --neg-strong: 251 113 133;    /* #FB7185 */
-    --on-strong: 17 17 16;     /* #111110 */
+    --on-strong: 11 15 20;     /* #0B0F14 */
     --warn: 251 191 36;          /* #FBBF24 */
     --info: 96 165 250;          /* #60A5FA */
     --info-strong: 147 197 253;   /* #93C5FD */
-    --neutral: 168 164 155;       /* #A8A49B */
-    --chart-grid: 34 33 31;    /* #22211F */
-    --brush-stroke: 74 72 67;  /* #4A4843 */
-    --brush-fill: 34 34 31;    /* #22221F */
+    --neutral: 152 163 177;       /* #98A3B1 */
+    --chart-grid: 25 33 44;    /* #19212C */
+    --brush-stroke: 58 70 86;  /* #3A4656 */
+    --brush-fill: 25 33 44;    /* #19212C */
     --shadow-card: 0 1px 2px rgb(0 0 0 / 0.45), 0 8px 24px rgb(0 0 0 / 0.30);
     --shadow-card-hover: 0 2px 6px rgb(0 0 0 / 0.50), 0 14px 32px rgb(var(--accent) / 0.12);
     --signal: 34 211 238;       /* #22D3EE */
@@ -148,8 +148,8 @@
     --signal-fg: 8 51 68;       /* #083344 */
     --signal-ink-fg: 8 51 68;   /* #083344 */
     --glow: 34 211 238;         /* #22D3EE */
-    --raised: 30 30 27;         /* #1E1E1B yükseltilmiş yüzey (modal, panel) */
-    --chart-line: 228 225 218;  /* #E4E1DA grafik ana çizgisi (nötr, net) */
+    --raised: 21 28 38;         /* #151C26 */
+    --chart-line: 211 218 227;  /* #D3DAE3 */
     --shadow-raised: 0 2px 8px rgb(0 0 0 / 0.5), 0 24px 60px -12px rgb(0 0 0 / 0.6);
   }
 }
@@ -167,16 +167,8 @@ body {
   padding-right: env(safe-area-inset-right);
   color: rgb(var(--slate-100));
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  /* Sıcak kağıt zemini + hafif gazete grain'i. (Mor glow KALDIRILDI — kağıt zeminde
-     görünmüyordu ve boşuna repaint üretiyordu; editöryel his için düz kağıt yeter.) */
+  /* Düz, soğuk zemin: gren ve ışıma yok. Derinlik gereken yerde yalnızca .grid-bg (ince ızgara). */
   background-color: rgb(var(--ink-900));
-  background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
-  background-size: 140px 140px;
-  background-repeat: repeat;
-  /* PERF: 'fixed' arka plan her kaydırmada tüm ekranı yeniden boyar (mobilde jank).
-     'scroll' ile sayfayla birlikte kayar, repaint yok. */
-  background-attachment: scroll;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -372,17 +364,21 @@ html.lenis, html.lenis body { height: auto; }
   background-color: rgb(var(--ink-900));
   color: rgb(var(--slate-100));
 }
-/* Gren: sabit katman, içeriğin ARKASINDA (metin kontrastına dokunmaz), kaydırmada yeniden boyanmaz. */
-.lx-grain {
-  position: fixed;
+/* İnce ızgara: 48px kareler, 1px soluk çizgi; kenarlara doğru söner (maske). Gren/ışıma yerine
+   tek derinlik aracı (hero arkası). Saf CSS, görüntü yok, kaydırmada yeniden boyanmaz. */
+.grid-bg {
+  position: absolute;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size: 180px 180px;
-  opacity: 0.06;
+  background-image:
+    linear-gradient(to right, rgb(var(--ink-600) / 0.7) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(var(--ink-600) / 0.7) 1px, transparent 1px);
+  background-size: 48px 48px;
+  background-position: -1px -1px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 60% 40%, #000 30%, transparent 75%);
+  mask-image: radial-gradient(ellipse 80% 70% at 60% 40%, #000 30%, transparent 75%);
 }
-:root[data-theme="light"] .lx-grain { opacity: 0.045; }
 
 /* Tipografi: başlık Space Grotesk (akışkan, sıkı), metin Inter 18–20px, rakam JetBrains Mono. */
 .lx-display {

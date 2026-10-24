@@ -132,6 +132,7 @@ export default function Hero({ demo, onAnchor, onApp }) {
   const lines = [t("land.hero.l1"), t("land.hero.l2"), t("land.hero.l3")];
   return (
     <section ref={ref} className={`relative flex min-h-[100svh] items-center overflow-clip ${paused ? "lx-paused" : ""}`}>
+      <div className="grid-bg" aria-hidden="true" />
       <div className="mx-auto grid w-full max-w-[1360px] items-center gap-16 px-5 pb-28 pt-28 sm:px-8 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:gap-8 lg:px-10 lg:pb-24">
         <div className="relative z-10">
           <h1 ref={title} className="lx-display lx-h1 origin-left text-slate-100">

@@ -248,7 +248,6 @@ export default function Landing({ lang, setLang }) {
   return (
     <EngineContext.Provider value={engine}>
       <div ref={root} className="lx min-h-dvh">
-        <div className="lx-grain" aria-hidden="true" />
         <Nav lang={lang} onLang={onLang} onAnchor={onAnchor} />
         <main>
           <Hero demo={demo} onAnchor={onAnchor} onApp={goApp} />
