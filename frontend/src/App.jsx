@@ -157,9 +157,11 @@ export default function App({ setLang }) {
 
   // Giriş yapılınca ilk yükleme. Devam eden bir tarama varsa status.is_running
   // ile yakalanır → aşağıdaki polling efekti otomatik devreye girer.
+  // Kullanıcı DEĞİŞİNCE de (çıkış → yeni misafir) yeniden yükle; kimliksiz geçici durumda yükleme yok.
   useEffect(() => {
-    if (authed) loadCards();
-  }, [authed, loadCards]);
+    if (authed && user?.id) loadCards();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authed, user?.id, loadCards]);
 
   // Dili uygula: ÖNCE backend'e kaydet (bekle) → sonra UI dilini çevir + veriyi yeni
   // dilde YENİDEN ÇEK. Backend AI içeriğini user.language'e göre döndürdüğü için, önce
@@ -325,13 +327,20 @@ export default function App({ setLang }) {
   }
 
   async function handleLogout() {
-    // Kayıtlı hesaptan çık → MİSAFİR (anon) oturuma dön (cihaz cookie'si varsa o misafir).
-    logout();
+    // Kayıtlı hesaptan çık → arayüz ANINDA misafir (ad/baş harf kalmaz), kullanıcıya ait tüm
+    // durum (kartlar, durum, öneriler, bildirim, takip) sıfırlanır; cihaz cookie'si silinir
+    // ve yeni misafir oturumu açılır.
+    setUser({ id: null, username: null, is_anonymous: true, is_admin: false, language: user?.language });
     setView("dashboard");
     setSelected(null);
     setCards([]);
     setStatus(null);
     setSuggestions([]);
+    setNotice(null);
+    trackRef.current = null;
+    setTracking(false);
+    setStarting(false);
+    await logout();
     try {
       setUser(await bootstrapSession());
     } catch {

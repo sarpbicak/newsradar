@@ -142,8 +142,27 @@ export function userLogin(username, password) {
   return userAuth("/users/login", { username, password });
 }
 
-export function logout() {
+// Kullanıcıya özel yerel anahtarlar (çıkışta silinir). Dil/tema CİHAZ tercihidir, kalır.
+const USER_SCOPED_KEYS = [USER_KEY, "nr_hint_account_dismissed", "nr_more_starters_dismissed", "nr_chat_panel_open"];
+const USER_SCOPED_PREFIXES = ["nr_section_"];
+
+export async function logout() {
   setUserToken(null); // kişisel çıkış (genel katman korunur — istenirse ayrıca temizlenebilir)
+  try {
+    USER_SCOPED_KEYS.forEach((k) => localStorage.removeItem(k));
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && USER_SCOPED_PREFIXES.some((p) => k.startsWith(p))) localStorage.removeItem(k);
+    }
+  } catch {
+    /* depolama kapalı — yalnızca bellekteki durum sıfırlanır */
+  }
+  // Cihaz cookie'sini sunucuda sil: aksi halde bir sonraki bootstrap kayıtlı hesabı geri getirir.
+  try {
+    await fetch(`${API_BASE}/session/logout`, { method: "POST", credentials: "include" });
+  } catch {
+    /* ağ hatası: token zaten silindi; bootstrap yine denenecek */
+  }
 }
 export function logoutAll() {
   setUserToken(null);

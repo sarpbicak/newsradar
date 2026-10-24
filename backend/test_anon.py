@@ -90,6 +90,16 @@ def main():
     old = A.get("/users/me", headers=hA)
     check(old.status_code == 401, f"upgrade öncesi token geçersiz (pwhash değişti): {old.status_code}")
 
+    print("\n== Çıkış: cihaz cookie'si silinir, kayıtlı hesap geri GELMEZ ==")
+    # Upgrade'den sonra cihaz cookie'si alice'e bağlı: çıkış yapılmadan bootstrap alice'i döndürür.
+    again = A.post("/session/bootstrap").json()["user"]
+    check(again["username"] == "alice", f"çıkış öncesi bootstrap aynı hesabı döndürür ({again['username']})")
+    lo = A.post("/session/logout")
+    check(lo.status_code == 204 and "max-age=0" in lo.headers.get("set-cookie", "").lower(),
+          f"logout 204 + cookie silme başlığı ({lo.status_code})")
+    after = A.post("/session/bootstrap").json()["user"]
+    check(after["is_anonymous"] and after["id"] != again["id"], "çıkıştan sonra YENİ misafir (alice değil)")
+
     print("\n== Kayıt genel şifre GEREKTİRMİYOR (herkese açık) ==")
     rg = new_device_client().post("/users/register", json={"username": "bob", "password": "parola12345"})
     check(rg.status_code == 201, f"register 201 (genel token'sız): {rg.status_code}")
