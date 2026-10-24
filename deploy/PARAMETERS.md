@@ -74,6 +74,7 @@ Varsayılanlar Render'a göre ayarlıdır. AWS'de bu değerleri vermek gerekir.
 | `NEWSRADAR_MAX_ENTITIES_REGISTERED` | Kayıtlı kullanıcının izleme listesi sınırı. | String | `10` | `10` |
 | `NEWSRADAR_MAX_REFRESH_ANON` | Anonim kullanıcının 24 saatteki elle yenileme hakkı. | String | `1` | `1` |
 | `NEWSRADAR_MAX_REFRESH_REGISTERED` | Kayıtlı kullanıcının 24 saatteki elle yenileme hakkı. | String | `3` | `3` |
+| `NEWSRADAR_REFRESH_QUEUE_MAX` | Yenileme kuyruğunda aynı anda bekleyebilecek en fazla kullanıcı isteği (çalışan hariç; zamanlayıcı sayılmaz). Doluysa kullanıcıya "sıra dolu" denir. Kullanıcı başına zaten en fazla 1 istek. İsteğe bağlı. | String | `20` | `20` |
 | `NEWSRADAR_ANON_SESSIONS_PER_IP_HOUR` | IP başına saatlik yeni anonim oturum sınırı. | String | `10` | `10` |
 | `NEWSRADAR_FEEDBACK_PER_IP_HOUR` | IP başına saatlik geri bildirim sınırı (0 = sınırsız). | String | `5` | `5` |
 | `NEWSRADAR_IP_RETENTION_DAYS` | Kötüye kullanım kayıtlarındaki IP'lerin silinme süresi (gün). | String | `7` | `7` |
@@ -98,6 +99,7 @@ Bunlar ya `docker-compose.yml` / Dockerfile tarafından sabitlenir, ya yalnızca
 | `NEWSRADAR_DB` | docker-compose.yml | SQLite yolu (`data` volume'ü). | `/data/newsradar.db` |
 | `NEWSRADAR_TRUSTED_PROXY` | docker-compose.yml | İstemci IP'sinin kaynağı (`render` veya `caddy`). | `caddy` (Render: `render`) |
 | `NEWSRADAR_CADDY_IP` | docker-compose.yml + Dockerfile | uvicorn'un `--forwarded-allow-ips` değeri (Caddy'nin sabit iç IP'si). | `172.28.0.10` |
+| `NEWSRADAR_FAKE_REFRESH_SECONDS` | yalnızca testler (e2e, birim) | **Sadece test. Production'da ASLA tanımlama.** >0 ise yenilemeler sahte çalışır (ağ/LLM yok, veri güncellenmez). Tanımlıysa açılışta uyarı loglanır (Caddy arkasında ERROR). | tanımsız (`0`) |
 | `FRONTEND_URL` | Render | CORS origin'lerinin eski adı. `NEWSRADAR_CORS_ORIGINS` ile birleştirilir. AWS'de gerekmez. | `https://newsradar-web.onrender.com` |
 | `VITE_API_URL` | frontend build (CloudFront) | Build sırasında frontend'e gömülen API adresi. Sır değildir. | `https://api.newsradarapp.com` |
 | `VITE_API_BASE` | frontend build | `VITE_API_URL`'in eski adı (geriye uyum). | — |

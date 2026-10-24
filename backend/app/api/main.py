@@ -104,6 +104,16 @@ async def lifespan(_app: FastAPI):
     # "çalışıyor" durumu yalnızca bellekte: açılışta temizlenecek kalıcı bir işaret yok.
     from .. import refresh_queue
 
+    # Sahte tarama YALNIZCA test/e2e içindir: gerçek haber/analiz yapılmaz, kullanıcı "yenilendi"
+    # görür ama veri güncellenmez. Production'da tanımlanırsa yüksek sesle uyar (Caddy arkası =
+    # EC2 production profili → ERROR).
+    _fake = get_settings().fake_refresh_seconds
+    if _fake > 0:
+        _lvl = logging.ERROR if get_settings().trusted_proxy == "caddy" else logging.WARNING
+        logging.getLogger("newsradar").log(
+            _lvl,
+            "NEWSRADAR_FAKE_REFRESH_SECONDS=%s tanımlı: yenilemeler SAHTE (ağ/LLM yok, veri güncellenmez). "
+            "Bu değişken yalnızca test içindir, production'da ASLA tanımlanmamalı.", _fake)
     refresh_queue.ensure_worker()
     scheduler.start()
     yield
