@@ -103,7 +103,7 @@ function ChartTip({ active, payload, label }) {
   if (sent != null) parts.push(tt("chart.tipMood", { v: `${sent >= 0 ? "+" : ""}${sent.toFixed(1)}` }));
   if (price != null) parts.push(`$${price.toFixed(2)}`);
   return (
-    <div className="rounded-control bg-raised px-3 py-2 text-micro text-slate-300 shadow-raised ring-1 ring-ink-600">
+    <div className="rounded-control bg-raised px-3 py-2 text-micro text-slate-300 ring-1 ring-ink-600">
       <span className="font-medium text-slate-100">{label}</span>
       {parts.length ? ` · ${parts.join(" · ")}` : ""}
     </div>

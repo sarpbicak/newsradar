@@ -61,11 +61,12 @@ export default {
       transitionDuration: { hover: "var(--dur-hover)", state: "var(--dur-state)", page: "var(--dur-page)" },
       transitionTimingFunction: { std: "var(--ease)" },
       boxShadow: {
-        // Kağıt tema: çok yumuşak, dağınık, hafif gölge (üstte duran kart hissi).
+        // Gölge YOK (terminal dili): ayrım 1px kenar + yüzey tonuyla. Token'lar "none";
+        // eski sınıflar zararsız kalsın diye adlar duruyor.
         card: "var(--shadow-card)",
         "card-hover": "var(--shadow-card-hover)",
         raised: "var(--shadow-raised)",
-        glow: "0 10px 28px -12px rgb(var(--glow) / 0.7)",
+        glow: "none",
       },
       keyframes: {
         "card-in": {

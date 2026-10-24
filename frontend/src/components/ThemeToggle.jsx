@@ -58,7 +58,7 @@ export function ThemeSegmented() {
             aria-checked={pref === p}
             onClick={() => setPref(p)}
             className={`tap flex h-12 flex-col items-center justify-center gap-0.5 rounded-lg text-micro transition-colors duration-hover ease-std ${
-              pref === p ? "bg-raised font-semibold text-slate-100 shadow-card" : "text-slate-500 hover:text-slate-200"
+              pref === p ? "bg-raised font-semibold text-slate-100" : "text-slate-500 hover:text-slate-200"
             }`}
           >
             <Icon className="h-4 w-4" />

@@ -40,9 +40,9 @@
   --fs-body: 0.9375rem;   /* 15px gövde */
   --fs-meta: 0.8125rem;   /* 13px yardımcı metin */
   --fs-micro: 0.75rem;    /* 12px etiket */
-  --r-control: 10px;      /* input, select, küçük yüzey */
-  --r-card: 16px;         /* kart */
-  --r-panel: 20px;        /* modal, panel */
+  --r-control: 6px;       /* buton, çip, input, select (hap/tam yuvarlak yok) */
+  --r-card: 10px;         /* kart */
+  --r-panel: 12px;        /* modal, panel */
   color-scheme: light;
   --ink-900: 247 248 250;       /* #F7F8FA */
   --ink-800: 255 255 255;       /* #FFFFFF */
@@ -71,8 +71,8 @@
   --chart-grid: 232 235 239;    /* #E8EBEF */
   --brush-stroke: 199 205 213;  /* #C7CDD5 */
   --brush-fill: 244 246 248;    /* #F4F6F8 */
-  --shadow-card: 0 1px 3px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.04);
-  --shadow-card-hover: 0 2px 6px rgb(0 0 0 / 0.06), 0 14px 32px rgb(var(--accent) / 0.10);
+  --shadow-card: none;
+  --shadow-card-hover: none;
   /* TEK vurgu = camgöbeği (radar). --signal: birincil buton dolgusu; --signal-fg: üstündeki
      metin (koyu, AA); --signal-ink: metin olarak (= --accent); --glow — ışıma ve ince çizgiler.
      Zemin her yerde --ink-900 (koyu: soğuk lacivert-siyah #0B0F14; açık: soğuk açık gri #F7F8FA). */
@@ -83,7 +83,7 @@
   --signal-ink-fg: 255 255 255; /* #FFFFFF */
   --raised: 255 255 255;      /* #FFFFFF */
   --chart-line: 29 36 46;     /* #1D242E */
-  --shadow-raised: 0 2px 8px rgb(0 0 0 / 0.06), 0 24px 60px -12px rgb(0 0 0 / 0.18);
+  --shadow-raised: none;
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -114,8 +114,8 @@
   --chart-grid: 25 33 44;    /* #19212C */
   --brush-stroke: 58 70 86;  /* #3A4656 */
   --brush-fill: 25 33 44;    /* #19212C */
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.45), 0 8px 24px rgb(0 0 0 / 0.30);
-  --shadow-card-hover: 0 2px 6px rgb(0 0 0 / 0.50), 0 14px 32px rgb(var(--accent) / 0.12);
+  --shadow-card: none;
+  --shadow-card-hover: none;
   --signal: 34 211 238;       /* #22D3EE */
   --signal-ink: 34 211 238;   /* #22D3EE */
   --signal-fg: 8 51 68;       /* #083344 */
@@ -123,7 +123,7 @@
   --glow: 34 211 238;         /* #22D3EE */
   --raised: 21 28 38;         /* #151C26 */
   --chart-line: 211 218 227;  /* #D3DAE3 */
-  --shadow-raised: 0 2px 8px rgb(0 0 0 / 0.5), 0 24px 60px -12px rgb(0 0 0 / 0.6);
+  --shadow-raised: none;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
@@ -155,8 +155,8 @@
     --chart-grid: 25 33 44;    /* #19212C */
     --brush-stroke: 58 70 86;  /* #3A4656 */
     --brush-fill: 25 33 44;    /* #19212C */
-    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.45), 0 8px 24px rgb(0 0 0 / 0.30);
-    --shadow-card-hover: 0 2px 6px rgb(0 0 0 / 0.50), 0 14px 32px rgb(var(--accent) / 0.12);
+    --shadow-card: none;
+    --shadow-card-hover: none;
     --signal: 34 211 238;       /* #22D3EE */
     --signal-ink: 34 211 238;   /* #22D3EE */
     --signal-fg: 8 51 68;       /* #083344 */
@@ -164,7 +164,7 @@
     --glow: 34 211 238;         /* #22D3EE */
     --raised: 21 28 38;         /* #151C26 */
     --chart-line: 211 218 227;  /* #D3DAE3 */
-    --shadow-raised: 0 2px 8px rgb(0 0 0 / 0.5), 0 24px 60px -12px rgb(0 0 0 / 0.6);
+    --shadow-raised: none;
   }
 }
 
@@ -321,8 +321,8 @@ body {
 /* "Yenile"ye dikkat çek (yeni şirket eklendi, analiz yok): kısa, iki kez nabız. */
 .attn { animation: attn 1.2s var(--ease) 2; }
 @keyframes attn {
-  0%, 100% { box-shadow: 0 0 0 0 rgb(var(--glow) / 0); }
-  40% { box-shadow: 0 0 0 6px rgb(var(--glow) / 0.35); }
+  0%, 100% { outline: 0 solid rgb(var(--accent) / 0); outline-offset: 0; }
+  40% { outline: 2px solid rgb(var(--accent) / 0.6); outline-offset: 3px; }
 }
 /* Header altındaki ince ilerleme çizgisi (içeriği itmez) */
 .nav-progress { transition: transform var(--dur-state) var(--ease); transform-origin: left; }
@@ -434,13 +434,21 @@ html.lenis, html.lenis body { height: auto; }
   animation-delay: var(--at, 0s);
 }
 
-/* Radar: soluk halkalar + yavaşça dönen tarama. Hero ekran dışındayken durur (.lx-paused). */
+/* Radar: dönen tek ince çizgi (ışıma/konik dolgu yok). Hero ekran dışındayken durur (.lx-paused). */
 .lx-sweep {
   position: absolute;
   inset: 0;
-  border-radius: 9999px;
-  background: conic-gradient(from 0deg, transparent 0turn 0.8turn, rgb(var(--signal-ink) / 0.16) 1turn);
   animation: lx-spin 16s linear infinite;
+}
+.lx-sweep::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0.5%;
+  width: 1px;
+  height: 49.5%;
+  background: linear-gradient(to top, rgb(var(--signal-ink) / 0.6), rgb(var(--signal-ink) / 0.05));
+  transform-origin: bottom center;
 }
 @keyframes lx-spin { to { transform: rotate(1turn); } }
 .lx-flow { animation: lx-flow 42s linear infinite; }
@@ -487,28 +495,18 @@ html.lenis, html.lenis body { height: auto; }
   letter-spacing: -0.01em;
 }
 
-/* Nav: en üstte saydam; kaydırınca yarı saydam + bulanık zemin. */
+/* Nav: en üstte saydam; kaydırınca neredeyse opak zemin + 1px alt çizgi (bulanıklık yok). */
 .nav-bar {
   padding-top: env(safe-area-inset-top); /* ana ekrana eklenmiş (standalone) iOS: durum çubuğu */
   border-bottom: 1px solid transparent;
   transition: background-color var(--dur-state) var(--ease), border-color var(--dur-state) var(--ease);
 }
 .nav-bar[data-scrolled="true"] {
-  background-color: rgb(var(--ink-900) / 0.72);
-  border-bottom-color: rgb(var(--slate-100) / 0.08);
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
-  backdrop-filter: blur(14px) saturate(140%);
+  background-color: rgb(var(--ink-900) / 0.96);
+  border-bottom-color: rgb(var(--ink-600));
 }
 
-/* Uygulama penceresi (nasıl çalışır): yumuşak gölge + kenarda çok hafif sinyal ışıması. */
-.lx-window {
-  box-shadow: 0 0 0 1px rgb(var(--signal-ink) / 0.16), 0 40px 90px -36px rgb(0 0 0 / 0.65),
-    0 0 90px -30px rgb(var(--glow) / 0.32);
-}
-:root[data-theme="light"] .lx-window {
-  box-shadow: 0 0 0 1px rgb(var(--signal-ink) / 0.18), 0 30px 70px -34px rgb(0 0 0 / 0.22),
-    0 0 80px -34px rgb(var(--glow) / 0.45);
-}
+/* Uygulama paneli (nasıl çalışır): yalnızca 1px kenar (Tailwind border); gölge/ışıma yok. */
 /* Adım durumu: soluk ↔ tam renk. Soluk hal de AA (slate-600), yalnızca renk geçişi. */
 .lx-step { color: rgb(var(--slate-600)); transition: color var(--dur-state) var(--ease); }
 .lx-step[data-active="true"] { color: rgb(var(--slate-100)); }

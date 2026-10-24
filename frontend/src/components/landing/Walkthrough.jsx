@@ -20,16 +20,8 @@ const FADE = 0.1;     // adım sınırında geçiş: önce eski sahne söner, so
 
 export function AppWindow({ children, className = "" }) {
   return (
-    <div className={`lx-window overflow-hidden rounded-2xl border border-ink-600 bg-ink-800 ${className}`}>
-      <div className="flex items-center gap-3 border-b border-ink-600 bg-ink-900/70 px-4 py-3" aria-hidden="true">
-        <span className="flex gap-1.5">
-          {[0, 1, 2].map((i) => <span key={i} className="h-3 w-3 rounded-full bg-ink-500" />)}
-        </span>
-        <span className="mx-auto flex h-7 w-full max-w-[260px] items-center justify-center rounded-md bg-ink-700 font-mono text-xs text-slate-500">
-          newsradarapp.com/app
-        </span>
-        <span className="w-[48px]" />
-      </div>
+    // Sade, ince kenarlı panel (pencere çerçevesi/üç nokta yok).
+    <div className={`lx-window overflow-hidden rounded-card border border-ink-600 bg-ink-800 ${className}`}>
       <div className="p-5 sm:p-6">{children}</div>
     </div>
   );
@@ -155,7 +147,7 @@ function Pinned({ demo }) {
               </div>
             </div>
           ) : demo === null ? (
-            <div className="skeleton h-[560px] w-full rounded-2xl" aria-hidden="true" />
+            <div className="skeleton h-[560px] w-full rounded-card" aria-hidden="true" />
           ) : null}
         </div>
       </div>
@@ -195,7 +187,7 @@ function Stacked({ demo }) {
       {STEPS.map((n, i) => (
         <li key={n} className="lx-step" data-active="true">
           <StepText n={n} t={t} />
-          {demo ? <StackedScene index={i} demo={demo} /> : demo === null ? <div className="skeleton mt-10 h-[360px] w-full rounded-2xl" aria-hidden="true" /> : null}
+          {demo ? <StackedScene index={i} demo={demo} /> : demo === null ? <div className="skeleton mt-10 h-[360px] w-full rounded-card" aria-hidden="true" /> : null}
         </li>
       ))}
     </ol>

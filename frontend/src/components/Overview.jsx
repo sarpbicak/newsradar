@@ -132,9 +132,10 @@ const SORTS = {
   alpha: { tkey: "ov.sortAlpha", fn: (a, b) => (a.display_name || a.name).localeCompare(b.display_name || b.name, "tr") },
 };
 
-function SectionTitle({ children, aside }) {
+// Bölüm başlığı ince yatay çizginin üstünde (terminal düzeni). flush: altındaki tablo çizgiye yapışır.
+function SectionTitle({ children, aside, flush = false }) {
   return (
-    <div className="mb-3 flex items-center justify-between gap-3">
+    <div className={cx("flex min-h-10 items-end justify-between gap-3 border-b border-ink-600 pb-2.5", flush ? "" : "mb-4")}>
       <h2 className="font-display text-base font-medium text-slate-100">{children}</h2>
       {aside}
     </div>
@@ -229,7 +230,7 @@ export function OverviewSkeleton() {
         {[0, 1, 2].map((i) => (
           <Card key={i} className="space-y-4 p-6">
             <div className="flex justify-between">
-              <Skeleton className="h-6 w-28 rounded-full" />
+              <Skeleton className="h-6 w-28 rounded-control" />
               <Skeleton className="h-5 w-20" />
             </div>
             <Skeleton className="h-6 w-full" />
@@ -288,7 +289,7 @@ export default function Overview({
     </div>
   );
   const rows = (items) => (
-    <div ref={listRef} className="space-y-1">
+    <div ref={listRef} className="divide-y divide-ink-600 border-b border-ink-600">
       {items.map((c) => (
         <div key={c.id} data-key={c.id}>
           <EntityRow card={c} onOpen={onOpen} />
@@ -324,6 +325,7 @@ export default function Overview({
           {listRows.length > 0 && (
             <section>
               <SectionTitle
+                flush
                 aside={
                   <Tabs
                     variant="pill"

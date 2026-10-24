@@ -98,9 +98,9 @@ const STR = {
   "pr.divergence": { tr: "ayrışma", en: "divergence" },
 
   // ---- Etiketler (yön/vade/kanıt/trend) ----
-  "stance.bullish": { tr: "YÜKSELİŞ", en: "BULLISH" },
-  "stance.neutral": { tr: "NÖTR", en: "NEUTRAL" },
-  "stance.bearish": { tr: "DÜŞÜŞ", en: "BEARISH" },
+  "stance.bullish": { tr: "Yükseliş", en: "Bullish" },
+  "stance.neutral": { tr: "Nötr", en: "Neutral" },
+  "stance.bearish": { tr: "Düşüş", en: "Bearish" },
   "horizon.short": { tr: "Kısa", en: "Short" },
   "horizon.medium": { tr: "Orta", en: "Medium" },
   "horizon.long": { tr: "Uzun", en: "Long" },

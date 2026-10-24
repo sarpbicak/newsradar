@@ -23,7 +23,7 @@ export function HeadlineCards({ headlines, withLabels, t }) {
         return (
           <div
             key={i}
-            className={`flex items-start gap-2 rounded-control bg-ink-800 ring-1 ring-slate-100/5 px-3 py-2 shadow-card ${
+            className={`flex items-start gap-2 rounded-control bg-ink-800 ring-1 ring-ink-600 px-3 py-2 ${
               withLabels ? (junk ? "hiw-drop" : "") : "hiw-in"
             }`}
             style={withLabels ? (junk ? { animationDelay: "300ms" } : undefined) : { animationDelay: `${i * 80}ms` }}
@@ -46,7 +46,7 @@ export function MiniCard({ entity, t, animate }) {
   const a = entity.analysis;
   const an = entity.analyst;
   return (
-    <div className={`rounded-card bg-ink-800 ring-1 ring-slate-100/5 p-4 shadow-card ${animate ? "hiw-card-in" : ""}`}>
+    <div className={`rounded-card bg-ink-800 ring-1 ring-ink-600 p-4 ${animate ? "hiw-card-in" : ""}`}>
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-display text-base font-medium text-slate-100">{entity.name}</span>
         <span className="font-mono text-xs text-slate-500">
@@ -89,13 +89,13 @@ function AskPanel({ entity, t }) {
     t("chat.qWatch"),
   ];
   return (
-    <div className="hiw-card-in rounded-card bg-ink-800 ring-1 ring-slate-100/5 shadow-card" style={{ animationDelay: "120ms" }}>
+    <div className="hiw-card-in rounded-card bg-ink-800 ring-1 ring-ink-600" style={{ animationDelay: "120ms" }}>
       <div className="flex items-center gap-2 border-b border-ink-600 px-3 py-2 text-xs font-semibold text-slate-200">
         <MessageSquare className="h-3.5 w-3.5 text-accent" /> {t("chat.askAi")}
       </div>
       <div className="flex flex-col items-start gap-1.5 p-3">
         {qs.map((q) => (
-          <span key={q} className="rounded-full px-2.5 py-1 text-micro text-slate-200 ring-1 ring-inset ring-ink-500">
+          <span key={q} className="rounded-control px-2.5 py-1 text-micro text-slate-200 ring-1 ring-inset ring-ink-500">
             {q}
           </span>
         ))}
@@ -210,7 +210,7 @@ export default function HowItWorks({ onClose, onTry }) {
       {/* İlerleme noktaları + gezinme */}
       <div className="mt-6 flex items-center justify-center gap-1.5" aria-hidden="true">
         {Array.from({ length: STEPS }).map((_, i) => (
-          <span key={i} className={`h-1.5 rounded-full transition-all duration-state ease-std ${i === step ? "w-5 bg-accent" : "w-1.5 bg-ink-500"}`} />
+          <span key={i} className={`h-1.5 rounded-[2px] transition-all duration-state ease-std ${i === step ? "w-5 bg-accent" : "w-1.5 bg-ink-500"}`} />
         ))}
       </div>
       <div className="mt-4 flex items-center justify-between gap-3">

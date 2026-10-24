@@ -38,7 +38,7 @@ export function AnalystBar({ a, className = "" }) {
   return (
     <div className={cx("flex items-center gap-3 text-micro", className)}>
       <span className="whitespace-nowrap font-medium" style={{ color: lean.color }}>{lean.text}</span>
-      <div className="flex h-1 flex-1 overflow-hidden rounded-full bg-ink-700" aria-hidden="true">
+      <div className="flex h-1 flex-1 overflow-hidden rounded-[2px] bg-ink-700" aria-hidden="true">
         {ANALYST_SEG.map((s) => {
           const n = a[s.key] || 0;
           return n ? <div key={s.key} style={{ width: `${(n / total) * 100}%`, background: s.color }} /> : null;
@@ -108,7 +108,7 @@ function PriorityChip({ reason }) {
   return (
     <>
       <Chip tone="neutral" className="chip-full">{label}</Chip>
-      <span className="chip-compact h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ink-700 text-slate-300" title={label}>
+      <span className="chip-compact h-7 w-7 shrink-0 items-center justify-center rounded-control bg-ink-700 text-slate-300" title={label}>
         <Icon className="h-3.5 w-3.5" aria-hidden="true" />
         <span className="sr-only">{label}</span>
       </span>
@@ -178,7 +178,7 @@ export default function EntityCard({ card, onOpen }) {
 }
 
 // Liste satırı: ince renk göstergesi · kısa ad · sembol · tek satır değerlendirme (tooltip'te
-// tamamı) · sağda risk skoru (mono) ve varsa "yön değişti". Çizgi yerine boşluk + hover yüzeyi.
+// tamamı) · sağda risk skoru (mono) ve varsa "yön değişti". Satırlar ince çizgilerle ayrılır (tablo).
 // Mobilde değerlendirme adın altına iner (iki satıra kadar).
 export function EntityRow({ card, onOpen }) {
   const a = card.analysis;
@@ -190,7 +190,7 @@ export function EntityRow({ card, onOpen }) {
       type="button"
       onClick={() => onOpen(card.id)}
       title={verdict}
-      className="group flex w-full items-center gap-3 rounded-control px-3 py-3 text-left transition-colors duration-hover ease-std hover:bg-ink-800"
+      className="group flex w-full items-center gap-3 px-2 py-3 text-left transition-colors duration-hover ease-std hover:bg-ink-800"
     >
       <span className="h-9 w-0.5 shrink-0 self-center rounded-full" style={{ background: edge }} aria-hidden="true" />
       <span className="min-w-0 flex-1 md:flex md:items-center md:gap-4">

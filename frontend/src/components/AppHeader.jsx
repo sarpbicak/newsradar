@@ -44,7 +44,7 @@ function ScanProgress({ scan }) {
       </div>
       {label && (
         <div className="mx-auto flex w-full max-w-[1360px] justify-end px-5 sm:px-8 lg:px-10">
-          <span key={label} className="nr-name-in mt-2 hidden max-w-md truncate rounded-full bg-raised px-3 py-1 text-micro text-slate-400 shadow-card ring-1 ring-ink-600 md:inline-block">
+          <span key={label} className="nr-name-in mt-2 hidden max-w-md truncate rounded-control bg-raised px-3 py-1 text-micro text-slate-400 ring-1 ring-ink-600 md:inline-block">
             {label}
           </span>
         </div>
@@ -136,7 +136,7 @@ function RefreshButton({ refresh, compact = false }) {
         aria-disabled={q.exhausted || undefined}
         aria-label={compact ? text : undefined}
         aria-describedby={tipText ? tipId : undefined}
-        className={cx("nav-text disabled:opacity-80", q.exhausted && "cursor-not-allowed opacity-60 hover:translate-y-0 hover:shadow-none", attn && !q.exhausted && "attn", compact && "px-3")}
+        className={cx("nav-text disabled:opacity-80", q.exhausted && "cursor-not-allowed opacity-60 hover:translate-y-0 ", attn && !q.exhausted && "attn", compact && "px-3")}
       >
         <RefreshCw className={cx("h-4 w-4", isRefreshing && "animate-spin")} aria-hidden="true" />
         {compact ? (
@@ -154,7 +154,7 @@ function RefreshButton({ refresh, compact = false }) {
           id={tipId}
           role="tooltip"
           className={cx(
-            "pointer-events-none absolute right-0 top-full z-50 mt-2 w-64 rounded-control bg-raised px-3 py-2 text-micro text-slate-300 shadow-raised ring-1 ring-ink-600 transition-opacity duration-hover ease-std",
+            "pointer-events-none absolute right-0 top-full z-50 mt-2 w-64 rounded-control bg-raised px-3 py-2 text-micro text-slate-300 ring-1 ring-ink-600 transition-opacity duration-hover ease-std",
             tip ? "opacity-100" : "sr-only opacity-0"
           )}
         >
@@ -181,9 +181,9 @@ function UserMenu({ user, view, onAdmin, onLogout }) {
           onClick={toggle}
           aria-haspopup="menu"
           aria-expanded={open}
-          className="tap inline-flex h-10 items-center gap-2 rounded-full pl-1 pr-3 text-sm text-slate-300 transition-colors duration-hover ease-std hover:bg-ink-700 hover:text-slate-100"
+          className="tap inline-flex h-10 items-center gap-2 rounded-control pl-1 pr-3 text-sm text-slate-300 transition-colors duration-hover ease-std hover:bg-ink-700 hover:text-slate-100"
         >
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-ink-700 font-display text-sm font-medium text-slate-100" aria-hidden="true">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-control bg-ink-700 font-display text-sm font-medium text-slate-100" aria-hidden="true">
             {initials(user.username)}
           </span>
           <span className="nav-text max-w-36 truncate">{user.username}</span>

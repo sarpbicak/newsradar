@@ -85,7 +85,7 @@ export function LanguageSwitcher({ lang, onChange, size = "md" }) {
         title={label}
         aria-label={label}
         aria-pressed={on}
-        className={`tap-sq inline-flex items-center justify-center rounded-full transition duration-hover ease-std ${lg ? "h-12 w-12" : "h-10 w-10"} ${
+        className={`tap-sq inline-flex items-center justify-center rounded-control transition duration-hover ease-std ${lg ? "h-12 w-12" : "h-10 w-10"} ${
           on ? "bg-ink-700" : "opacity-55 hover:bg-ink-700 hover:opacity-100"
         }`}
       >

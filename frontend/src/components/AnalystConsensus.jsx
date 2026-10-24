@@ -33,7 +33,7 @@ function consensusLabel(a) {
 function Bar({ analyst }) {
   const total = analyst.total || 1;
   return (
-    <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-ink-700">
+    <div className="flex h-1.5 w-full overflow-hidden rounded-[2px] bg-ink-700">
       {SEGMENTS.map((s) => {
         const n = analyst[s.key] || 0;
         if (!n) return null;
@@ -54,10 +54,10 @@ function TargetRangeBar({ low, high, mean, price }) {
   const pos = (v) => `${((v - lo) / span) * 100}%`;
   return (
     <div className="mb-3">
-      <div className="relative h-1.5 rounded-full bg-ink-700">
+      <div className="relative h-1.5 rounded-[2px] bg-ink-700">
         {/* düşük–yüksek analist aralığı */}
         <div
-          className="absolute top-0 h-1.5 rounded-full"
+          className="absolute top-0 h-1.5 rounded-[2px]"
           style={{ left: pos(low), width: `${((high - low) / span) * 100}%`, background: cssColor("slate-500", 0.45) }}
         />
         {/* güncel fiyat işareti (dikey çizgi) */}

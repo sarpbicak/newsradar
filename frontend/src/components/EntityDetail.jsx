@@ -57,7 +57,7 @@ export function targetIsStale(analyst) {
 function DetailSkeleton() {
   return (
     <div className="space-y-6" aria-busy="true">
-      <Skeleton className="h-9 w-24 rounded-full" />
+      <Skeleton className="h-9 w-24 rounded-control" />
       <div className="space-y-4">
         <Skeleton className="h-6 w-48" />
         <Skeleton className="h-9 w-full max-w-3xl" />
@@ -207,13 +207,13 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
         </aside>
       )}
       {a && isDesktop && !chatOpen && (
-        <Button variant="primary" icon={MessageSquare} onClick={() => toggleChat(true)} title={tt("chat.open")} className="fixed bottom-20 right-6 z-40 shadow-raised">
+        <Button variant="primary" icon={MessageSquare} onClick={() => toggleChat(true)} title={tt("chat.open")} className="fixed bottom-20 right-6 z-40">
           {tt("chat.askAi")}
         </Button>
       )}
       {a && !isDesktop && (
         <>
-          <Button variant="primary" icon={MessageSquare} onClick={() => setSheetOpen(true)} className="fixed bottom-[max(5rem,calc(env(safe-area-inset-bottom)+4rem))] right-[max(1rem,env(safe-area-inset-right))] z-40 shadow-raised">
+          <Button variant="primary" icon={MessageSquare} onClick={() => setSheetOpen(true)} className="fixed bottom-[max(5rem,calc(env(safe-area-inset-bottom)+4rem))] right-[max(1rem,env(safe-area-inset-right))] z-40">
             {tt("chat.askAi")}
           </Button>
           {sheetOpen && (
@@ -243,7 +243,7 @@ function SummaryTab({ a, entity }) {
 
       {/* "AI ne düşünüyor?" — yükseltilmiş yüzey, solda ince vurgu çizgisi, rahat okunur metin. */}
       {a.ai_take && (
-        <section className="relative overflow-hidden rounded-card bg-raised p-6 shadow-card ring-1 ring-ink-600">
+        <section className="relative overflow-hidden rounded-card bg-raised p-6 ring-1 ring-ink-600">
           <span className="absolute inset-y-0 left-0 w-0.5 bg-accent" aria-hidden="true" />
           <h2 className="mb-3 flex items-center gap-2 font-display text-sm font-medium text-slate-200">
             <Sparkles className="h-4 w-4 text-accent" aria-hidden="true" /> {tt("sum.aiTake")}

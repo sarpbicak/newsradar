@@ -32,7 +32,7 @@ export default function ArchitectureDiagram() {
         const base = j * LANE;
         return (
           <li key={j} className="grid gap-4 py-6 sm:grid-cols-[10rem_minmax(0,1fr)] sm:items-center sm:py-7">
-            <span data-fx="rise" data-seg={`${base},${base + 0.08}`} className="font-mono text-sm uppercase tracking-wider text-slate-500">
+            <span data-fx="rise" data-seg={`${base},${base + 0.08}`} className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
               {lane.name}
             </span>
             <div className="flex items-center">
@@ -48,7 +48,7 @@ export default function ArchitectureDiagram() {
                     <span
                       data-fx="rise"
                       data-seg={`${at},${at + 0.06}`}
-                      className={`rounded-full border px-3 py-1.5 text-center text-[13px] leading-tight sm:px-4 sm:py-2 sm:text-[15px] ${
+                      className={`rounded-control border px-3 py-1.5 text-center text-[13px] leading-tight sm:px-4 sm:py-2 sm:text-[15px] ${
                         lane.key === k ? "border-accent text-slate-100" : "border-ink-500 text-slate-300"
                       }`}
                     >

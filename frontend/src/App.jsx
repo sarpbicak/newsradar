@@ -455,7 +455,7 @@ export default function App({ setLang }) {
           className="pointer-events-none fixed inset-x-0 top-0 z-40 flex justify-center pt-2 md:hidden"
           style={{ transform: `translateY(${pull}px)`, opacity: Math.min(pull / PULL_THRESHOLD, 1) }}
         >
-          <div className="flex items-center gap-2 rounded-full bg-raised px-3 py-1.5 text-micro text-slate-400 shadow-raised ring-1 ring-ink-600">
+          <div className="flex items-center gap-2 rounded-control bg-raised px-3 py-1.5 text-micro text-slate-400 ring-1 ring-ink-500">
             <ArrowDown className={`h-4 w-4 transition-transform ${pull >= PULL_THRESHOLD ? "rotate-180 text-accent" : ""}`} />
             {pull >= PULL_THRESHOLD ? t("pull.release") : t("pull.pull")}
           </div>

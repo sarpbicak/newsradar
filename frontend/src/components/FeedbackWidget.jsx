@@ -77,7 +77,7 @@ export default function FeedbackWidget({ open, onOpenChange, showButton = true }
           size="sm"
           icon={MessageSquare}
           onClick={() => onOpenChange(true)}
-          className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-40 bg-raised shadow-card md:bottom-6 md:right-6"
+          className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-40 bg-raised md:bottom-6 md:right-6"
         >
           {t("fb.button")}
         </Button>
@@ -87,7 +87,7 @@ export default function FeedbackWidget({ open, onOpenChange, showButton = true }
         <Modal onClose={close} labelledBy="fb-title" size="md">
           {sent ? (
             <div className="py-8 text-center" role="status">
-              <span className="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-accent/10 text-accent">
+              <span className="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-control bg-accent/10 text-accent">
                 <MessageSquare className="h-5 w-5" aria-hidden="true" />
               </span>
               <p className="font-display text-title font-semibold text-slate-100">{t("fb.thanks")}</p>

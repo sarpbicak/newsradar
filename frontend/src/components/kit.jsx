@@ -14,15 +14,16 @@ const cx = (...parts) => parts.filter(Boolean).join(" ");
 
 // ── Button ──────────────────────────────────────────────────────────────────────
 // primary: camgöbeği dolgulu · secondary: sade, ince kenarlı · ghost: yalnızca metin.
+// Köşe 6px (--r-control), gölge yok: hover yalnızca yüzey/kenar tonunu değiştirir.
 // iconOnly: kare ikon butonu (aria-label zorunlu). Aynı boyutta aynı yükseklik/yarıçap/hover.
 const BTN_BASE =
-  "inline-flex shrink-0 select-none items-center justify-center gap-2 whitespace-nowrap rounded-full font-medium " +
+  "inline-flex shrink-0 select-none items-center justify-center gap-2 whitespace-nowrap rounded-control font-medium " +
   "transition duration-hover ease-std disabled:pointer-events-none disabled:opacity-50";
 const BTN_SIZE = { sm: "h-9 px-3.5 text-meta", md: "h-10 px-4 text-sm", lg: "h-14 px-7 text-lg font-semibold" };
 const BTN_SQUARE = { sm: "h-9 w-9", md: "h-10 w-10", lg: "h-14 w-14" };
 const BTN_VARIANT = {
-  primary: "bg-signal font-semibold text-signal-fg hover:-translate-y-px hover:shadow-glow active:translate-y-0",
-  secondary: "text-slate-200 ring-1 ring-inset ring-ink-500 hover:bg-ink-700 hover:text-slate-100",
+  primary: "bg-signal font-semibold text-signal-fg hover:bg-signal/85 active:bg-signal/80",
+  secondary: "text-slate-200 ring-1 ring-inset ring-ink-500 hover:bg-ink-700 hover:text-slate-100 hover:ring-slate-700",
   ghost: "text-slate-300 hover:bg-ink-700 hover:text-slate-100",
 };
 
@@ -60,7 +61,7 @@ const CHIP_SIZE = { sm: "px-2.5 py-1 text-micro", md: "px-3 py-1 text-meta" };
 export function Chip({ tone = "neutral", size = "sm", icon: Icon, wrap = false, className = "", children, ...rest }) {
   return (
     <span
-      className={cx("inline-flex items-center gap-1.5 font-medium", wrap ? "rounded-control text-left" : "whitespace-nowrap rounded-full", CHIP_SIZE[size], CHIP_TONE[tone], className)}
+      className={cx("inline-flex items-center gap-1.5 font-medium", wrap ? "rounded-control text-left" : "whitespace-nowrap rounded-control", CHIP_SIZE[size], CHIP_TONE[tone], className)}
       {...rest}
     >
       {Icon && <Icon className="h-3.5 w-3.5" aria-hidden="true" />}
@@ -76,8 +77,8 @@ export const ChipButton = forwardRef(function ChipButton({ icon: Icon, className
       ref={ref}
       type={type || "button"}
       className={cx(
-        "tap inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 py-1.5 text-left text-meta font-medium text-slate-200 ring-1 ring-inset ring-ink-500",
-        "transition duration-hover ease-std hover:bg-ink-700 hover:text-slate-100 disabled:opacity-50",
+        "tap inline-flex min-h-9 items-center gap-1.5 rounded-control px-3 py-1.5 text-left text-meta font-medium text-slate-200 ring-1 ring-inset ring-ink-500",
+        "transition duration-hover ease-std hover:bg-ink-700 hover:text-slate-100 hover:ring-slate-700 disabled:opacity-50",
         className
       )}
       {...rest}
@@ -99,14 +100,14 @@ export function LabelChip({ label, t, size = "sm", className = "", style }) {
 }
 
 // ── Card ────────────────────────────────────────────────────────────────────────
-// Yüzey tonuyla ayrılan kart; çerçeve yerine çok ince halka + yumuşak gölge. interactive: hafif yükselme.
+// Kart: 1px ince kenar + yüzey tonu, gölge yok. interactive: hover'da kenar koyulaşır (yükselme yok).
 export const Card = forwardRef(function Card({ as: Tag = "div", interactive = false, className = "", children, ...rest }, ref) {
   return (
     <Tag
       ref={ref}
       className={cx(
-        "rounded-card bg-ink-800 shadow-card ring-1 ring-slate-100/5",
-        interactive && "cursor-pointer transition duration-hover ease-std hover:-translate-y-0.5 hover:shadow-card-hover",
+        "rounded-card bg-ink-800 ring-1 ring-inset ring-ink-600",
+        interactive && "cursor-pointer transition-colors duration-hover ease-std hover:ring-slate-700",
         className
       )}
       {...rest}
@@ -168,7 +169,7 @@ export function Tabs({ items, value, onChange, variant = "underline", label, cla
   }
   const underline = variant === "underline";
   return (
-    <div role="tablist" aria-label={label} className={cx("flex", underline ? "gap-1 border-b border-ink-600" : "gap-0.5 rounded-full bg-ink-800 p-1", className)}>
+    <div role="tablist" aria-label={label} className={cx("flex", underline ? "gap-1 border-b border-ink-600" : "gap-0.5 rounded-control bg-ink-800 p-1 ring-1 ring-inset ring-ink-600", className)}>
       {items.map((it, i) => {
         const on = it.key === value;
         const Icon = it.icon;
@@ -186,11 +187,11 @@ export function Tabs({ items, value, onChange, variant = "underline", label, cla
               underline
                 ? cx(
                     "tap relative -mb-px inline-flex h-11 items-center gap-2 whitespace-nowrap px-3 text-sm font-medium transition-colors duration-hover ease-std",
-                    "after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-accent after:transition-transform after:duration-hover",
+                    "after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-accent after:transition-transform after:duration-hover",
                     on ? "text-slate-100 after:scale-x-100" : "text-slate-500 after:scale-x-0 hover:text-slate-200"
                   )
                 : cx(
-                    "tap inline-flex h-8 items-center whitespace-nowrap rounded-full px-3 text-meta font-medium transition-colors duration-hover ease-std",
+                    "tap inline-flex h-8 items-center whitespace-nowrap rounded-[4px] px-3 text-meta font-medium transition-colors duration-hover ease-std",
                     on ? "bg-ink-700 text-slate-100" : "text-slate-500 hover:text-slate-200"
                   )
             }
@@ -205,7 +206,7 @@ export function Tabs({ items, value, onChange, variant = "underline", label, cla
 }
 
 // ── Modal ───────────────────────────────────────────────────────────────────────
-// Yükseltilmiş yüzey, yumuşak gölge, karartma + blur; açılış 200ms (ölçek + fade).
+// Yükseltilmiş yüzey, ince kenar (gölge yok), düz karartma; açılış 200ms (ölçek + fade).
 // Esc kapatır, odak modalda hapsolur, kapanınca odak açan öğeye döner. Mobilde alttan çıkar.
 const MODAL_SIZE = { sm: "sm:max-w-sm", md: "sm:max-w-md", lg: "sm:max-w-lg", xl: "sm:max-w-2xl" };
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
@@ -256,7 +257,7 @@ export function Modal({ onClose, labelledBy, label, size = "md", drawer = false,
   }, [dismissable]);
   return createPortal(
     <div className={cx("fixed inset-0 z-50 flex", drawer ? "items-stretch justify-end" : "items-end justify-center sm:items-center sm:p-4")} style={drawer ? wrapperStyle : { top: vp.offsetTop, height: vp.height, "--vvh": `${vp.height}px`, ...wrapperStyle }}>
-      <div className="fade-in absolute inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true" onMouseDown={() => dismissable && closeRef.current?.()} />
+      <div className="fade-in absolute inset-0 bg-black/50" aria-hidden="true" onMouseDown={() => dismissable && closeRef.current?.()} />
       <div
         ref={panel}
         role="dialog"
@@ -267,8 +268,8 @@ export function Modal({ onClose, labelledBy, label, size = "md", drawer = false,
         className={cx(
           "relative overflow-y-auto overscroll-contain bg-raised focus:outline-none",
           drawer
-            ? "drawer-in flex h-full w-80 max-w-[88vw] flex-col pl-6 pr-[max(1.5rem,env(safe-area-inset-right))] pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] shadow-raised"
-            : "modal-in max-h-full w-full rounded-t-panel p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-raised ring-1 ring-ink-600 sm:max-h-[92dvh] sm:rounded-panel sm:pb-6",
+            ? "drawer-in flex h-full w-80 max-w-[88vw] flex-col pl-6 pr-[max(1.5rem,env(safe-area-inset-right))] pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] border-l border-ink-600"
+            : "modal-in max-h-full w-full rounded-t-panel p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] ring-1 ring-ink-600 sm:max-h-[92dvh] sm:rounded-panel sm:pb-6",
           !drawer && MODAL_SIZE[size],
           className
         )}
@@ -313,7 +314,7 @@ export function Toast({ tone = "info", title, onClose, inline = false, className
       role={tone === "error" || tone === "warn" ? "alert" : "status"}
       className={cx(
         "relative flex w-full gap-3 overflow-hidden rounded-control py-3 pl-4 pr-3 text-meta text-slate-300",
-        inline ? "bg-ink-800 ring-1 ring-ink-600" : "toast-in pointer-events-auto bg-raised shadow-raised ring-1 ring-ink-600",
+        inline ? "bg-ink-800 ring-1 ring-ink-600" : "toast-in pointer-events-auto bg-raised ring-1 ring-ink-500",
         className
       )}
     >
@@ -342,7 +343,7 @@ export function EmptyState({ icon: Icon, title, body, className = "", children }
   return (
     <div className={cx("flex flex-col items-center px-6 py-12 text-center", className)}>
       {Icon && (
-        <span className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-ink-800 text-accent ring-1 ring-ink-600">
+        <span className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-control bg-ink-800 text-accent ring-1 ring-ink-600">
           <Icon className="h-5 w-5" aria-hidden="true" />
         </span>
       )}
@@ -410,7 +411,7 @@ export function Menu({ button, label, align = "right", className = "", children 
           aria-label={label}
           onClick={(e) => e.target.closest("[data-close]") && setOpen(false)}
           className={cx(
-            "fade-in absolute top-full z-40 mt-2 min-w-48 rounded-control bg-raised p-1.5 shadow-raised ring-1 ring-ink-600",
+            "fade-in absolute top-full z-40 mt-2 min-w-48 rounded-control bg-raised p-1.5 ring-1 ring-ink-500",
             align === "right" ? "right-0" : "left-0",
             className
           )}

@@ -167,7 +167,7 @@ export function InfoTip({ text, className = "" }) {
       {open && (
         <span
           role="tooltip"
-          className="absolute bottom-full left-1/2 z-30 mb-1.5 w-52 max-w-[60vw] -translate-x-1/2 rounded-lg border border-ink-500 bg-ink-800 px-3 py-2 text-[11px] font-normal normal-case leading-snug tracking-normal text-slate-300 shadow-card-hover"
+          className="absolute bottom-full left-1/2 z-30 mb-1.5 w-52 max-w-[60vw] -translate-x-1/2 rounded-lg border border-ink-500 bg-ink-800 px-3 py-2 text-[11px] font-normal normal-case leading-snug tracking-normal text-slate-300"
           style={{ pointerEvents: "none" }}
         >
           {text}
@@ -199,45 +199,45 @@ export function overallSignal(stance, evidence) {
   return { ...lvl, label: tt(lvl.tkey) };
 }
 
-// Durum "pill" stili: güçlü uçlar dolu (zıt metin); ortalar soluk dolgu+renkli metin. Kontrast
-// iki temada AA (≥4.5:1) — renkler src/index.css'te.
+// Durum etiketi: köşeli (4px), ince renkli kenar + renkli nokta + metin; büyük harf yok.
+// Güçlü uçlar hafif dolgulu ve yarı kalın, ortalar yalnızca kenarlı. Metin rengi anlamsal ton:
+// iki temada yüzeylerde AA (≥4.5:1) — renkler src/index.css'te.
 const PILL_STYLE = {
-  "2": { bg: C.posStrong, color: C.onStrong },               // GÜÇLÜ OLUMLU (dolu)
-  "1": { bg: cssColor("pos", 0.12), color: C.pos },           // OLUMLU (soluk dolgu)
-  "0": { bg: cssColor("neutral", 0.14), color: C.neutral },   // NÖTR
-  "-1": { bg: cssColor("neg", 0.10), color: C.neg },          // OLUMSUZ (soluk dolgu)
-  "-2": { bg: C.negStrong, color: C.onStrong },               // GÜÇLÜ OLUMSUZ (dolu)
+  "2": { color: C.posStrong, bg: cssColor("pos", 0.1), border: cssColor("pos", 0.45), strong: true },
+  "1": { color: C.pos, bg: "transparent", border: cssColor("pos", 0.35) },
+  "0": { color: C.neutral, bg: "transparent", border: cssColor("neutral", 0.35) },
+  "-1": { color: C.neg, bg: "transparent", border: cssColor("neg", 0.35) },
+  "-2": { color: C.negStrong, bg: cssColor("neg", 0.08), border: cssColor("neg", 0.45), strong: true },
 };
 
-// DURUM etiketi (dolgulu, anlamsal; 5 kademe) — kart, liste, detay ve landing aynı etiketi kullanır.
-export function SignalPill({ stance, evidence }) {
-  const sig = overallSignal(stance, evidence);
-  const st = PILL_STYLE[String(sig.key)] || PILL_STYLE["0"];
+function TagShell({ st, children }) {
   return (
     <span
-      className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-micro font-semibold uppercase tracking-wide"
-      style={{ background: st.bg, color: st.color }}
+      className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[4px] border px-2 py-0.5 text-micro ${st.strong ? "font-semibold" : "font-medium"}`}
+      style={{ background: st.bg, color: st.color, borderColor: st.border }}
     >
       <span className="h-1.5 w-1.5 rounded-full" style={{ background: st.color }} aria-hidden="true" />
-      {sig.label}
+      {children}
     </span>
   );
 }
 
-// TEK durum etiketi: yön · güç ("BULLISH · Medium"). Güç YALNIZCA evidence_strength'ten
+// DURUM etiketi (anlamsal; 5 kademe) — kart, liste, detay ve landing aynı etiketi kullanır.
+export function SignalPill({ stance, evidence }) {
+  const sig = overallSignal(stance, evidence);
+  return <TagShell st={PILL_STYLE[String(sig.key)] || PILL_STYLE["0"]}>{sig.label}</TagShell>;
+}
+
+// TEK durum etiketi: yön · güç ("Olumlu · orta"). Güç YALNIZCA evidence_strength'ten
 // (kanaat + haber sayısı + tutarlılıktan türetilen kanonik alan; genel bakış kartıyla aynı)
 // — conviction ayrıca gösterilmez, çelişki olmaz. Renk overallSignal ile aynı.
 export function StatusTag({ stance, evidence }) {
   const sig = overallSignal(stance, evidence);
-  const st = PILL_STYLE[String(sig.key)] || PILL_STYLE["0"];
   return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold tracking-wide"
-      style={{ background: st.bg, color: st.color }}
-    >
-      <span className="uppercase">{stanceLabel(stance)}</span>
-      {evidence && <span className="font-semibold">· {evidenceLabel(evidence)}</span>}
-    </span>
+    <TagShell st={PILL_STYLE[String(sig.key)] || PILL_STYLE["0"]}>
+      {stanceLabel(stance)}
+      {evidence && <span className="font-normal">· {evidenceLabel(evidence)}</span>}
+    </TagShell>
   );
 }
 
@@ -251,7 +251,7 @@ export function SignalBand({ stance, evidence, showLabel = true, minimal = false
         // minimal (kart): sadece sağda durum metni. Tam (detay): solda "Genel sinyal".
         <div className={`mb-1.5 flex items-center ${minimal ? "justify-end" : "justify-between"}`}>
           {!minimal && (
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+            <span className="text-micro font-medium text-slate-500">
               {tt("sig.overall")}
             </span>
           )}
@@ -262,7 +262,7 @@ export function SignalBand({ stance, evidence, showLabel = true, minimal = false
       )}
       {/* Yumuşak spektrum (olumsuz→nötr(gri)→olumlu) + konum işaretçisi. Renkler temaya bağlı. */}
       <div
-        className="relative h-2 rounded-full"
+        className="relative h-2 rounded-[2px]"
         style={{
           background:
             `linear-gradient(90deg, ${cssColor("neg", 0.55)} 0%, ${cssColor("neg", 0.22)} 28%, ${cssColor("neutral", 0.2)} 50%, ${cssColor("pos", 0.22)} 72%, ${cssColor("pos", 0.55)} 100%)`,
@@ -379,7 +379,7 @@ export function SentimentGauge({ value }) {
         </span>
         <span>+</span>
       </div>
-      <div className="relative h-1.5 w-full rounded-full bg-ink-600">
+      <div className="relative h-1.5 w-full rounded-[2px] bg-ink-600">
         <div className="absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full border-2 border-ink-800"
              style={{ left: `calc(${pct}% - 6px)`, background: color }} />
       </div>

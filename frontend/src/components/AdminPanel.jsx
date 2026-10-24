@@ -475,7 +475,7 @@ function UserDetail({ userId, onClose }) {
   }, [userId]);
 
   return (
-    <section className="rounded-card bg-raised p-6 shadow-raised ring-1 ring-ink-600">
+    <section className="rounded-card bg-raised p-6 ring-1 ring-ink-600">
       <div className="mb-5 flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 font-display text-title font-semibold text-slate-100">
           {data ? data.user.username : <Skeleton className="h-6 w-32" />}

@@ -159,7 +159,7 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
             autoComplete="off"
           />
           {showDropdown && (searching || results.length > 0 || searched) && (
-            <div className="fade-in absolute top-full z-20 mt-1.5 w-full overflow-hidden rounded-control bg-raised p-1 shadow-raised ring-1 ring-ink-600">
+            <div className="fade-in absolute top-full z-20 mt-1.5 w-full overflow-hidden rounded-control bg-raised p-1 ring-1 ring-ink-600">
               {searching && <div className="px-3 py-2 text-meta text-slate-500">{t("wl.searching")}</div>}
               {!searching &&
                 results.map((r) => (
@@ -220,13 +220,13 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
       {cards.length > 0 && (
         <ul className="mt-5 flex flex-wrap gap-2">
           {cards.map((c) => (
-            <li key={c.id} className="inline-flex items-center gap-2 rounded-full bg-ink-800 py-1 pl-3 pr-1 text-meta ring-1 ring-slate-100/5">
+            <li key={c.id} className="inline-flex items-center gap-2 rounded-control bg-ink-800 py-1 pl-3 pr-1 text-meta ring-1 ring-inset ring-ink-600">
               <span className="text-slate-200">{displayName(c)}</span>
               <span className="font-mono text-micro text-slate-500">
                 {c.type === "ticker" ? "$" : "#"}
                 {c.query}
               </span>
-              {c.language && c.language !== "en" && <span className="rounded-full bg-ink-700 px-1.5 text-micro uppercase text-slate-400">{c.language}</span>}
+              {c.language && c.language !== "en" && <span className="rounded-[4px] bg-ink-700 px-1.5 text-micro uppercase text-slate-400">{c.language}</span>}
               <Button
                 variant="ghost"
                 size="sm"

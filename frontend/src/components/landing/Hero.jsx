@@ -11,14 +11,26 @@ import { SignalPill, riskColor } from "../ui.jsx";
 import { clamp01 } from "../../motion.js";
 import { scrub, useScrub } from "./scroll.js";
 
+// Teknik radar: ince halkalar, dış halkada ölçek işaretleri (5°'de bir, 30°'de uzun), artı
+// çizgileri ve dönen tek bir ince çizgi. Işıma/dolgu yok.
+const TICKS = Array.from({ length: 72 }, (_, i) => i * 5);
 function Radar() {
   return (
     <div className="absolute inset-0" aria-hidden="true">
       <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full text-signal-ink" fill="none" stroke="currentColor">
         {[49.5, 37, 24.5, 12].map((r) => (
-          <circle key={r} cx="50" cy="50" r={r} strokeWidth="0.12" strokeOpacity="0.28" />
+          <circle key={r} cx="50" cy="50" r={r} strokeWidth="0.1" strokeOpacity="0.3" />
         ))}
-        <path d="M50 0.5V99.5M0.5 50H99.5" strokeWidth="0.1" strokeOpacity="0.16" />
+        {TICKS.map((d) => {
+          const long = d % 30 === 0;
+          const a = (d * Math.PI) / 180;
+          const r1 = 49.5, r2 = long ? 47.3 : 48.4;
+          return (
+            <line key={d} x1={50 + r1 * Math.sin(a)} y1={50 - r1 * Math.cos(a)} x2={50 + r2 * Math.sin(a)} y2={50 - r2 * Math.cos(a)}
+              strokeWidth={long ? 0.16 : 0.09} strokeOpacity={long ? 0.5 : 0.3} />
+          );
+        })}
+        <path d="M50 0.5V99.5M0.5 50H99.5" strokeWidth="0.08" strokeOpacity="0.2" strokeDasharray="0.6 0.9" />
         {[[66, 30], [31, 62], [72, 71]].map(([x, y]) => (
           <circle key={`${x}-${y}`} cx={x} cy={y} r="0.7" fill="currentColor" fillOpacity="0.5" stroke="none" />
         ))}
@@ -33,8 +45,8 @@ function LiveCard({ demo, t }) {
   const a = e.analysis || {};
   const risk = a.risk_score;
   return (
-    <div className="relative rounded-2xl border border-ink-600 bg-ink-800 p-6 shadow-card">
-      <div className="flex items-center gap-2 font-mono text-xs font-medium uppercase tracking-wider text-accent">
+    <div className="relative rounded-card border border-ink-600 bg-ink-800 p-6">
+      <div className="flex items-center gap-2 text-meta font-medium text-accent">
         <span className="relative flex h-2 w-2" aria-hidden="true">
           <span className="absolute inset-0 rounded-full bg-signal opacity-60 motion-safe:animate-ping" />
           <span className="relative h-2 w-2 rounded-full bg-signal" />
@@ -52,8 +64,8 @@ function LiveCard({ demo, t }) {
       {risk != null && (
         <div className="mt-6 flex items-center gap-3">
           <span className="text-sm text-slate-400">{t("land.hero.risk")}</span>
-          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-ink-600">
-            <div className="h-full origin-left rounded-full" style={{ transform: `scaleX(${risk / 100})`, background: riskColor(risk) }} />
+          <div className="h-1.5 flex-1 overflow-hidden rounded-[2px] bg-ink-600">
+            <div className="h-full origin-left" style={{ transform: `scaleX(${risk / 100})`, background: riskColor(risk) }} />
           </div>
           <span className="lx-num text-sm font-semibold" style={{ color: riskColor(risk) }}>{risk}/100</span>
         </div>
@@ -78,7 +90,7 @@ function Flow({ headlines, t }) {
     <div className="lx-fade-y pointer-events-none absolute -inset-x-3 -inset-y-8 -z-10 overflow-hidden sm:-inset-x-6 lg:-inset-y-28" aria-hidden="true">
       <div className="lx-flow space-y-3">
         {loop.map((h, i) => (
-          <div key={i} className={`flex items-center gap-3 rounded-xl border border-ink-600 bg-ink-800 px-4 py-3 ${i % 2 ? "ml-6" : "mr-6"}`}>
+          <div key={i} className={`flex items-center gap-3 rounded-card border border-ink-600 bg-ink-800 px-4 py-3 ${i % 2 ? "ml-6" : "mr-6"}`}>
             <LabelChip label={h.label} t={t} />
             <span className="truncate text-sm text-slate-300">{h.title}</span>
           </div>
@@ -169,13 +181,13 @@ export default function Hero({ demo, onAnchor, onApp }) {
                 <LiveCard demo={demo} t={t} />
               </div>
             ) : demo === null ? (
-              <div className="skeleton h-[300px] w-full rounded-2xl" aria-hidden="true" />
+              <div className="skeleton h-[300px] w-full rounded-card" aria-hidden="true" />
             ) : null}
           </div>
         </div>
       </div>
       <div ref={cue} className="absolute bottom-7 left-1/2 hidden -translate-x-1/2 flex-col items-center gap-2 sm:flex" aria-hidden="true">
-        <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-slate-500">{t("land.hero.scroll")}</span>
+        <span className="text-micro text-slate-500">{t("land.hero.scroll")}</span>
         <span className="relative h-8 w-px overflow-hidden bg-ink-500">
           <span className="lx-cue-dot absolute left-0 top-0 h-2 w-px bg-signal" />
         </span>
