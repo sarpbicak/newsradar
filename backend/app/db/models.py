@@ -457,6 +457,9 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     username: Mapped[str] = mapped_column(String(50), nullable=False)
+    # E-posta: küçük harfle saklanır; kayıtta zorunlu, eski hesaplarda boş olabilir. Benzersizlik
+    # NULL hariç kısmi index'le (init_db: ux_users_email). Doğrulama/şifre sıfırlama henüz yok.
+    email: Mapped[str | None] = mapped_column(String(254), nullable=True)
     password_hash: Mapped[str] = mapped_column(String(200), nullable=False)  # bcrypt
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)

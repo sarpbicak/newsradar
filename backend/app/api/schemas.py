@@ -70,6 +70,11 @@ class FeedbackIn(BaseModel):
 class RegisterIn(BaseModel):
     username: str = Field(max_length=100)   # detay doğrulama route'ta (regex 3–30)
     password: str = Field(max_length=200)
+    email: str | None = Field(default=None, max_length=254)  # kayıtta zorunlu (route doğrular)
+
+
+class EmailIn(BaseModel):
+    email: str = Field(max_length=254)
 
 
 class UserLoginIn(BaseModel):
@@ -89,6 +94,7 @@ class UserOut(BaseModel):
     guide_dismissed: bool = False   # "NewsRadar ne yapar?" kutusu kapatıldı mı
     tutorial_done: bool = False     # ilk giriş tutorial'ı tamamlandı mı
     language: str = "tr"            # arayüz dili (tr/en)
+    email: str | None = None        # yalnızca kişinin kendisine döner (eski hesaplarda boş)
 
 
 class UserTokenOut(BaseModel):
@@ -104,6 +110,7 @@ class AdminUserRow(BaseModel):
 
     id: int
     username: str
+    email: str | None = None
     is_admin: bool
     created_at: datetime
     last_login_at: datetime | None

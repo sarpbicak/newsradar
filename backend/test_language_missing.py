@@ -14,6 +14,7 @@ import asyncio
 import logging
 import os
 import tempfile
+import uuid
 from datetime import datetime, timedelta, timezone
 
 _db = os.path.join(tempfile.gettempdir(), "nr_test_lang_missing.db")
@@ -68,7 +69,7 @@ client = TestClient(app)
 
 def auth_headers(username, password="pw12345678"):
     gtok = client.post("/auth/login", json={"password": "testpass"}).json()["token"]
-    r = client.post("/users/register", json={"username": username, "password": password},
+    r = client.post("/users/register", json={"username": username, "password": password, "email": f"{uuid.uuid4().hex[:12]}@test.local"},
                     headers={"Authorization": f"Bearer {gtok}"})
     assert r.status_code == 201, r.text
     return {"Authorization": f"Bearer {r.json()['token']}"}

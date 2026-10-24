@@ -8,6 +8,7 @@ MAX_USERS, yarış, rate limit, token expiry, entity/refresh kotası, admin 403.
 import os
 import tempfile
 import time as _time
+import uuid
 
 _db = os.path.join(tempfile.gettempdir(), "nr_test_sec.db")
 for sfx in ("", "-wal", "-shm"):
@@ -41,7 +42,7 @@ def gtok(client):
 
 def reg(client, username, pw="parola12345", gt=None):
     gt = gt or gtok(client)
-    return client.post("/users/register", json={"username": username, "password": pw},
+    return client.post("/users/register", json={"username": username, "password": pw, "email": f"{uuid.uuid4().hex[:12]}@test.local"},
                        headers={"Authorization": f"Bearer {gt}"})
 
 

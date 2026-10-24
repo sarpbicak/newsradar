@@ -28,7 +28,7 @@ from .routes_auth import (
     require_auth,
     verify_password,
 )
-from .schemas import RegisterIn, UserLoginIn, UserOut, UserTokenOut
+from .schemas import EmailIn, RegisterIn, UserLoginIn, UserOut, UserTokenOut
 from .usage import record_event
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -78,7 +78,34 @@ def _user_out(u: User) -> UserOut:
         created_at=u.created_at, last_login_at=u.last_login_at,
         guide_dismissed=u.guide_dismissed, tutorial_done=u.tutorial_done,
         language=getattr(u, "language", "tr") or "tr",
+        email=getattr(u, "email", None),
     )
+
+
+# E-posta: basit ve kasıtlı olarak gevşek biçim denetimi (tek @, noktalı alan adı, boşluk yok).
+# Doğrulama postası henüz yok (sonraki adım); burada yalnızca biçim + benzersizlik.
+_EMAIL_RE = re.compile(r"^[^@\s]{1,64}@[^@\s]+\.[^@\s.]{2,}$")
+
+
+def normalize_email(raw: str | None) -> str | None:
+    """Küçük harf + kırpılmış e-posta; biçim geçersizse None."""
+    e = (raw or "").strip().lower()
+    return e if e and len(e) <= 254 and _EMAIL_RE.match(e) else None
+
+
+def _find_by_email(db: Session, email: str) -> User | None:
+    return db.scalar(select(User).where(User.email == email))
+
+
+def _require_email(raw: str | None, db: Session, exclude_id: int | None = None) -> str:
+    """Kayıt/ekleme için e-posta: zorunlu, biçimli, benzersiz (küçük harfe göre)."""
+    email = normalize_email(raw)
+    if email is None:
+        raise HTTPException(status_code=422, detail="Geçerli bir e-posta adresi gir.")
+    other = _find_by_email(db, email)
+    if other is not None and other.id != exclude_id:
+        raise HTTPException(status_code=409, detail="Bu e-posta adresi zaten kayıtlı.")
+    return email
 
 
 def _find_by_username_ci(db: Session, username: str) -> User | None:
@@ -118,6 +145,11 @@ def register(payload: RegisterIn, request: Request, db: Session = Depends(get_db
         if _find_by_username_ci(db, username) is not None:
             _record_register_failed("duplicate", username, request)
             raise HTTPException(status_code=409, detail="Bu kullanıcı adı zaten alınmış.")
+        try:
+            email = _require_email(payload.email, db)
+        except HTTPException:
+            _record_register_failed("email", username, request)
+            raise
 
         # Admin belirleme: ADMIN_USERNAME eşleşirse ya da hiç kullanıcı yoksa (ilk kayıt).
         admin_username = settings.admin_username
@@ -126,14 +158,14 @@ def register(payload: RegisterIn, request: Request, db: Session = Depends(get_db
         else:
             is_admin = (db.scalar(select(func.count()).select_from(User)) or 0) == 0
 
-        user = User(username=username, password_hash=hash_password(payload.password), is_admin=is_admin)
+        user = User(username=username, email=email, password_hash=hash_password(payload.password), is_admin=is_admin)
         db.add(user)
         try:
             db.flush()
         except IntegrityError:
             db.rollback()
             _record_register_failed("duplicate", username, request)
-            raise HTTPException(status_code=409, detail="Bu kullanıcı adı zaten alınmış.")
+            raise HTTPException(status_code=409, detail="Bu kullanıcı adı ya da e-posta zaten kayıtlı.")
 
         user.last_login_at = datetime.now(timezone.utc)
         record_event(db, user.id, "login", {"via": "register"})
@@ -156,7 +188,12 @@ def login(payload: UserLoginIn, request: Request, db: Session = Depends(get_db, 
     locked = login_limiter.locked_seconds(ip) or account_limiter.locked_seconds(akey)
     if locked:
         raise HTTPException(status_code=429, detail=f"Çok fazla deneme. {locked // 60 + 1} dk sonra tekrar deneyin.")
-    user = _find_by_username_ci(db, attempted)
+    # Kullanıcı adı YA DA e-posta ile giriş ("@" içeriyorsa e-posta; kullanıcı adı regex'i "@" içermez).
+    if "@" in attempted:
+        em = normalize_email(attempted)
+        user = _find_by_email(db, em) if em else None
+    else:
+        user = _find_by_username_ci(db, attempted)
     if user is None or not verify_password(payload.password, user.password_hash):
         # TANI: hesaplanan IP ile ham XFF'i logla — canlıda IP'nin tutarlı mı yoksa her
         # istekte farklı mı geldiği (XFF/proxy sorunu) buradan görülür.
@@ -209,6 +246,7 @@ def upgrade(payload: RegisterIn, user: User = Depends(get_current_user),
         raise HTTPException(status_code=422, detail=f"Şifre en az {MIN_PASSWORD_LEN} karakter olmalı.")
     if _find_by_username_ci(db, username) is not None:
         raise HTTPException(status_code=409, detail="Bu kullanıcı adı zaten alınmış.")
+    user.email = _require_email(payload.email, db)
     user.username = username
     user.password_hash = hash_password(payload.password)
     user.is_anonymous = False
@@ -216,6 +254,21 @@ def upgrade(payload: RegisterIn, user: User = Depends(get_current_user),
     record_event(db, user.id, "login", {"via": "upgrade"})
     db.flush()
     return UserTokenOut(token=make_user_token(user), user=_user_out(user))
+
+
+@router.post("/me/email", response_model=UserOut)
+def set_email(payload: EmailIn, user: User = Depends(get_current_user),
+              db: Session = Depends(get_db, scope="function")) -> UserOut:
+    """E-posta ekle/değiştir (eski hesaplarda boş olabilir). Yalnızca kalıcı hesap."""
+    if user.is_anonymous:
+        raise HTTPException(status_code=403, detail="Önce hesap oluştur.")
+    user.email = _require_email(payload.email, db, exclude_id=user.id)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Bu e-posta adresi zaten kayıtlı.")
+    return _user_out(user)
 
 
 @router.post("/me/guide-dismiss", response_model=UserOut)

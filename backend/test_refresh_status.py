@@ -13,6 +13,7 @@ Doğrular:
 """
 import os
 import tempfile
+import uuid
 from datetime import datetime, timedelta, timezone
 
 _db = os.path.join(tempfile.gettempdir(), "nr_test_refresh_status.db")
@@ -58,7 +59,7 @@ def parse(ts):
 with TestClient(app) as c:
     # İlk kayıt = admin.
     gt = c.post("/auth/login", json={"password": "genelsifre"}).json()["token"]
-    adm = c.post("/users/register", json={"username": "rootadmin", "password": "parola12345"},
+    adm = c.post("/users/register", json={"username": "rootadmin", "password": "parola12345", "email": f"{uuid.uuid4().hex[:12]}@test.local"},
                  headers={"Authorization": f"Bearer {gt}"}).json()["token"]
     c.cookies.clear()
     anon = c.post("/session/bootstrap", headers={"X-Forwarded-For": "198.51.100.7"}).json()

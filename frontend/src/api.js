@@ -111,10 +111,10 @@ export async function bootstrapSession() {
 }
 
 // Anonim oturumu KALICI hesaba çevir (liste korunur).
-export async function upgradeAccount(username, password) {
+export async function upgradeAccount(username, password, email) {
   const data = await req("/users/upgrade", {
     method: "POST",
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ username, password, email }),
   });
   setUserToken(data.token);
   return data.user;
@@ -135,8 +135,12 @@ async function userAuth(path, body) {
   return data.user;
 }
 
-export function register(username, password) {
-  return userAuth("/users/register", { username, password });
+export function register(username, password, email) {
+  return userAuth("/users/register", { username, password, email });
+}
+// Hesaba e-posta ekle/değiştir (eski hesaplarda boş olabilir).
+export function setEmail(email) {
+  return req("/users/me/email", { method: "POST", body: JSON.stringify({ email }) });
 }
 export function userLogin(username, password) {
   return userAuth("/users/login", { username, password });

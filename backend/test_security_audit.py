@@ -16,6 +16,7 @@ import subprocess
 import tempfile
 import threading
 import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 
 # --- Ortam: izole temp DB + üretim-benzeri cookie (Secure/SameSite=None) ---
@@ -83,7 +84,7 @@ def bearer(tok: str) -> dict:
     return {"Authorization": f"Bearer {tok}"}
 
 def register(c, username, password, **hdr):
-    return c.post("/users/register", json={"username": username, "password": password}, headers=hdr)
+    return c.post("/users/register", json={"username": username, "password": password, "email": f"{uuid.uuid4().hex[:12]}@test.local"}, headers=hdr)
 
 def bootstrap(c, **hdr):
     return c.post("/session/bootstrap", headers=hdr)

@@ -4,6 +4,7 @@
 """
 import os
 import tempfile
+import uuid
 
 _db = os.path.join(tempfile.gettempdir(), "nr_test_anon.db")
 for sfx in ("", "-wal", "-shm"):
@@ -76,7 +77,7 @@ def main():
     check(a_list == {"E0", "E1", "E2"} and b_list == {"OnlyB"}, "iki cihaz listeleri izole")
 
     print("\n== Hesaba yükseltme (liste korunur) ==")
-    up = A.post("/users/upgrade", json={"username": "alice", "password": "parola12345"}, headers=hA)
+    up = A.post("/users/upgrade", json={"username": "alice", "password": "parola12345", "email": f"{uuid.uuid4().hex[:12]}@test.local"}, headers=hA)
     check(up.status_code == 200, f"upgrade 200 ({up.status_code})")
     check(up.json()["user"]["is_anonymous"] is False and up.json()["user"]["username"] == "alice",
           "artık kalıcı hesap (is_anonymous=False, username=alice)")
@@ -101,7 +102,7 @@ def main():
     check(after["is_anonymous"] and after["id"] != again["id"], "çıkıştan sonra YENİ misafir (alice değil)")
 
     print("\n== Kayıt genel şifre GEREKTİRMİYOR (herkese açık) ==")
-    rg = new_device_client().post("/users/register", json={"username": "bob", "password": "parola12345"})
+    rg = new_device_client().post("/users/register", json={"username": "bob", "password": "parola12345", "email": f"{uuid.uuid4().hex[:12]}@test.local"})
     check(rg.status_code == 201, f"register 201 (genel token'sız): {rg.status_code}")
 
     print(f"\n{'='*50}\nSONUÇ: {PASS} geçti, {FAIL} başarısız")

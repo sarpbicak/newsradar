@@ -84,3 +84,31 @@ test("mobil: çıkıştan sonra menüde kullanıcı adı ve rozet yok", async ({
   expect(await meId(page, apiURL)).not.toBe(id);
   await ctx.close();
 });
+
+test("kayıt formu: e-posta zorunlu ve biçimi denetlenir; e-postayla giriş", async ({ browser, apiURL }) => {
+  const ctx = await browser.newContext({ ignoreHTTPSErrors: true });
+  await ctx.addInitScript(() => localStorage.setItem("nr_lang", "tr"));
+  const page = await ctx.newPage();
+  await page.goto("/app");
+  await page.waitForFunction(() => localStorage.getItem("newsradar_user_token"));
+  await page.locator("header[data-nav-bar]").getByRole("button", { name: "Hesap oluştur", exact: true }).click();
+  const dlg = page.getByRole("dialog");
+  const name = `f${Date.now() % 1e8}`;
+  await dlg.getByLabel("Kullanıcı adı").fill(name);
+  await dlg.getByLabel("Şifre").fill("parola12345");
+  await dlg.getByLabel("E-posta").fill("bozuk-adres");
+  await dlg.getByRole("button", { name: "Hesap oluştur", exact: true }).click();
+  await expect(dlg.getByRole("alert")).toHaveText("Geçerli bir e-posta adresi gir.");
+  await dlg.getByLabel("E-posta").fill(`${name}@Example.com`);
+  await dlg.getByRole("button", { name: "Hesap oluştur", exact: true }).click();
+  await expect(page.locator("header[data-nav-bar]")).toContainText(name);
+  // Çıkış → e-postayla giriş.
+  await page.locator("header[data-nav-bar]").getByRole("button", { name: new RegExp(name) }).click();
+  await page.getByRole("menuitem", { name: "Çıkış yap" }).click();
+  await page.locator("header[data-nav-bar]").getByRole("button", { name: "Giriş yap", exact: true }).click();
+  await page.getByRole("dialog").getByLabel("Kullanıcı adı ya da e-posta").fill(`${name}@example.com`);
+  await page.getByRole("dialog").getByLabel("Şifre").fill("parola12345");
+  await page.getByRole("dialog").getByRole("button", { name: "Giriş yap", exact: true }).click();
+  await expect(page.locator("header[data-nav-bar]")).toContainText(name);
+  await ctx.close();
+});

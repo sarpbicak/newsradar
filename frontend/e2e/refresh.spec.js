@@ -68,8 +68,9 @@ async function loginAsNewUser(page, apiURL) {
         body: JSON.stringify(body),
       }).then((r) => r.json());
     const g = await post("/auth/login", { password: "e2e-genel-sifre" });
-    await post("/users/register", { username: "e2eadmin", password: "parola12345" }, g.token); // ilk kayıt (admin) — varsa 409
-    const u = await post("/users/register", { username: `u${Date.now()}`, password: "parola12345" }, g.token);
+    await post("/users/register", { username: "e2eadmin", password: "parola12345", email: "e2eadmin@example.com" }, g.token); // ilk kayıt (admin) — varsa 409
+    const name = `u${Date.now()}`;
+    const u = await post("/users/register", { username: name, password: "parola12345", email: `${name}@example.com` }, g.token);
     return u.token;
   }, apiURL);
   expect(tok).toBeTruthy();

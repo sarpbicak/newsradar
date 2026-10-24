@@ -30,6 +30,7 @@ import os
 import pathlib
 import sqlite3
 import tempfile
+import uuid
 
 _db = os.path.join(tempfile.gettempdir(), "nr_test_commit_timing.db")
 for sfx in ("", "-wal", "-shm"):
@@ -102,7 +103,7 @@ client = TestClient(probe, raise_server_exceptions=False)
 
 
 def register(username, password="pw12345678"):
-    r = client.post("/users/register", json={"username": username, "password": password})
+    r = client.post("/users/register", json={"username": username, "password": password, "email": f"{uuid.uuid4().hex[:12]}@test.local"})
     assert r.status_code == 201, r.text
     return r.json()["token"], r.json()["user"]["id"]
 

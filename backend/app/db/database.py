@@ -58,6 +58,12 @@ def init_db() -> None:
     _ensure_column("entity_analyses", "headline_verdict", "TEXT")
     _ensure_column("entity_analyses", "ai_take", "TEXT")
     _ensure_column("entity_analyses", "driver_directions", "JSON")
+    _ensure_column("users", "email", "VARCHAR(254)")
+    # E-posta benzersizliği: yalnızca dolu değerler (eski hesaplarda NULL çok olabilir).
+    with engine.begin() as conn:
+        conn.exec_driver_sql(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ux_users_email ON users (email) WHERE email IS NOT NULL"
+        )
     _ensure_column("entities", "language", "VARCHAR(5) NOT NULL DEFAULT 'en'")
     _ensure_column("suggestions", "source_language", "VARCHAR(5) NOT NULL DEFAULT 'en'")
     _ensure_column("suggestions", "country", "VARCHAR(60)")

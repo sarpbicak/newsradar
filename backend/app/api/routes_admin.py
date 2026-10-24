@@ -85,7 +85,7 @@ def list_users(db: Session = Depends(get_db, scope="function")) -> list[AdminUse
             select(func.max(UsageEvent.created_at)).where(UsageEvent.user_id == u.id)
         )
         rows.append(AdminUserRow(
-            id=u.id, username=u.username, is_admin=u.is_admin,
+            id=u.id, username=u.username, email=u.email, is_admin=u.is_admin,
             created_at=u.created_at, last_login_at=u.last_login_at,
             login_count=_count(db, u.id, "login"),
             refresh_count=_count(db, u.id, "refresh"),

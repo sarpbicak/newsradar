@@ -5,6 +5,7 @@ Gerçek DB'ye DOKUNMAZ (NEWSRADAR_DB=/tmp/nr_test_iso.db).
 """
 import os
 import tempfile
+import uuid
 
 # ÖNEMLİ: config lru_cache'lenir → app import'undan ÖNCE env ayarla.
 _db = os.path.join(tempfile.gettempdir(), "nr_test_iso.db")
@@ -65,7 +66,7 @@ def seed_pool():
 def auth_headers(client, username, password="pw12345678"):
     """Genel giriş + kişisel kayıt → kişisel token header'ı döndür."""
     gtok = client.post("/auth/login", json={"password": "testpass"}).json()["token"]
-    r = client.post("/users/register", json={"username": username, "password": password},
+    r = client.post("/users/register", json={"username": username, "password": password, "email": f"{uuid.uuid4().hex[:12]}@test.local"},
                     headers={"Authorization": f"Bearer {gtok}"})
     assert r.status_code == 201, f"register {username}: {r.status_code} {r.text}"
     utok = r.json()["token"]

@@ -321,6 +321,7 @@ export default function AdminPanel({ currentUserId }) {
           <thead className="text-micro text-slate-500">
             <tr className="border-b border-ink-600">
               <th className="px-5 py-3 font-medium">{tt("adm.thUser")}</th>
+              <th className="px-4 py-3 font-medium">{tt("adm.thEmail")}</th>
               <th className="px-4 py-3 font-medium">{tt("adm.thReg")}</th>
               <th className="px-4 py-3 font-medium">{tt("adm.thLastLogin")}</th>
               <th className="px-4 py-3 text-right font-medium">{tt("adm.thLogin")}</th>
@@ -341,6 +342,7 @@ export default function AdminPanel({ currentUserId }) {
                   <span className="font-medium text-slate-100">{u.username}</span>
                   {u.is_admin && <Chip tone="accent" className="ml-2">admin</Chip>}
                 </td>
+                <td className="max-w-56 truncate px-4 py-2.5 text-slate-400" title={u.email || undefined}>{u.email || "—"}</td>
                 <td className="px-4 py-2.5 text-slate-500">{fmtDate(u.created_at)}</td>
                 <td className="px-4 py-2.5 text-slate-500">{u.last_login_at ? timeAgo(u.last_login_at) : "—"}</td>
                 <td className="px-4 py-2.5 text-right font-mono tabular-nums text-slate-300">{u.login_count}</td>

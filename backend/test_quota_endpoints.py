@@ -4,6 +4,7 @@ TestClient + izole temp DB. Çalıştır: python test_quota_endpoints.py
 """
 import os
 import tempfile
+import uuid
 
 _db = os.path.join(tempfile.gettempdir(), "nr_test_qep.db")
 for sfx in ("", "-wal", "-shm"):
@@ -32,7 +33,7 @@ def main():
     with TestClient(app) as client:
         gt = client.post("/auth/login", json={"password": "genelsifre"}).json()["token"]
         # İlk kayıt = admin (rootadmin).
-        r = client.post("/users/register", json={"username": "rootadmin", "password": "parola12345"},
+        r = client.post("/users/register", json={"username": "rootadmin", "password": "parola12345", "email": f"{uuid.uuid4().hex[:12]}@test.local"},
                         headers={"Authorization": f"Bearer {gt}"})
         adm = r.json()["token"]
         H = {"Authorization": f"Bearer {adm}"}

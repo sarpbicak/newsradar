@@ -4,7 +4,7 @@
 // ilerleme header'ın alt kenarında ince bir çizgi (içeriği itmez) + küçük durum metni.
 // Mobil: logo · Yenile · menü → tam ekran çekmece (dil, tema, nasıl çalışır, hesap).
 import React, { useEffect, useId, useRef, useState } from "react";
-import { HelpCircle, LayoutDashboard, LogOut, Menu as MenuIcon, MessageSquare, RefreshCw, ShieldCheck, X } from "lucide-react";
+import { HelpCircle, LayoutDashboard, LogOut, Mail, Menu as MenuIcon, MessageSquare, RefreshCw, ShieldCheck, X } from "lucide-react";
 import { fmtTime, parseUtc, refreshParts, useI18n } from "../i18n.jsx";
 import { navigate } from "../router.js";
 import { Button, Chip, Menu, MenuItem, Modal, cx } from "./kit.jsx";
@@ -195,7 +195,7 @@ function initials(name) {
   return (name || "?").trim().slice(0, 1).toUpperCase();
 }
 
-function UserMenu({ user, view, onAdmin, onLogout }) {
+function UserMenu({ user, view, onAdmin, onLogout, onAccount }) {
   const { t } = useI18n();
   return (
     <Menu
@@ -225,6 +225,11 @@ function UserMenu({ user, view, onAdmin, onLogout }) {
       {user.is_admin && (
         <MenuItem icon={view === "admin" ? LayoutDashboard : ShieldCheck} onClick={onAdmin}>
           {view === "admin" ? t("header.backToDashboard") : t("header.adminPanel")}
+        </MenuItem>
+      )}
+      {!user.email && (
+        <MenuItem icon={Mail} onClick={() => onAccount("email")}>
+          {t("header.addEmail")}
         </MenuItem>
       )}
       <MenuItem icon={LogOut} onClick={onLogout}>
@@ -288,6 +293,9 @@ function Drawer({ user, view, lang, onLang, onClose, onHow, onAccount, onAdmin, 
             {view === "admin" ? t("header.backToDashboard") : t("header.adminPanel")}
           </MenuItem>
         )}
+        {!user.is_anonymous && !user.email && (
+          <MenuItem icon={Mail} onClick={act(() => onAccount("email"))} className={item}>{t("header.addEmail")}</MenuItem>
+        )}
         <MenuItem icon={MessageSquare} onClick={act(onFeedback)} className={item}>{t("fb.button")}</MenuItem>
       </nav>
 
@@ -335,7 +343,7 @@ export default function AppHeader({ user, view, lang, onLang, onHome, onAccount,
             <Button onClick={() => onAccount("upgrade")} className="nav-text">{t("header.createAccount")}</Button>
           </>
         ) : (
-          <UserMenu user={user} view={view} onAdmin={onAdmin} onLogout={onLogout} />
+          <UserMenu user={user} view={view} onAdmin={onAdmin} onLogout={onLogout} onAccount={onAccount} />
         )}
       </div>
       <div className="hidden md:block">

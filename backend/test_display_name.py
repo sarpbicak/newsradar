@@ -12,6 +12,7 @@ Doğrular:
 import os
 import sqlite3
 import tempfile
+import uuid
 
 _db = os.path.join(tempfile.gettempdir(), "nr_test_display_name.db")
 for sfx in ("", "-wal", "-shm"):
@@ -129,7 +130,7 @@ client = TestClient(app)
 
 def auth_headers(username, password="pw12345678"):
     gtok = client.post("/auth/login", json={"password": "testpass"}).json()["token"]
-    r = client.post("/users/register", json={"username": username, "password": password},
+    r = client.post("/users/register", json={"username": username, "password": password, "email": f"{uuid.uuid4().hex[:12]}@test.local"},
                     headers={"Authorization": f"Bearer {gtok}"})
     assert r.status_code == 201, r.text
     return {"Authorization": f"Bearer {r.json()['token']}"}

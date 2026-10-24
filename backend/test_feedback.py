@@ -4,6 +4,7 @@
 """
 import os
 import tempfile
+import uuid
 
 _db = os.path.join(tempfile.gettempdir(), "nr_test_feedback.db")
 for sfx in ("", "-wal", "-shm"):
@@ -37,7 +38,7 @@ def anon(client):
 
 
 def register(client, username, password):
-    r = client.post("/users/register", json={"username": username, "password": password})
+    r = client.post("/users/register", json={"username": username, "password": password, "email": f"{uuid.uuid4().hex[:12]}@test.local"})
     return {"Authorization": f"Bearer {r.json()['token']}"}, r.json()["user"]
 
 
