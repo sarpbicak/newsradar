@@ -6,9 +6,12 @@
 //   mobilde "AI'ya sor" → alttan açılan sayfa (ortak Modal).
 // Grafikler (Recharts) ayrı pakette, yalnızca sekme açılınca yüklenir.
 import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, BarChart3, ChevronLeft, Eye, FileText, Lock, MessageSquare, Minus, Newspaper, Sparkles, TrendingUp } from "lucide-react";
+import { ArrowDown, ArrowUp, BarChart3, ChevronLeft, Eye, FileText, GitFork, Lock, MessageSquare, Minus, Newspaper, Sparkles, TrendingUp } from "lucide-react";
 import { api } from "../api.js";
-import { RelTime, RiskChange, SignalPill, horizonLabel, riskColor, sentimentLabel, targetOf, useIsMobile } from "./ui.jsx";
+import {
+  HorizonToggle, InfoTip, NewsPill, RelTime, RiskChange, divergenceText, hasHorizons, horizonName, horizonOf, newsSignal, riskColor,
+  sentimentLabel, targetOf, useHorizon, useIsMobile, verdictInfo,
+} from "./ui.jsx";
 import { C } from "../theme.js";
 import ArticleTable from "./ArticleTable.jsx";
 import ChatPanel from "./ChatPanel.jsx";
@@ -38,11 +41,14 @@ function writeChatPref(open) {
 }
 
 // O entity'ye özel 2–3 örnek soru (sohbet panelinin başındaki çipler).
-function chatSuggestions(entity) {
+// "Neden" sorusu görünen etiketle aynı yönde: seçili vadenin hükmü (yetersiz veride genel yön).
+function chatSuggestions(entity, horizon) {
   const a = entity.analysis;
   if (!a) return [];
   const name = displayName(entity);
-  const why = a.stance === "bullish" ? "chat.qWhyPos" : a.stance === "bearish" ? "chat.qWhyNeg" : "chat.qWhyMixed";
+  const hz = newsSignal(a, entity.evidence_strength, horizon).level;
+  const dir = hz ?? (a.stance === "bullish" ? 1 : a.stance === "bearish" ? -1 : 0);
+  const why = dir > 0 ? "chat.qWhyPos" : dir < 0 ? "chat.qWhyNeg" : "chat.qWhyMixed";
   const qs = [tt(why, { name })];
   if (entity.type === "ticker" && targetOf(entity.analyst) != null) qs.push(tt("chat.qGap"));
   else qs.push(tt("chat.qRisk", { name }));
@@ -85,6 +91,7 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
   const isDesktop = !useIsMobile(1024);
   const [chatOpen, setChatOpen] = useState(readChatPref); // masaüstü yan panel
   const [sheetOpen, setSheetOpen] = useState(false); // mobil alttan sayfa
+  const [horizon, setHorizon] = useHorizon(); // kısa / uzun vade (kartlarla ortak)
   const toggleChat = (open) => {
     setChatOpen(open);
     writeChatPref(open);
@@ -152,7 +159,7 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
   const { entity, articles, risk_history, price_history, article_status: st } = data;
   const a = entity.analysis;
   const isTicker = entity.type === "ticker";
-  const suggestions = chatSuggestions(entity);
+  const suggestions = chatSuggestions(entity, horizon);
   const name = displayName(entity);
 
   const tabs = [
@@ -174,7 +181,13 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <h1 className="font-display text-xl font-semibold text-slate-100">{name}</h1>
             <span className="font-mono text-meta text-slate-500">{symbolOf(entity)}</span>
-            {a && <SignalPill stance={a.stance} evidence={entity.evidence_strength} />}
+            {a && (
+              <span className="inline-flex flex-wrap items-center gap-2">
+                <NewsPill a={a} evidence={entity.evidence_strength} horizon={horizon} />
+                {hasHorizons(a) && <HorizonToggle value={horizon} onChange={setHorizon} />}
+                <InfoTip text={tt("hz.explain")} />
+              </span>
+            )}
           </div>
           {a?.headline_verdict && <p className="max-w-4xl font-display text-verdict font-medium text-slate-100">{a.headline_verdict}</p>}
           {isTicker ? (
@@ -192,7 +205,6 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
           )}
           {a && (
             <p className="text-micro text-slate-500">
-              {entity.horizon && <>{tt("detail.metaHorizon", { h: horizonLabel(entity.horizon) })} · </>}
               {(() => {
                 const n = st?.analyzed ?? entity.evidence_count ?? 0;
                 return tt("detail.metaArticles", { n, count: fmtInt(n) });
@@ -221,7 +233,7 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
               <Tabs items={tabs} value={activeTab} onChange={changeTab} label={tt("detail.tabsLabel")} />
             </div>
             <div key={activeTab} className="tab-fade pt-6" role="tabpanel">
-              {activeTab === "summary" && <SummaryTab a={a} entity={entity} riskHistory={risk_history} articles={articles} analyzedCount={st?.analyzed} />}
+              {activeTab === "summary" && <SummaryTab a={a} entity={entity} riskHistory={risk_history} articles={articles} analyzedCount={st?.analyzed} horizon={horizon} />}
               {activeTab === "charts" && (
                 <Suspense fallback={<Skeleton className="h-72 w-full" />}>
                   <TimeSeriesCharts riskHistory={risk_history} priceHistory={price_history} articles={chartArticles || articles} isTicker={isTicker} isMobile={isMobile} />
@@ -311,7 +323,58 @@ function Indicator({ label, children }) {
 }
 
 // Özet sekmesi: (özel şirket notu) · AI yorumu · 3 gösterge · etkenler + takip edilecekler.
-function SummaryTab({ a, entity, riskHistory = [], articles = [], analyzedCount }) {
+// Etken listesi (↑ olumlu / ↓ olumsuz; ekran okuyucuya yön metni).
+function DriverList({ items }) {
+  return (
+    <ul className="divide-y divide-ink-600">
+      {items.map(({ text, direction: dir }, i) => {
+        const Icon = dir === "up" ? ArrowUp : dir === "down" ? ArrowDown : Minus;
+        const cls = dir === "up" ? "text-emerald-600" : dir === "down" ? "text-rose-600" : "text-slate-500";
+        return (
+          <li key={i} className="flex gap-3 py-3 text-body text-slate-200">
+            <Icon className={`mt-1 h-4 w-4 shrink-0 ${cls}`} aria-hidden="true" />
+            <span>
+              {dir && <span className="sr-only">{tt(dir === "up" ? "sum.dirUp" : "sum.dirDown")}: </span>}
+              {text}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+// Seçili vade: özet + etkenler; altında diğer vadenin tek satırı. Yetersiz veride açık not.
+function HorizonSection({ a, horizon }) {
+  const other = horizon === "long" ? "short" : "long";
+  const cur = horizonOf(a, horizon);
+  const curInfo = verdictInfo(cur);
+  const oth = horizonOf(a, other);
+  const othInfo = verdictInfo(oth);
+  const noData = (h) => tt(h === "long" ? "hz.noDataLong" : "hz.noDataShort");
+  const cap = (x) => x.charAt(0).toLocaleUpperCase() + x.slice(1);
+  return (
+    <section>
+      <h3 className="border-b border-ink-600 pb-2 font-display text-base font-medium text-slate-100">
+        {tt("hz.drivers", { h: horizonName(horizon) })}
+      </h3>
+      {curInfo.noData ? (
+        <p className="py-3 text-body text-slate-400">{noData(horizon)}</p>
+      ) : (
+        <>
+          {cur?.summary && <p className="pt-3 text-body text-slate-200">{cur.summary}</p>}
+          {cur?.drivers?.length > 0 && <DriverList items={cur.drivers} />}
+        </>
+      )}
+      <p className="mt-2 border-t border-ink-600 pt-3 text-meta text-slate-400">
+        <span className="font-medium text-slate-300">{tt("hz.otherLine", { h: cap(horizonName(other)), v: othInfo.label })}</span>{" "}
+        {othInfo.noData ? noData(other) : oth?.summary}
+      </p>
+    </section>
+  );
+}
+
+function SummaryTab({ a, entity, riskHistory = [], articles = [], analyzedCount, horizon = "short" }) {
   const isPrivate = entity.type !== "ticker";
   const take = mergeTake(a.ai_take, a.summary);
   const spark = riskHistory.slice(-7).map((p) => p.risk_score);
@@ -321,8 +384,16 @@ function SummaryTab({ a, entity, riskHistory = [], articles = [], analyzedCount 
   const pct = (n) => (scored.length ? Math.round((n / scored.length) * 100) : 0);
   const follow = [...(a.what_to_verify || []), ...(a.invalidation ? [a.invalidation] : [])];
   const dirs = a.driver_directions || [];
+  const horizons = hasHorizons(a);
+  const diverge = divergenceText(a, entity.evidence_strength, entity.analyst, horizon);
   return (
     <div className="space-y-8">
+      {diverge && (
+        <p className="flex items-center gap-2 text-meta text-slate-400">
+          <GitFork className="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+          {diverge}
+        </p>
+      )}
       {isPrivate && (
         <p className="flex items-start gap-2.5 text-meta text-slate-400">
           <Lock className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
@@ -384,26 +455,15 @@ function SummaryTab({ a, entity, riskHistory = [], articles = [], analyzedCount 
       </section>
 
       <div className="grid gap-8 md:grid-cols-2">
-        {a.top_drivers?.length > 0 && (
-          <section>
-            <h3 className="border-b border-ink-600 pb-2 font-display text-base font-medium text-slate-100">{tt("sum.drivers")}</h3>
-            <ul className="divide-y divide-ink-600">
-              {a.top_drivers.map((d, i) => {
-                const dir = dirs[i];
-                const Icon = dir === "up" ? ArrowUp : dir === "down" ? ArrowDown : Minus;
-                const cls = dir === "up" ? "text-emerald-600" : dir === "down" ? "text-rose-600" : "text-slate-500";
-                return (
-                  <li key={i} className="flex gap-3 py-3 text-body text-slate-200">
-                    <Icon className={`mt-1 h-4 w-4 shrink-0 ${cls}`} aria-hidden="true" />
-                    <span>
-                      {dir && <span className="sr-only">{tt(dir === "up" ? "sum.dirUp" : "sum.dirDown")}: </span>}
-                      {d}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
+        {horizons ? (
+          <HorizonSection a={a} horizon={horizon} />
+        ) : (
+          a.top_drivers?.length > 0 && (
+            <section>
+              <h3 className="border-b border-ink-600 pb-2 font-display text-base font-medium text-slate-100">{tt("sum.drivers")}</h3>
+              <DriverList items={a.top_drivers.map((text, i) => ({ text, direction: dirs[i] }))} />
+            </section>
+          )
         )}
         {follow.length > 0 && (
           <section>

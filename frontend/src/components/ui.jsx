@@ -1,5 +1,5 @@
 // Paylaşılan UI atomları: rozetler, göstergeler, çipler.
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowDown, ArrowUp, Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { fmtDateTime, fmtPct, getLang, tt, timeAgo as _timeAgo } from "../i18n.jsx";
 import { C, cssColor } from "../theme.js";
@@ -115,9 +115,6 @@ export const targetOf = (a) => a?.target ?? a?.target_mean ?? null;
 export const isMedianTarget = (a) => a?.target_kind === "median";
 export const targetSourceLabel = (a) => tt(isMedianTarget(a) ? "an.srcMedian" : "an.srcAvg");
 
-export function horizonLabel(h) {
-  return ["short", "medium", "long"].includes(h) ? tt(`horizon.${h}`) : "—";
-}
 export function evidenceLabel(e) {
   return ["strong", "medium", "weak"].includes(e) ? tt(`evidence.${e}`) : "—";
 }
@@ -204,10 +201,121 @@ function TagShell({ st, children }) {
   );
 }
 
-// DURUM etiketi (anlamsal; 5 kademe) — kart, liste, detay ve landing aynı etiketi kullanır.
-export function SignalPill({ stance, evidence }) {
-  const sig = overallSignal(stance, evidence);
-  return <TagShell st={PILL_STYLE[String(sig.key)] || PILL_STYLE["0"]}>{sig.label}</TagShell>;
+// --- Kısa / uzun vade (haber yönü) ---
+// Seçim cihaz tercihi: tüm kartlar ve detay aynı vadeyi gösterir; localStorage'da saklanır
+// (gizli pencere / kapalı depolama → bellekte "short").
+const HZ_KEY = "nr_horizon";
+let _hz = "short";
+try {
+  if (localStorage.getItem(HZ_KEY) === "long") _hz = "long";
+} catch {
+  /* depolama kapalı */
+}
+const _hzSubs = new Set();
+export function setHorizon(h) {
+  _hz = h === "long" ? "long" : "short";
+  try {
+    localStorage.setItem(HZ_KEY, _hz);
+  } catch {
+    /* depolama kapalı — yalnızca bu oturum */
+  }
+  _hzSubs.forEach((f) => f());
+}
+export function useHorizon() {
+  const h = useSyncExternalStore(
+    (cb) => {
+      _hzSubs.add(cb);
+      return () => _hzSubs.delete(cb);
+    },
+    () => _hz,
+    () => "short",
+  );
+  return [h, setHorizon];
+}
+
+const VERDICT_LEVEL = { very_negative: -2, negative: -1, neutral: 0, positive: 1, very_positive: 2 };
+const LEVEL_KEY = { "-2": "verdict.veryNeg", "-1": "verdict.neg", 0: "verdict.neutral", 1: "verdict.pos", 2: "verdict.veryPos" };
+export const levelLabel = (level) => tt(LEVEL_KEY[level]);
+export const levelColor = (level) => (SIGNAL_LEVELS.find((l) => l.key === level) || NEUTRAL).color;
+export const hasHorizons = (a) => !!(a?.short_term || a?.long_term);
+export const horizonOf = (a, h) => (h === "long" ? a?.long_term : a?.short_term);
+export const horizonName = (h) => tt(h === "long" ? "hz.long" : "hz.short");
+
+// Vade hükmü → { level (-2..2 | null), label }. mixed / insufficient_data → level null.
+export function verdictInfo(v) {
+  if (v && v.verdict in VERDICT_LEVEL) {
+    const level = VERDICT_LEVEL[v.verdict];
+    return { level, label: levelLabel(level) };
+  }
+  if (v?.verdict === "mixed") return { level: null, label: tt("verdict.mixed"), mixed: true };
+  return { level: null, label: tt("verdict.noData"), noData: true };
+}
+
+// Haber etiketi: "Haberler · kısa vade: Olumsuz". Vadesiz (eski) analiz → "Haberler: Olumlu"
+// (yön + kanıt gücünden tek etiket). level: renk ve ayrışma hesabı için.
+export function newsSignal(a, evidence, horizon) {
+  if (hasHorizons(a)) {
+    const v = verdictInfo(horizonOf(a, horizon));
+    return { ...v, text: tt("news.labelH", { h: horizonName(horizon), v: v.label }), color: v.level == null ? C.neutral : levelColor(v.level) };
+  }
+  const sig = overallSignal(a?.stance, evidence);
+  return { level: sig.key, label: sig.label, text: tt("news.label", { v: sig.label }), color: sig.color };
+}
+
+// Analist görüşü: Finnhub tavsiyelerinin ağırlıklı skoru (güçlü al +2 … güçlü sat −2) → 5 kademe.
+export function analystLevel(an) {
+  const total = an?.total || 0;
+  if (!total) return null;
+  const score = (2 * an.strong_buy + an.buy - an.sell - 2 * an.strong_sell) / total;
+  const level = score <= -1.2 ? -2 : score <= -0.4 ? -1 : score < 0.4 ? 0 : score < 1.2 ? 1 : 2;
+  return { level, score, label: levelLabel(level) };
+}
+
+// Ayrışma notu (tek satır): kısa↔uzun vade ve/veya haber↔analist yönleri ZIT ise.
+export function divergenceText(a, evidence, analyst, horizon) {
+  const s = verdictInfo(a?.short_term).level;
+  const l = verdictInfo(a?.long_term).level;
+  const horizons = s != null && l != null && s * l < 0;
+  const news = newsSignal(a, evidence, horizon).level;
+  const al = analystLevel(analyst)?.level;
+  const vsAnalysts = news != null && al != null && news * al < 0;
+  if (horizons && vsAnalysts) return tt("div.both");
+  if (horizons) return tt("div.horizons");
+  if (vsAnalysts) return tt("div.newsAnalysts");
+  return null;
+}
+
+// Haber etiketi (kart, satır, detay aynı).
+export function NewsPill({ a, evidence, horizon }) {
+  const sig = newsSignal(a, evidence, horizon);
+  const st = sig.level == null ? PILL_STYLE["0"] : PILL_STYLE[String(sig.level)];
+  return <TagShell st={st}>{sig.text}</TagShell>;
+}
+
+// Kısa / uzun vade seçici (iki düğme, aria-pressed). Kart bir role=button olduğundan tık ve
+// klavye olayları karta taşmaz. compact: kartta "Kısa | Uzun".
+export function HorizonToggle({ value, onChange, compact = false, className = "" }) {
+  return (
+    <div role="group" aria-label={tt("hz.toggle")} className={`inline-flex shrink-0 rounded-control border border-ink-600 p-0.5 ${className}`}>
+      {["short", "long"].map((h) => (
+        <button
+          key={h}
+          type="button"
+          aria-pressed={value === h}
+          onClick={(e) => {
+            e.stopPropagation();
+            onChange(h);
+          }}
+          onKeyDown={(e) => e.stopPropagation()}
+          className={`min-h-7 rounded-[5px] px-2.5 text-micro font-medium transition-colors duration-hover ease-std ${
+            value === h ? "bg-ink-700 text-slate-100" : "text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          {tt(compact ? (h === "long" ? "hz.longC" : "hz.shortC") : h === "long" ? "hz.longBtn" : "hz.shortBtn")}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 // TEK durum etiketi: yön · güç ("Olumlu · orta"). Güç YALNIZCA evidence_strength'ten

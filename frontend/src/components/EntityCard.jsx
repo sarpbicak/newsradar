@@ -8,7 +8,10 @@
 // (iki satıra kadar sarar, asla kesilmez).
 import React from "react";
 import { Activity, ArrowLeftRight, ArrowRight, Compass, GitFork, Lock, TrendingUp, Zap } from "lucide-react";
-import { AnimatedNumber, SignalPill, horizonLabel, overallSignal, riskColor, targetOf, targetSourceLabel } from "./ui.jsx";
+import {
+  AnimatedNumber, HorizonToggle, NewsPill, divergenceText, hasHorizons, newsSignal, riskColor, targetOf, targetSourceLabel,
+  useHorizon,
+} from "./ui.jsx";
 import { Card, Chip, cx } from "./kit.jsx";
 import { tt, fmtPct } from "../i18n.jsx";
 import { C } from "../theme.js";
@@ -126,8 +129,12 @@ function PriorityChip({ reason }) {
 
 export default function EntityCard({ card, onOpen }) {
   const a = card.analysis;
-  const edge = a ? overallSignal(a.stance, card.evidence_strength).color : C.subtle;
+  const [horizon, setHorizon] = useHorizon();
+  const edge = a ? newsSignal(a, card.evidence_strength, horizon).color : C.subtle;
   const changed = a && card.delta?.stance_changed;
+  const diverge = a ? divergenceText(a, card.evidence_strength, card.analyst, horizon) : null;
+  // Ayrışma notu görünüyorsa aynı bilgiyi taşıyan "ayrışma" çipi tekrarlanmaz.
+  const priority = diverge && card.priority_reason === "divergence" ? null : card.priority_reason;
   const open = () => onOpen(card.id);
   return (
     <Card
@@ -147,15 +154,21 @@ export default function EntityCard({ card, onOpen }) {
 
       {/* Başlık: sabit en az yükseklik (iki satırlık ad + sembol) → hüküm her kartta aynı hizada. */}
       <div className="flex min-h-14 items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-nowrap items-center gap-2">
-          {a ? <SignalPill stance={a.stance} evidence={card.evidence_strength} /> : <Chip tone="muted">{tt(card.analysis_missing_language ? "card.langMissingShort" : "card.noAnalysis")}</Chip>}
-          {card.priority_reason && <PriorityChip reason={card.priority_reason} />}
-        </div>
-        <div className="min-w-0 basis-2/5 text-right">
+        <div className="min-w-0">
           <div className="break-words font-display text-base font-medium leading-tight text-slate-100">{displayName(card)}</div>
           <div className="mt-1 font-mono text-micro text-slate-500">{symbolOf(card)}</div>
         </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {!a && <Chip tone="muted">{tt(card.analysis_missing_language ? "card.langMissingShort" : "card.noAnalysis")}</Chip>}
+          {priority && <PriorityChip reason={priority} />}
+        </div>
       </div>
+      {a && (
+        <div className="-mt-1 flex flex-wrap items-center justify-between gap-2">
+          <NewsPill a={a} evidence={card.evidence_strength} horizon={horizon} />
+          {hasHorizons(a) && <HorizonToggle value={horizon} onChange={setHorizon} compact />}
+        </div>
+      )}
 
       {a ? (
         <>
@@ -169,8 +182,14 @@ export default function EntityCard({ card, onOpen }) {
             ) : (
               <PrivateLine drivers={a.top_drivers} />
             )}
+            {diverge && (
+              <p className="flex items-center gap-1.5 text-micro text-slate-400">
+                <GitFork className="h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden="true" />
+                {diverge}
+              </p>
+            )}
             <p className="text-micro text-slate-500">
-              {tt("card.horizon", { h: horizonLabel(card.horizon) })} · {tt("card.newsCount", { n: card.evidence_count })}
+              {tt("card.newsCount", { n: card.evidence_count })}
               {changed && <span className="text-amber-600"> · {tt("card.stanceChanged")}</span>}
             </p>
           </div>
@@ -190,7 +209,8 @@ export default function EntityCard({ card, onOpen }) {
 // Mobilde değerlendirme adın altına iner (iki satıra kadar).
 export function EntityRow({ card, onOpen }) {
   const a = card.analysis;
-  const edge = a ? overallSignal(a.stance, card.evidence_strength).color : C.subtle;
+  const [horizon] = useHorizon();
+  const edge = a ? newsSignal(a, card.evidence_strength, horizon).color : C.subtle;
   const changed = a && card.delta?.stance_changed;
   const verdict = a ? a.headline_verdict || a.summary : noAnalysisText(card, true);
   return (
@@ -206,6 +226,11 @@ export function EntityRow({ card, onOpen }) {
           <span className="break-words font-display text-sm font-medium text-slate-100">{displayName(card)}</span>
           <span className="shrink-0 font-mono text-micro text-slate-500">{symbolOf(card)}</span>
         </span>
+        {a && (
+          <span className="mt-1 flex md:mt-0 md:w-60 md:shrink-0">
+            <NewsPill a={a} evidence={card.evidence_strength} horizon={horizon} />
+          </span>
+        )}
         <span className="mt-0.5 line-clamp-2 text-meta text-slate-400 md:mt-0 md:line-clamp-1 md:flex-1">{verdict}</span>
       </span>
       {changed && <span className="hidden shrink-0 text-micro font-medium text-amber-600 md:inline">{tt("card.stanceChanged")}</span>}
