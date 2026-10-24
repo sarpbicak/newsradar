@@ -63,6 +63,7 @@ def init_db() -> None:
     _ensure_column("entity_analyses", "texts", "JSON")
     _ensure_column("entities", "backfilled_at", "DATETIME")
     _ensure_column("articles", "backfill", "BOOLEAN NOT NULL DEFAULT 0")
+    _ensure_column("users", "email_verified_at", "DATETIME")
     _ensure_column("users", "email", "VARCHAR(254)")
     # E-posta benzersizliği: yalnızca dolu değerler (eski hesaplarda NULL çok olabilir).
     # Önce varlık kontrolü: ikinci açılışta hiçbir DDL çalışmasın (yalnızca okuma).

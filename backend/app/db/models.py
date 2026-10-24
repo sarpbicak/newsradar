@@ -467,6 +467,9 @@ class User(Base):
     # E-posta: küçük harfle saklanır; kayıtta zorunlu, eski hesaplarda boş olabilir. Benzersizlik
     # NULL hariç kısmi index'le (init_db: ux_users_email). Doğrulama/şifre sıfırlama henüz yok.
     email: Mapped[str | None] = mapped_column(String(254), nullable=True)
+    # E-posta doğrulandığı an (bağlantıya tıklandı). Adres değişince None olur. Doğrulanmamış
+    # e-posta hesabı ENGELLEMEZ; menüde "E-postanı doğrula" uyarısı görünür.
+    email_verified_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     password_hash: Mapped[str] = mapped_column(String(200), nullable=False)  # bcrypt
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
@@ -556,3 +559,33 @@ class EntityAnalysis(Base):
     avg_sentiment: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     entity: Mapped["Entity"] = relationship(back_populates="analyses")
+
+
+class EmailToken(Base):
+    """Tek kullanımlık e-posta bağlantısı (doğrulama / şifre sıfırlama).
+
+    Düz token ASLA saklanmaz: yalnızca sha256'sı. purpose: "verify" (24 sa) | "reset" (1 sa).
+    verify kaydı hangi adres için üretildiğini tutar — adres sonradan değiştiyse eski bağlantı
+    yeni adresi doğrulamaz."""
+
+    __tablename__ = "email_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    purpose: Mapped[str] = mapped_column(String(10), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    email: Mapped[str | None] = mapped_column(String(254), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+
+class RateEvent(Base):
+    """Genel hız sınırı olayı (ör. şifre sıfırlama isteği). key içinde ham IP/e-posta YOK:
+    "forgot:ip:<hmac>" biçiminde özet saklanır. 1 günden eskiler temizlenir."""
+
+    __tablename__ = "rate_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    key: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False, index=True)

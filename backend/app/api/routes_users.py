@@ -11,12 +11,15 @@ import re
 import threading
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from datetime import timedelta
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from .. import account_mail
 from ..config import get_settings
 from ..db.database import get_db, session_scope
 from ..db.models import User
@@ -28,7 +31,7 @@ from .routes_auth import (
     require_auth,
     verify_password,
 )
-from .schemas import EmailIn, RegisterIn, UserLoginIn, UserOut, UserTokenOut
+from .schemas import EmailIn, RegisterIn, ResetPasswordIn, TokenIn, UserLoginIn, UserOut, UserTokenOut
 from .usage import record_event
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -79,6 +82,7 @@ def _user_out(u: User) -> UserOut:
         guide_dismissed=u.guide_dismissed, tutorial_done=u.tutorial_done,
         language=getattr(u, "language", "tr") or "tr",
         email=getattr(u, "email", None),
+        email_verified=bool(getattr(u, "email", None) and getattr(u, "email_verified_at", None)),
     )
 
 
@@ -113,7 +117,8 @@ def _find_by_username_ci(db: Session, username: str) -> User | None:
 
 
 @router.post("/register", response_model=UserTokenOut, status_code=201)
-def register(payload: RegisterIn, request: Request, db: Session = Depends(get_db, scope="function")) -> UserTokenOut:
+def register(payload: RegisterIn, request: Request, background: BackgroundTasks,
+             db: Session = Depends(get_db, scope="function")) -> UserTokenOut:
     """Yeni kişisel hesap (HERKESE AÇIK — genel şifre kapısı kaldırıldı; max_users + anon
     hız sınırı korur). İlk kullanıcı (ya da ADMIN_USERNAME) admin olur."""
     _check_locked(request)
@@ -169,8 +174,10 @@ def register(payload: RegisterIn, request: Request, db: Session = Depends(get_db
 
         user.last_login_at = datetime.now(timezone.utc)
         record_event(db, user.id, "login", {"via": "register"})
+        send = account_mail.prepare_verification(db, user)
         # KİLİT İÇİNDE commit: satır kalıcı olsun ki bir sonraki eşzamanlı kayıt onu saysın.
         db.commit()
+        background.add_task(send)  # yanıttan sonra gönderilir (SES gecikmesi beklenmez)
         token = make_user_token(user)
         out = _user_out(user)
     return UserTokenOut(token=token, user=out)
@@ -230,7 +237,7 @@ def me(user: User = Depends(get_current_user)) -> UserOut:
 
 
 @router.post("/upgrade", response_model=UserTokenOut)
-def upgrade(payload: RegisterIn, user: User = Depends(get_current_user),
+def upgrade(payload: RegisterIn, background: BackgroundTasks, user: User = Depends(get_current_user),
             db: Session = Depends(get_db, scope="function")) -> UserTokenOut:
     """Anonim oturumu KALICI hesaba çevir (liste/geçmiş korunur — aynı satır).
 
@@ -253,22 +260,109 @@ def upgrade(payload: RegisterIn, user: User = Depends(get_current_user),
     user.last_login_at = datetime.now(timezone.utc)
     record_event(db, user.id, "login", {"via": "upgrade"})
     db.flush()
+    background.add_task(account_mail.prepare_verification(db, user))
     return UserTokenOut(token=make_user_token(user), user=_user_out(user))
 
 
 @router.post("/me/email", response_model=UserOut)
-def set_email(payload: EmailIn, user: User = Depends(get_current_user),
+def set_email(payload: EmailIn, background: BackgroundTasks, user: User = Depends(get_current_user),
               db: Session = Depends(get_db, scope="function")) -> UserOut:
-    """E-posta ekle/değiştir (eski hesaplarda boş olabilir). Yalnızca kalıcı hesap."""
+    """E-posta ekle/değiştir (eski hesaplarda boş olabilir). Yalnızca kalıcı hesap.
+    Adres değişince doğrulama sıfırlanır ve yeni adrese doğrulama bağlantısı gider."""
     if user.is_anonymous:
         raise HTTPException(status_code=403, detail="Önce hesap oluştur.")
-    user.email = _require_email(payload.email, db, exclude_id=user.id)
+    email = _require_email(payload.email, db, exclude_id=user.id)
+    changed = email != user.email
+    user.email = email
+    if changed:
+        user.email_verified_at = None
+        account_mail.invalidate_tokens(db, user.id, "verify")
     try:
         db.flush()
     except IntegrityError:
         db.rollback()
         raise HTTPException(status_code=409, detail="Bu e-posta adresi zaten kayıtlı.")
+    if changed:
+        background.add_task(account_mail.prepare_verification(db, user))
     return _user_out(user)
+
+
+# ------------------------- E-posta doğrulama ------------------------- #
+@router.post("/me/email/resend", response_model=UserOut)
+def resend_verification(background: BackgroundTasks, user: User = Depends(get_current_user),
+                        db: Session = Depends(get_db, scope="function")) -> UserOut:
+    """Doğrulama bağlantısını yeniden gönder: 1 dk bekleme süresi, günde en fazla 10."""
+    if user.is_anonymous or not user.email:
+        raise HTTPException(status_code=400, detail="Önce bir e-posta adresi ekle.")
+    if user.email_verified_at is not None:
+        return _user_out(user)
+    wait = account_mail.resend_wait_seconds(db, user)
+    if wait or account_mail.verification_sends_today(db, user) >= account_mail.VERIFY_PER_DAY:
+        raise HTTPException(status_code=429, detail="Biraz bekleyip tekrar dene.",
+                            headers={"Retry-After": str(wait or 3600)})
+    background.add_task(account_mail.prepare_verification(db, user))
+    return _user_out(user)
+
+
+@router.post("/verify-email")
+def verify_email(payload: TokenIn, db: Session = Depends(get_db, scope="function")) -> dict:
+    """Bağlantıdaki token ile e-postayı doğrular (oturum gerekmez; başka cihazda açılabilir)."""
+    user = account_mail.verify_email(db, payload.token)
+    if user is None:
+        raise HTTPException(status_code=400, detail="Bağlantı geçersiz, kullanılmış ya da süresi dolmuş.")
+    record_event(db, user.id, "email_verified", None)
+    return {"ok": True}
+
+
+# ------------------------- Şifre sıfırlama ------------------------- #
+FORGOT_MESSAGE = "Bu adres kayıtlıysa şifre sıfırlama bağlantısı gönderdik."
+
+
+@router.post("/forgot-password", status_code=202)
+def forgot_password(payload: EmailIn, request: Request, background: BackgroundTasks,
+                    db: Session = Depends(get_db, scope="function")) -> dict:
+    """Şifre sıfırlama bağlantısı ister. Yanıt, adres kayıtlı olsun olmasın AYNIDIR (hesap
+    varlığı sızmaz). IP başına saatte 5 istek (aşılırsa 429); adres başına saatte 3 — aşılırsa
+    sessizce gönderilmez (429 dönmek adresin kayıtlı olduğunu ele verirdi)."""
+    ip = get_client_ip(request)
+    if not account_mail.rate_allow(db, account_mail.rate_key("forgot:ip", ip),
+                                   account_mail.FORGOT_PER_IP_HOUR, timedelta(hours=1)):
+        db.commit()
+        raise HTTPException(status_code=429, detail="Çok fazla istek. Biraz sonra tekrar dene.")
+    email = normalize_email(payload.email)
+    user = _find_by_email(db, email) if email else None
+    if (user is not None and not user.is_anonymous
+            and account_mail.rate_allow(db, account_mail.rate_key("forgot:email", email),
+                                        account_mail.FORGOT_PER_EMAIL_HOUR, timedelta(hours=1))):
+        background.add_task(account_mail.prepare_reset(db, user))
+        record_event(db, user.id, "password_reset_requested", None)
+    return {"detail": FORGOT_MESSAGE}
+
+
+@router.post("/reset-password", response_model=UserTokenOut)
+def reset_password(payload: ResetPasswordIn, request: Request,
+                   db: Session = Depends(get_db, scope="function")) -> UserTokenOut:
+    """Bağlantıdaki token (1 sa, tek kullanımlık) ile yeni şifre. Şifre değişince TÜM eski
+    oturum token'ları geçersizleşir (imzada şifre özeti var) ve cihaz bağları kaldırılır —
+    başka cihazdaki çerez hesabı geri getiremez. Bu cihaz için taze token döner."""
+    _check_locked(request)
+    if len(payload.password) < MIN_PASSWORD_LEN:
+        raise HTTPException(status_code=422, detail=f"Şifre en az {MIN_PASSWORD_LEN} karakter olmalı.")
+    tok = account_mail.consume_token(db, payload.token, "reset")
+    user = db.get(User, tok.user_id) if tok else None
+    if user is None:
+        login_limiter.record_failure(get_client_ip(request))
+        raise HTTPException(status_code=400, detail="Bağlantı geçersiz, kullanılmış ya da süresi dolmuş.")
+    user.password_hash = hash_password(payload.password)
+    user.device_id_hash = None
+    account_mail.invalidate_tokens(db, user.id, "reset")
+    # Bağlantı bu adrese geldi → adres de doğrulanmış sayılır.
+    if user.email and tok.email == user.email and user.email_verified_at is None:
+        user.email_verified_at = datetime.now(timezone.utc)
+    user.last_login_at = datetime.now(timezone.utc)
+    record_event(db, user.id, "password_reset", None)
+    db.flush()
+    return UserTokenOut(token=make_user_token(user), user=_user_out(user))
 
 
 @router.post("/me/guide-dismiss", response_model=UserOut)

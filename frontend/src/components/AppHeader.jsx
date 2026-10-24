@@ -4,7 +4,7 @@
 // ilerleme header'ın alt kenarında ince bir çizgi (içeriği itmez) + küçük durum metni.
 // Mobil: logo · Yenile · menü → tam ekran çekmece (dil, tema, nasıl çalışır, hesap).
 import React, { useEffect, useId, useRef, useState } from "react";
-import { HelpCircle, LayoutDashboard, LogOut, Mail, Menu as MenuIcon, MessageSquare, RefreshCw, ShieldCheck, X } from "lucide-react";
+import { HelpCircle, LayoutDashboard, LogOut, Mail, MailWarning, Menu as MenuIcon, MessageSquare, RefreshCw, ShieldCheck, X } from "lucide-react";
 import { fmtTime, parseUtc, refreshParts, useI18n } from "../i18n.jsx";
 import { navigate } from "../router.js";
 import { Button, Chip, Menu, MenuItem, Modal, cx } from "./kit.jsx";
@@ -195,7 +195,10 @@ function initials(name) {
   return (name || "?").trim().slice(0, 1).toUpperCase();
 }
 
-function UserMenu({ user, view, onAdmin, onLogout, onAccount }) {
+// E-posta var ama doğrulanmamış (ve gönderim gerçekten açık) → menüde "E-postanı doğrula".
+const needsVerify = (user, emailEnabled) => emailEnabled && !user.is_anonymous && !!user.email && !user.email_verified;
+
+function UserMenu({ user, view, onAdmin, onLogout, onAccount, emailEnabled }) {
   const { t } = useI18n();
   return (
     <Menu
@@ -232,6 +235,11 @@ function UserMenu({ user, view, onAdmin, onLogout, onAccount }) {
           {t("header.addEmail")}
         </MenuItem>
       )}
+      {needsVerify(user, emailEnabled) && (
+        <MenuItem icon={MailWarning} onClick={() => onAccount("verify")} className="text-amber-600">
+          {t("header.verifyEmail")}
+        </MenuItem>
+      )}
       <MenuItem icon={LogOut} onClick={onLogout}>
         {t("header.logout")}
       </MenuItem>
@@ -245,7 +253,7 @@ function SectionLabel({ children }) {
   return <div className="mb-2 text-micro font-medium text-slate-500">{children}</div>;
 }
 
-function Drawer({ user, view, lang, onLang, onClose, onHow, onAccount, onAdmin, onLogout, onFeedback }) {
+function Drawer({ user, view, lang, onLang, onClose, onHow, onAccount, onAdmin, onLogout, onFeedback, emailEnabled }) {
   const { t } = useI18n();
   const act = (fn) => () => {
     onClose();
@@ -296,6 +304,9 @@ function Drawer({ user, view, lang, onLang, onClose, onHow, onAccount, onAdmin, 
         {!user.is_anonymous && !user.email && (
           <MenuItem icon={Mail} onClick={act(() => onAccount("email"))} className={item}>{t("header.addEmail")}</MenuItem>
         )}
+        {needsVerify(user, emailEnabled) && (
+          <MenuItem icon={MailWarning} onClick={act(() => onAccount("verify"))} className={`${item} text-amber-600`}>{t("header.verifyEmail")}</MenuItem>
+        )}
         <MenuItem icon={MessageSquare} onClick={act(onFeedback)} className={item}>{t("fb.button")}</MenuItem>
       </nav>
 
@@ -312,7 +323,7 @@ function Drawer({ user, view, lang, onLang, onClose, onHow, onAccount, onAdmin, 
   );
 }
 
-export default function AppHeader({ user, view, lang, onLang, onHome, onAccount, onAdmin, onLogout, onFeedback, refresh, scan }) {
+export default function AppHeader({ user, view, lang, onLang, onHome, onAccount, onAdmin, onLogout, onFeedback, refresh, scan, emailEnabled = false }) {
   const { t } = useI18n();
   const [drawer, setDrawer] = useState(false);
   // Görünüm değişince çekmece açık kalmasın.
@@ -343,7 +354,7 @@ export default function AppHeader({ user, view, lang, onLang, onHome, onAccount,
             <Button onClick={() => onAccount("upgrade")} className="nav-text">{t("header.createAccount")}</Button>
           </>
         ) : (
-          <UserMenu user={user} view={view} onAdmin={onAdmin} onLogout={onLogout} onAccount={onAccount} />
+          <UserMenu user={user} view={view} onAdmin={onAdmin} onLogout={onLogout} onAccount={onAccount} emailEnabled={emailEnabled} />
         )}
       </div>
       <div className="hidden md:block">
@@ -363,6 +374,7 @@ export default function AppHeader({ user, view, lang, onLang, onHome, onAccount,
           onClose={() => setDrawer(false)}
           onHow={goHow}
           onAccount={onAccount}
+          emailEnabled={emailEnabled}
           onAdmin={onAdmin}
           onLogout={onLogout}
           onFeedback={onFeedback}

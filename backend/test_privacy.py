@@ -89,7 +89,8 @@ with TestClient(app) as client:
     check(r.status_code == 200, f"girişsiz erişilebilir ({r.status_code})")
     d = r.json()
     check(d == {"llm_provider": "Anthropic", "hosting_provider": "Render",
-                "contact_email": "privacy@example.com", "ip_retention_days": 7}, f"değerler config'ten: {d}")
+                "contact_email": "privacy@example.com", "ip_retention_days": 7,
+                "email_provider": None}, f"değerler config'ten (console arka ucunda e-posta sağlayıcısı yok): {d}")
 
 print("== D: sağlayıcı adı tek kaynaktan ==")
 st = get_settings()

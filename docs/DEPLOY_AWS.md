@@ -1620,3 +1620,119 @@ Repo dosyaları:
 | "Yalnızca HTTPS" (CloudFront) | | `redirect-to-https`: HTTP üzerinden hiçbir içerik sunulmaz, yalnızca HTTPS'e 301 döner. `https-only` seçilirse `http://newsradarapp.com` yazan kullanıcı 403 alır. |
 | Yedek saklama | 30 gün, eski sürümler dahil | Güncel sürüm 30 gün, eski sürüm güncel olmaktan çıktıktan sonra 30 gün → en fazla 60 gün. Kesin 30 gün için `NoncurrentDays: 1` ([Adım 5](#adım-5--yedek-bucketı)). |
 | ACM | | Yalnızca CloudFront için (us-east-1). API sertifikasını Caddy alıyor. |
+
+---
+
+## Ek C — SES kurulumu (e-posta doğrulama ve şifre sıfırlama)
+
+**Durum (karar):** Şimdilik `EMAIL_BACKEND=console`. Production'da e-posta gönderilmez; arayüz "Şifremi unuttum" bağlantısını ve "E-postanı doğrula" uyarısını gizler (`/public/features` → `email: false`). Açılışta ERROR seviyesinde bir uyarı log'a düşer. IMDS atlama sınırı **1** kalır, container'lar instance rolüne ulaşamaz. Aşağıdaki adımlar yalnızca belgedir; SES'e geçmeye karar verilince sırayla uygulanır.
+
+Kod tarafı hazırdır ([backend/app/mailer.py](../backend/app/mailer.py)):
+- `EMAIL_BACKEND=ses` olunca boto3 `sesv2.send_email` kullanılır.
+- Kimlik bilgileri boto3'ün varsayılan zincirinden gelir. Koda ya da ortama anahtar konmaz; (b) yolu seçilirse ayrı bir anahtar gerekir, bkz. C5.
+
+### C1 — Alan adını SES'te doğrula (Easy DKIM, Route 53)
+
+```bash
+aws sesv2 create-email-identity --region "$REGION" --email-identity "$DOMAIN" \
+  --dkim-signing-attributes NextSigningKeyLength=RSA_2048_BIT
+aws sesv2 get-email-identity --region "$REGION" --email-identity "$DOMAIN" \
+  --query 'DkimAttributes.Tokens' --output text          # 3 token
+```
+
+Her token için Route 53'te bir CNAME kaydı oluşturulur:
+
+```
+<token>._domainkey.$DOMAIN  CNAME  <token>.dkim.amazonses.com
+```
+
+Bu kayıtlar `aws route53 change-resource-record-sets` ile ya da konsoldan eklenir. Doğrulama:
+
+```bash
+aws sesv2 get-email-identity --region "$REGION" --email-identity "$DOMAIN" \
+  --query '[VerifiedForSendingStatus,DkimAttributes.Status]' --output text   # True SUCCESS
+```
+
+### C2 — SPF ve DMARC
+
+- **Özel MAIL FROM alanı (önerilir).** SPF hizalaması için:
+  ```bash
+  aws sesv2 put-email-identity-mail-from-attributes --region "$REGION" --email-identity "$DOMAIN" \
+    --mail-from-domain "mail.$DOMAIN" --behavior-on-mx-failure USE_DEFAULT_VALUE
+  ```
+  Route 53 kayıtları:
+  ```
+  mail.$DOMAIN  MX   10 feedback-smtp.$REGION.amazonses.com
+  mail.$DOMAIN  TXT  "v=spf1 include:amazonses.com ~all"
+  ```
+- **DMARC.** Önce yalnızca raporlama, birkaç hafta sonra `p=quarantine`:
+  ```
+  _dmarc.$DOMAIN  TXT  "v=DMARC1; p=none; rua=mailto:<NEWSRADAR_CONTACT_EMAIL>; adkim=s; aspf=r"
+  ```
+
+### C3 — Sandbox'tan çıkış talebi
+
+Yeni hesaplar sandbox'tadır: yalnızca doğrulanmış alıcılara gönderilebilir ve günlük kota düşüktür. Talep:
+
+```bash
+aws sesv2 put-account-details --region "$REGION" --production-access-enabled \
+  --mail-type TRANSACTIONAL --website-url "https://$DOMAIN" --contact-language EN \
+  --use-case-description "Transactional account email only: address verification and password reset links for NewsRadar users. No marketing. Expected volume: a few emails per day. Bounces and complaints are monitored in the SES console."
+aws sesv2 get-account --region "$REGION" --query '[ProductionAccessEnabled,SendQuota]'
+```
+
+Onay genellikle 1 iş günü sürer. Beklerken kendi adresinizi alıcı olarak doğrulayıp sandbox'ta deneyebilirsiniz: `aws sesv2 create-email-identity --email-identity siz@ornek.com`.
+
+### C4 — En dar IAM izni
+
+Yalnızca bu alan adı kimliğinden ve yalnızca bu gönderen adresinden `ses:SendEmail` izni verilir:
+
+```json
+{
+  "Sid": "SendAccountEmailOnly",
+  "Effect": "Allow",
+  "Action": "ses:SendEmail",
+  "Resource": "arn:aws:ses:__REGION__:__ACCOUNT_ID__:identity/__DOMAIN__",
+  "Condition": { "StringEquals": { "ses:FromAddress": "no-reply@__DOMAIN__" } }
+}
+```
+
+- **Sandbox'tayken** SES alıcı kimliğini de yetkilendirir. Test alıcısı için kaynağa `arn:aws:ses:__REGION__:__ACCOUNT_ID__:identity/siz@ornek.com` eklenir; production erişimi gelince bu satır kaldırılır.
+- `ses:SendRawEmail` ve `ses:*` **verilmez**. Bağlanacağı yer C5'teki seçime göre değişir: instance rolüne ([deploy/iam/ec2-instance-policy.json](../deploy/iam/ec2-instance-policy.json)) ya da ayrı kullanıcıya.
+
+### C5 — Kimlik bilgisinin backend container'ına ulaşması (karar sonra verilecek)
+
+Backend Docker container'ında çalışır. Bugün `HttpPutResponseHopLimit=1` olduğu için container'lar instance rolüne ulaşamaz (Adım 13). İki yol var:
+
+- **(a) Atlama sınırı 2 + Caddy'nin IMDS erişimini engellemek.** Anahtarsız; kimlik instance rolünden gelir.
+  ```bash
+  aws ec2 modify-instance-metadata-options --region "$REGION" --instance-id "$INSTANCE_ID" \
+    --http-tokens required --http-put-response-hop-limit 2
+  # Host'ta (Session Manager): Caddy'nin sabit iç IP'sinden IMDS'e giden trafiği düşür.
+  sudo iptables -I DOCKER-USER -s 172.28.0.10 -d 169.254.169.254 -j DROP
+  ```
+  - iptables kuralı yeniden başlatmada kaybolur. Kalıcı olması için user-data'ya ya da bir systemd unit'ine (`ExecStart=/usr/sbin/iptables -I DOCKER-USER …`) eklenmelidir.
+  - Backend container'ı rolün TÜM izinlerine (SSM okuma, yedek bucket'ı, ECR) ulaşabilir hale gelir. Rol zaten dar tutulduğu için etki sınırlı, ama savunma katmanı bir azalır.
+- **(b) Yalnızca `ses:SendEmail` izinli ayrı bir yol.** IMDS kapalı kalır.
+  - Yalnızca C4 politikasını taşıyan ayrı bir IAM kullanıcısı açılır.
+  - Erişim anahtarı SSM'e SecureString olarak yazılır: `AWS_ACCESS_KEY_ID` ve `AWS_SECRET_ACCESS_KEY`. boto3 bunları ortamdan kendiliğinden okur.
+  - Bedeli uzun ömürlü bir anahtardır: 90 günde bir yenilenmeli, CloudTrail'de izlenmelidir.
+  - Bu iki ad uygulama ayarı değildir. PARAMETERS.md'ye yalnızca bu yol seçilirse eklenir.
+
+### C6 — SSM parametreleri ve imaj
+
+```bash
+put_param EMAIL_BACKEND String ses
+put_param EMAIL_FROM String "NewsRadar <no-reply@${DOMAIN}>"
+put_param EMAIL_SES_REGION String "$REGION"
+put_param NEWSRADAR_PUBLIC_URL String "https://${DOMAIN}"   # e-postadaki bağlantıların kökü
+```
+
+- `backend/requirements.txt`'e `boto3` eklenip imaj yeniden derlenir. SES kapalıyken imaj büyümesin diye (botocore ~100 MB) bugün eklenmedi.
+- boto3 yoksa `ses` arka ucu her gönderimde "boto3 kurulu değil" hatasını log'a yazar; kullanıcı akışı bozulmaz.
+
+### C7 — Deneme
+
+- Production'da kendi hesabınızla "Şifremi unuttum"u kullanın, gelen e-postadaki bağlantıyla şifreyi değiştirin. Diğer cihazdaki oturumun kapandığını görün.
+- `docker compose logs backend | grep mail:ses` → `gönderildi`.
+- SES konsolunda "Reputation metrics" bölümünde bounce ve complaint oranlarını izleyin. %5 bounce ya da %0,1 complaint üstü hesabı riske sokar.

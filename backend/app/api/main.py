@@ -114,6 +114,12 @@ async def lifespan(_app: FastAPI):
             _lvl,
             "NEWSRADAR_FAKE_REFRESH_SECONDS=%s tanımlı: yenilemeler SAHTE (ağ/LLM yok, veri güncellenmez). "
             "Bu değişken yalnızca test içindir, production'da ASLA tanımlanmamalı.", _fake)
+    # E-posta console arka ucu üretimde gönderim YAPMAZ (yalnızca log): doğrulama/sıfırlama
+    # postaları kullanıcıya ulaşmaz. Caddy arkasında (EC2 production profili) ERROR.
+    if get_settings().email_backend == "console" and get_settings().trusted_proxy == "caddy":
+        logging.getLogger("newsradar").error(
+            "EMAIL_BACKEND=console: doğrulama ve şifre sıfırlama e-postaları GÖNDERİLMİYOR "
+            "(yalnızca log). Production'da EMAIL_BACKEND=ses kullanın (docs/DEPLOY_AWS.md, SES kurulumu).")
     refresh_queue.ensure_worker()
     scheduler.start()
     yield
@@ -154,6 +160,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
+    expose_headers=["Retry-After"],  # "Tekrar gönder" bekleme süresi farklı alt alan adından okunabilsin
 )
 
 # Genel şifre ucu (/auth/login) — geriye uyum için duruyor ama artık ZORUNLU DEĞİL
@@ -207,4 +214,6 @@ def privacy_info() -> dict:
         "hosting_provider": s.hosting_provider,
         "contact_email": s.contact_email or None,
         "ip_retention_days": s.ip_retention_days,
+        # Hesap e-postaları (doğrulama / şifre sıfırlama) kimin üzerinden gider.
+        "email_provider": f"Amazon SES ({s.email_ses_region})" if s.email_backend == "ses" else None,
     }

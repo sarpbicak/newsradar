@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from ..config import get_settings
 from ..db.database import get_db
 from ..db.models import Article, EntityAnalysis
 from .routes_how import build_how_it_works
@@ -41,3 +42,13 @@ def public_how_it_works(response: Response, lang: str = Query("en", pattern="^(t
                         db: Session = Depends(get_db, scope="function")) -> HowItWorksOut:
     response.headers["Cache-Control"] = CACHE
     return build_how_it_works(db, lang)
+
+
+@router.get("/features")
+def public_features(response: Response) -> dict:
+    """Arayüzün açıp kapattığı özellikler. email: doğrulama/şifre sıfırlama postaları gerçekten
+    gidiyor mu — production'da console arka ucu (gönderim yok) iken "Şifremi unuttum" ve
+    "E-postanı doğrula" gizlenir; yerelde console ile de açıktır (bağlantı log'da/stderr'de)."""
+    s = get_settings()
+    response.headers["Cache-Control"] = CACHE
+    return {"email": s.email_backend == "ses" or s.trusted_proxy != "caddy"}

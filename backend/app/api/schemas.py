@@ -77,6 +77,15 @@ class EmailIn(BaseModel):
     email: str = Field(max_length=254)
 
 
+class TokenIn(BaseModel):
+    token: str = Field(max_length=200)
+
+
+class ResetPasswordIn(BaseModel):
+    token: str = Field(max_length=200)
+    password: str = Field(max_length=200)
+
+
 class UserLoginIn(BaseModel):
     username: str = Field(max_length=100)
     password: str = Field(max_length=200)
@@ -95,6 +104,7 @@ class UserOut(BaseModel):
     tutorial_done: bool = False     # ilk giriş tutorial'ı tamamlandı mı
     language: str = "tr"            # arayüz dili (tr/en)
     email: str | None = None        # yalnızca kişinin kendisine döner (eski hesaplarda boş)
+    email_verified: bool = False    # e-posta bağlantıyla doğrulandı mı (engellemez; menüde uyarı)
 
 
 class UserTokenOut(BaseModel):

@@ -12,6 +12,9 @@ applyMotionVars();
 
 // Pano (Recharts dahil) AYRI pakette: landing'in ilk yüklemesi küçük kalsın.
 const App = lazy(() => import("./App.jsx"));
+// E-postadaki doğrulama / şifre sıfırlama bağlantılarının sayfası (nadiren açılır → ayrı paket).
+const EmailLinkPage = lazy(() => import("./components/EmailLinkPage.jsx"));
+const LINK_PAGES = { "/verify-email": "verify", "/reset-password": "reset" };
 
 // Daha önce gelmiş ziyaretçi "/"'ı açarsa ilk render'dan ÖNCE panoya (landing flaşı yok).
 if (shouldSkipLanding()) window.history.replaceState(null, "", "/app");
@@ -25,12 +28,17 @@ function Root() {
   });
   const path = usePath();
   const inApp = isAppPath(path);
+  const linkKind = LINK_PAGES[path];
   return (
     <ThemeProvider>
       <I18nProvider lang={lang} setLang={setLang}>
         {/* Sayfa geçişi: kısa (≤250ms) fade/slide — key değişince yeniden oynar. */}
-        <div key={inApp ? "app" : "landing"} className="page-in">
-          {inApp ? (
+        <div key={inApp ? "app" : linkKind || "landing"} className="page-in">
+          {linkKind ? (
+            <Suspense fallback={<main className="min-h-dvh" aria-busy="true" />}>
+              <EmailLinkPage kind={linkKind} />
+            </Suspense>
+          ) : inApp ? (
             <Suspense fallback={<main className="min-h-dvh" aria-busy="true" />}>
               <App lang={lang} setLang={setLang} />
             </Suspense>

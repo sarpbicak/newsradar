@@ -36,7 +36,13 @@ export default function App({ setLang }) {
   const [switchingLang, setSwitchingLang] = useState(false); // dil değişiminde kısa fade
   const [user, setUser] = useState(null);            // kişisel kullanıcı (anon ya da kayıtlı)
   const [checkingSession, setCheckingSession] = useState(true);
-  const [account, setAccount] = useState(null);      // "upgrade" | "login" | null (modal)
+  const [account, setAccount] = useState(null);      // "upgrade" | "login" | "email" | "forgot" | "verify" | null
+  // E-posta gönderimi gerçekten açık mı (production'da console arka ucu → kapalı: "Şifremi
+  // unuttum" ve "E-postanı doğrula" gösterilmez, kullanıcı çalışmayan bir şey görmez).
+  const [emailEnabled, setEmailEnabled] = useState(false);
+  useEffect(() => {
+    api.publicFeatures().then((f) => setEmailEnabled(!!f?.email)).catch(() => {});
+  }, []);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [view, setView] = useState("dashboard");     // "dashboard" | "admin"
@@ -517,6 +523,7 @@ export default function App({ setLang }) {
         onLang={applyLang}
         onHome={goHome}
         onAccount={setAccount}
+        emailEnabled={emailEnabled}
         onAdmin={() => setView((v) => (v === "admin" ? "dashboard" : "admin"))}
         onLogout={handleLogout}
         onFeedback={() => setFeedbackOpen(true)}
@@ -604,6 +611,8 @@ export default function App({ setLang }) {
       {account && (
         <AccountModal
           mode={account}
+          user={user}
+          emailEnabled={emailEnabled}
           onClose={() => setAccount(null)}
           onDone={(u) => {
             setUser(u);

@@ -146,6 +146,40 @@ export function userLogin(username, password) {
   return userAuth("/users/login", { username, password });
 }
 
+// --- E-posta doğrulama / şifre sıfırlama (bağlantı sayfaları oturumsuz da çalışır) ---
+async function publicPost(path, body) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw await apiError(res);
+  return res.json();
+}
+export function forgotPassword(email) {
+  return publicPost("/users/forgot-password", { email });
+}
+export function verifyEmail(token) {
+  return publicPost("/users/verify-email", { token });
+}
+// Yeni şifre: başarılıysa bu cihazda oturum açılır (diğer oturumlar sunucuda kapanır).
+export async function resetPassword(token, password) {
+  const data = await publicPost("/users/reset-password", { token, password });
+  setUserToken(data.token);
+  return data.user;
+}
+// "Tekrar gönder" — 429'da err.retryAfter (sn) dolu döner.
+export async function resendVerification() {
+  const res = await fetch(`${API_BASE}/users/me/email/resend`, { method: "POST", headers: authHeaders(), credentials: "include" });
+  if (!res.ok) {
+    const err = await apiError(res);
+    err.retryAfter = Number(res.headers.get("Retry-After")) || 60;
+    throw err;
+  }
+  return res.json();
+}
+
 // Kullanıcıya özel yerel anahtarlar (çıkışta silinir). Dil/tema CİHAZ tercihidir, kalır.
 const USER_SCOPED_KEYS = [USER_KEY, "nr_hint_account_dismissed", "nr_more_starters_dismissed", "nr_chat_panel_open"];
 const USER_SCOPED_PREFIXES = ["nr_section_"];
@@ -185,6 +219,7 @@ export const api = {
   // ziyaretçi için oturum açılmaz (kullanıcı kotası tüketilmez).
   publicStats: () => publicGet("/public/stats"),
   publicHowItWorks: (lang) => publicGet(`/public/how-it-works?lang=${encodeURIComponent(lang)}`),
+  publicFeatures: () => publicGet("/public/features"),
   // Geri bildirim (herkese açık — anon da gönderebilir)
   sendFeedback: (message, contact) =>
     req("/feedback", { method: "POST", body: JSON.stringify({ message, contact }) }),

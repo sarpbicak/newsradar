@@ -171,6 +171,16 @@ class Settings:
         # Vite (localhost:5173) izinli. "*" = tümüne izin.
         self.frontend_url: str = _env("FRONTEND_URL", "")
         self.cors_origins_env: str = _env("NEWSRADAR_CORS_ORIGINS", "")
+        # E-postadaki bağlantıların kökü (https://newsradarapp.com). Boşsa ilk CORS kökeni.
+        # İsteğin Host başlığı ASLA kullanılmaz (sıfırlama bağlantısı zehirlenmesin).
+        self.public_url_env: str = _env("NEWSRADAR_PUBLIC_URL", "")
+        # E-posta gönderimi: console (log'a yazar; geliştirme/test) | ses (Amazon SES v2, boto3;
+        # kimlik bilgileri varsayılan AWS zincirinden — EC2 instance rolü, anahtar yok).
+        self.email_backend: str = _env("EMAIL_BACKEND", "console").lower()
+        if self.email_backend not in ("console", "ses"):
+            raise ValueError(f"EMAIL_BACKEND geçersiz: {self.email_backend!r} (console | ses)")
+        self.email_from: str = _env("EMAIL_FROM", "NewsRadar <no-reply@localhost>")
+        self.email_ses_region: str = _env("EMAIL_SES_REGION", "eu-central-1")
         # Deploy: açılışta varsayılan izleme listesini otomatik ekle (idempotent).
         # Kalıcı olmayan diskte (Render bedava katman) DB boş başlamasın diye faydalı.
         self.seed_on_start: bool = _env("NEWSRADAR_SEED_ON_START", "off").lower() == "on"
@@ -191,6 +201,14 @@ class Settings:
         if "*" in extra:
             return ["*"]  # esnek kaçış: tüm origin'lere izin
         return dev + [o for o in dict.fromkeys(extra) if o not in dev]
+
+    @property
+    def public_url(self) -> str:
+        """E-posta bağlantılarının kökü (sonda / yok)."""
+        if self.public_url_env:
+            return self.public_url_env.rstrip("/")
+        extra = [o for o in self.cors_origins if o != "*" and "localhost" not in o and "127.0.0.1" not in o]
+        return (extra[0] if extra else "http://localhost:5173").rstrip("/")
 
     # --- Sağlayıcı erişilebilirliği (anahtar var mı?) ---
     @property

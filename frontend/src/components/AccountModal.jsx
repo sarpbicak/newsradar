@@ -1,18 +1,23 @@
 // Hesap modalı: anonim oturumu KALICI hesaba çevir (upgrade: kullanıcı adı + e-posta + şifre),
-// mevcut hesaba GİRİŞ (kullanıcı adı ya da e-posta) ya da eski hesaba E-POSTA EKLE ("email").
+// mevcut hesaba GİRİŞ (kullanıcı adı ya da e-posta), eski hesaba E-POSTA EKLE ("email"),
+// ŞİFREMİ UNUTTUM ("forgot") ya da e-postayı DOĞRULA / tekrar gönder ("verify").
+// "forgot" ve "verify" yalnızca e-posta gönderimi açıkken (emailEnabled) sunulur.
 // Genel şifre kapısı YOK — site herkese açık.
-import React, { useState } from "react";
-import { LogIn, Mail, UserPlus } from "lucide-react";
-import { setEmail, upgradeAccount, userLogin } from "../api.js";
+import React, { useEffect, useState } from "react";
+import { KeyRound, LogIn, Mail, MailCheck, UserPlus } from "lucide-react";
+import { forgotPassword, resendVerification, setEmail, upgradeAccount, userLogin } from "../api.js";
 import { useI18n } from "../i18n.jsx";
 import { Button, Field, Input, Modal, ModalHeader } from "./kit.jsx";
 
 // Sunucuyla aynı gevşek biçim denetimi (tek @, noktalı alan adı, boşluk yok).
 const EMAIL_RE = /^[^@\s]{1,64}@[^@\s]+\.[^@\s.]{2,}$/;
 
-export default function AccountModal({ mode: initialMode, onClose, onDone }) {
+// "Tekrar gönder" bekleme süresi (sn): sunucu 429 + Retry-After ile de söyler.
+const RESEND_COOLDOWN = 60;
+
+export default function AccountModal({ mode: initialMode, onClose, onDone, user, emailEnabled = false }) {
   const { t } = useI18n();
-  const [mode, setMode] = useState(["login", "email"].includes(initialMode) ? initialMode : "upgrade");
+  const [mode, setMode] = useState(["login", "email", "forgot", "verify"].includes(initialMode) ? initialMode : "upgrade");
   const [username, setUsername] = useState("");
   const [email, setEmailValue] = useState("");
   const [password, setPassword] = useState("");
@@ -21,6 +26,88 @@ export default function AccountModal({ mode: initialMode, onClose, onDone }) {
 
   const isUpgrade = mode === "upgrade";
   const isEmail = mode === "email";
+  const [sent, setSent] = useState(false); // forgot: genel "gönderdik" mesajı
+  const [cooldown, setCooldown] = useState(0);
+  useEffect(() => {
+    if (cooldown <= 0) return undefined;
+    const id = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(id);
+  }, [cooldown]);
+
+  async function resend() {
+    if (busy || cooldown > 0) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await resendVerification();
+      setSent(true);
+      setCooldown(RESEND_COOLDOWN);
+    } catch (e2) {
+      if (e2.status === 429) setCooldown(e2.retryAfter || RESEND_COOLDOWN);
+      else setErr(e2.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (mode === "verify") {
+    return (
+      <Modal onClose={onClose} labelledBy="acc-title" size="sm">
+        <ModalHeader id="acc-title" title={t("acc.verifyTitle")} icon={MailCheck} onClose={onClose}>
+          {t("acc.verifyBody", { email: user?.email || "" })}
+        </ModalHeader>
+        {sent && <p className="mb-3 text-meta text-emerald-600" role="status">{t("acc.verifySent")}</p>}
+        {err && <p className="mb-3 text-meta text-rose-600" role="alert">{err}</p>}
+        <Button variant="primary" onClick={resend} disabled={busy || cooldown > 0} className="w-full">
+          {cooldown > 0 ? t("acc.resendIn", { s: cooldown }) : t("acc.resend")}
+        </Button>
+      </Modal>
+    );
+  }
+
+  if (mode === "forgot") {
+    const submitForgot = async (e) => {
+      e.preventDefault();
+      if (busy) return;
+      if (!EMAIL_RE.test(email.trim())) {
+        setErr(t("acc.emailInvalid"));
+        return;
+      }
+      setBusy(true);
+      setErr(null);
+      try {
+        await forgotPassword(email.trim());
+        setSent(true); // adres kayıtlı olsun olmasın aynı mesaj (hesap varlığı sızmaz)
+      } catch (e2) {
+        setErr(e2.status === 429 ? t("acc.tooMany") : e2.message);
+      } finally {
+        setBusy(false);
+      }
+    };
+    return (
+      <Modal onClose={onClose} labelledBy="acc-title" size="sm">
+        <ModalHeader id="acc-title" title={t("acc.forgotTitle")} icon={KeyRound} onClose={onClose}>
+          {sent ? t("acc.forgotSent") : t("acc.forgotBody")}
+        </ModalHeader>
+        {!sent && (
+          <form onSubmit={submitForgot} className="space-y-3" noValidate>
+            <Field label={t("acc.email")} htmlFor="acc-email">
+              <Input id="acc-email" type="email" inputMode="email" value={email} onChange={(e) => setEmailValue(e.target.value)} autoComplete="email" data-autofocus required />
+            </Field>
+            {err && <p className="text-meta text-rose-600" role="alert">{err}</p>}
+            <Button type="submit" variant="primary" disabled={busy} className="w-full">
+              {busy ? t("acc.working") : t("acc.forgotSubmit")}
+            </Button>
+          </form>
+        )}
+        <div className="mt-4 text-center">
+          <Button variant="ghost" size="sm" onClick={() => { setErr(null); setSent(false); setMode("login"); }}>
+            {t("acc.backToLogin")}
+          </Button>
+        </div>
+      </Modal>
+    );
+  }
 
   async function submit(e) {
     e.preventDefault();
@@ -86,6 +173,13 @@ export default function AccountModal({ mode: initialMode, onClose, onDone }) {
             autoComplete={isUpgrade ? "new-password" : "current-password"}
           />
         </Field>
+        )}
+        {mode === "login" && emailEnabled && (
+          <div className="-mt-1 text-right">
+            <button type="button" onClick={() => { setErr(null); setMode("forgot"); }} className="text-micro text-slate-400 underline-offset-2 hover:text-slate-200 hover:underline">
+              {t("acc.forgot")}
+            </button>
+          </div>
         )}
         {err && <p className="text-meta text-rose-600" role="alert">{err}</p>}
         <Button type="submit" variant="primary" disabled={busy} className="w-full">
