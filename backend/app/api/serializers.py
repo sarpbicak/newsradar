@@ -8,6 +8,7 @@ from collections import Counter
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from ..analyst import display_target
 from ..config import get_settings
 from ..db.models import AnalystSnapshot, Article, Entity, EntityAnalysis, PriceSnapshot
 from .schemas import (
@@ -171,17 +172,18 @@ def _analyst_out(snap: AnalystSnapshot | None, current_price: float | None = Non
     if snap is None:
         return None
     total = snap.strong_buy + snap.buy + snap.hold + snap.sell + snap.strong_sell
-    has_target = snap.target_mean is not None
+    target, kind = display_target(snap)
     # Tavsiye ya da hedeften en az biri olmalı (yalnızca hedef varsa da göster).
-    if total == 0 and not has_target:
+    if total == 0 and target is None:
         return None
-    # Upside % — GERÇEK hedef ile güncel fiyat farkı (tahmin değil, aritmetik).
+    # Upside % — GERÇEK hedef (medyan, yoksa konsensüs) ile güncel fiyat farkı (aritmetik).
     upside = None
-    if has_target and current_price:
-        upside = round((snap.target_mean - current_price) / current_price * 100, 1)
+    if target is not None and current_price:
+        upside = round((target - current_price) / current_price * 100, 1)
     return AnalystOut(
         strong_buy=snap.strong_buy, buy=snap.buy, hold=snap.hold,
         sell=snap.sell, strong_sell=snap.strong_sell, total=total, period=snap.period,
+        target=target, target_kind=kind,
         target_mean=snap.target_mean, target_high=snap.target_high, target_low=snap.target_low,
         target_median=snap.target_median, target_consensus=snap.target_consensus,
         current_price=current_price, upside_percent=upside,

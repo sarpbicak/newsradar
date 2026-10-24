@@ -109,6 +109,12 @@ const STANCE_COLOR = { bullish: C.pos, neutral: C.neutral, bearish: C.neg };
 export function stanceColor(stance) {
   return STANCE_COLOR[stance] || STANCE_COLOR.neutral;
 }
+// Gösterilen analist hedefi: medyan (varsa) ya da FMP konsensüs ortalaması. Kart, detay ve
+// "Nasıl çalışır" aynı değeri ve aynı kaynak notunu kullanır ("Medyan hedef, FMP").
+export const targetOf = (a) => a?.target ?? a?.target_mean ?? null;
+export const isMedianTarget = (a) => a?.target_kind === "median";
+export const targetSourceLabel = (a) => tt(isMedianTarget(a) ? "an.srcMedian" : "an.srcAvg");
+
 export function horizonLabel(h) {
   return ["short", "medium", "long"].includes(h) ? tt(`horizon.${h}`) : "—";
 }

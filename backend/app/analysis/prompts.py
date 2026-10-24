@@ -224,9 +224,11 @@ def _analyst_lines(analyst: dict | None) -> list[str]:
             f"akışıyla uyumunu yorumla): {total} analist — " + ", ".join(parts) + "."
         )
     # GERÇEK hedef fiyat (FMP price-target-consensus). Yoksa bu satır hiç eklenmez.
-    tm = analyst.get("target_mean")
+    # Medyan varsa o (kartta/detayda gösterilenle aynı), yoksa konsensüs ortalaması.
+    tm = analyst.get("target", analyst.get("target_mean"))
     if tm is not None:
-        target = f"ANALİST HEDEF FİYATI (GERÇEK, FMP konsensüsü — SEN ÜRETME, sadece aktar): ortalama={tm}"
+        kind = "medyan" if analyst.get("target_kind") == "median" else "ortalama"
+        target = f"ANALİST HEDEF FİYATI (GERÇEK, FMP — SEN ÜRETME, sadece aktar): {kind}={tm}"
         if analyst.get("target_low") is not None and analyst.get("target_high") is not None:
             target += f" (aralık {analyst['target_low']}–{analyst['target_high']})"
         price = analyst.get("current_price")

@@ -252,6 +252,9 @@ class AnalystOut(BaseModel):
     total: int
     period: str | None
     # Hedef fiyatlar — GERÇEK analist konsensüsü (FMP). Kaynak yoksa None (tahmin YOK).
+    # target: gösterilen değer (medyan, yoksa konsensüs); target_kind: "median" | "consensus".
+    target: float | None = None
+    target_kind: str | None = None
     target_mean: float | None = None
     target_high: float | None = None
     target_low: float | None = None

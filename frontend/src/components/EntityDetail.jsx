@@ -8,7 +8,7 @@
 import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, BarChart3, ChevronLeft, Eye, FileText, Lock, MessageSquare, Minus, Newspaper, Sparkles, TrendingUp } from "lucide-react";
 import { api } from "../api.js";
-import { RelTime, RiskChange, SignalPill, horizonLabel, riskColor, sentimentLabel, useIsMobile } from "./ui.jsx";
+import { RelTime, RiskChange, SignalPill, horizonLabel, riskColor, sentimentLabel, targetOf, useIsMobile } from "./ui.jsx";
 import { C } from "../theme.js";
 import ArticleTable from "./ArticleTable.jsx";
 import ChatPanel from "./ChatPanel.jsx";
@@ -44,7 +44,7 @@ function chatSuggestions(entity) {
   const name = displayName(entity);
   const why = a.stance === "bullish" ? "chat.qWhyPos" : a.stance === "bearish" ? "chat.qWhyNeg" : "chat.qWhyMixed";
   const qs = [tt(why, { name })];
-  if (entity.type === "ticker" && entity.analyst?.target_mean != null) qs.push(tt("chat.qGap"));
+  if (entity.type === "ticker" && targetOf(entity.analyst) != null) qs.push(tt("chat.qGap"));
   else qs.push(tt("chat.qRisk", { name }));
   qs.push(tt("chat.qWatch"));
   return qs;

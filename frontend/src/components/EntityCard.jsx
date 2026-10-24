@@ -8,7 +8,7 @@
 // (iki satıra kadar sarar, asla kesilmez).
 import React from "react";
 import { Activity, ArrowLeftRight, ArrowRight, Compass, GitFork, Lock, TrendingUp, Zap } from "lucide-react";
-import { AnimatedNumber, SignalPill, horizonLabel, overallSignal, riskColor } from "./ui.jsx";
+import { AnimatedNumber, SignalPill, horizonLabel, overallSignal, riskColor, targetOf, targetSourceLabel } from "./ui.jsx";
 import { Card, Chip, cx } from "./kit.jsx";
 import { tt, fmtPct } from "../i18n.jsx";
 import { C } from "../theme.js";
@@ -62,7 +62,7 @@ export function AnalystBar({ a, className = "" }) {
 export function PriceRow({ entity, size = "md", muted = false }) {
   const price = entity.price;
   const chg = entity.change_percent;
-  const target = entity.analyst?.target_mean;
+  const target = targetOf(entity.analyst);
   const upside = entity.analyst?.upside_percent;
   if (price == null) return <p className="text-meta text-slate-500">{tt("card.noPrice")} · {tt("card.newsOnly")}</p>;
   const num = cx(size === "lg" ? "text-title" : "text-body", muted && "!text-slate-500");
@@ -84,7 +84,7 @@ export function PriceRow({ entity, size = "md", muted = false }) {
               ${target.toFixed(0)}
               {upside != null && <span className={cx("text-meta font-medium", tone(upside))}>{fmtPct(upside)}</span>}
             </div>
-            <div className="text-micro text-slate-500">{tt("card.analystTarget")}</div>
+            <div className="text-micro text-slate-500">{targetSourceLabel(entity.analyst)}</div>
           </div>
         </>
       )}

@@ -9,7 +9,7 @@ import React, { useEffect, useState } from "react";
 import { MessageSquare, X } from "lucide-react";
 import { api } from "../api.js";
 import { useI18n, fmtInt, fmtPct } from "../i18n.jsx";
-import { StatusTag, stanceLabel } from "./ui.jsx";
+import { StatusTag, stanceLabel, targetOf } from "./ui.jsx";
 import { navigate } from "../router.js";
 import { Button, LabelChip, Modal, Skeleton } from "./kit.jsx";
 
@@ -65,10 +65,10 @@ export function MiniCard({ entity, t, animate }) {
               {fmtPct(entity.change_percent, { digits: 2 })}
             </span>
           )}
-          {an?.target_mean != null && (
+          {targetOf(an) != null && (
             <>
               <span className="text-slate-500">→ {t("detail.target")}</span>
-              <span className="font-mono font-semibold text-slate-100">${an.target_mean.toFixed(2)}</span>
+              <span className="font-mono font-semibold text-slate-100">${targetOf(an).toFixed(2)}</span>
               {an.upside_percent != null && (
                 <span className={`font-mono font-semibold ${an.upside_percent >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
                   {fmtPct(an.upside_percent)}

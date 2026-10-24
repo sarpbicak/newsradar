@@ -23,6 +23,16 @@ logger = logging.getLogger("newsradar.analyst")
 MAX_ANALYST_HISTORY = 50  # entity başına saklanacak en fazla snapshot
 
 
+def display_target(snap: AnalystSnapshot) -> tuple[float | None, str | None]:
+    """Gösterilecek hedef fiyat ve türü: medyan varsa medyan (uç tahminlere dayanıklı),
+    yoksa FMP konsensüsü (ortalama). Kart, detay, istem ve sohbet aynı değeri kullanır."""
+    if snap.target_median is not None:
+        return snap.target_median, "median"
+    if snap.target_mean is not None:
+        return snap.target_mean, "consensus"
+    return None, None
+
+
 def _latest_price(session: Session, entity_id: int) -> float | None:
     snap = session.scalar(
         select(PriceSnapshot)
@@ -136,20 +146,22 @@ def analyst_context_for(entity_id: int) -> dict | None:
         if snap is None:
             return None
         total = snap.strong_buy + snap.buy + snap.hold + snap.sell + snap.strong_sell
-        has_target = snap.target_mean is not None
-        if total == 0 and not has_target:
+        target, kind = display_target(snap)
+        if total == 0 and target is None:
             return None
 
         price = _latest_price(session, entity_id)
         upside = None
-        if has_target and price:
-            upside = round((snap.target_mean - price) / price * 100, 1)
+        if target is not None and price:
+            upside = round((target - price) / price * 100, 1)
 
         return {
             "strong_buy": snap.strong_buy, "buy": snap.buy, "hold": snap.hold,
             "sell": snap.sell, "strong_sell": snap.strong_sell, "total": total,
             "period": snap.period,
             # GERÇEK analist hedefi (FMP). Yoksa None — Claude ÜRETMEZ.
+            "target": target,
+            "target_kind": kind,
             "target_mean": snap.target_mean,
             "target_high": snap.target_high,
             "target_low": snap.target_low,
