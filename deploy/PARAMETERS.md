@@ -62,8 +62,8 @@ Varsayılanlar Render'a göre ayarlıdır. AWS'de bu değerleri vermek gerekir.
 | Ad | Açıklama | Tür | Varsayılan | Örnek |
 |---|---|---|---|---|
 | `NEWSRADAR_LLM_PROVIDER` | `anthropic` ise Claude kullanılır. Başka her değer OpenAI uyumlu endpoint'e yönlendirir (geri dönüş). | String | `anthropic` | `anthropic` |
-| `NEWSRADAR_ARTICLE_MODEL` | Makale toplu analizi için model. | String | `claude-haiku-5-5` | `claude-haiku-5-5` |
-| `NEWSRADAR_ASSESSMENT_MODEL` | Entity değerlendirmesi için model. | String | `claude-haiku-5-5` | `claude-haiku-5-5` |
+| `NEWSRADAR_ARTICLE_MODEL` | Makale toplu analizi için model; değerlendirme metinlerinin TR çevirisi de bu modelle yapılır (hüküm/risk çeviriye gitmez). | String | `claude-haiku-5-5` | `claude-haiku-5-5` |
+| `NEWSRADAR_ASSESSMENT_MODEL` | Entity değerlendirmesi için model (şirket başına tek çağrı, İngilizce kaynak; TR ve EN aynı hükmü paylaşır). | String | `claude-haiku-5-5` | `claude-haiku-5-5` |
 | `NEWSRADAR_CHAT_MODEL` | Sohbet için model. | String | `claude-haiku-5-5` | `claude-haiku-5-5` |
 | `NEWSRADAR_LLM_BASE_URL` | OpenAI uyumlu endpoint'in adresi (geri dönüş). | String | `https://openrouter.ai/api/v1` | `https://openrouter.ai/api/v1` |
 | `NEWSRADAR_LLM_MODEL` | OpenAI uyumlu endpoint'in modeli (geri dönüş). | String | `meta-llama/llama-3.3-70b-instruct` | aynı |
@@ -83,7 +83,9 @@ Varsayılanlar Render'a göre ayarlıdır. AWS'de bu değerleri vermek gerekir.
 | `NEWSRADAR_SESSION_COOKIE_DAYS` | Cihaz cookie'sinin ömrü (gün). | String | `365` | `365` |
 | `NEWSRADAR_SCHEDULER` | Otomatik yenileme (`on`/`off`). | String | `on` | `on` |
 | `NEWSRADAR_SCHEDULER_HOURS` | Otomatik yenileme aralığı (saat). | String | `6` | `6` |
-| `NEWSRADAR_LOOKBACK_HOURS` | Her yenilemede geriye dönük haber penceresi (saat). | String | `48` | `48` |
+| `NEWSRADAR_LOOKBACK_HOURS` | Her yenilemede geriye dönük haber penceresi (saat). Bu süreden eski haber kaydedilmez; analiz edilmeden süresi geçen bekleyen haber `expired` olur (LLM'e gitmez). | String | `48` | `48` |
+| `NEWSRADAR_BACKFILL_DAYS` | Yeni eklenen şirkette (hiç değerlendirmesi yoksa) bir kerelik geriye dönük doldurma penceresi (gün). Lookback'ten eski haberlerden en yeni `NEWSRADAR_BACKFILL_MAX_ARTICLES` tanesi kaydedilir; ikinci yenilemede çalışmaz. `0` = kapalı. İsteğe bağlı. | String | `7` | `7` |
+| `NEWSRADAR_BACKFILL_MAX_ARTICLES` | Geriye dönük doldurmada kaydedilecek en fazla eski haber (yeni şirket başına en fazla bu kadar ek makale analizi). İsteğe bağlı. | String | `20` | `20` |
 | `NEWSAPI_DAILY_LIMIT` | NewsAPI'nin günlük istek sınırı (ücretsiz katmanda yaklaşık 100). | String | `100` | `100` |
 | `NEWSRADAR_BATCH_SIZE` | Tek LLM çağrısında analiz edilen makale sayısı. | String | `10` | `10` |
 | `NEWSRADAR_MAX_ARTICLES_PER_ENTITY` | Bir yenilemede entity başına makale tavanı (0 = sınırsız). | String | `200` | `200` |
