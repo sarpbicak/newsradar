@@ -65,10 +65,15 @@ def init_db() -> None:
     _ensure_column("articles", "backfill", "BOOLEAN NOT NULL DEFAULT 0")
     _ensure_column("users", "email", "VARCHAR(254)")
     # E-posta benzersizliği: yalnızca dolu değerler (eski hesaplarda NULL çok olabilir).
+    # Önce varlık kontrolü: ikinci açılışta hiçbir DDL çalışmasın (yalnızca okuma).
     with engine.begin() as conn:
-        conn.exec_driver_sql(
-            "CREATE UNIQUE INDEX IF NOT EXISTS ux_users_email ON users (email) WHERE email IS NOT NULL"
-        )
+        exists = conn.exec_driver_sql(
+            "SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'ux_users_email'"
+        ).first()
+        if exists is None:
+            conn.exec_driver_sql(
+                "CREATE UNIQUE INDEX ux_users_email ON users (email) WHERE email IS NOT NULL"
+            )
     _ensure_column("entities", "language", "VARCHAR(5) NOT NULL DEFAULT 'en'")
     _ensure_column("suggestions", "source_language", "VARCHAR(5) NOT NULL DEFAULT 'en'")
     _ensure_column("suggestions", "country", "VARCHAR(60)")
