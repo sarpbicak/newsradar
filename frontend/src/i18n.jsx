@@ -297,12 +297,15 @@ const STR = {
   "notice.newArticles_one": { tr: "1 yeni makale", en: "1 new article" },
   "notice.analyzedRun": { tr: "bu taramada {n} analiz", en: "{n} analyzed this run" },
   "notice.filteredOut": { tr: "{n} elendi", en: "{n} filtered out" },
-  "notice.queued": { tr: "Sıradasın", en: "Queued" },
-  "notice.queued_one": { tr: "1 makale sonraki taramada", en: "1 queued for next refresh" },
+  // Yenileme ÖZETİ sayacı (biten taramada sonraki taramaya kalan makale) — kuyruk DURUMUYLA
+  // (queueStatus) aynı anahtarı paylaşmaz: paylaşınca biten özette "Sıradasın" yazıyordu.
+  "notice.queuedArticles": { tr: "{n} makale sonraki taramada", en: "{n} queued for next refresh" },
+  "notice.queuedArticles_one": { tr: "1 makale sonraki taramada", en: "1 queued for next refresh" },
   "notice.warnings": { tr: " {n} uyarı.", en: " {n} warnings." },
   "notice.warnings_one": { tr: " 1 uyarı.", en: " 1 warning." },
   "notice.infos": { tr: "{n} bilgi (kota koruması)", en: "{n} notes (quota protection)" },
   "notice.infos_one": { tr: "1 bilgi (kota koruması)", en: "1 note (quota protection)" },
+  "notice.queueStatus": { tr: "Sıradasın", en: "Queued" },
   "notice.queuedNext": { tr: "Sıradaki sensin", en: "You're next" },
   "notice.queuedPos": { tr: "Sıradasın: {n}. sıra", en: "Queued: #{n}" },
   "notice.queueMerged": { tr: "Listendeki şirketler başka bir yenilemede zaten güncellendi. Hakkın düşmedi.", en: "Your companies were already updated by another refresh. No refresh was used." },
@@ -741,6 +744,11 @@ export function tt(key, vars) {
 // ("1 warning" / "2 warnings"; Türkçe'de çoğul eki olmadığından _one çoğu zaman gereksiz).
 // Tembel paketlerin kendi metinleri (admin ziyaretleri, e-posta bağlantı sayfası, hesap
 // penceresi): sözlüğe bileşen yüklenince eklenir → landing'in ilk paketi büyümez.
+// Belirli bir dil için çevirici (testler ve dil bağımsız yardımcılar; arayüz tt/useI18n kullanır).
+export function ttFor(lang) {
+  return (key, vars) => render(key, lang, vars);
+}
+
 export function addStrings(entries) {
   Object.assign(STR, entries);
 }
@@ -762,7 +770,7 @@ export function refreshParts(sm, t) {
   const filtered = (sm.prefiltered || 0) + (sm.discarded || 0);
   const parts = [t("notice.newArticles", { n: sm.fetched_new || 0 }), t("notice.analyzedRun", { n: llm })];
   if (filtered) parts.push(t("notice.filteredOut", { n: filtered }));
-  if (sm.queued) parts.push(t("notice.queued", { n: sm.queued }));
+  if (sm.queued) parts.push(t("notice.queuedArticles", { n: sm.queued }));
   return parts;
 }
 

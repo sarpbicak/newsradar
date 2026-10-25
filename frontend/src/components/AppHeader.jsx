@@ -22,7 +22,7 @@ const STEP_KEYS = {
 // Yenileme durumunun tek satırlık metni (backend adımı yayınlar; kullanıcının dilinde).
 function scanLabel(t, scan) {
   const { phase, step, stepEntity, stepCount, currentEntity, skippedEntity, summary, queuePos } = scan;
-  if (phase === "queued") return queuePos === 1 ? t("notice.queuedNext") : queuePos ? t("notice.queuedPos", { n: queuePos }) : t("notice.queued");
+  if (phase === "queued") return queuePos === 1 ? t("notice.queuedNext") : queuePos ? t("notice.queuedPos", { n: queuePos }) : t("notice.queueStatus");
   if (phase === "done") return summary ? t("notice.scanDone", { parts: refreshParts(summary, t).slice(0, 2).join(" · ") }) : "";
   if (phase === "starting") return t("notice.scanStarting");
   if (skippedEntity) return t("notice.stepSkipped", { name: skippedEntity });

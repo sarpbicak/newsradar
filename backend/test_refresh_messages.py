@@ -60,7 +60,7 @@ missing = [c for c in sorted(CODES)
 check(not missing, f"her mesaj kodunun TR+EN çevirisi var (eksik: {missing})")
 missing_src = [s for s in _SOURCE_TR if f'"src.{s}"' not in i18n]
 check(not missing_src, f"her kaynağın çevirisi var (eksik: {missing_src})")
-for k in ("notice.warnings_one", "notice.newArticles_one", "notice.infos_one", "notice.queued_one"):
+for k in ("notice.warnings_one", "notice.newArticles_one", "notice.infos_one", "notice.queuedArticles_one"):
     check(f'"{k}"' in i18n, f"tekil biçim tanımlı: {k}")
 check('en: " 1 warning."' in i18n and 'en: " {n} warnings."' in i18n, "EN: '1 warning' / 'N warnings'")
 
