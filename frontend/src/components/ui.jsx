@@ -373,30 +373,6 @@ export function SignalBand({ stance, evidence, showLabel = true, minimal = false
   );
 }
 
-// --- Fiyat gösterimi (yalnızca ticker; price null ise hiç render etme) ---
-// Burada fiyat ARTIŞI yeşil (iyi), düşüş kırmızı — risk deltasının TERSİ.
-export function PriceDisplay({ price, changePercent, updatedAt, showTime = true }) {
-  if (price == null) return null;
-  const up = (changePercent ?? 0) >= 0;
-  return (
-    <span className="inline-flex items-baseline gap-1.5">
-      <span className="font-mono font-semibold text-slate-100">
-        <AnimatedNumber value={price} decimals={2} prefix="$" />
-      </span>
-      {changePercent != null && (
-        <span className={`font-mono text-xs font-medium ${up ? "text-emerald-400" : "text-rose-400"}`}>
-          {fmtPct(changePercent, { digits: 2 })}
-        </span>
-      )}
-      {showTime && updatedAt && (
-        <span className="text-[10px] text-slate-500" title="fiyatın çekilme zamanı">
-          {timeAgo(updatedAt)}
-        </span>
-      )}
-    </span>
-  );
-}
-
 // --- Risk değişim rozeti (son taramaya göre) ---
 // Risk için ARTIŞ kötü (kırmızı ▲), AZALIŞ iyi (yeşil ▼). Değişim yoksa gizli.
 // Haber duygusu (-1..1) → etiket. Eşik ±0.15 (haber listesi, özet dağılımı, grafikler ortak).
@@ -563,3 +539,18 @@ export function eventLabel(e) {
   return x ? x[getLang()] || x.tr : e || "–";
 }
 
+
+// Veri kaynakları notu (uygulama + landing altbilgisi). GDELT kullanım şartı atıf + site
+// bağlantısı ister (https://www.gdeltproject.org/about.html#termsofuse).
+export function DataSources({ className = "" }) {
+  const [pre, post] = tt("footer.sources").split("{gdelt}");
+  return (
+    <p className={className}>
+      {pre}
+      <a href="https://www.gdeltproject.org/" target="_blank" rel="noopener noreferrer" className="link-u text-slate-400 hover:text-slate-200">
+        GDELT Project
+      </a>
+      {post}
+    </p>
+  );
+}

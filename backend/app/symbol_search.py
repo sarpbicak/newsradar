@@ -1,8 +1,10 @@
-"""Sembol arama — Finnhub /search sarmalayıcısı.
+"""Sembol arama — Finnhub /search sarmalayıcısı (ücretsiz planda global).
 
 Kullanıcı ticker eklerken şirket adından sembol bulabilsin diye. Anahtar yoksa
-ya da çağrı patlarsa BOŞ liste döner (hata vermez). Sadece hisse senedi sonuçları,
-ABD borsası (sembolde nokta yok) olanlar önde, en fazla `limit` sonuç.
+ya da çağrı patlarsa BOŞ liste döner (hata vermez). Sadece hisse senedi sonuçları.
+Her sonuçta borsa, ülke ve para birimi (app.markets). ABD dışı semboller de hisse olarak
+eklenir: haberleri GDELT'ten gelir; fiyat/analist yuvası boş olduğu için "veri yok".
+ABD sonuçları önde (fiyat ve analist verisi olanlar), en fazla `limit` sonuç.
 """
 
 from __future__ import annotations
@@ -12,49 +14,13 @@ import logging
 import httpx
 
 from .config import get_settings
+from .markets import market_of, suffix_of
 
 logger = logging.getLogger("newsradar.symbolsearch")
 
 _BASE = "https://finnhub.io/api/v1"
 # Hisse senedi tipleri (Finnhub `type` alanı). Boş tip de kabul (bazı sonuçlarda yok).
 _STOCK_HINTS = ("stock", "adr", "equity", "reit", "dr")
-
-# Yabancı borsa son eki → insan-okur ad (Finnhub ücretsiz katmanı bunları kapsamaz).
-_EXCHANGE_NAMES = {
-    "IS": "Borsa İstanbul",
-    "DE": "XETRA (Frankfurt)",
-    "F": "Frankfurt",
-    "PA": "Euronext Paris",
-    "L": "Londra (LSE)",
-    "MC": "Bolsa de Madrid",
-    "MI": "Borsa Italiana",
-    "AS": "Euronext Amsterdam",
-    "BR": "Euronext Brüksel",
-    "LS": "Euronext Lizbon",
-    "SW": "SIX (İsviçre)",
-    "ST": "Nasdaq Stockholm",
-    "HE": "Nasdaq Helsinki",
-    "CO": "Nasdaq Kopenhag",
-    "OL": "Oslo Børs",
-    "VI": "Wiener Börse",
-    "WA": "GPW (Varşova)",
-    "AT": "Athens Exchange",
-    "TO": "Toronto (TSX)",
-    "HK": "Hong Kong",
-    "T": "Tokyo",
-}
-# Son ek → önerilen keyword dili (yoksa en).
-_SUFFIX_LANG = {
-    "IS": "tr",
-    "DE": "de", "F": "de", "VI": "de", "SW": "de",
-    "PA": "fr", "BR": "fr",
-}
-
-
-def _suffix_of(symbol: str) -> str | None:
-    """ABD-dışı sembol son eki (ASELS.E.IS → IS), yoksa None (ABD)."""
-    return symbol.rsplit(".", 1)[-1].upper() if "." in symbol else None
-
 
 def _is_stock(type_str: str) -> bool:
     t = (type_str or "").strip().lower()
@@ -92,19 +58,25 @@ def search_symbols(query: str, limit: int = 8) -> list[dict]:
             continue
         if not _is_stock(r.get("type", "")):
             continue
+        # Bilinmeyen borsa son eki (tabloda yok) → pazarı söylenemez, atla. Tek harfli son ek
+        # ABD hisse sınıfıdır (BRK.B) ve kalır.
+        tail = symbol.rsplit(".", 1)[-1] if "." in symbol else ""
+        if tail and suffix_of(symbol) is None and len(tail) > 1:
+            continue
         seen.add(symbol)
-        suffix = _suffix_of(symbol)
-        us_supported = suffix is None  # nokta yoksa ABD → Finnhub kapsıyor
+        m = market_of(symbol)
         cleaned.append(
             {
                 "symbol": symbol,
                 "description": desc,
                 "type": (r.get("type") or "").strip(),
-                "market": suffix or "US",
-                "us_supported": us_supported,
-                # ABD-dışı için insan-okur borsa adı + önerilen keyword dili.
-                "exchange_name": "ABD" if us_supported else _EXCHANGE_NAMES.get(suffix, suffix),
-                "suggested_language": "en" if us_supported else _SUFFIX_LANG.get(suffix, "en"),
+                "market": m.code,
+                "us_supported": m.is_us,
+                "exchange_name": m.exchange,
+                "country_tr": m.country_tr,
+                "country_en": m.country_en,
+                "currency": m.currency,
+                "suggested_language": m.news_lang,
             }
         )
 

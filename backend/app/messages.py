@@ -26,6 +26,8 @@ _TR = {
     "key_missing": "{key} tanımlı değil — atlandı.",
     "http_error": "{source} hatası ({status}) — {symbol} atlandı.",
     "connection_error": "{source} bağlantı/çözümleme hatası: {error}",
+    "gdelt_busy": "Haber kaynağı (GDELT) şu an yoğun; bir sonraki yenilemede tekrar denenecek.",
+    "gdelt_error": "Haber kaynağı (GDELT) bu aramayı yanıtlamadı: {detail}",
     "no_data": "{symbol} için {source} verisi yok.",
     "bad_response": "{source} beklenmeyen yanıt döndü ({symbol}).",
     "newsapi_status": "NewsAPI durum='{status}': {message}",
@@ -43,7 +45,7 @@ _TR = {
 _SOURCE_TR = {
     "finnhub_news": "Finnhub", "finnhub_price": "Finnhub fiyat",
     "finnhub_analyst": "Finnhub analist", "fmp_target": "FMP hedef fiyat",
-    "newsapi": "NewsAPI",
+    "newsapi": "NewsAPI", "gdelt": "GDELT",
 }
 
 

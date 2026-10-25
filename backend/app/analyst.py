@@ -16,7 +16,7 @@ from .db.database import session_scope
 from .db.models import AnalystSnapshot, Entity, PriceSnapshot
 from .messages import msg, with_entity
 from .provider_skip import is_skipped, mark_skip
-from .providers import get_analyst_provider, get_target_provider
+from .providers import analyst_supported, get_analyst_provider, get_target_provider
 
 logger = logging.getLogger("newsradar.analyst")
 
@@ -63,6 +63,9 @@ def refresh_analyst(entity_ids: set[int] | None = None) -> list[dict]:
             q = q.where(Entity.id.in_(entity_ids))
         tickers = session.scalars(q).all()
         for e in tickers:
+            # ABD dışı pazarda analist yuvası boş → hiç sorulmaz (kartta mevcut boş durum ekranı).
+            if not analyst_supported(e):
+                continue
             sb = b = h = s = ss = 0
             period = None
             th = tl = tm = tmed = tcons = None

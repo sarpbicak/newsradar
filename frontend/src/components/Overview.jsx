@@ -17,6 +17,9 @@ const STARTERS = [
   { name: "NVIDIA", type: "ticker", query: "NVDA" },
   { name: "Microsoft", type: "ticker", query: "MSFT" },
   { name: "Amazon", type: "ticker", query: "AMZN" },
+  // ABD dışı: haber GDELT'ten; fiyat/analist yok ("veri yok").
+  { name: "SAP", type: "ticker", query: "SAP.DE" },
+  { name: "Aselsan", type: "ticker", query: "ASELS.IS" },
   { name: "OpenAI", type: "keyword", query: "OpenAI" },
 ];
 

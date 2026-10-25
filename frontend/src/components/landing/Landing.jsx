@@ -15,6 +15,7 @@ import NavBar, { Brand, NavLink, WRAP } from "../NavBar.jsx";
 import PrivacyModal from "../PrivacyModal.jsx";
 import { LanguageSwitcher } from "../LanguageBits.jsx";
 import { ThemeMenu } from "../ThemeToggle.jsx";
+import { DataSources } from "../ui.jsx";
 import { GITHUB_PROFILE_URL, GITHUB_REPO_URL, GitHubIcon, LINKEDIN_URL, LinkedInIcon, SocialIcon } from "../Social.jsx";
 import ArchitectureDiagram from "./ArchitectureDiagram.jsx";
 import Hero from "./Hero.jsx";
@@ -221,6 +222,7 @@ function Footer({ onPrivacy }) {
               {t("land.footer.privacy")}
             </button>
           </p>
+          <DataSources className="mt-1 text-micro text-slate-500" />
         </div>
         <div className="flex items-center gap-2">
           <SocialIcon href={LINKEDIN_URL} label="LinkedIn"><LinkedInIcon /></SocialIcon>

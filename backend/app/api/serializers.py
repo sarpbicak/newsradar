@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..analyst import display_target
 from ..config import get_settings
+from ..markets import market_of
 from ..analysis.schemas import apply_texts
 from ..db.models import ALL_LANGUAGES, AnalystSnapshot, Article, Entity, EntityAnalysis, PriceSnapshot
 from .schemas import (
@@ -299,6 +300,13 @@ def _priority(analysis, delta, change_percent, analyst) -> tuple[int, str | None
     return score, reason
 
 
+def _market_fields(entity: Entity, language: str) -> dict:
+    if entity.type != "ticker":
+        return {}
+    m = market_of(entity.query)
+    return {"exchange": m.exchange, "country": m.country(language), "currency": m.currency, "us_market": m.is_us}
+
+
 def _news_window_days(entity: Entity) -> int:
     """'Son N günde yeterli haber yok' notundaki N: geriye dönük doldurma yapıldıysa o süre."""
     s = get_settings()
@@ -378,6 +386,7 @@ def entity_card(session: Session, entity: Entity, language: str = "tr") -> Entit
         display_name=entity.display_name,
         no_analysis_reason=no_reason,
         news_window_days=_news_window_days(entity),
+        **_market_fields(entity, language),
         type=entity.type,
         query=entity.query,
         language=entity.language,

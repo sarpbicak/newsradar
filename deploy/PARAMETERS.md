@@ -38,7 +38,7 @@ Boş bırakılırsa ilgili özellik kapanır ama uygulama çalışmaya devam ede
 | Ad | Açıklama | Tür | Varsayılan | Örnek |
 |---|---|---|---|---|
 | `FINNHUB_API_KEY` | Ticker haberleri ve analist tavsiyesi. Yoksa ticker sağlayıcısı atlanır. | SecureString | boş | `c1ab…` |
-| `NEWSAPI_KEY` | Keyword (startup) haberleri. Yoksa keyword sağlayıcısı atlanır. | SecureString | boş | `0f9e…` |
+| `NEWSAPI_KEY` | NewsAPI anahtarı; yalnızca `NEWSRADAR_NEWSAPI_ENABLED=on` iken kullanılır (varsayılan: keyword haberleri GDELT'ten, anahtarsız). | SecureString | boş | `0f9e…` |
 | `FMP_API_KEY` | Analist hedef fiyatı. Yoksa hedef fiyat gösterilmez. | SecureString | boş | `Xy7…` |
 | `APP_PASSWORD` | Eski genel giriş şifresi (`/auth/login`). Site herkese açık olduğu için artık zorunlu değil. | SecureString | boş | `<parola>` |
 | `NEWSRADAR_LLM_API_KEY` | OpenAI uyumlu yedek LLM anahtarı. Yalnızca `NEWSRADAR_LLM_PROVIDER≠anthropic` iken kullanılır. | SecureString | boş | `sk-or-v1-…` |
@@ -90,6 +90,7 @@ Varsayılanlar Render'a göre ayarlıdır. AWS'de bu değerleri vermek gerekir.
 | `NEWSRADAR_LOOKBACK_HOURS` | Her yenilemede geriye dönük haber penceresi (saat). Bu süreden eski haber kaydedilmez; analiz edilmeden süresi geçen bekleyen haber `expired` olur (LLM'e gitmez). | String | `48` | `48` |
 | `NEWSRADAR_BACKFILL_DAYS` | Yeni eklenen şirkette (hiç değerlendirmesi yoksa) bir kerelik geriye dönük doldurma penceresi (gün). Lookback'ten eski haberlerden en yeni `NEWSRADAR_BACKFILL_MAX_ARTICLES` tanesi kaydedilir; ikinci yenilemede çalışmaz. `0` = kapalı. İsteğe bağlı. | String | `7` | `7` |
 | `NEWSRADAR_BACKFILL_MAX_ARTICLES` | Geriye dönük doldurmada kaydedilecek en fazla eski haber (yeni şirket başına en fazla bu kadar ek makale analizi). İsteğe bağlı. | String | `20` | `20` |
+| `NEWSRADAR_NEWSAPI_ENABLED` | NewsAPI'yi kullan (`on`/`off`). NewsAPI'nin ücretsiz Developer planı production kullanımını yasaklar; varsayılan `off`: anahtar kelimeli ve ABD dışı şirketler GDELT'ten haber alır. `on` yalnızca ücretli planla ya da yerel denemede. İsteğe bağlı. | String | `off` | `off` |
 | `NEWSAPI_DAILY_LIMIT` | NewsAPI'nin günlük istek sınırı (ücretsiz katmanda yaklaşık 100). | String | `100` | `100` |
 | `NEWSRADAR_BATCH_SIZE` | Tek LLM çağrısında analiz edilen makale sayısı. | String | `10` | `10` |
 | `NEWSRADAR_MAX_ARTICLES_PER_ENTITY` | Bir yenilemede entity başına makale tavanı (0 = sınırsız). | String | `200` | `200` |

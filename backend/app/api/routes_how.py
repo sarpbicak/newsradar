@@ -28,7 +28,7 @@ router = APIRouter(tags=["how-it-works"])
 
 PREFERRED = "NVDA"
 FRESH_DAYS = 7
-_PROVIDER_NAMES = {"finnhub": "Finnhub", "newsapi": "NewsAPI"}
+_PROVIDER_NAMES = {"finnhub": "Finnhub", "newsapi": "NewsAPI", "gdelt": "GDELT"}
 
 
 def _label(sentiment: float | None) -> str:

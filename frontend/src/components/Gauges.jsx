@@ -3,7 +3,8 @@
 // İnce yay, kademeler arası boşluk, ince ibre; yalnızca etkin kademe tam renkli, diğerleri soluk.
 // Degrade yok, al/sat dili yok. Yalnızca SVG (bağımlılık yok).
 import React from "react";
-import { fmtPct, tt } from "../i18n.jsx";
+import { fmtPct, getLang, tt } from "../i18n.jsx";
+import { fmtMoney } from "../money.js";
 import { analystLevel, hasHorizons, horizonName, levelColor, levelLabel, newsSignal, targetOf, targetSourceLabel } from "./ui.jsx";
 
 const W = 168;
@@ -76,7 +77,7 @@ export default function Gauges({ a, entity, horizon }) {
   const target = targetOf(entity.analyst);
   const up = entity.analyst?.upside_percent;
   const anSub = target != null
-    ? `${targetSourceLabel(entity.analyst)}: $${Math.round(target)}${up != null ? ` · ${fmtPct(up)}` : ""}`
+    ? `${targetSourceLabel(entity.analyst)}: ${fmtMoney(target, entity.currency || "USD", getLang(), { digits: 0 })}${up != null ? ` · ${fmtPct(up)}` : ""}`
     : null;
 
   return (

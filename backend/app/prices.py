@@ -19,7 +19,7 @@ from .db.database import session_scope
 from .db.models import Entity, PriceSnapshot
 from .messages import msg, with_entity
 from .provider_skip import is_skipped, mark_skip
-from .providers import get_price_provider
+from .providers import price_provider_for
 
 logger = logging.getLogger("newsradar.prices")
 
@@ -33,10 +33,7 @@ def refresh_prices(entity_ids: set[int] | None = None) -> list[dict]:
     entity_ids verilirse yalnızca o entity'ler işlenir (kişisel elle yenileme);
     None ise tüm aktif ticker'lar (scheduler).
     """
-    provider = get_price_provider()
     warnings: list[dict] = []  # app.messages.msg(...)
-    if not provider.is_available():
-        return warnings  # anahtar yoksa sessizce atla (haber tarafı zaten uyarıyor)
 
     now = datetime.now(timezone.utc)
     with session_scope() as session:
@@ -45,7 +42,12 @@ def refresh_prices(entity_ids: set[int] | None = None) -> list[dict]:
             q = q.where(Entity.id.in_(entity_ids))
         tickers = session.scalars(q).all()
         for e in tickers:
-            # Kalıcı/beklenen durum (ABD dışı sembol, premium uç) cache'liyse hiç sorma.
+            # Pazara göre sağlayıcı: ABD dışında yuva boşsa (ücretli kaynak yok) hiç sorulmaz →
+            # kartta "fiyat verisi yok". Anahtar yoksa da sessizce atlanır (haber tarafı uyarıyor).
+            provider = price_provider_for(e)
+            if provider is None or not provider.is_available():
+                continue
+            # Kalıcı/beklenen durum (premium uç) cache'liyse hiç sorma.
             if is_skipped(session, provider.name, e.query):
                 continue
             try:

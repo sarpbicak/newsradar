@@ -13,7 +13,8 @@ import {
   useHorizon,
 } from "./ui.jsx";
 import { Card, Chip, cx } from "./kit.jsx";
-import { tt, fmtPct } from "../i18n.jsx";
+import { tt, fmtPct, getLang } from "../i18n.jsx";
+import { fmtMoney } from "../money.js";
 import { C } from "../theme.js";
 
 // Analiz yoksa NEDEN: dil eksik · bekleyen haber var (yenileme işe yarar) · pencerede haber yok
@@ -26,6 +27,8 @@ export function noAnalysisText(card, short = false) {
 
 export const displayName = (e) => e.display_name || e.name;
 export const symbolOf = (e) => `${e.type === "ticker" ? "$" : "#"}${e.query}`;
+// ABD dışı hissede borsa · ülke ("XETRA · Almanya"); ABD ve keyword'de null (gürültü olmasın).
+export const marketLabel = (e) => (e.us_market === false && e.exchange ? `${e.exchange} · ${e.country}` : null);
 
 // Analist dağılımı (al → sat) ve baskın görüşün TAVSİYE GİBİ OKUNMAYAN etiketi.
 const ANALYST_SEG = [
@@ -67,14 +70,24 @@ export function PriceRow({ entity, size = "md", muted = false }) {
   const chg = entity.change_percent;
   const target = targetOf(entity.analyst);
   const upside = entity.analyst?.upside_percent;
-  if (price == null) return <p className="text-meta text-slate-500">{tt("card.noPrice")} · {tt("card.newsOnly")}</p>;
+  // ABD dışı borsa: fiyat/analist kaynağı yok (yuva boş) → borsayı adıyla söyle.
+  if (price == null) {
+    return (
+      <p className="text-meta text-slate-500">
+        {entity.us_market === false ? tt("card.noPriceExchange", { exchange: entity.exchange }) : tt("card.noPrice")} · {tt("card.newsOnly")}
+      </p>
+    );
+  }
+  // Fiyat kendi para biriminde, dile uygun ondalıkla (dönüşüm yok).
+  const cur = entity.currency || "USD";
+  const lang = getLang();
   const num = cx(size === "lg" ? "text-title" : "text-body", muted && "!text-slate-500");
   const tone = (v) => (muted ? "text-slate-500" : v >= 0 ? "text-emerald-600" : "text-rose-600");
   return (
     <div className="flex items-start gap-3">
       <div>
         <div className={cx("flex items-baseline gap-2 font-mono font-semibold tabular-nums text-slate-100", num)}>
-          <AnimatedNumber value={price} decimals={2} prefix="$" />
+          <AnimatedNumber value={price} format={(v) => fmtMoney(v, cur, lang)} />
           {chg != null && <span className={cx("text-meta font-medium", tone(chg))}>{fmtPct(chg, { digits: 2 })}</span>}
         </div>
         <div className="text-micro text-slate-500">{tt("card.now")}</div>
@@ -84,7 +97,7 @@ export function PriceRow({ entity, size = "md", muted = false }) {
           <ArrowRight className={cx("h-4 w-4 shrink-0 text-slate-600", size === "lg" ? "mt-2" : "mt-1")} aria-hidden="true" />
           <div>
             <div className={cx("flex items-baseline gap-2 font-mono font-semibold tabular-nums text-slate-100", num)}>
-              ${target.toFixed(0)}
+              {fmtMoney(target, cur, lang, { digits: 0 })}
               {upside != null && <span className={cx("text-meta font-medium", tone(upside))}>{fmtPct(upside)}</span>}
             </div>
             <div className="text-micro text-slate-500">{targetSourceLabel(entity.analyst)}</div>
@@ -155,7 +168,10 @@ export default function EntityCard({ card, onOpen }) {
       <div className="flex min-h-14 items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="break-words font-display text-base font-medium leading-tight text-slate-100">{displayName(card)}</div>
-          <div className="mt-1 font-mono text-micro text-slate-500">{symbolOf(card)}</div>
+          <div className="mt-1 font-mono text-micro text-slate-500">
+            {symbolOf(card)}
+            {marketLabel(card) && <span className="font-sans"> · {card.exchange}</span>}
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {!a && <Chip tone="muted">{tt(card.analysis_missing_language ? "card.langMissingShort" : "card.noAnalysis")}</Chip>}

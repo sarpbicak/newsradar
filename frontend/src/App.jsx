@@ -11,7 +11,7 @@ import HowItWorks from "./components/HowItWorks.jsx";
 import FeedbackWidget from "./components/FeedbackWidget.jsx";
 import AppHeader, { refreshQuota, resetText } from "./components/AppHeader.jsx";
 import { LanguageModal } from "./components/LanguageBits.jsx";
-import { useIsMobile } from "./components/ui.jsx";
+import { DataSources, useIsMobile } from "./components/ui.jsx";
 import { WRAP } from "./components/NavBar.jsx";
 import { fmtMsg, refreshParts, useI18n } from "./i18n.jsx";
 import { ArrowDown, RotateCcw } from "lucide-react";
@@ -490,7 +490,8 @@ export default function App({ setLang }) {
   const missingKeys = [];
   if (status && user?.is_admin) {
     if (!status.providers.finnhub) missingKeys.push("FINNHUB_API_KEY");
-    if (!status.providers.newsapi) missingKeys.push("NEWSAPI_KEY");
+    // NewsAPI varsayılan kapalı (production'a lisanssız); yalnızca açıkken ve anahtarsızsa uyar.
+    if (status.providers.newsapi === false) missingKeys.push("NEWSAPI_KEY");
     if (!status.claude) missingKeys.push("LLM API");
     // FMP opsiyonel: yoksa yalnızca hedef fiyat gösterilmez (tavsiye/haber çalışır).
     if (status.providers["fmp-target"] === false) missingKeys.push("FMP_API_KEY");
@@ -629,6 +630,7 @@ export default function App({ setLang }) {
             <span className="font-display text-sm font-medium text-slate-300">{t("land.footer.built", { name: "Sarp Bıçak" })}</span>
             <span className="ml-2 text-micro text-slate-500">{t("land.footer.place")}</span>
             <p className="mt-1 max-w-2xl">{t("footer.disclaimer")}</p>
+            <DataSources className="mt-1 max-w-2xl" />
           </div>
           <nav className="flex flex-wrap gap-x-5 gap-y-2" aria-label={t("footer.nav")}>
             <a href="/?welcome" onClick={(e) => { e.preventDefault(); navigate("/?welcome"); }} className="link-u -mx-1 -my-3.5 inline-block px-1 py-3.5 text-slate-400 hover:text-slate-200">

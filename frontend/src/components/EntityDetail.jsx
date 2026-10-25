@@ -17,7 +17,7 @@ import ArticleTable from "./ArticleTable.jsx";
 import ChatPanel from "./ChatPanel.jsx";
 import AnalystConsensus from "./AnalystConsensus.jsx";
 import Gauges from "./Gauges.jsx";
-import { PriceRow, displayName, noAnalysisText, symbolOf } from "./EntityCard.jsx";
+import { PriceRow, displayName, marketLabel, noAnalysisText, symbolOf } from "./EntityCard.jsx";
 import { Button, Card, ErrorState, Modal, Skeleton, Tabs } from "./kit.jsx";
 import { tt, fmtDate, fmtInt, parseUtc } from "../i18n.jsx";
 
@@ -182,6 +182,7 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <h1 className="font-display text-xl font-semibold text-slate-100">{name}</h1>
             <span className="font-mono text-meta text-slate-500">{symbolOf(entity)}</span>
+            {marketLabel(entity) && <span className="text-meta text-slate-500">{marketLabel(entity)}</span>}
             {a && (
               <span className="inline-flex flex-wrap items-center gap-2">
                 <NewsPill a={a} evidence={entity.evidence_strength} horizon={horizon} />
@@ -197,7 +198,9 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
                 <PriceRow entity={entity} size="lg" muted={stale} />
               </div>
             ) : (
-              <p className="text-meta text-slate-500">{tt("detail.noPrice")}</p>
+              <p className="text-meta text-slate-500">
+                {entity.us_market === false ? tt("detail.noPriceExchange", { exchange: entity.exchange }) : tt("detail.noPrice")}
+              </p>
             )
           ) : (
             <p className="flex items-center gap-1.5 text-meta text-slate-500">
@@ -237,12 +240,12 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
               {activeTab === "summary" && <SummaryTab a={a} entity={entity} riskHistory={risk_history} articles={articles} analyzedCount={st?.analyzed} horizon={horizon} />}
               {activeTab === "charts" && (
                 <Suspense fallback={<Skeleton className="h-72 w-full" />}>
-                  <TimeSeriesCharts riskHistory={risk_history} priceHistory={price_history} articles={chartArticles || articles} isTicker={isTicker} isMobile={isMobile} />
+                  <TimeSeriesCharts riskHistory={risk_history} priceHistory={price_history} articles={chartArticles || articles} isTicker={isTicker} isMobile={isMobile} currency={entity.currency || "USD"} />
                 </Suspense>
               )}
               {activeTab === "news" && <ArticleTable articles={articles} />}
               {activeTab === "analysts" && isTicker && (
-                <AnalystConsensus analyst={entity.analyst} price={entity.price} type={entity.type} stale={stale} history={data.analyst_history || []} />
+                <AnalystConsensus analyst={entity.analyst} price={entity.price} type={entity.type} stale={stale} history={data.analyst_history || []} currency={entity.currency || "USD"} />
               )}
             </div>
           </div>

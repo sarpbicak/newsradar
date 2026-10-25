@@ -8,7 +8,8 @@
 import React, { useEffect, useState } from "react";
 import { MessageSquare, X } from "lucide-react";
 import { api } from "../api.js";
-import { useI18n, fmtInt, fmtPct } from "../i18n.jsx";
+import { useI18n, fmtInt, fmtPct, getLang } from "../i18n.jsx";
+import { fmtMoney } from "../money.js";
 import { StatusTag, stanceLabel, targetOf } from "./ui.jsx";
 import { navigate } from "../router.js";
 import { Button, LabelChip, Modal, Skeleton } from "./kit.jsx";
@@ -59,7 +60,7 @@ export function MiniCard({ entity, t, animate }) {
       )}
       {entity.price != null && (
         <p className="mt-2 flex flex-wrap items-baseline gap-x-1.5 text-xs">
-          <span className="font-mono font-semibold text-slate-100">${entity.price.toFixed(2)}</span>
+          <span className="font-mono font-semibold text-slate-100">{fmtMoney(entity.price, entity.currency || "USD", getLang())}</span>
           {entity.change_percent != null && (
             <span className={`font-mono ${entity.change_percent >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
               {fmtPct(entity.change_percent, { digits: 2 })}
@@ -68,7 +69,7 @@ export function MiniCard({ entity, t, animate }) {
           {targetOf(an) != null && (
             <>
               <span className="text-slate-500">→ {t("detail.target")}</span>
-              <span className="font-mono font-semibold text-slate-100">${targetOf(an).toFixed(2)}</span>
+              <span className="font-mono font-semibold text-slate-100">{fmtMoney(targetOf(an), entity.currency || "USD", getLang())}</span>
               {an.upside_percent != null && (
                 <span className={`font-mono font-semibold ${an.upside_percent >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
                   {fmtPct(an.upside_percent)}

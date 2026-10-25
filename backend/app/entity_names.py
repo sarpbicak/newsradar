@@ -39,7 +39,13 @@ KNOWN_DISPLAY_NAMES: dict[str, str] = {
 _SUFFIXES = {
     "inc", "incorporated", "corp", "corporation", "co", "company", "ltd", "limited",
     "plc", "llc", "ag", "sa", "nv", "se", "holdings", "holding", "aş", "as",
+    # Yabancı borsa adlarındaki ekler (yalnızca sondaysa atılır): Türk A.O./T.A.Ş., Alman KGaA,
+    # İtalyan SpA, Fin Oyj, Norveç ASA, İsveç AB, Japon KK.
+    "ao", "taş", "tas", "kgaa", "spa", "oyj", "asa", "ab", "kk",
 }
+# Yalnızca okunur adda (readable_name) sondan atılan Türk unvan kalıbı "Sanayi ve Ticaret".
+# _norm eşleme anahtarına girmez (KNOWN_DISPLAY_NAMES anahtarları bu kelimeleri içerir).
+_TR_TITLE = {"sanayi", "sanayii", "ticaret", "ve"}
 _PARENS = re.compile(r"\([^)]*\)")
 _SHARE_CLASS = re.compile(r"\b(?:class|cl)\s+[a-c]\b")
 _TR_AS = re.compile(r"\ba\.\s*[şs]\.?")  # Türk şirket eki "A.Ş." → tek kelime "aş"
@@ -63,7 +69,7 @@ def _norm(text: str) -> str:
 # Tamamı büyük harf gelen resmi adlarda (sembol araması: "OCUGEN INC") büyük kalacak kısaltmalar.
 # 3 harf ve altı kelimeler de kısaltma sayılır (AMD, IBM, BP); bağlaçlar küçük yazılır.
 _KEEP_UPPER = {"NVIDIA", "ASML", "TSMC", "HSBC", "AT&T", "SAP", "BYD", "UBS", "BMW", "AIG", "ING"}
-_SMALL = {"of", "and", "the", "de", "la", "du", "von", "van", "&"}
+_SMALL = {"of", "and", "the", "de", "la", "du", "von", "van", "&", "ve"}
 
 
 def _is_shouty(name: str) -> bool:
@@ -82,7 +88,8 @@ def readable_name(name: str) -> str:
     t = _PARENS.sub(" ", raw)
     t = re.sub(r"\b(?:CLASS|CL)\s+[A-C]\b", " ", t, flags=re.IGNORECASE)
     words = [w.strip(",.") for w in t.replace(",", " ").split() if w.strip(",.")]
-    while len(words) > 1 and (_NON_WORD.sub("", words[-1]).lower() in _SUFFIXES or words[-1].lower() in ("&", "and")):
+    while len(words) > 1 and (_NON_WORD.sub("", words[-1]).lower() in _SUFFIXES | _TR_TITLE
+                              or words[-1].lower() in ("&", "and")):
         words.pop()
     out = []
     for i, w in enumerate(words):

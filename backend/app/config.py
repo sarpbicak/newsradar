@@ -30,6 +30,10 @@ class Settings:
         self.anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "").strip()
         self.finnhub_api_key: str = os.getenv("FINNHUB_API_KEY", "").strip()
         self.newsapi_key: str = os.getenv("NEWSAPI_KEY", "").strip()
+        # NewsAPI ücretsiz Developer planı production kullanımını YASAKLAR (yalnızca geliştirme).
+        # Kod kalır, varsayılan KAPALI: anahtar kelimeli şirketler GDELT'ten haber alır.
+        # on → anahtar kelimeli şirketler yeniden NewsAPI kullanır (ücretli plan ya da yerel deneme).
+        self.newsapi_enabled: bool = _env("NEWSRADAR_NEWSAPI_ENABLED", "off").lower() == "on"
         # FMP (Financial Modeling Prep) — GERÇEK analist hedef fiyatı (Finnhub'da premium).
         # Yoksa hedef fiyat gösterilmez (tavsiye/haber etkilenmez).
         self.fmp_api_key: str = os.getenv("FMP_API_KEY", "").strip()
@@ -217,7 +221,7 @@ class Settings:
 
     @property
     def newsapi_available(self) -> bool:
-        return bool(self.newsapi_key)
+        return bool(self.newsapi_key) and self.newsapi_enabled
 
     @property
     def fmp_available(self) -> bool:

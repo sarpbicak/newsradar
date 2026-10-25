@@ -2,10 +2,10 @@
 //  - ticker: Ad + Sembol zorunlu, dil yok. Ada yazarken sembol araması çıkar.
 //  - keyword: sadece Ad (query=name), Sembol gizli, dil seçici görünür.
 import React, { useEffect, useRef, useState } from "react";
-import { AlertTriangle, X } from "lucide-react";
+import { X } from "lucide-react";
 import { api } from "../api.js";
 import { useI18n } from "../i18n.jsx";
-import { Button, ConfirmDialog, Field, Input, Select } from "./kit.jsx";
+import { Button, Field, Input, Select } from "./kit.jsx";
 import { displayName } from "./EntityCard.jsx";
 
 const LANGUAGES = [
@@ -16,7 +16,7 @@ const LANGUAGES = [
 ];
 
 export default function WatchlistManager({ cards, onCreate, onDelete, embedded = false, focusSignal = 0 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const nameInputRef = useRef(null);
   // "Kendi şirketlerinle dene" → ad alanına odaklan ve görünür kaydır.
   useEffect(() => {
@@ -39,7 +39,6 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
   const skipSearch = useRef(false); // öneri seçilince tekrar aramayı bastır
-  const [confirmNonUs, setConfirmNonUs] = useState(null); // ABD dışı borsa sembolü → keyword önerisi
 
   // Ada yazarken (ticker, ≥2 karakter, 400ms debounce) sembol ara.
   useEffect(() => {
@@ -75,26 +74,11 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
   }, [name, type]);
 
   function pickSymbol(r) {
-    // ABD dışı borsa: ticker olarak eklenirse haber/fiyat gelmez → keyword'e yönlendir (onay penceresi).
-    if (!r.us_supported) {
-      setConfirmNonUs(r);
-      return;
-    }
-    // ABD sembolü: ticker alanlarını doldur (name değişince yeniden arama yapma).
+    // Her borsa hisse olarak eklenir: ABD dışında haberler GDELT'ten gelir, fiyat/analist "veri yok".
+    // Ticker alanlarını doldur (name değişince yeniden arama yapma).
     skipSearch.current = true;
     setName(r.description);
     setQuery(r.symbol);
-    setResults([]);
-    setSearched(false);
-  }
-
-  function acceptKeyword(r) {
-    // Tip keyword'e geç, ad dolsun, dil önerisi uygulansın (type keyword olunca arama efekti erken döner).
-    setConfirmNonUs(null);
-    setType("keyword");
-    setQuery("");
-    setLanguage(r.suggested_language || "en");
-    setName(r.description);
     setResults([]);
     setSearched(false);
   }
@@ -169,17 +153,15 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
                     onClick={() => pickSymbol(r)}
                     className="tap block w-full rounded-lg px-3 py-2 text-left text-meta transition-colors duration-hover ease-std hover:bg-ink-700"
                   >
-                    <span className={`flex items-center justify-between gap-2 ${r.us_supported ? "" : "opacity-70"}`}>
+                    <span className="flex items-center justify-between gap-2">
                       <span className="truncate text-slate-200">{r.description}</span>
-                      <span className="shrink-0 font-mono text-slate-400">
-                        {r.symbol} <span className="text-slate-500">({r.market})</span>
-                      </span>
+                      <span className="shrink-0 font-mono text-slate-400">{r.symbol}</span>
                     </span>
-                    {!r.us_supported && (
-                      <span className="mt-0.5 flex items-center gap-1 text-micro text-amber-600">
-                        <AlertTriangle className="h-3 w-3" aria-hidden="true" /> {r.exchange_name}: {t("wl.nonUsShort")}
-                      </span>
-                    )}
+                    {/* "SAP SE · XETRA · Almanya"; ABD dışında fiyat/analist yok notu */}
+                    <span className="mt-0.5 block text-micro text-slate-500">
+                      {r.exchange_name} · {lang === "en" ? r.country_en : r.country_tr}
+                      {!r.us_supported && <> · {t("wl.nonUsShort")}</>}
+                    </span>
                   </button>
                 ))}
               {!searching && searched && results.length === 0 && <div className="px-3 py-2 text-meta text-amber-600">{t("wl.notFound")}</div>}
@@ -242,16 +224,6 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
         </ul>
       )}
 
-      {confirmNonUs && (
-        <ConfirmDialog
-          title={t("wl.nonUsTitle", { symbol: confirmNonUs.symbol })}
-          body={t("wl.nonUsBody", { exchange: confirmNonUs.exchange_name })}
-          confirmLabel={t("wl.nonUsConfirm")}
-          cancelLabel={t("common.cancel")}
-          onConfirm={() => acceptKeyword(confirmNonUs)}
-          onCancel={() => setConfirmNonUs(null)}
-        />
-      )}
     </div>
   );
 }

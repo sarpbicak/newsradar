@@ -16,6 +16,8 @@ from .registry import (
     get_price_provider,
     get_provider_for,
     get_target_provider,
+    price_provider_for,
+    analyst_supported,
     provider_status,
 )
 
@@ -33,5 +35,7 @@ __all__ = [
     "get_price_provider",
     "get_provider_for",
     "get_target_provider",
+    "price_provider_for",
+    "analyst_supported",
     "provider_status",
 ]

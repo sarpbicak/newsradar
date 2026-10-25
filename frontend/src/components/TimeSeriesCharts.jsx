@@ -29,6 +29,7 @@ import {
 } from "recharts";
 import { BarChart3 } from "lucide-react";
 import { tt, parseUtc, getLang, fmtPct } from "../i18n.jsx";
+import { fmtMoney } from "../money.js";
 import { C } from "../theme.js";
 import { Card, EmptyState, Tabs } from "./kit.jsx";
 import { sentimentLabel, stanceLabel } from "./ui.jsx";
@@ -49,7 +50,8 @@ function dayStart(iso) {
 }
 const locale = () => (getLang() === "tr" ? "tr-TR" : "en-US");
 const fmtDay = (ts) => new Date(ts).toLocaleDateString(locale(), { day: "numeric", month: "short" });
-const fmtUsd = (v) => `$${v.toFixed(2)}`;
+// Fiyat kendi para biriminde, dile uygun ondalıkla (grafik eksen/ipucu/etiket aynı biçim).
+const fmtPrice = (v, cur) => fmtMoney(v, cur, getLang());
 
 // "18 Eki" + Türkçe ayrılma eki ("18 Eki'den beri"); EN "since Oct 18".
 const TR_ABL = { oca: "dan", şub: "tan", mar: "tan", nis: "ten", may: "tan", haz: "dan", tem: "den", ağu: "tan", eyl: "den", eki: "den", kas: "tan", ara: "dan" };
@@ -161,7 +163,7 @@ function priceSummary(rows) {
   return text ? text.charAt(0).toLocaleUpperCase(locale()) + text.slice(1) + "." : "";
 }
 
-function Tip({ active, payload, events }) {
+function Tip({ active, payload, events, currency }) {
   if (!active || !payload?.length) return null;
   const r = payload[0].payload;
   const ev = events.get(r.ts) || [];
@@ -170,7 +172,7 @@ function Tip({ active, payload, events }) {
       <div className="font-medium text-slate-100">{fmtDay(r.ts)}</div>
       {r.price != null && (
         <div className="mt-1 font-mono tabular-nums">
-          {fmtUsd(r.price)}
+          {fmtPrice(r.price, currency)}
           {r.chg != null && (
             <span className={r.chg >= 0 ? "text-emerald-600" : "text-rose-600"}> {fmtPct(r.chg, { digits: 1 })}</span>
           )}
@@ -200,7 +202,7 @@ function ChartCard({ title, summary, children, note }) {
   );
 }
 
-export default function TimeSeriesCharts({ riskHistory = [], priceHistory = [], articles = [], isTicker, isMobile }) {
+export default function TimeSeriesCharts({ riskHistory = [], priceHistory = [], articles = [], isTicker, isMobile, currency = "USD" }) {
   const allDays = useMemo(() => buildDays(isTicker ? priceHistory : [], articles, riskHistory), [priceHistory, articles, riskHistory, isTicker]);
   const events = useMemo(() => buildEvents(riskHistory), [riskHistory]);
 
@@ -254,8 +256,8 @@ export default function TimeSeriesCharts({ riskHistory = [], priceHistory = [], 
                 <ComposedChart data={rows} syncId="nr-price-news" margin={{ top: 10, right: 64, bottom: 0, left: 0 }}>
                   <CartesianGrid vertical={false} stroke={C.grid} />
                   <XAxis dataKey="label" hide />
-                  <YAxis domain={["auto", "auto"]} tick={MONO} tickLine={false} axisLine={false} width={52} tickFormatter={(v) => `$${Math.round(v)}`} />
-                  <Tooltip content={<Tip events={events} />} cursor={{ stroke: C.muted, strokeWidth: 1 }} isAnimationActive={false} />
+                  <YAxis domain={["auto", "auto"]} tick={MONO} tickLine={false} axisLine={false} width={52} tickFormatter={(v) => fmtMoney(v, currency, getLang(), { digits: 0 })} />
+                  <Tooltip content={<Tip events={events} currency={currency} />} cursor={{ stroke: C.muted, strokeWidth: 1 }} isAnimationActive={false} />
                   <Area
                     type="linear"
                     dataKey="price"
@@ -278,7 +280,7 @@ export default function TimeSeriesCharts({ riskHistory = [], priceHistory = [], 
                       r={3}
                       fill={C.accent}
                       stroke="none"
-                      label={{ value: fmtUsd(last.price), position: "right", offset: 8, style: { ...MONO, fill: C.line, fontWeight: 600 } }}
+                      label={{ value: fmtPrice(last.price, currency), position: "right", offset: 8, style: { ...MONO, fill: C.line, fontWeight: 600 } }}
                     />
                   )}
                 </ComposedChart>

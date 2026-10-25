@@ -6,6 +6,7 @@ import React from "react";
 import { BarChart3 } from "lucide-react";
 import { fmtDate, fmtMonth, fmtPct, getLang, parseUtc, tt } from "../i18n.jsx";
 import { C, cssColor } from "../theme.js";
+import { fmtMoney } from "../money.js";
 import { EmptyState } from "./kit.jsx";
 import { isMedianTarget, targetOf, targetSourceLabel } from "./ui.jsx";
 
@@ -47,10 +48,11 @@ function Bar({ analyst }) {
   );
 }
 
-const usd = (v) => `$${Math.round(v)}`;
+// Tutarlar hedef/fiyat para biriminde, tam sayı (dile uygun biçim; dönüşüm yok).
+const money0 = (v, cur) => fmtMoney(v, cur, getLang(), { digits: 0 });
 
 // Manşet: "Analistlerin ortalama hedefi $329, şu anki fiyatın %31 üstünde." Rakamlar mono.
-function Headline({ mean, price, median }) {
+function Headline({ mean, price, median, cur }) {
   const diff = ((mean - price) / price) * 100;
   const key = Math.abs(diff) < 0.5 ? "an.headlineAt" : diff > 0 ? "an.headlineAbove" : "an.headlineBelow";
   const which = tt(median ? "an.whichMedian" : "an.whichAvg");
@@ -58,7 +60,7 @@ function Headline({ mean, price, median }) {
   return (
     <h3 className="max-w-3xl font-display text-2xl font-medium leading-snug text-slate-100 sm:text-[1.75rem]">
       {pre}
-      <span className="font-mono text-[0.9em] tabular-nums">{usd(mean)}</span>
+      <span className="font-mono text-[0.9em] tabular-nums">{money0(mean, cur)}</span>
       {mid}
       {post != null && <span className="font-mono text-[0.9em] tabular-nums">{fmtPct(Math.abs(diff), { signed: false })}</span>}
       {post}
@@ -69,7 +71,7 @@ function Headline({ mean, price, median }) {
 // Etiketli hedef aralığı: en düşük → en yüksek; "Şimdi" ince nötr çizgi + etiket (üstte),
 // "Ortalama" vurgu renginde nokta + etiket (altta) → etiketler hiç çakışmaz. Şimdi ile
 // ortalama arası hafif vurgulu. Kenara yakın etiketler içeri hizalanır (taşmaz).
-function LabeledRange({ low, high, mean, price, median = false, dim = false }) {
+function LabeledRange({ low, high, mean, price, median = false, dim = false, cur }) {
   if (low == null || high == null || high <= low) return null;
   const lo = Math.min(low, price ?? low);
   const hi = Math.max(high, price ?? high);
@@ -83,7 +85,7 @@ function LabeledRange({ low, high, mean, price, median = false, dim = false }) {
       <div className="relative h-14">
         {price != null && (
           <span className={`absolute top-0 whitespace-nowrap text-micro text-slate-300 ${align(p(price))}`} style={{ left: `${p(price)}%` }}>
-            {tt("an.now")} <span className="font-mono tabular-nums text-slate-100">{usd(price)}</span>
+            {tt("an.now")} <span className="font-mono tabular-nums text-slate-100">{money0(price, cur)}</span>
           </span>
         )}
         <div className={`absolute inset-x-0 top-7 h-2 rounded-[2px] bg-ink-700 ${dim ? "opacity-50" : ""}`}>
@@ -95,12 +97,12 @@ function LabeledRange({ low, high, mean, price, median = false, dim = false }) {
       </div>
       <div className="relative h-5">
         <span className={`absolute top-0 whitespace-nowrap text-micro font-medium text-accent ${align(p(mean))}`} style={{ left: `${p(mean)}%` }}>
-          {tt(median ? "an.median" : "an.average")} <span className="font-mono tabular-nums">{usd(mean)}</span>
+          {tt(median ? "an.median" : "an.average")} <span className="font-mono tabular-nums">{money0(mean, cur)}</span>
         </span>
       </div>
       <div className="mt-2 flex justify-between text-micro text-slate-500">
-        <span>{tt("an.lowest")} <span className="font-mono tabular-nums text-slate-300">{usd(low)}</span></span>
-        <span>{tt("an.highest")} <span className="font-mono tabular-nums text-slate-300">{usd(high)}</span></span>
+        <span>{tt("an.lowest")} <span className="font-mono tabular-nums text-slate-300">{money0(low, cur)}</span></span>
+        <span>{tt("an.highest")} <span className="font-mono tabular-nums text-slate-300">{money0(high, cur)}</span></span>
       </div>
     </div>
   );
@@ -153,17 +155,17 @@ function PeriodColumns({ history }) {
 }
 
 // Hedef fiyat tek satırı (yalnızca KART): $319 → hedef $412 · +%29 (dile göre yüzde).
-function TargetLine({ price, mean, upside, compact }) {
+function TargetLine({ price, mean, upside, compact, cur }) {
   if (mean == null) return null;
   const up = upside != null ? upside : price ? ((mean - price) / price) * 100 : null;
   const pctColor = up == null ? "" : up >= 0 ? "text-emerald-400" : "text-rose-400";
   return (
     <div className={`flex items-baseline gap-1.5 ${compact ? "text-xs" : "text-sm"}`}>
-      {price != null && <span className="tabular-nums text-slate-400">${price.toFixed(compact ? 0 : 2)}</span>}
+      {price != null && <span className="tabular-nums text-slate-400">{fmtMoney(price, cur, getLang(), { digits: compact ? 0 : 2 })}</span>}
       <span className="inline-flex items-center gap-0.5 text-slate-500">
         → {tt("detail.target")}
       </span>
-      <span className="font-semibold tabular-nums text-slate-100">${mean.toFixed(compact ? 0 : 2)}</span>
+      <span className="font-semibold tabular-nums text-slate-100">{fmtMoney(mean, cur, getLang(), { digits: compact ? 0 : 2 })}</span>
       {up != null && (
         <span className={`font-semibold tabular-nums ${pctColor}`}>
           · {fmtPct(up)}
@@ -174,7 +176,7 @@ function TargetLine({ price, mean, upside, compact }) {
 }
 
 // stale: veri 30 günden eski → barlar soluk + tarih notu (metin AA kalır).
-export default function AnalystConsensus({ analyst, price, type, compact = false, stale = false, history = [] }) {
+export default function AnalystConsensus({ analyst, price, type, compact = false, stale = false, history = [], currency = "USD" }) {
   const hasRec = analyst && analyst.total > 0;
   const target = targetOf(analyst);
   const hasTarget = target != null;
@@ -202,7 +204,7 @@ export default function AnalystConsensus({ analyst, price, type, compact = false
         )}
         {hasTarget && (
           <>
-            <TargetLine price={curPrice} mean={target} upside={analyst.upside_percent} compact />
+            <TargetLine price={curPrice} mean={target} upside={analyst.upside_percent} compact cur={currency} />
             <span className="text-micro text-slate-500">
               {hasRec ? `${tt("card.analysts", { n: analyst.total })} · ` : ""}{targetSourceLabel(analyst)}
             </span>
@@ -217,7 +219,7 @@ export default function AnalystConsensus({ analyst, price, type, compact = false
     <div className="space-y-8">
       <section>
         {hasTarget && curPrice != null ? (
-          <Headline mean={target} price={curPrice} median={median} />
+          <Headline mean={target} price={curPrice} median={median} cur={currency} />
         ) : (
           <h3 className="font-display text-xl font-medium text-slate-100">{tt("an.title")}</h3>
         )}
@@ -233,7 +235,7 @@ export default function AnalystConsensus({ analyst, price, type, compact = false
         {hasTarget && (
           <section className="border-t border-ink-600 pt-5">
             <h4 className="text-meta font-medium text-slate-300">{tt("an.rangeTitle")}</h4>
-            <LabeledRange low={analyst.target_low} high={analyst.target_high} mean={target} price={curPrice} median={median} dim={stale} />
+            <LabeledRange low={analyst.target_low} high={analyst.target_high} mean={target} price={curPrice} median={median} dim={stale} cur={currency} />
           </section>
         )}
         {hasRec && (

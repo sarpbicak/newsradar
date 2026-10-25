@@ -318,6 +318,12 @@ class EntityCardOut(BaseModel):
     # Analiz yoksa neden: "pending" (analiz bekleyen haber var → yenileme işe yarar) ·
     # "few_news" (pencerede analiz edilecek haber yok → yeni haber çıkınca güncellenir).
     no_analysis_reason: str | None = None
+    # Hisse pazarı (app.markets): borsa adı, ülke (istenen dilde), para birimi. us_market=False →
+    # fiyat/analist yuvası boş, arayüz "veri yok" gösterir. Keyword'de hepsi None.
+    exchange: str | None = None
+    country: str | None = None
+    currency: str | None = None
+    us_market: bool | None = None
     news_window_days: int = 2                # haber penceresi (lookback) gün olarak
     # Kart hiyerarşisi için türetilmiş "3 saniyelik" alanlar (analiz varsa dolu).
     horizon: str | None = None            # çoğunluk vade: short | medium | long
@@ -468,10 +474,13 @@ class SymbolResultOut(BaseModel):
     symbol: str
     description: str
     type: str
-    market: str              # "US" ya da yabancı borsa son eki (IS, DE, L...)
-    us_supported: bool       # Finnhub kapsıyor mu (ABD borsası)
-    exchange_name: str       # insan-okur borsa adı ("ABD", "Borsa İstanbul"...)
-    suggested_language: str  # keyword'e yönlendirilirse önerilen dil (IS→tr...)
+    market: str              # "US" ya da yabancı borsa son eki (IS, DE, T...)
+    us_supported: bool       # fiyat/analist verisi var mı (bugün yalnızca ABD; diğerlerinde "veri yok")
+    exchange_name: str       # insan-okur borsa adı ("NYSE / Nasdaq", "XETRA", "Borsa İstanbul"...)
+    country_tr: str = ""     # "Almanya"
+    country_en: str = ""     # "Germany"
+    currency: str = "USD"    # fiyatın para birimi (ISO 4217)
+    suggested_language: str  # haber dili ipucu (IS→tr, DE→de, diğerleri en)
 
 
 class NewsApiQuotaOut(BaseModel):
