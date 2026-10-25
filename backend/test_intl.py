@@ -171,11 +171,13 @@ with SessionLocal() as s:
     sent, slept, clock = [], [], [1000.0]
     gd.time.monotonic = lambda: clock[0]
     gd.time.sleep = lambda x: (slept.append(x), clock.__setitem__(0, clock[0] + x))
-    gd._last_call[0] = 0.0
+    gd._last_done[0] = float("-inf")
     gd._cache.clear()
+    RESP_S = 3.0  # her GDELT yanıtı 3 sn sürsün (sahte saat ilerler)
 
     def fake_get(url, params=None, timeout=None):
         sent.append(params)
+        clock[0] += RESP_S
         return Resp(json_data=GD)
     gd.httpx.get = fake_get
     since = datetime(2026, 10, 22, 12, tzinfo=timezone.utc)
@@ -184,17 +186,82 @@ with SessionLocal() as s:
           and r1.articles[0].published_at == datetime(2026, 10, 24, 10, 30, tzinfo=timezone.utc), "ayrıştırma: url/başlık/kaynak/tarih")
     check(sent[0]["startdatetime"] == "20261022120000" and sent[0]["mode"] == "artlist" and sent[0]["format"] == "json"
           and "sourcelang:turkish" in sent[0]["query"], "istek: başlangıç zamanı, artlist/json, dil filtresi")
+    check(slept == [], "ilk istek beklemez")
     gd.GdeltProvider().fetch(kw_e, since)
     check(len(sent) == 1, "aynı sorgu 10 dk önbellekten (ikinci istek yok)")
     gd.GdeltProvider().fetch(sap_e, since)
-    check(len(sent) == 2 and slept and abs(slept[-1] - gd.MIN_INTERVAL_S) < 1e-6, f"istekler arası en az 5 sn ({slept})")
-    gd.httpx.get = lambda url, params=None, timeout=None: Resp(status=200, text="Please limit requests to one every 5 seconds or contact ...")
-    gd._cache.clear()
+    check(len(sent) == 2 and slept == [5.0],
+          f"aralık önceki yanıtın BİTİŞİNDEN 5 sn (yanıt 3 sn sürse de; eskiden 2 sn beklerdi) ({slept})")
+
+    print("== E2: hız sınırı → bir kez bekleyip yeniden dene")
+    LIMIT = "Please limit requests to one every 5 seconds or contact ..."
+    seq = []
+
+    def seq_get(url, params=None, timeout=None):
+        sent.append(params)
+        clock[0] += RESP_S
+        return seq.pop(0)
+    gd.httpx.get = seq_get
+    gd._cache.clear(); slept.clear(); sent.clear()
+    seq[:] = [Resp(status=200, text=LIMIT), Resp(json_data=GD)]
     r = gd.GdeltProvider().fetch(thy_e, since)
-    check(r.warning and r.warning["code"] == "gdelt_busy" and not r.articles, "hız sınırı metni → kibar uyarı (gdelt_busy)")
+    check(len(sent) == 2 and len(r.articles) == 2 and not r.warning, "ilk yanıt hız sınırı, yeniden denemede haberler geldi")
+    check(slept == [5.0, 10.0], f"aralık + 10 sn geri çekilme (geri çekilme aralığı zaten aşıyor) ({slept})")
+    gd._cache.clear(); slept.clear(); sent.clear()
+    seq[:] = [Resp(status=429, text="Too many"), Resp(status=200, text=LIMIT)]
+    r = gd.GdeltProvider().fetch(thy_e, since + timedelta(hours=2))
+    check(len(sent) == 2 and r.warning and r.warning["code"] == "gdelt_busy" and not r.articles,
+          "yeniden denemede de hız sınırı → kibar uyarı (gdelt_busy), üçüncü istek yok")
     gd.httpx.get = lambda url, params=None, timeout=None: Resp(status=200, text="The specified phrase is too short.")
     r = gd.GdeltProvider().fetch(thy_e, since + timedelta(hours=1))
-    check(r.warning and r.warning["code"] == "gdelt_error", "düz metin hata → gdelt_error")
+    check(r.warning and r.warning["code"] == "gdelt_error", "düz metin hata → gdelt_error (yeniden deneme yok)")
+
+    print("== E3: aralık ortam değişkeninden; yenileme süresine etkisi")
+    os.environ["NEWSRADAR_GDELT_INTERVAL_SECONDS"] = "2"; get_settings.cache_clear()
+    gd.httpx.get = fake_get
+    gd._cache.clear(); slept.clear(); sent.clear(); gd._last_done[0] = clock[0]
+    gd.GdeltProvider().fetch(kw_e, since + timedelta(hours=3))
+    check(slept == [2.0], f"NEWSRADAR_GDELT_INTERVAL_SECONDS=2 → 2 sn ({slept})")
+    seq[:] = [Resp(status=200, text=LIMIT), Resp(json_data=GD)]
+    gd.httpx.get = seq_get; slept.clear()
+    gd.GdeltProvider().fetch(sap_e, since + timedelta(hours=3))
+    check(10.0 in slept, "kısa aralıkta da geri çekilme en az 10 sn")
+    os.environ["NEWSRADAR_GDELT_INTERVAL_SECONDS"] = "5"; get_settings.cache_clear()
+    # 4 GDELT şirketi, yanıt 3 sn: toplam = 4×3 + 3×5 = 27 sn (aralık yanıt bitişinden).
+    gd.httpx.get = fake_get; gd._cache.clear(); gd._last_done[0] = float("-inf")
+    t0 = clock[0]
+    for i, e in enumerate([kw_e, sap_e, thy_e, kw_e]):
+        gd.GdeltProvider().fetch(e, since + timedelta(hours=10 + i))
+    check(abs((clock[0] - t0) - 27.0) < 1e-6, f"4 GDELT şirketi (yanıt 3 sn): yenilemeye ~27 sn ({clock[0] - t0:.0f} sn)")
+
+print("== E4: eşzamanlı çağrılar tek sırada (gerçek saat)")
+import threading  # noqa: E402
+import time as _real_time  # noqa: E402
+import importlib  # noqa: E402
+
+gd.time = importlib.import_module("time")  # sahte saati geri al
+os.environ["NEWSRADAR_GDELT_INTERVAL_SECONDS"] = "0.05"; get_settings.cache_clear()
+active, peak = [0], [0]
+lk = threading.Lock()
+
+
+def slow_get(url, params=None, timeout=None):
+    with lk:
+        active[0] += 1; peak[0] = max(peak[0], active[0])
+    _real_time.sleep(0.03)
+    with lk:
+        active[0] -= 1
+    return Resp(json_data=GD)
+
+
+gd.httpx.get = slow_get; gd._cache.clear(); gd._last_done[0] = float("-inf")
+with SessionLocal() as s:
+    ents = [s.get(Entity, x) for x in (kw.id, sap.id, thy.id)]
+    threads = [threading.Thread(target=gd.GdeltProvider().fetch, args=(e, since + timedelta(hours=20 + i))) for i, e in enumerate(ents * 2)]
+    for th in threads: th.start()
+    for th in threads: th.join()
+check(peak[0] == 1, f"aynı anda en fazla 1 GDELT isteği ({peak[0]})")
+os.environ["NEWSRADAR_GDELT_INTERVAL_SECONDS"] = "5"; get_settings.cache_clear()
 
 print("== F: GDELT gürültüsü → mevcut alaka filtresi (LLM relevance < 0.3)")
 import asyncio  # noqa: E402

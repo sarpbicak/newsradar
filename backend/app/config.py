@@ -34,6 +34,9 @@ class Settings:
         # Kod kalır, varsayılan KAPALI: anahtar kelimeli şirketler GDELT'ten haber alır.
         # on → anahtar kelimeli şirketler yeniden NewsAPI kullanır (ücretli plan ya da yerel deneme).
         self.newsapi_enabled: bool = _env("NEWSRADAR_NEWSAPI_ENABLED", "off").lower() == "on"
+        # GDELT istekleri arası en az bekleme (sn): önceki yanıtın bitişinden ölçülür. Birden çok
+        # keyword/ABD dışı şirkette her ek şirket yenilemeye yaklaşık bu kadar süre ekler.
+        self.gdelt_interval_seconds: float = float(_env("NEWSRADAR_GDELT_INTERVAL_SECONDS", "5"))
         # FMP (Financial Modeling Prep) — GERÇEK analist hedef fiyatı (Finnhub'da premium).
         # Yoksa hedef fiyat gösterilmez (tavsiye/haber etkilenmez).
         self.fmp_api_key: str = os.getenv("FMP_API_KEY", "").strip()
