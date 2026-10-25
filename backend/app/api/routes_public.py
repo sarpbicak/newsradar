@@ -8,11 +8,15 @@ bilgisi) dönmez. Yanıtlar 5 dk önbelleklenebilir (CloudFront/tarayıcı).
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from .. import visits
 from ..config import get_settings
+from ..security import get_client_ip
+from .routes_auth import get_current_user
 from ..db.database import get_db
 from ..db.models import Article, EntityAnalysis
 from .routes_how import build_how_it_works
@@ -52,3 +56,24 @@ def public_features(response: Response) -> dict:
     s = get_settings()
     response.headers["Cache-Control"] = CACHE
     return {"email": s.email_backend == "ses" or s.trusted_proxy != "caddy"}
+
+
+class PageViewIn(BaseModel):
+    page: str = Field(max_length=10)                     # landing | app | detail
+    referrer: str | None = Field(default=None, max_length=500)
+
+
+@router.post("/pv", status_code=204)
+def page_view(payload: PageViewIn, request: Request, authorization: str | None = Header(default=None),
+              db: Session = Depends(get_db, scope="function")) -> Response:
+    """Çerezsiz sayfa görüntüleme sayacı (app.visits). Oturum isteğe bağlı: admin token'ı ile
+    gelen ziyaret sayılmaz. Ham IP/UA saklanmaz; yanıt her durumda 204 (içerik yok)."""
+    is_admin = False
+    if authorization:
+        try:
+            is_admin = get_current_user(authorization=authorization, db=db).is_admin
+        except HTTPException:
+            pass  # geçersiz/süresi dolmuş token → sıradan ziyaretçi
+    visits.record_view(db, payload.page, payload.referrer, get_client_ip(request),
+                       request.headers.get("user-agent", ""), is_admin=is_admin)
+    return Response(status_code=204)

@@ -589,3 +589,28 @@ class RateEvent(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     key: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False, index=True)
+
+
+class VisitSalt(Base):
+    """Ziyaretçi sayacının GÜNLÜK gizli tuzu (UTC gün başına bir satır). Yeni gün başlayınca
+    yenisi üretilir, eskisi SİLİNİR → dünkü özetler bugünkü IP+UA'dan yeniden hesaplanamaz."""
+
+    __tablename__ = "visit_salts"
+
+    day: Mapped[str] = mapped_column(String(10), primary_key=True)   # "2026-10-25"
+    salt: Mapped[str] = mapped_column(String(64), nullable=False)
+
+
+class PageView(Base):
+    """Sayfa görüntüleme (çerezsiz). Ham IP / User-Agent SAKLANMAZ: yalnızca
+    sha256(günlük tuz | IP | UA) özeti (aynı gün aynı kişiyi tekilleştirmek için), sayfa türü ve
+    yönlendiren alan adı (ör. linkedin.com). Ülke yok. 90 günden eskiler silinir."""
+
+    __tablename__ = "page_views"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    day: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+    page: Mapped[str] = mapped_column(String(10), nullable=False)             # landing | app | detail
+    visitor_hash: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    referrer: Mapped[str | None] = mapped_column(String(100), nullable=True)   # alan adı, yoksa None (doğrudan)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)

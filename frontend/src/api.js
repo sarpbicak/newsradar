@@ -202,6 +202,18 @@ export async function logout() {
     /* ağ hatası: token zaten silindi; bootstrap yine denenecek */
   }
 }
+// Çerezsiz ziyaretçi sayacı: sayfa türü + (yalnızca ilk görüntülemede) yönlendiren adres.
+// Kişisel token varsa gönderilir ki admin ziyaretleri sayılmasın. Hata sessizce yutulur.
+let referrerSent = false;
+export function trackView(page) {
+  const referrer = referrerSent ? null : document.referrer || null;
+  referrerSent = true;
+  const headers = { "Content-Type": "application/json" };
+  if (userToken) headers.Authorization = `Bearer ${userToken}`;
+  fetch(`${API_BASE}/public/pv`, { method: "POST", headers, body: JSON.stringify({ page, referrer }), keepalive: true, credentials: "omit" })
+    .catch(() => {});
+}
+
 export function logoutAll() {
   setUserToken(null);
   setGeneralToken(null);
@@ -232,6 +244,7 @@ export const api = {
   adminDeleteUser: (id) => req(`/admin/users/${id}`, { method: "DELETE" }),
   adminResetPassword: (id) => req(`/admin/users/${id}/reset-password`, { method: "POST" }),
   adminStats: () => req("/admin/stats"),
+  adminVisits: () => req("/admin/visits"),
   status: () => req("/status"),
   // ?lang: AI içeriği arayüzün GÜNCEL dilinde (backend user.language'e güvenmeden).
   listEntities: () => req(`/entities?lang=${getLang()}`),

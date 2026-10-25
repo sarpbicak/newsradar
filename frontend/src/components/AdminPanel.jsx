@@ -9,6 +9,7 @@ import { timeAgo } from "./ui.jsx";
 import { tt, fmtDate, fmtDateTime, fmtPct } from "../i18n.jsx";
 import { Button, Card, Chip, ConfirmDialog, ErrorState, Input, Modal, ModalHeader, Skeleton, Toast, cx } from "./kit.jsx";
 import { displayName } from "./EntityCard.jsx";
+import AdminVisits from "./AdminVisits.jsx";
 
 function eventLabel(t) {
   const s = tt(`ev.${t}`);
@@ -248,6 +249,9 @@ export default function AdminPanel({ currentUserId }) {
           hint={tt("adm.cacheHitHint")}
         />
       </div>
+
+      {/* ZİYARETLER (çerezsiz sayaç, son 30 gün) */}
+      <AdminVisits />
 
       {/* Model kırılımı (son 30 gün) */}
       {stats.model_breakdown?.length > 0 && (

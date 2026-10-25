@@ -1,4 +1,5 @@
-import React, { Suspense, lazy, useState } from "react";
+import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { trackView } from "./api.js";
 import ReactDOM from "react-dom/client";
 import Landing from "./components/landing/Landing.jsx";
 import { I18nProvider } from "./i18n.jsx";
@@ -29,6 +30,14 @@ function Root() {
   const path = usePath();
   const inApp = isAppPath(path);
   const linkKind = LINK_PAGES[path];
+  // Çerezsiz sayaç: landing, /app, detay (bağlantı sayfaları sayılmaz). Aynı yol tekrar sayılmaz
+  // (StrictMode çift efekti ve yeniden render).
+  const lastTracked = useRef(null);
+  useEffect(() => {
+    if (linkKind || lastTracked.current === path) return;
+    lastTracked.current = path;
+    trackView(!inApp ? "landing" : /^\/app\/e\/\d+/.test(path) ? "detail" : "app");
+  }, [path, inApp, linkKind]);
   return (
     <ThemeProvider>
       <I18nProvider lang={lang} setLang={setLang}>

@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
+from .. import visits
 from ..db.database import get_db
 from ..db.models import (
     Entity,
@@ -326,3 +327,10 @@ def mark_feedback_read(feedback_id: int, db: Session = Depends(get_db, scope="fu
     if fb is None:
         raise HTTPException(status_code=404, detail="Geri bildirim bulunamadı.")
     fb.is_read = True
+
+
+@router.get("/visits")
+def visit_stats(db: Session = Depends(get_db, scope="function")) -> dict:
+    """Ziyaretler (son 30 gün, çerezsiz sayaç): günlük benzersiz ziyaretçi + görüntüleme,
+    en çok gelen 5 kaynak, landing → uygulama geçiş oranı."""
+    return visits.stats(db, days=30)

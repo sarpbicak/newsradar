@@ -33,6 +33,7 @@ export default function PrivacyModal({ onClose }) {
             <li>{t("privacy.c1")}</li>
             <li>{t("privacy.cIp", vars)}</li>
             <li>{t("privacy.c2")}</li>
+            <li>{t("privacy.cVisits")}</li>
             <li>
               {t("privacy.c3")}
               {info?.email_provider && <> {t("privacy.cMail", { mail: info.email_provider })}</>}
