@@ -54,9 +54,18 @@ def purge_user(db: Session, user: User) -> None:
         recompute_active(db, eid)
 
 
+def _utc_now(now: datetime | None) -> datetime:
+    """Karşılaştırma saati DAİMA UTC ve zone-aware. Enjekte edilen naive değer UTC kabul edilir
+    (yerel saat sanılıp sınırı DST/ofset kadar kaydırmasın); verilmezse gerçek UTC saati."""
+    if now is None:
+        return datetime.now(timezone.utc)
+    return now.replace(tzinfo=timezone.utc) if now.tzinfo is None else now.astimezone(timezone.utc)
+
+
 def candidates(db: Session, now: datetime | None = None) -> list[tuple[int, bool]]:
-    """Silinecek misafirler: [(user_id, listesinde_şirket_var_mı)]."""
-    now = now or datetime.now(timezone.utc)
+    """Silinecek misafirler: [(user_id, listesinde_şirket_var_mı)]. Süreler UTC'de mutlak
+    (timedelta): yaz saati geçişi "30 gün" sınırını 1 saat kaydırmaz."""
+    now = _utc_now(now)
     seen = func.coalesce(User.last_active_at, User.created_at)
     has_list = exists().where(UserWatchlist.user_id == User.id)
     rows = db.execute(
@@ -75,6 +84,7 @@ def run(dry_run: bool | None = None, now: datetime | None = None) -> dict:
     """Temizliği çalıştırır, sonucu kaydeder ve döner. dry_run=None → ilk çalıştırma deneme,
     sonrakiler gerçek (NEWSRADAR_ANON_CLEANUP=dry-run ise hep deneme)."""
     mode = get_settings().anon_cleanup
+    now = _utc_now(now)
     with session_scope() as db:
         if dry_run is None:
             first = db.scalar(select(MaintenanceRun.id).where(MaintenanceRun.job == JOB).limit(1)) is None
@@ -88,7 +98,7 @@ def run(dry_run: bool | None = None, now: datetime | None = None) -> dict:
                 user = db.get(User, uid)
                 if user is not None:
                     purge_user(db, user)
-        db.add(MaintenanceRun(job=JOB, ran_at=now or datetime.now(timezone.utc), dry_run=dry_run,
+        db.add(MaintenanceRun(job=JOB, ran_at=now, dry_run=dry_run,
                               deleted=len(found), details=details))
     verb = "silinecek (deneme, hiçbir şey silinmedi)" if dry_run else "silindi"
     logger.info("[anon-temizlik] %d misafir %s: şirketsiz %d (>%d gün), şirketli %d (>%d gün); toplam misafir %d",

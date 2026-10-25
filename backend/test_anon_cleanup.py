@@ -8,11 +8,14 @@ Doğrular:
   (D) ortak havuz korunur: entity ve analizleri kalır (kimsede kalmadıysa pasif, başkasındaysa aktif);
       kişisel satırlar (liste, olaylar, e-posta token'ı) silinir, geri bildirim anonimleşir
   (E) NEWSRADAR_ANON_CLEANUP=off işi kapatır, dry-run her çalıştırmayı deneme yapar; admin ucu
-Çalıştır: python test_anon_cleanup.py
+  (F) saat bağımsızlığı: sınırlar günün saatinden, yaz saati geçiş günlerinden (25 Eki / 29 Mar)
+      ve "şimdi"nin naive / Berlin saatli verilmesinden etkilenmez (tüm çalıştırmalar sabit "şimdi")
+Çalıştır: python test_anon_cleanup.py  (CI: TZ=UTC ve TZ=Europe/Berlin ile de)
 """
 import os
 import tempfile
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 _db = os.path.join(tempfile.gettempdir(), "nr_test_anon_cleanup.db")
 for sfx in ("", "-wal", "-shm"):
@@ -122,13 +125,37 @@ before = SessionLocal().query(MaintenanceRun).count()
 scheduler._anon_cleanup_job()
 check(SessionLocal().query(MaintenanceRun).count() == before, "off: zamanlayıcı işi hiçbir şey yapmadı")
 os.environ["NEWSRADAR_ANON_CLEANUP"] = "dry-run"; get_settings.cache_clear()
-r3 = AC.run()
+r3 = AC.run(now=NOW)  # her çalıştırmaya sabit "şimdi" (gerçek saat günün saatine göre sınırı geçerdi)
 check(r3["dry_run"] and SessionLocal().scalar(select(User.id).where(User.username == "anon:yeni-eski")) is not None,
       "dry-run: her çalıştırma deneme (silmedi)")
 os.environ["NEWSRADAR_ANON_CLEANUP"] = "on"; get_settings.cache_clear()
 with SessionLocal() as s:
     last = AC.last_run(s)
 check(last["dry_run"] and last["deleted"] == 1 and "ran_at" in last, f"son çalışma bilgisi (admin paneli) {last}")
+
+print("== F: günün saati, yaz saati geçişi, naive / Berlin saatli 'şimdi'")
+BERLIN = ZoneInfo("Europe/Berlin")
+MOMENTS = [datetime(2026, 10, 25, h, m, tzinfo=timezone.utc) for h, m in ((0, 30), (1, 30), (12, 0), (23, 30))] + \
+          [datetime(2026, 3, 29, h, m, tzinfo=timezone.utc) for h, m in ((0, 30), (1, 30), (12, 0), (23, 30))]
+for now in MOMENTS:
+    with SessionLocal() as s:
+        s.query(UserWatchlist).filter(UserWatchlist.user_id.in_(
+            s.query(User.id).filter(User.username.like("b:%")))).delete(synchronize_session=False)
+        s.query(User).filter(User.username.like("b:%")).delete(synchronize_session=False)
+        made = {}
+        for name, delta, co in (("b:e-30", timedelta(days=30), False), ("b:e-30+1s", timedelta(days=30, seconds=1), False),
+                                ("b:c-90", timedelta(days=90), True), ("b:c-90+1s", timedelta(days=90, seconds=1), True)):
+            u = User(username=name, password_hash="x", is_anonymous=True, created_at=now - delta, last_active_at=now - delta)
+            s.add(u); s.flush(); made[name] = u.id
+            if co:
+                s.add(UserWatchlist(user_id=u.id, entity_id=shared_id))
+        s.commit()
+        mine = set(made.values())
+        got = {v: {uid for uid, _ in AC.candidates(s, v)} & mine
+               for v in (now, now.replace(tzinfo=None), now.astimezone(BERLIN))}
+    want = {made["b:e-30+1s"], made["b:c-90+1s"]}
+    check(all(g == want for g in got.values()),
+          f"{now:%Y-%m-%d %H:%M}Z: tam 30/90 gün kalır, 1 sn fazlası silinir; naive ve Berlin saatli 'şimdi' aynı")
 
 print("=" * 50)
 print(f"SONUÇ: {PASS} geçti, {FAIL} başarısız")
