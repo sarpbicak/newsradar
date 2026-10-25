@@ -9,6 +9,7 @@ import { timeAgo } from "./ui.jsx";
 import { tt, fmtDate, fmtDateTime, fmtPct } from "../i18n.jsx";
 import { Button, Card, Chip, ConfirmDialog, ErrorState, Input, Modal, ModalHeader, Skeleton, Toast, cx } from "./kit.jsx";
 import { displayName } from "./EntityCard.jsx";
+import AdminEntities from "./AdminEntities.jsx";
 import AdminVisits from "./AdminVisits.jsx";
 
 function eventLabel(t) {
@@ -310,6 +311,9 @@ export default function AdminPanel({ currentUserId }) {
       )}
 
       <FeedbackInbox items={feedback} onMarkRead={markRead} onDelete={deleteFeedback} />
+
+      {/* Şirketlerin görünen adı (ör. "KOC" → "Koç Holding") */}
+      <AdminEntities />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="p-5">

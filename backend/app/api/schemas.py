@@ -567,3 +567,21 @@ class HowItWorksOut(BaseModel):
     headlines: list[HowHeadlineOut] = []
     articles_week: int = 0          # son 7 günde toplanan (elenenler dahil)
     providers: list[str] = []       # gerçek kaynak adları (Finnhub, NewsAPI…)
+
+
+class AdminEntityRow(BaseModel):
+    """Admin şirket listesi satırı (görünen adı düzenlemek için)."""
+
+    id: int
+    name: str                       # kaynak/ham ad (değişmez)
+    display_name: str | None        # gösterilen ad (elle ya da otomatik)
+    auto_display_name: str | None   # boş bırakılırsa dönülecek otomatik ad (None = ham ad)
+    type: str
+    query: str
+    followers: int
+    active: bool
+
+
+class DisplayNameIn(BaseModel):
+    # Uzunluk asıl olarak route'ta (boşluk kırpıldıktan sonra) denetlenir; bu kaba üst sınır.
+    display_name: str | None = Field(default=None, max_length=500)

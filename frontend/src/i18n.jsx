@@ -710,6 +710,7 @@ const STR = {
   "ev.delete_feedback": { tr: "geri bildirim silme", en: "delete feedback" },
   "ev.email_verified": { tr: "e-posta doğrulama", en: "email verified" },
   "ev.password_reset_requested": { tr: "şifre sıfırlama isteği", en: "password reset requested" },
+  "ev.rename_entity": { tr: "şirket adı düzenleme", en: "rename company" },
 };
 
 const Ctx = createContext({ lang: "tr", t: (k) => k, setLang: () => {} });

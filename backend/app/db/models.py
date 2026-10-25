@@ -452,6 +452,7 @@ USAGE_EVENT_TYPES = (
     "delete_user", "password_reset", "feedback_sent", "delete_feedback",
     # Hesap e-postası (record_event izin listesi dışındaki tipleri sessizce atar).
     "email_verified", "password_reset_requested",
+    "rename_entity",  # admin görünen adı değiştirdi
 )
 
 

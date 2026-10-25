@@ -12,9 +12,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+import re
+import unicodedata
+
 from .. import visits
 from ..anon_cleanup import last_run as anon_cleanup_last_run, purge_user
 from ..db.database import get_db
+from ..entity_names import display_name_for
 from ..db.models import (
     Entity,
     Feedback,
@@ -25,6 +29,8 @@ from ..db.models import (
 from .routes_auth import hash_password, require_admin
 from .routes_feedback import device_from_user_agent
 from .schemas import (
+    AdminEntityRow,
+    DisplayNameIn,
     AdminEventOut,
     AdminFeedbackOut,
     AdminHealthOut,
@@ -325,3 +331,41 @@ def visit_stats(db: Session = Depends(get_db, scope="function")) -> dict:
 def maintenance(db: Session = Depends(get_db, scope="function")) -> dict:
     """Bakım işlerinin son çalışması (misafir temizliği: ne zaman, deneme mi, kaç kayıt)."""
     return {"anon_cleanup": anon_cleanup_last_run(db)}
+
+
+DISPLAY_NAME_MAX = 60  # kart başlığına sığan makul üst sınır (kolon 200)
+
+
+def _entity_row(e: Entity, followers: int) -> AdminEntityRow:
+    return AdminEntityRow(id=e.id, name=e.name, display_name=e.display_name, auto_display_name=display_name_for(e.name),
+                          type=e.type, query=e.query, followers=followers, active=e.active)
+
+
+@router.get("/entities", response_model=list[AdminEntityRow])
+def list_entities(db: Session = Depends(get_db, scope="function")) -> list[AdminEntityRow]:
+    """Havuzdaki şirketler (en çok takip edilen önce) — görünen adı düzenlemek için."""
+    followers = dict(db.execute(select(UserWatchlist.entity_id, func.count()).group_by(UserWatchlist.entity_id)).all())
+    rows = [_entity_row(e, followers.get(e.id, 0)) for e in db.scalars(select(Entity))]
+    return sorted(rows, key=lambda r: (-r.followers, (r.display_name or r.name).casefold()))
+
+
+@router.patch("/entities/{entity_id}/display-name", response_model=AdminEntityRow)
+def set_display_name(entity_id: int, payload: DisplayNameIn, admin: User = Depends(require_admin),
+                     db: Session = Depends(get_db, scope="function")) -> AdminEntityRow:
+    """Yalnızca görünen adı değiştirir (ham ad, sembol, analizler aynı kalır). Boş → otomatik ad
+    (entity_names.display_name_for; o da yoksa None = ham ad gösterilir). Boşluklar sadeleşir;
+    en fazla 60 karakter; kontrol karakteri yasak."""
+    e = db.get(Entity, entity_id)
+    if e is None:
+        raise HTTPException(status_code=404, detail="Şirket bulunamadı.")
+    raw = re.sub(r"\s+", " ", (payload.display_name or "")).strip()
+    if any(unicodedata.category(c).startswith("C") for c in raw):
+        raise HTTPException(status_code=422, detail="Görünen ad kontrol karakteri içeremez.")
+    if len(raw) > DISPLAY_NAME_MAX:
+        raise HTTPException(status_code=422, detail=f"Görünen ad en fazla {DISPLAY_NAME_MAX} karakter olabilir.")
+    old = e.display_name
+    e.display_name = raw or display_name_for(e.name)
+    record_event(db, admin.id, "rename_entity", {"entity_id": e.id, "from": old, "to": e.display_name, "auto": not raw})
+    db.flush()
+    followers = db.scalar(select(func.count()).select_from(UserWatchlist).where(UserWatchlist.entity_id == e.id)) or 0
+    return _entity_row(e, followers)

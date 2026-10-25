@@ -266,6 +266,9 @@ export const api = {
   adminStats: () => req("/admin/stats"),
   adminVisits: () => req("/admin/visits"),
   adminMaintenance: () => req("/admin/maintenance"),
+  adminEntities: () => req("/admin/entities"),
+  adminSetDisplayName: (id, displayName) =>
+    req(`/admin/entities/${id}/display-name`, { method: "PATCH", body: JSON.stringify({ display_name: displayName }) }),
   status: () => req("/status"),
   // ?lang: AI içeriği arayüzün GÜNCEL dilinde (backend user.language'e güvenmeden).
   listEntities: () => req(`/entities?lang=${getLang()}`),
