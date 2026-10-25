@@ -6,8 +6,24 @@
 import React, { useEffect, useState } from "react";
 import { KeyRound, LogIn, Mail, MailCheck, UserPlus } from "lucide-react";
 import { forgotPassword, resendVerification, setEmail, upgradeAccount, userLogin } from "../api.js";
-import { useI18n } from "../i18n.jsx";
+import { addStrings, useI18n } from "../i18n.jsx";
 import { Button, Field, Input, Modal, ModalHeader } from "./kit.jsx";
+
+// Şifremi unuttum / doğrulama metinleri — uygulama paketinde (landing'de değil).
+addStrings({
+  "acc.forgot": { tr: "Şifremi unuttum", en: "Forgot password?" },
+  "acc.forgotTitle": { tr: "Şifreni sıfırla", en: "Reset your password" },
+  "acc.forgotBody": { tr: "Hesabındaki e-posta adresini yaz; şifre sıfırlama bağlantısı gönderelim.", en: "Enter your account's email address and we'll send a password reset link." },
+  "acc.forgotSubmit": { tr: "Bağlantı gönder", en: "Send link" },
+  "acc.forgotSent": { tr: "Bu adres kayıtlıysa şifre sıfırlama bağlantısı gönderdik. Gelen kutunu (ve gereksiz klasörünü) kontrol et; bağlantı 1 saat geçerli.", en: "If this address is registered, we've sent a password reset link. Check your inbox (and spam folder); the link is valid for 1 hour." },
+  "acc.backToLogin": { tr: "Girişe dön", en: "Back to sign in" },
+  "acc.tooMany": { tr: "Çok fazla istek. Biraz sonra tekrar dene.", en: "Too many requests. Try again a bit later." },
+  "acc.verifyTitle": { tr: "E-postanı doğrula", en: "Verify your email" },
+  "acc.verifyBody": { tr: "{email} adresine bir doğrulama bağlantısı gönderdik. Hesabını kullanmaya devam edebilirsin; doğrulama şifreni unutursan sıfırlayabilmen için.", en: "We sent a verification link to {email}. You can keep using your account; verifying lets you reset your password if you forget it." },
+  "acc.verifySent": { tr: "Yeni bağlantı gönderildi.", en: "A new link is on its way." },
+  "acc.resend": { tr: "Tekrar gönder", en: "Send again" },
+  "acc.resendIn": { tr: "Tekrar gönder ({s} sn)", en: "Send again ({s}s)" },
+});
 
 // Sunucuyla aynı gevşek biçim denetimi (tek @, noktalı alan adı, boşluk yok).
 const EMAIL_RE = /^[^@\s]{1,64}@[^@\s]+\.[^@\s.]{2,}$/;

@@ -5,7 +5,6 @@ import { api, bootstrapSession, getUserToken, logout, setUnauthorizedHandler } f
 import Overview, { OverviewSkeleton } from "./components/Overview.jsx";
 import EntityDetail from "./components/EntityDetail.jsx";
 import AccountModal from "./components/AccountModal.jsx";
-import PrivacyModal from "./components/PrivacyModal.jsx";
 import { Button, ErrorState, Toast, ToastStack } from "./components/kit.jsx";
 import HowItWorks from "./components/HowItWorks.jsx";
 import FeedbackWidget from "./components/FeedbackWidget.jsx";
@@ -19,6 +18,7 @@ import { navigate, usePath } from "./router.js";
 
 // Admin paneli ayrı pakette — yalnızca admin açınca yüklenir.
 const AdminPanel = lazy(() => import("./components/AdminPanel.jsx"));
+const PrivacyModal = lazy(() => import("./components/PrivacyModal.jsx"));
 
 // Mobil aşağı-çekip-yenile eşiği (px). Bu mesafeyi geçince bırakınca yenilenir.
 const PULL_THRESHOLD = 70;
@@ -40,9 +40,13 @@ export default function App({ setLang }) {
   // E-posta gönderimi gerçekten açık mı (production'da console arka ucu → kapalı: "Şifremi
   // unuttum" ve "E-postanı doğrula" gösterilmez, kullanıcı çalışmayan bir şey görmez).
   const [emailEnabled, setEmailEnabled] = useState(false);
+  const [loaded, setLoaded] = useState(false); // ilk yükleme tamamlandı mı (skeleton için)
+  // Bayrak yalnızca menü/giriş penceresi için: ilk kart yüklemesinden SONRA istenir ki ilk
+  // boyamanın API istekleriyle yarışmasın (aynı kökene eşzamanlı bağlantı sınırı → LCP +190 ms).
   useEffect(() => {
+    if (!loaded) return;
     api.publicFeatures().then((f) => setEmailEnabled(!!f?.email)).catch(() => {});
-  }, []);
+  }, [loaded]);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [view, setView] = useState("dashboard");     // "dashboard" | "admin"
@@ -70,7 +74,6 @@ export default function App({ setLang }) {
   // onaydan önce giden bir /status "çalışmıyor" der ve göstergeyi söndürürdü.
   const [tracking, setTracking] = useState(false);
   const trackRef = useRef(null); // { prevCompleted, at } — bu tıklamanın taramasını tanımak için
-  const [loaded, setLoaded] = useState(false); // ilk yükleme tamamlandı mı (skeleton için)
   const [loadError, setLoadError] = useState(null);
   const [notice, setNotice] = useState(null);
   // Tarama tamamlanınca kısa süre gösterilen bitiş kartı ({news, analyses}) + sönme.
@@ -621,7 +624,11 @@ export default function App({ setLang }) {
           }}
         />
       )}
-      {showPrivacy && <PrivacyModal onClose={() => setShowPrivacy(false)} />}
+      {showPrivacy && (
+        <Suspense fallback={null}>
+          <PrivacyModal onClose={() => setShowPrivacy(false)} />
+        </Suspense>
+      )}
 
       {/* Footer — landing footer'ının sade hali. */}
       <footer className="border-t border-ink-600">

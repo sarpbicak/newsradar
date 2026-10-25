@@ -204,14 +204,34 @@ export async function logout() {
 }
 // Çerezsiz ziyaretçi sayacı: sayfa türü + (yalnızca ilk görüntülemede) yönlendiren adres.
 // Kişisel token varsa gönderilir ki admin ziyaretleri sayılmasın. Hata sessizce yutulur.
+// İstek yüklemeden ~3 sn sonra gider (ilk boyamanın kritik yoluyla — CORS ön isteği + POST —
+// yarışmasın; Lighthouse landing LCP +150 ms ölçülmüştü). Sayfa daha önce kapanırsa pagehide'da
+// keepalive ile hemen gönderilir (hızlı çıkan ziyaretçi de sayılır).
+const PV_DELAY_MS = 3000;
 let referrerSent = false;
+const pendingViews = [];
+let pvTimer = null;
+
+function flushViews() {
+  clearTimeout(pvTimer);
+  pvTimer = null;
+  while (pendingViews.length) {
+    const body = pendingViews.shift();
+    const headers = { "Content-Type": "application/json" };
+    if (userToken) headers.Authorization = `Bearer ${userToken}`;
+    fetch(`${API_BASE}/public/pv`, { method: "POST", headers, body, keepalive: true, credentials: "omit" }).catch(() => {});
+  }
+}
+if (typeof window !== "undefined") window.addEventListener("pagehide", flushViews);
+
 export function trackView(page) {
   const referrer = referrerSent ? null : document.referrer || null;
   referrerSent = true;
-  const headers = { "Content-Type": "application/json" };
-  if (userToken) headers.Authorization = `Bearer ${userToken}`;
-  fetch(`${API_BASE}/public/pv`, { method: "POST", headers, body: JSON.stringify({ page, referrer }), keepalive: true, credentials: "omit" })
-    .catch(() => {});
+  pendingViews.push(JSON.stringify({ page, referrer }));
+  if (pvTimer) return;
+  const arm = () => { pvTimer = setTimeout(flushViews, PV_DELAY_MS); };
+  if (document.readyState === "complete") arm();
+  else window.addEventListener("load", arm, { once: true });
 }
 
 export function logoutAll() {

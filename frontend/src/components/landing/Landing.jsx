@@ -5,17 +5,19 @@
 // kapanış · footer. Hareket kaydırmaya bağlı (scroll.js); yalnızca hero açılışı bir kez oynar.
 // Hero ve sahneler aynı gerçek örneği kullanır: /public/how-it-works bir kez çekilir; örnek yoksa
 // uydurma yok, görseller gizlenir. reduced-motion: hareket yok, her şey son halinde.
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { api } from "../../api.js";
 import { fmtCompact, useI18n } from "../../i18n.jsx";
 import { navigate } from "../../router.js";
 import { Button } from "../kit.jsx";
 import NavBar, { Brand, NavLink, WRAP } from "../NavBar.jsx";
-import PrivacyModal from "../PrivacyModal.jsx";
 import { LanguageSwitcher } from "../LanguageBits.jsx";
 import { ThemeMenu } from "../ThemeToggle.jsx";
 import { DataSources } from "../ui.jsx";
+
+// Gizlilik penceresi tıklanınca yüklenir (metinleriyle birlikte) — landing'in ilk paketi küçük kalsın.
+const PrivacyModal = lazy(() => import("../PrivacyModal.jsx"));
 import { GITHUB_PROFILE_URL, GITHUB_REPO_URL, GitHubIcon, LINKEDIN_URL, LinkedInIcon, SocialIcon } from "../Social.jsx";
 import ArchitectureDiagram from "./ArchitectureDiagram.jsx";
 import Hero from "./Hero.jsx";
@@ -303,7 +305,11 @@ export default function Landing({ lang, setLang }) {
           )}
         </main>
         {below && <Footer onPrivacy={() => setPrivacy(true)} />}
-        {privacy && <PrivacyModal onClose={() => setPrivacy(false)} />}
+        {privacy && (
+          <Suspense fallback={null}>
+            <PrivacyModal onClose={() => setPrivacy(false)} />
+          </Suspense>
+        )}
       </div>
     </EngineContext.Provider>
   );

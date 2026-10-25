@@ -5,9 +5,36 @@
 import React, { useEffect, useState } from "react";
 import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "../api.js";
-import { fmtInt, fmtPct, getLang, parseUtc, tt } from "../i18n.jsx";
+import { addStrings, fmtInt, fmtPct, getLang, parseUtc, tt } from "../i18n.jsx";
 import { C } from "../theme.js";
 import { Card, Skeleton } from "./kit.jsx";
+
+// Yalnızca admin panelinde görünen metinler (temizlik kartı dahil) — tembel pakette.
+addStrings({
+  "adm.cleanupTitle": { tr: "Misafir temizliği", en: "Guest cleanup" },
+  "adm.cleanupDone": { tr: "Son çalışmada {n} misafir silindi (toplam {total} misafirden).", en: "Last run deleted {n} guests (of {total})." },
+  "adm.cleanupDone_one": { tr: "Son çalışmada {n} misafir silindi (toplam {total} misafirden).", en: "Last run deleted {n} guest (of {total})." },
+  "adm.cleanupDry": { tr: "Deneme çalıştırması: {n} misafir silinecek (toplam {total}); hiçbir şey silinmedi.", en: "Dry run: {n} guests would be deleted (of {total}); nothing was deleted." },
+  "adm.cleanupDry_one": { tr: "Deneme çalıştırması: {n} misafir silinecek (toplam {total}); hiçbir şey silinmedi.", en: "Dry run: {n} guest would be deleted (of {total}); nothing was deleted." },
+  "adm.cleanupNever": { tr: "Henüz çalışmadı (günde bir; ilk çalıştırma deneme).", en: "Hasn't run yet (daily; the first run is a dry run)." },
+  "adm.cleanupRule": { tr: "Kural: şirket eklememiş misafir 30, şirketli misafir 90 gün görülmezse silinir. Kayıtlı hesaplara ve ortak analiz havuzuna dokunulmaz.", en: "Rule: guests with no companies are deleted after 30 days unseen, guests with companies after 90. Registered accounts and the shared analysis pool are never touched." },
+  "vis.title": { tr: "Ziyaretler (son 30 gün)", en: "Visits (last 30 days)" },
+  "vis.note": { tr: "Çerezsiz sayaç: botlar ve admin ziyaretleri sayılmaz; kişi yalnızca aynı gün içinde tekilleşir.", en: "Cookie-free counter: bots and admin visits are excluded; a person is deduplicated within a day only." },
+  "vis.visitors30": { tr: "Benzersiz ziyaretçi", en: "Unique visitors" },
+  "vis.visitorsHint": { tr: "günlük toplamların toplamı", en: "sum of daily uniques" },
+  "vis.views30": { tr: "Görüntüleme", en: "Page views" },
+  "vis.conversion": { tr: "Landing → uygulama", en: "Landing → app" },
+  "vis.conversionHint": { tr: "{l} landing ziyaretçisinden {a}", en: "{a} of {l} landing visitors" },
+  "vis.topSources": { tr: "En çok gelen kaynaklar", en: "Top sources" },
+  "vis.noSources": { tr: "Henüz yönlendiren site yok (doğrudan ziyaret).", en: "No referring sites yet (direct visits)." },
+  "vis.legendVisitors": { tr: "ziyaretçi", en: "visitors" },
+  "vis.legendViews": { tr: "görüntüleme", en: "views" },
+  "vis.visitorsN": { tr: "{n} ziyaretçi", en: "{n} visitors" },
+  "vis.visitorsN_one": { tr: "{n} ziyaretçi", en: "{n} visitor" },
+  "vis.viewsN": { tr: "{n} görüntüleme", en: "{n} views" },
+  "vis.viewsN_one": { tr: "{n} görüntüleme", en: "{n} view" },
+  "vis.aria": { tr: "Son 30 gün: {v} benzersiz ziyaretçi, {p} görüntüleme.", en: "Last 30 days: {v} unique visitors, {p} page views." },
+});
 
 const MONO = { fontFamily: '"JetBrains Mono", ui-monospace, monospace', fontSize: 11, fill: C.muted };
 const fmtDay = (iso) => parseUtc(`${iso}T12:00:00Z`).toLocaleDateString(getLang() === "tr" ? "tr-TR" : "en-US", { day: "numeric", month: "short" });

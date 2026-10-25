@@ -3,11 +3,31 @@
 // (geçmişe / Referer'a düşmesin). Doğrulama isteği tek sefer gider (StrictMode çift efekti token'ı
 // harcayıp "geçersiz" göstermesin).
 import React, { useEffect, useRef, useState } from "react";
-import { CheckCircle2, KeyRound, XCircle } from "lucide-react";
+import { CheckCircle2, LockKeyhole, XCircle } from "lucide-react"; // App ile paylaşılmayan simgeler
 import { resetPassword, verifyEmail } from "../api.js";
-import { useI18n } from "../i18n.jsx";
+import { addStrings, useI18n } from "../i18n.jsx";
 import { navigate } from "../router.js";
 import { Button, Card, Field, Input } from "./kit.jsx";
+
+// Bağlantı sayfası metinleri — yalnızca bu (tembel) pakette.
+addStrings({
+  "link.toApp": { tr: "NewsRadar'a git", en: "Go to NewsRadar" },
+  "link.checking": { tr: "Bağlantı kontrol ediliyor…", en: "Checking the link…" },
+  "link.verifiedTitle": { tr: "E-postan doğrulandı", en: "Your email is verified" },
+  "link.verifiedBody": { tr: "Şifreni unutursan bu adrese sıfırlama bağlantısı gönderebiliriz.", en: "If you forget your password, we can send a reset link to this address." },
+  "link.badTitle": { tr: "Bağlantı çalışmadı", en: "This link didn't work" },
+  "link.badVerify": { tr: "Bağlantı geçersiz, kullanılmış ya da süresi dolmuş. Menüdeki “E-postanı doğrula” ile yenisini isteyebilirsin.", en: "The link is invalid, used or expired. Request a new one from “Verify your email” in the menu." },
+  "link.badReset": { tr: "Bağlantı geçersiz, kullanılmış ya da süresi dolmuş. Girişteki “Şifremi unuttum” ile yenisini isteyebilirsin.", en: "The link is invalid, used or expired. Request a new one with “Forgot password?” on the sign-in screen." },
+  "link.resetTitle": { tr: "Yeni şifre belirle", en: "Set a new password" },
+  "link.resetBody": { tr: "Şifren değişince diğer cihazlardaki oturumların kapanır.", en: "Changing your password signs you out on other devices." },
+  "link.newPassword": { tr: "Yeni şifre", en: "New password" },
+  "link.newPassword2": { tr: "Yeni şifre (tekrar)", en: "New password (again)" },
+  "link.resetSubmit": { tr: "Şifreyi değiştir", en: "Change password" },
+  "link.pwShort": { tr: "Şifre en az {n} karakter olmalı.", en: "The password must be at least {n} characters." },
+  "link.pwMismatch": { tr: "İki şifre aynı değil.", en: "The two passwords don't match." },
+  "link.resetDoneTitle": { tr: "Şifren değişti", en: "Your password has changed" },
+  "link.resetDoneBody": { tr: "Bu cihazda oturumun açık. Diğer cihazlarda yeni şifrenle giriş yapman gerekecek.", en: "You're signed in on this device. On other devices, sign in with your new password." },
+});
 
 const MIN_PASSWORD_LEN = 8;
 
@@ -89,7 +109,7 @@ function ResetPassword() {
   return (
     <form onSubmit={submit} className="space-y-3" noValidate>
       <div className="mb-2 flex items-center gap-2">
-        <KeyRound className="h-5 w-5 text-accent" aria-hidden="true" />
+        <LockKeyhole className="h-5 w-5 text-accent" aria-hidden="true" />
         <h1 className="font-display text-lg font-medium text-slate-100">{t("link.resetTitle")}</h1>
       </div>
       <p className="text-meta text-slate-400">{t("link.resetBody")}</p>
