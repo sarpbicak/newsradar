@@ -708,6 +708,8 @@ const STR = {
   "ev.password_reset": { tr: "şifre sıfırlama", en: "password reset" },
   "ev.feedback_sent": { tr: "geri bildirim", en: "feedback" },
   "ev.delete_feedback": { tr: "geri bildirim silme", en: "delete feedback" },
+  "ev.email_verified": { tr: "e-posta doğrulama", en: "email verified" },
+  "ev.password_reset_requested": { tr: "şifre sıfırlama isteği", en: "password reset requested" },
 };
 
 const Ctx = createContext({ lang: "tr", t: (k) => k, setLang: () => {} });

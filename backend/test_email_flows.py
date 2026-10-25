@@ -39,7 +39,7 @@ from sqlalchemy import update  # noqa: E402
 from app.config import get_settings  # noqa: E402
 from app.api.main import app  # noqa: E402
 from app.db.database import SessionLocal  # noqa: E402
-from app.db.models import EmailToken, User  # noqa: E402
+from app.db.models import EmailToken, UsageEvent, User  # noqa: E402
 from app.mailer import get_mailer, send_email, EmailMessage  # noqa: E402
 
 PASS = FAIL = 0
@@ -101,6 +101,9 @@ with TestClient(app) as c:
         check(stored.token_hash != vt and len(stored.token_hash) == 64, "token düz değil, sha256 özetiyle saklanıyor")
     check(c.post("/users/verify-email", json={"token": vt}).status_code == 200, "bağlantı doğruladı")
     check(c.get("/users/me", headers=auth(tok_ayse)).json()["email_verified"] is True, "me: email_verified=True")
+    with SessionLocal() as s:
+        check(s.query(UsageEvent).filter_by(user_id=uid, event_type="email_verified").count() == 1,
+              "doğrulama olayı kaydedildi (admin panelinde görünür)")
     check(c.post("/users/verify-email", json={"token": vt}).status_code == 400, "aynı bağlantı ikinci kez 400")
     check(c.post("/users/verify-email", json={"token": "uydurma"}).status_code == 400, "uydurma token 400")
     # EN kullanıcı + süresi dolmuş bağlantı
@@ -134,6 +137,9 @@ with TestClient(app) as c:
     check(r1.status_code == r2.status_code == r3.status_code == 202 and r1.json() == r2.json() == r3.json(),
           "kayıtlı / kayıtsız / bozuk adres → aynı durum ve aynı mesaj")
     check(len(mails()) == n + 1 and mails()[-1].to == "ayse@example.com", "yalnızca kayıtlı adrese posta gitti")
+    with SessionLocal() as s:
+        check(s.query(UsageEvent).filter_by(user_id=uid, event_type="password_reset_requested").count() == 1,
+              "sıfırlama isteği olayı kaydedildi")
     for _ in range(4):
         c.post("/users/forgot-password", json={"email": "ayse@example.com"}, headers=xff())
     with SessionLocal() as s:
@@ -158,6 +164,8 @@ with TestClient(app) as c:
     check(r.status_code == 200 and r.json()["token"], "geçerli bağlantı → yeni şifre + bu cihaz için taze oturum")
     check(c.get("/users/me", headers=auth(mtok)).status_code == 401, "eski oturum token'ı 401 (diğer oturumlar kapandı)")
     check(c.get("/users/me", headers=auth(r.json()["token"])).status_code == 200, "yeni token çalışıyor")
+    with SessionLocal() as s:
+        check(s.query(UsageEvent).filter_by(user_id=mid, event_type="password_reset").count() == 1, "sıfırlama olayı kaydedildi")
     b = other.post("/session/bootstrap", headers=xff()).json()["user"]
     check(b["username"] != "mehmet" and b["is_anonymous"], "diğer cihazın çerezi artık hesabı geri getirmiyor")
     check(c.post("/users/login", json={"username": "mehmet", "password": "yeniparola99"}, headers=xff()).status_code == 200, "yeni şifreyle giriş")

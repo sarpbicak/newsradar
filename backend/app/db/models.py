@@ -450,6 +450,8 @@ USAGE_EVENT_TYPES = (
     "login", "login_failed", "register_failed", "refresh", "view_entity",
     "add_entity", "remove_entity", "chat", "add_suggestion", "dismiss_suggestion",
     "delete_user", "password_reset", "feedback_sent", "delete_feedback",
+    # Hesap e-postası (record_event izin listesi dışındaki tipleri sessizce atar).
+    "email_verified", "password_reset_requested",
 )
 
 
