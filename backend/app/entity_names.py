@@ -103,13 +103,56 @@ def readable_name(name: str) -> str:
     return " ".join(out) or raw
 
 
-def display_name_for(name: str) -> str | None:
-    """Bilinen uzun ad için kısa görünen ad; tamamı büyük harf resmi ad için okunur biçim
-    ("OCUGEN INC" → "Ocugen"); ikisi de yoksa ya da adla aynıysa None."""
-    short = KNOWN_DISPLAY_NAMES.get(_norm(name)) or readable_name(name)
+# ADR/ADS ekleri (Finnhub ABD listeleri: "SAP SE-SPONSORED ADR", "TOYOTA MOTOR CORP -SPON ADR",
+# "XYZ PLC ADR", "ABC LTD-UNSPONSORED ADR", "DEF AG ADS"): ekten sonrası atılır.
+_ADR_RE = re.compile(
+    # "-SPONSORED ADR", "UNSPONSORED ADR", "-SPON ADR", "-SPONS ADR", "-SP ADR" (ardından ADR/ADS şart)
+    r"[\s-]*\b(?i:(?:un)?(?:sponsored|spons|spon|sp))[\s.-]+(?i:adrs?)\b.*$"
+    r"|[\s-]*\b(?i:(?:un)?(?:sponsored|spons|spon|sp))[\s.-]+ADS\b.*$"
+    r"|[\s-]+(?i:adrs?)\b.*$"                  # "-ADR", " ADR", " ADRs" (ve sonrası)
+    r"|[\s-]+ADS$"                               # " ADS" yalnızca BÜYÜK harf ve sonda ("Google Ads" değil)
+    r"|[\s-]+(?i:(?:ny\s+)?reg(?:istry)?\s+shs?)\b.*$",  # "-NY REG SHS" (New York tescilli hisse)
+)
+
+
+def strip_adr(name: str) -> str:
+    """ADR/ADS eklerini atar; geriye bir şey kalmazsa adı olduğu gibi döner."""
+    raw = (name or "").strip()
+    cleaned = _ADR_RE.sub("", raw).strip(" -,")
+    return cleaned or raw
+
+
+def _auto_name(name: str, adr: bool = True) -> str | None:
+    base = strip_adr(name) if adr else (name or "").strip()
+    short = KNOWN_DISPLAY_NAMES.get(_norm(base)) or readable_name(base)
     if not short or short == (name or "").strip():
         return None
     return short
+
+
+def display_name_for(name: str) -> str | None:
+    """Bilinen uzun ad için kısa görünen ad; tamamı büyük harf resmi ad için okunur biçim
+    ("OCUGEN INC" → "Ocugen"); ADR ekleri atılır ("SAP SE-SPONSORED ADR" → "SAP"); hiçbiri yoksa
+    ya da adla aynıysa None."""
+    return _auto_name(name)
+
+
+def fix_adr_display_names(conn) -> int:
+    """Bir kerelik (idempotent): ADR ekli adlarda eski otomatik adı ("SAP Se-Sponsored ADR")
+    yenisiyle ("SAP") değiştirir. Yalnızca görünen adı BOŞ ya da eski algoritmanın ürettiğiyle
+    birebir aynı olanlar — admin'in elle verdiği ad eski otomatik adla eşleşmez, dokunulmaz."""
+    rows = conn.exec_driver_sql("SELECT id, name, display_name FROM entities").fetchall()
+    n = 0
+    for eid, name, current in rows:
+        if not _ADR_RE.search(name or ""):
+            continue
+        old, new = _auto_name(name, adr=False), _auto_name(name)
+        if current in (None, old) and current != new:
+            conn.exec_driver_sql("UPDATE entities SET display_name = ? WHERE id = ?", (new, eid))
+            n += 1
+    if n:
+        logger.info("ADR ekli %d otomatik görünen ad düzeltildi.", n)
+    return n
 
 
 def backfill_display_names(conn) -> int:

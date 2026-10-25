@@ -166,6 +166,30 @@ mf = st.json().get("most_followed", []) if st.status_code == 200 else []
 check(any(m.get("display_name") == "SpaceX" for m in mf),
       f"admin stats most_followed'da display_name ({st.status_code})")
 
+print("== ADR ekleri")
+from app.entity_names import fix_adr_display_names  # noqa: E402
+
+for raw, want in [("SAP SE-SPONSORED ADR", "SAP"), ("TOYOTA MOTOR CORP -SPON ADR", "Toyota Motor"),
+                  ("INFOSYS LTD-SP ADR", "Infosys"), ("NOVO-NORDISK A/S-SPONS ADR", "Novo-Nordisk"),
+                  ("ABC LTD-UNSPONSORED ADR", "ABC"), ("DEUTSCHE BANK AG ADS", "Deutsche Bank"),
+                  ("BHP GROUP LTD ADR", "BHP Group"), ("ASML HOLDING NV-NY REG SHS", "ASML")]:
+    check(display_name_for(raw) == want, f"{raw!r} → {want!r} ({display_name_for(raw)!r})")
+check(display_name_for("Google Ads Inc") is None and display_name_for("ADS-TEC ENERGY PLC") == "Ads-Tec Energy",
+      "'Ads' kelimesi / ADS ile başlayan ad ADR sayılmaz")
+with session_scope() as s:
+    old_auto = Entity(name="SAP SE-SPONSORED ADR", display_name="SAP Se-Sponsored ADR", type="ticker", query="ADRT1")
+    empty = Entity(name="TAIWAN SEMICONDUCTOR-SP ADR", display_name=None, type="ticker", query="ADRT2")
+    manual = Entity(name="TOYOTA MOTOR CORP -SPON ADR", display_name="Toyota (ADR)", type="ticker", query="ADRT3")
+    s.add_all([old_auto, empty, manual]); s.flush()
+    ids = (old_auto.id, empty.id, manual.id)
+with engine.begin() as conn:
+    n1 = fix_adr_display_names(conn)
+    n2 = fix_adr_display_names(conn)
+with session_scope() as s:
+    got = [s.get(Entity, i).display_name for i in ids]
+check(n1 == 2 and n2 == 0, f"bir kerelik düzeltme: 2 kayıt, ikinci çalıştırmada 0 (idempotent) ({n1}, {n2})")
+check(got == ["SAP", "Taiwan Semiconductor", "Toyota (ADR)"], f"eski otomatik + boş düzeldi, elle verilen ad korundu ({got})")
+
 print("=" * 50)
 print(f"SONUÇ: {PASS} geçti, {FAIL} başarısız")
 raise SystemExit(1 if FAIL else 0)

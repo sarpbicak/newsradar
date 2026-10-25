@@ -97,9 +97,10 @@ def init_db() -> None:
     _ensure_column("llm_usage", "cost_usd", "FLOAT NOT NULL DEFAULT 0")
     # Kısa görünen ad + bilinen uzun adlar için idempotent doldurma (yalnızca NULL'lar).
     _ensure_column("entities", "display_name", "VARCHAR(200)")
-    from ..entity_names import backfill_display_names
+    from ..entity_names import backfill_display_names, fix_adr_display_names
 
     with engine.begin() as conn:
+        fix_adr_display_names(conn)  # önce eski ADR otomatik adları, sonra boşları doldur
         backfill_display_names(conn)
 
 
