@@ -295,25 +295,25 @@ function Drawer({ user, view, lang, onLang, onClose, onHow, onAccount, onAdmin, 
 
       {/* Öğeler sol hizayı korur: hover zemini kenara taşar (-mx-3), ikon ve metin hizada kalır. */}
       <nav className="-mx-3 space-y-0.5" aria-label={t("header.menu")}>
-        <MenuItem icon={HelpCircle} onClick={act(onHow)} className={item}>{t("header.howItWorks")}</MenuItem>
+        <MenuItem plain icon={HelpCircle} onClick={act(onHow)} className={item}>{t("header.howItWorks")}</MenuItem>
         {user.is_admin && (
-          <MenuItem icon={view === "admin" ? LayoutDashboard : ShieldCheck} onClick={act(onAdmin)} className={item}>
+          <MenuItem plain icon={view === "admin" ? LayoutDashboard : ShieldCheck} onClick={act(onAdmin)} className={item}>
             {view === "admin" ? t("header.backToDashboard") : t("header.adminPanel")}
           </MenuItem>
         )}
         {!user.is_anonymous && !user.email && (
-          <MenuItem icon={Mail} onClick={act(() => onAccount("email"))} className={item}>{t("header.addEmail")}</MenuItem>
+          <MenuItem plain icon={Mail} onClick={act(() => onAccount("email"))} className={item}>{t("header.addEmail")}</MenuItem>
         )}
         {needsVerify(user, emailEnabled) && (
-          <MenuItem icon={MailWarning} onClick={act(() => onAccount("verify"))} className={`${item} text-amber-600`}>{t("header.verifyEmail")}</MenuItem>
+          <MenuItem plain icon={MailWarning} onClick={act(() => onAccount("verify"))} className={`${item} text-amber-600`}>{t("header.verifyEmail")}</MenuItem>
         )}
-        <MenuItem icon={MessageSquare} onClick={act(onFeedback)} className={item}>{t("fb.button")}</MenuItem>
+        <MenuItem plain icon={MessageSquare} onClick={act(onFeedback)} className={item}>{t("fb.button")}</MenuItem>
       </nav>
 
       {!user.is_anonymous && (
         <div className="mt-auto border-t border-ink-600 pt-3">
           <div className="-mx-3">
-            <MenuItem icon={LogOut} tone="danger" onClick={act(onLogout)} className={item}>
+            <MenuItem plain icon={LogOut} tone="danger" onClick={act(onLogout)} className={item}>
               {t("header.logout")}
             </MenuItem>
           </div>

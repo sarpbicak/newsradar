@@ -75,7 +75,7 @@ test("mobil: çıkıştan sonra menüde kullanıcı adı ve rozet yok", async ({
   await open();
   const drawer = page.getByRole("dialog");
   await expect(drawer).toContainText(username);
-  await drawer.getByRole("menuitem", { name: "Çıkış yap" }).click();
+  await drawer.getByRole("button", { name: "Çıkış yap" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await open();
   await expect(page.getByRole("dialog")).not.toContainText(username);

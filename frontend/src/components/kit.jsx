@@ -432,11 +432,12 @@ export function Menu({ button, label, align = "right", className = "", children 
 }
 
 // tone="danger": yıkıcı aksiyon (çıkış) — soluk kırmızı, bağırmayan.
-export function MenuItem({ icon: Icon, tone, className = "", children, ...rest }) {
+// plain: menü dışında (ör. mobil çekmece) düz düğme — role="menuitem" yalnızca role="menu" içinde geçerli.
+export function MenuItem({ icon: Icon, tone, className = "", plain = false, children, ...rest }) {
   return (
     <button
       type="button"
-      role="menuitem"
+      role={plain ? undefined : "menuitem"}
       data-close
       className={cx(
         "tap flex h-10 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm transition-colors duration-hover ease-std hover:bg-ink-700",
