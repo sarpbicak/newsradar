@@ -245,6 +245,7 @@ export const api = {
   adminResetPassword: (id) => req(`/admin/users/${id}/reset-password`, { method: "POST" }),
   adminStats: () => req("/admin/stats"),
   adminVisits: () => req("/admin/visits"),
+  adminMaintenance: () => req("/admin/maintenance"),
   status: () => req("/status"),
   // ?lang: AI içeriği arayüzün GÜNCEL dilinde (backend user.language'e güvenmeden).
   listEntities: () => req(`/entities?lang=${getLang()}`),

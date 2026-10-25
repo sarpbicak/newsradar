@@ -119,6 +119,11 @@ class Settings:
         # OpenAI-uyumlu endpoint anahtarı (OpenRouter/NVIDIA/… — hangisini kullanıyorsan).
         self.llm_api_key: str = os.getenv("NEWSRADAR_LLM_API_KEY", "").strip()
         self.lookback_hours: int = int(_env("NEWSRADAR_LOOKBACK_HOURS", "48"))
+        # Günlük misafir temizliği (app/anon_cleanup.py): on (ilk çalıştırma deneme, sonra siler)
+        # | dry-run (her çalıştırma deneme) | off.
+        self.anon_cleanup: str = _env("NEWSRADAR_ANON_CLEANUP", "on").lower()
+        if self.anon_cleanup not in ("on", "dry-run", "off"):
+            raise ValueError(f"NEWSRADAR_ANON_CLEANUP geçersiz: {self.anon_cleanup!r} (on | dry-run | off)")
         # Yeni şirket (hiç değerlendirmesi yok) için BİR KERELİK geriye dönük doldurma: lookback
         # dışındaki son N günün en yeni M haberi de kaydedilir (az haberli şirket ilk gün
         # değerlendirme alabilsin). 0 = kapalı. Genel lookback penceresi değişmez.

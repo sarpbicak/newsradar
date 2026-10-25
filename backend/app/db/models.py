@@ -614,3 +614,16 @@ class PageView(Base):
     visitor_hash: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     referrer: Mapped[str | None] = mapped_column(String(100), nullable=True)   # alan adı, yoksa None (doğrudan)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+
+
+class MaintenanceRun(Base):
+    """Bakım işi çalışma kaydı (ör. anon temizliği): ne zaman, deneme mi, kaç kayıt."""
+
+    __tablename__ = "maintenance_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    job: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    ran_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+    dry_run: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    deleted: Mapped[int] = mapped_column(Integer, default=0, nullable=False)   # silinen (deneme: silinecek)
+    details: Mapped[dict | None] = mapped_column(JSON, nullable=True)

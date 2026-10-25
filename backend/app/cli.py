@@ -475,6 +475,17 @@ def cmd_reconcile(_args: argparse.Namespace) -> None:
     print(f"Ön-filtre reconcile: {n} makale yeniden değerlendirmeye açıldı.")
 
 
+def cmd_anon_cleanup(args: argparse.Namespace) -> None:
+    """Misafir temizliği. Varsayılan DENEME (hiçbir şey silinmez); --apply ile gerçekten siler."""
+    from .anon_cleanup import IDLE_DAYS_EMPTY, IDLE_DAYS_WITH_LIST, run
+
+    init_db()
+    r = run(dry_run=not args.apply)
+    print(f"{'SİLİNDİ' if args.apply else 'DENEME — silinecek'}: {r['deleted']} / {r['anon_total']} misafir "
+          f"(şirketsiz >{IDLE_DAYS_EMPTY} gün: {r['without_companies']}, "
+          f"şirketli >{IDLE_DAYS_WITH_LIST} gün: {r['with_companies']})")
+
+
 def cmd_content_report(args: argparse.Namespace) -> None:
     """SALT OKUNUR içerik raporu (init_db ÇAĞRILMAZ; DB mode=ro açılır)."""
     from .content_report import collect, open_readonly, render
@@ -526,6 +537,10 @@ def main() -> None:
     p_an.add_argument("--force-assessment", action="store_true",
                       help="Yeni veri olmasa da TR+EN değerlendirmeyi yeniden üret")
     p_an.set_defaults(func=cmd_analyze)
+
+    p_ac = sub.add_parser("anon-cleanup", help="Misafir temizliği (varsayılan deneme; --apply siler)")
+    p_ac.add_argument("--apply", action="store_true", help="Gerçekten sil (yoksa yalnızca rapor)")
+    p_ac.set_defaults(func=cmd_anon_cleanup)
 
     p_rep = sub.add_parser(
         "content-report",

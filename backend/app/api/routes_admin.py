@@ -9,20 +9,19 @@ import secrets
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .. import visits
+from ..anon_cleanup import last_run as anon_cleanup_last_run, purge_user
 from ..db.database import get_db
 from ..db.models import (
     Entity,
     Feedback,
-    SuggestionDismissal,
     UsageEvent,
     User,
     UserWatchlist,
 )
-from ..watchlist import recompute_active
 from .routes_auth import hash_password, require_admin
 from .routes_feedback import device_from_user_agent
 from .schemas import (
@@ -167,23 +166,9 @@ def delete_user(
         raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
     username = target.username
 
-    # Silmeden ÖNCE etkilenen entity'leri topla (sonra active'i yeniden hesapla).
-    entity_ids = list(db.scalars(
-        select(UserWatchlist.entity_id).where(UserWatchlist.user_id == user_id)
-    ).all())
-
-    # Bağlı verileri açıkça sil (cascade'e güvenme).
-    db.execute(delete(UserWatchlist).where(UserWatchlist.user_id == user_id))
-    db.execute(delete(SuggestionDismissal).where(SuggestionDismissal.user_id == user_id))
-    db.execute(delete(UsageEvent).where(UsageEvent.user_id == user_id))
-    # Geri bildirim SİLİNMEZ (kıymetli) — yalnızca kimlik düşer (anonimleşir).
-    db.execute(update(Feedback).where(Feedback.user_id == user_id).values(user_id=None))
-    db.delete(target)
-    db.flush()
-
-    # Kullanıcının entity'leri: kimsede kalmadıysa pasifleştir (havuz mantığı).
-    for eid in entity_ids:
-        recompute_active(db, eid)
+    # Bağlı kişisel satırlar açıkça silinir, entity'ler havuzda kalır (gerekirse pasif) —
+    # misafir temizliğiyle aynı yol (app/anon_cleanup.purge_user).
+    purge_user(db, target)
 
     # Kim kimi sildi — admin'in kaydına yaz (silinen kullanıcının olayları gitti).
     record_event(db, admin.id, "delete_user", {"deleted_id": user_id, "username": username})
@@ -334,3 +319,9 @@ def visit_stats(db: Session = Depends(get_db, scope="function")) -> dict:
     """Ziyaretler (son 30 gün, çerezsiz sayaç): günlük benzersiz ziyaretçi + görüntüleme,
     en çok gelen 5 kaynak, landing → uygulama geçiş oranı."""
     return visits.stats(db, days=30)
+
+
+@router.get("/maintenance")
+def maintenance(db: Session = Depends(get_db, scope="function")) -> dict:
+    """Bakım işlerinin son çalışması (misafir temizliği: ne zaman, deneme mi, kaç kayıt)."""
+    return {"anon_cleanup": anon_cleanup_last_run(db)}

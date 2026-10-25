@@ -25,6 +25,30 @@ function SectionLabel({ children, aside }) {
   );
 }
 
+// Misafir temizliği: son çalışma (zamanlayıcı günde bir). İlk çalıştırma deneme: hiçbir şey
+// silinmez, yalnızca "silinecek" sayısı gösterilir.
+function CleanupCard() {
+  const [run, setRun] = useState(undefined);
+  useEffect(() => {
+    api.adminMaintenance().then((d) => setRun(d.anon_cleanup)).catch(() => setRun(null));
+  }, []);
+  if (run === undefined) return null;
+  return (
+    <Card className="p-5">
+      <SectionLabel>{tt("adm.cleanupTitle")}</SectionLabel>
+      {run ? (
+        <p className="text-meta text-slate-300">
+          {tt(run.dry_run ? "adm.cleanupDry" : "adm.cleanupDone", { n: run.deleted, total: run.anon_total ?? "—" })}{" "}
+          <span className="text-slate-500">· {timeAgo(run.ran_at)}</span>
+        </p>
+      ) : (
+        <p className="text-meta text-slate-500">{tt("adm.cleanupNever")}</p>
+      )}
+      <p className="mt-1 text-micro text-slate-500">{tt("adm.cleanupRule")}</p>
+    </Card>
+  );
+}
+
 function StatCard({ label, value, hint, tone }) {
   const toneText = tone === "neg" ? "text-rose-600" : tone === "accent" ? "text-accent" : "text-slate-100";
   return (
@@ -252,6 +276,7 @@ export default function AdminPanel({ currentUserId }) {
 
       {/* ZİYARETLER (çerezsiz sayaç, son 30 gün) */}
       <AdminVisits />
+      <CleanupCard />
 
       {/* Model kırılımı (son 30 gün) */}
       {stats.model_breakdown?.length > 0 && (

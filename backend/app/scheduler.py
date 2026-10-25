@@ -41,6 +41,16 @@ def _prune_ip_job() -> None:
         logger.exception("IP kayıt temizliği başarısız")
 
 
+def _anon_cleanup_job() -> None:
+    if get_settings().anon_cleanup == "off":
+        return
+    try:
+        from .anon_cleanup import run
+        run()
+    except Exception:  # noqa: BLE001 — zamanlayıcı thread'i asla çökmesin
+        logger.exception("Misafir kayıt temizliği başarısız")
+
+
 def start() -> None:
     """Zamanlayıcıyı başlatır (config'e göre açık/kapalı). Uygulama açılışında çağrılır."""
     global _scheduler, _enabled
@@ -53,6 +63,8 @@ def start() -> None:
     _scheduler.add_job(_job, "interval", hours=hours, id=_JOB_ID, max_instances=1)
     # GİZLİLİK: IP saklama süresi temizliği — yenileme açık/kapalı olsun her gün çalışır.
     _scheduler.add_job(_prune_ip_job, "interval", hours=24, id="ip_prune", max_instances=1)
+    # Misafir temizliği — günde bir (ilk çalıştırma deneme; bkz. app/anon_cleanup.py).
+    _scheduler.add_job(_anon_cleanup_job, "interval", hours=24, id="anon_cleanup", max_instances=1)
     _scheduler.start()
     logger.info("Zamanlayıcı başladı (aktif=%s, her %d saatte)", _enabled, hours)
 
