@@ -337,9 +337,16 @@ export function Toast({ tone = "info", title, onClose, inline = false, className
   );
 }
 
-// Sağ üstte (header'ın altında) toast yığını.
+// Toast yığını. Masaüstü: SOL ALT — sağ sütun Ask AI paneli, sağ alt köşe Geri bildirim /
+// Ask AI butonlarıyla dolu (sağ üstteyken panelin hazır sorularını kapatıyordu). Mobil: altta,
+// güvenli alanın (ev çubuğu / Safari adres çubuğu) ve sağ alttaki yüzen butonların üstünde.
+// flex-col-reverse: en yeni bildirim en altta, gözün ilk düştüğü yerde.
 export function ToastStack({ children }) {
-  return <div className="pointer-events-none fixed inset-x-4 top-20 z-[60] flex flex-col gap-2 sm:left-auto sm:right-6 sm:w-96">{children}</div>;
+  return (
+    <div className="pointer-events-none fixed inset-x-4 bottom-[calc(max(1rem,env(safe-area-inset-bottom))+6.5rem)] z-[60] flex flex-col-reverse gap-2 sm:bottom-6 sm:left-6 sm:right-auto sm:w-96">
+      {children}
+    </div>
+  );
 }
 
 // ── Durumlar ────────────────────────────────────────────────────────────────────
