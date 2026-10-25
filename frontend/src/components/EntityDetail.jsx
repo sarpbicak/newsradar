@@ -6,10 +6,11 @@
 //   mobilde "AI'ya sor" → alttan açılan sayfa (ortak Modal).
 // Grafikler (Recharts) ayrı pakette, yalnızca sekme açılınca yüklenir.
 import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, BarChart3, ChevronLeft, Eye, FileText, GitFork, Lock, MessageSquare, Minus, Newspaper, Sparkles, TrendingUp } from "lucide-react";
+import { ArrowDown, ArrowUp, BarChart3, ChevronLeft, Eye, FileText, GitFork, Info, Lock, MessageSquare, Minus, Newspaper, Sparkles, TrendingUp } from "lucide-react";
 import { api } from "../api.js";
 import {
-  HorizonToggle, InfoTip, NewsPill, RelTime, RiskChange, divergence, hasHorizons, horizonName, horizonOf, newsSignal, riskColor,
+  HorizonToggle, InfoTip, NewsPill, RelTime, RiskChange, divergence, effectiveHorizon, hasHorizons, horizonName, horizonOf,
+  newsSignal, riskColor,
   sentimentLabel, targetOf, useHorizon, useIsMobile, verdictInfo,
 } from "./ui.jsx";
 import { C } from "../theme.js";
@@ -160,7 +161,9 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
   const { entity, articles, risk_history, price_history, article_status: st } = data;
   const a = entity.analysis;
   const isTicker = entity.type === "ticker";
-  const suggestions = chatSuggestions(entity, horizon);
+  // Bu şirkette seçili ufukta veri yoksa veri olan ufuk gösterilir (genel seçim aynı kalır).
+  const shown = a ? effectiveHorizon(a, horizon) : { horizon, fellBack: false };
+  const suggestions = chatSuggestions(entity, shown.horizon);
   const name = displayName(entity);
 
   const tabs = [
@@ -185,7 +188,7 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
             {marketLabel(entity) && <span className="text-meta text-slate-500">{marketLabel(entity)}</span>}
             {a && (
               <span className="inline-flex flex-wrap items-center gap-2">
-                <NewsPill a={a} evidence={entity.evidence_strength} horizon={horizon} />
+                <NewsPill a={a} evidence={entity.evidence_strength} horizon={shown.horizon} />
                 {hasHorizons(a) && <HorizonToggle value={horizon} onChange={setHorizon} />}
                 <InfoTip text={tt("hz.explain")} />
               </span>
@@ -237,7 +240,7 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
               <Tabs items={tabs} value={activeTab} onChange={changeTab} label={tt("detail.tabsLabel")} />
             </div>
             <div key={activeTab} className="tab-fade pt-6" role="tabpanel">
-              {activeTab === "summary" && <SummaryTab a={a} entity={entity} riskHistory={risk_history} articles={articles} analyzedCount={st?.analyzed} horizon={horizon} />}
+              {activeTab === "summary" && <SummaryTab a={a} entity={entity} riskHistory={risk_history} articles={articles} analyzedCount={st?.analyzed} horizon={shown.horizon} fellBackFrom={shown.fellBack ? horizon : null} />}
               {activeTab === "charts" && (
                 <Suspense fallback={<Skeleton className="h-72 w-full" />}>
                   <TimeSeriesCharts riskHistory={risk_history} priceHistory={price_history} articles={chartArticles || articles} isTicker={isTicker} isMobile={isMobile} currency={entity.currency || "USD"} />
@@ -378,7 +381,7 @@ function HorizonSection({ a, horizon }) {
   );
 }
 
-function SummaryTab({ a, entity, riskHistory = [], articles = [], analyzedCount, horizon = "short" }) {
+function SummaryTab({ a, entity, riskHistory = [], articles = [], analyzedCount, horizon = "short", fellBackFrom = null }) {
   const isPrivate = entity.type !== "ticker";
   const take = mergeTake(a.ai_take, a.summary);
   const spark = riskHistory.slice(-7).map((p) => p.risk_score);
@@ -395,6 +398,12 @@ function SummaryTab({ a, entity, riskHistory = [], articles = [], analyzedCount,
     <div className="space-y-8">
       {/* Göstergeler + (ayrışma varsa) tek nötr not — kart notunun detaydaki karşılığı. */}
       <div className="space-y-3">
+        {fellBackFrom && (
+          <p className="flex items-start gap-2 text-meta text-slate-400" role="status">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+            {tt(fellBackFrom === "long" ? "hz.fallbackToShort" : "hz.fallbackToLong")}
+          </p>
+        )}
         <Gauges a={a} entity={entity} horizon={horizon} />
         {divNote && (
           <p className="flex items-start gap-2 text-meta text-slate-400">

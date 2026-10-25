@@ -241,6 +241,17 @@ export const hasHorizons = (a) => !!(a?.short_term || a?.long_term);
 export const horizonOf = (a, h) => (h === "long" ? a?.long_term : a?.short_term);
 export const horizonName = (h) => tt(h === "long" ? "hz.long" : "hz.short");
 
+// Detayda gösterilecek ufuk: seçili ufukta "yetersiz veri" var ama öteki ufukta veri varsa öteki
+// (ör. yeni eklenen şirkette uzun vade henüz boş). Genel seçim DEĞİŞMEZ; yalnızca bu şirkette.
+export function effectiveHorizon(a, horizon) {
+  if (!hasHorizons(a)) return { horizon, fellBack: false };
+  const other = horizon === "long" ? "short" : "long";
+  if (verdictInfo(horizonOf(a, horizon)).noData && !verdictInfo(horizonOf(a, other)).noData) {
+    return { horizon: other, fellBack: true };
+  }
+  return { horizon, fellBack: false };
+}
+
 // Vade hükmü → { level (-2..2 | null), label }. mixed / insufficient_data → level null.
 export function verdictInfo(v) {
   if (v && v.verdict in VERDICT_LEVEL) {

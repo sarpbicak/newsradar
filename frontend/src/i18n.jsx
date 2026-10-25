@@ -118,6 +118,8 @@ const STR = {
   "hz.toggle": { tr: "Vade", en: "Time horizon" },
   "hz.noDataShort": { tr: "Son 7 günde yeterli haber yok; kısa vade için en az 2 haber gerekiyor.", en: "Not enough news in the last 7 days; the short term needs at least 2 articles." },
   "hz.noDataLong": { tr: "Uzun vade için yeterli haber yok; en az 3 haber gerekiyor.", en: "Not enough news for the long term; it needs at least 3 articles." },
+  "hz.fallbackToShort": { tr: "Uzun vade için henüz yeterli veri yok, kısa vade gösteriliyor.", en: "There isn't enough data for the long term yet, so the short term is shown." },
+  "hz.fallbackToLong": { tr: "Kısa vade için henüz yeterli veri yok, uzun vade gösteriliyor.", en: "There isn't enough data for the short term yet, so the long term is shown." },
   "hz.drivers": { tr: "Etkenler · {h}", en: "Drivers · {h}" },
   "hz.otherLine": { tr: "{h}: {v}.", en: "{h}: {v}." },
   "hz.explain": { tr: "Üç ayrı ölçü: risk skoru (0–100) haberlerdeki risk işaretlerini, haber yönü (kısa ya da uzun vade) haberlerin şirket için olumlu mu olumsuz mu olduğunu, analist görüşü ise Finnhub tavsiyeleriyle FMP hedef fiyatını gösterir. Hiçbiri fiyat tahmini değildir.", en: "Three separate measures: the risk score (0–100) reflects risk signals in the news, the news direction (short or long term) shows whether the news is good or bad for the company, and the analyst view shows Finnhub ratings and the FMP price target. None of them is a price forecast." },
