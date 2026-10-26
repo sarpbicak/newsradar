@@ -9,7 +9,6 @@ import { Button, ErrorState, Toast, ToastStack } from "./components/kit.jsx";
 import HowItWorks from "./components/HowItWorks.jsx";
 import FeedbackWidget from "./components/FeedbackWidget.jsx";
 import AppHeader, { refreshQuota, resetText } from "./components/AppHeader.jsx";
-import { LanguageModal } from "./components/LanguageBits.jsx";
 import { DataSources, useIsMobile } from "./components/ui.jsx";
 import { WRAP } from "./components/NavBar.jsx";
 import { LANGS, fmtMsg, refreshParts, useI18n } from "./i18n.jsx";
@@ -33,7 +32,6 @@ const START_GRACE_MS = 8000;
 export default function App({ setLang }) {
   const { t, lang } = useI18n();
   // İlk ziyarette dil sorulur (localStorage'da seçim yoksa).
-  const [showLangModal, setShowLangModal] = useState(() => !localStorage.getItem("nr_lang"));
   const [switchingLang, setSwitchingLang] = useState(false); // dil değişiminde kısa fade
   const [user, setUser] = useState(null);            // kişisel kullanıcı (anon ya da kayıtlı)
   const [checkingSession, setCheckingSession] = useState(true);
@@ -139,9 +137,6 @@ export default function App({ setLang }) {
       }
       if (alive) {
         setUser(u);
-        // Kullanıcı bir seçim yapmadıysa (localStorage boş), backend'in dilini benimse
-        // (anon: tarayıcı dili; kayıtlı: kayıtlı dil). Modal yine de bir kez onay ister.
-        if (u && !localStorage.getItem("nr_lang") && u.language) setLang(u.language);
         setCheckingSession(false);
       }
     })();
@@ -200,15 +195,17 @@ export default function App({ setLang }) {
     setSwitchingLang(false);           // fade geri
   }, [lang, setLang, authed, loadCards]);
 
-  // Kullanıcı yüklendiğinde cihazdaki seçili dil (localStorage) backend'le eşleşmiyorsa
-  // senkronla — ilk ziyaret yarışını (modal seçimi POST'tan önce) ve cihaz-başı tercihi
-  // garanti eder ki AI içeriği doğru dilde gelsin. (user kimliği başına bir kez.)
+  // Arayüz dili: cihazda seçilen dil (bayraklar → localStorage) her zaman önce; seçim yoksa
+  // tarayıcıdan algılanan dil (main.jsx). Backend'deki dil bundan farklıysa senkronla: kartlar
+  // ?lang= ile zaten ekrandaki dilde gelir, sohbet ve e-postalar kayıtlı dili okur. (user kimliği
+  // başına bir kez.)
   useEffect(() => {
     if (!user) return;
     const saved = localStorage.getItem("nr_lang");
-    if (LANGS.includes(saved) && saved !== user.language) {
-      api.setLanguage(saved)
-        .then(() => setUser((u) => (u ? { ...u, language: saved } : u)))
+    const want = LANGS.includes(saved) ? saved : lang;
+    if (want !== user.language) {
+      api.setLanguage(want)
+        .then(() => setUser((u) => (u ? { ...u, language: want } : u)))
         .catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -695,9 +692,6 @@ export default function App({ setLang }) {
       <FeedbackWidget open={feedbackOpen} onOpenChange={setFeedbackOpen} showButton={selected == null && view === "dashboard"} />
 
       {/* İlk giriş dil seçimi (localStorage'da seçim yoksa) */}
-      {showLangModal && (
-        <LanguageModal onSelect={(l) => { applyLang(l); setShowLangModal(false); }} />
-      )}
     </div>
   );
 }

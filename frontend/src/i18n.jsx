@@ -446,8 +446,6 @@ const STR = {
   "fb.fail": { tr: "Gönderilemedi, tekrar dene.", en: "Couldn't send it, try again." },
 
   // ---- Dil modalı ----
-  "langmodal.title": { tr: "Dil / Language", en: "Dil / Language" },
-  "langmodal.subtitle": { tr: "Arayüz ve değerlendirmeler bu dilde gösterilir.", en: "The interface and assessments are shown in this language." },
 
   // ---- Gezinme (Geri / İleri) ----
   // ---- "Nasıl çalışır?" (gerçek veriyle 4 adım) ----

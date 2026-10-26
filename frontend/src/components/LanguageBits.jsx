@@ -1,8 +1,9 @@
-// Dil seçimi öğeleri: inline SVG bayraklar (emoji DEĞİL), ilk-giriş modalı, header
-// değiştirici. Bayraklar küçük, yuvarlatılmış, ince kenarlıklı (beyaz kısımlar kaybolmasın).
+// Dil seçimi öğeleri: inline SVG bayraklar (emoji DEĞİL), header değiştirici ve dar ekran
+// menüsü. İlk dil tarayıcıdan algılanır (i18n.initialLang); ayrı bir dil penceresi yok.
+// Bayraklar küçük, yuvarlatılmış, ince kenarlıklı (beyaz kısımlar kaybolmasın).
 import React from "react";
 import { LANGS, useI18n } from "../i18n.jsx";
-import { Menu, MenuItem, Modal } from "./kit.jsx";
+import { Menu, MenuItem } from "./kit.jsx";
 
 const flagWrap = "inline-block overflow-hidden rounded-[3px] ring-1 ring-slate-500/30";
 
@@ -61,32 +62,6 @@ export const LANG_NAMES = { tr: "Türkçe", en: "English", de: "Deutsch" };
 export function Flag({ lang, className }) {
   const F = FLAGS[lang] || FlagGB;
   return <F className={className} />;
-}
-
-// İlk giriş: sade dil seçim modalı (tek tıkla geçer; seçim yapılmadan kapanmaz).
-export function LanguageModal({ onSelect }) {
-  const { t } = useI18n();
-  const opt = (lang, name) => (
-    <button
-      type="button"
-      onClick={() => onSelect(lang)}
-      className="tap flex h-14 w-full items-center gap-3 rounded-control bg-ink-800 px-4 text-left ring-1 ring-ink-600 transition duration-hover ease-std hover:bg-ink-700 hover:ring-accent/50"
-    >
-      <Flag lang={lang} className="h-6 w-9" />
-      <span className="font-display text-base font-medium text-slate-100">{name}</span>
-    </button>
-  );
-  return (
-    <Modal labelledBy="lang-title" size="sm" dismissable={false}>
-      <h2 id="lang-title" className="text-center font-display text-title font-semibold text-slate-100">
-        {t("langmodal.title")}
-      </h2>
-      <p className="mb-6 mt-1.5 text-center text-meta text-slate-500">{t("langmodal.subtitle")}</p>
-      <div className="space-y-2.5">
-        {LANGS.map((l) => <React.Fragment key={l}>{opt(l, LANG_NAMES[l])}</React.Fragment>)}
-      </div>
-    </Modal>
-  );
 }
 
 // Header'daki değiştirici — üç küçük bayrak butonu (tooltip'te dil adı).

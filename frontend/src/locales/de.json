@@ -372,8 +372,6 @@
  "fb.thanks": "Danke, ich lese es.",
  "fb.builtBy": "{name} hat dieses Tool gebaut.",
  "fb.fail": "Senden hat nicht geklappt, versuch es noch einmal.",
- "langmodal.title": "Sprache / Language",
- "langmodal.subtitle": "Oberfläche und Einschätzungen werden in dieser Sprache angezeigt.",
  "hiw.dialog": "So funktioniert’s",
  "hiw.link": "So funktioniert’s (30 Sek.)",
  "hiw.stepOf": "Schritt {n} von {total}",

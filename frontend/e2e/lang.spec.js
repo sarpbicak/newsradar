@@ -1,5 +1,6 @@
 // İlk ziyarette dil: tarayıcı dili de → DE, tr → TR, diğerleri → EN; kayıtlı seçim (nr_lang)
-// her zaman önce gelir. DE sözlüğü ayrı paketten yüklenir; <html lang> ve bayrak seçici güncellenir.
+// her zaman önce gelir. Ayrı bir dil penceresi yok; dil bayraklardan değişir. DE sözlüğü ayrı
+// paketten yüklenir; <html lang> ve bayrak seçici güncellenir.
 import { test as base, expect } from "@playwright/test";
 
 const test = base.extend({ apiURL: ["", { option: true }], target: ["local", { option: true }] });
@@ -21,15 +22,34 @@ for (const [locale, lang] of [["de-DE", "de"], ["tr-TR", "tr"], ["fr-FR", "en"]]
   });
 }
 
+// Backend'deki kullanıcı dili (sohbet ve e-postalar bunu okur).
+const backendLang = (page, apiURL) => page.evaluate(async (api) => {
+  const tok = localStorage.getItem("newsradar_user_token");
+  const r = await fetch(api + "/users/me", { credentials: "include", headers: { Authorization: `Bearer ${tok}` } });
+  return (await r.json()).language;
+}, apiURL);
+
 test.describe("uygulama, de tarayıcı, ilk ziyaret", () => {
   test.use({ locale: "de-DE" });
-  test("/app Almanca açılır (anonim oturum da de), dil penceresi Almanca", async ({ page }) => {
+  test("dil penceresi yok: /app doğrudan Almanca, backend dili de", async ({ page, apiURL }) => {
     await page.goto("/app");
-    await expect(page.getByRole("heading", { name: "Sprache / Language" })).toBeVisible();
-    await expect(page.getByText("Oberfläche und Einschätzungen werden in dieser Sprache angezeigt.")).toBeVisible();
-    await page.getByRole("dialog").getByRole("button", { name: "Deutsch" }).click();
     await expect(page.getByRole("heading", { name: "Übersicht" })).toBeVisible();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(page.locator("html")).toHaveAttribute("lang", "de");
+    await expect.poll(() => backendLang(page, apiURL)).toBe("de");
+    expect(await page.evaluate(() => localStorage.getItem("nr_lang"))).toBeNull(); // seçim yapılmadı
+  });
+
+  test("seçim yokken tarayıcı dili backend'deki eski dile üstün gelir ve backend'e yazılır", async ({ page, apiURL }) => {
+    await page.goto("/app");
+    await expect(page.getByRole("heading", { name: "Übersicht" })).toBeVisible();
+    await page.evaluate(async (api) => {
+      const tok = localStorage.getItem("newsradar_user_token");
+      await fetch(api + "/users/me/language", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` }, body: JSON.stringify({ language: "en" }) });
+    }, apiURL);
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Übersicht" })).toBeVisible();
+    await expect.poll(() => backendLang(page, apiURL)).toBe("de");
   });
 });
 
