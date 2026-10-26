@@ -1,8 +1,8 @@
-import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
+import React, { Suspense, lazy, useEffect, useRef } from "react";
 import { trackView } from "./api.js";
 import ReactDOM from "react-dom/client";
 import Landing from "./components/landing/Landing.jsx";
-import { I18nProvider, initialLang, loadLang } from "./i18n.jsx";
+import { I18nProvider, initialLang, loadLang, useLangState } from "./i18n.jsx";
 import { ThemeProvider } from "./theme.js";
 import { isAppPath, shouldSkipLanding, usePath } from "./router.js";
 import { applyMotionVars } from "./motion.js";
@@ -20,17 +20,13 @@ const LINK_PAGES = { "/verify-email": "verify", "/reset-password": "reset" };
 // Daha önce gelmiş ziyaretçi "/"'ı açarsa ilk render'dan ÖNCE panoya (landing flaşı yok).
 if (shouldSkipLanding()) window.history.replaceState(null, "", "/app");
 
-// Dil durumu en üstte tutulur (I18nProvider sağlar); landing ve App onu okur/değiştirir.
-// Seçim (localStorage) her zaman önce; yoksa tarayıcı dili (de → DE, tr → TR, diğerleri → EN).
-// Almanca sözlük ayrı pakette: dil ona çevrilmeden önce yüklenir (setLang bekler).
+// Dil durumu en üstte tutulur (I18nProvider sağlar); landing ve App yalnızca setLang'ı çağırır
+// (kural ve kalıcılık i18n.useLangState'te). Almanca sözlük ayrı pakette: ilk dil DE ise
+// render'dan önce yüklenir.
 const FIRST_LANG = initialLang();
 
 function Root() {
-  const [lang, setLangState] = useState(FIRST_LANG);
-  const setLang = useCallback(async (l) => {
-    await loadLang(l).catch(() => {}); // yüklenemezse DE arayüz İngilizce metinlerle açılır
-    setLangState(l);
-  }, []);
+  const [lang, setLang] = useLangState(FIRST_LANG);
   const path = usePath();
   const inApp = isAppPath(path);
   const linkKind = LINK_PAGES[path];

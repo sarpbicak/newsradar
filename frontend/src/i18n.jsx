@@ -3,7 +3,7 @@
 // Almanca (de): TÜM metinler tek dosyada, locales/de.json (anahtar → metin; bir Almanca
 // konuşan kontrol edebilsin diye). Yalnızca dil DE olunca ayrı paket olarak yüklenir
 // (loadLang) → TR/EN ilk yüklemesi büyümez. e2e/i18n.spec.js üç dilin eksiksizliğini denetler.
-import React, { createContext, useContext } from "react";
+import React, { createContext, useCallback, useContext, useState } from "react";
 
 export const LANGS = ["tr", "en", "de"];
 const LOCALES = { tr: "tr-TR", en: "en-US", de: "de-DE" };
@@ -16,11 +16,17 @@ export function getLang() {
   return _lang;
 }
 
+// DİLİN TEK SAHİBİ: initialLang (okuma) + useLangState (yazma). Kural: kullanıcının son
+// tıkladığı dil her şeyin önündedir ve TIKLANDIĞI ANDA localStorage'a yazılır; tarayıcı dili
+// yalnızca hiç seçim yapılmamışsa kullanılır. Hesaptaki/oturumdaki dil arayüzü belirlemez,
+// yalnızca arayüzden oraya yazılır (App, arka planda).
+const LANG_KEY = "nr_lang";
+
 // İlk dil: kullanıcının seçimi (localStorage) her zaman önce; yoksa tarayıcı dili
 // (de → DE, tr → TR, diğerleri → EN).
 export function initialLang() {
   try {
-    const saved = localStorage.getItem("nr_lang");
+    const saved = localStorage.getItem(LANG_KEY);
     if (LANGS.includes(saved)) return saved;
   } catch {
     /* depolama kapalı */
@@ -37,6 +43,35 @@ export function initialLang() {
 let DE = null;
 export async function loadLang(lang) {
   if (lang === "de" && !DE) DE = (await import("./locales/de.json", { with: { type: "json" } })).default;
+}
+
+// Kullanıcının seçimi: arayüzün dil durumu ve onu değiştiren TEK fonksiyon (main.jsx'teki
+// kök bileşen kullanır; landing ve uygulama yalnızca bunu çağırır). Seçim önce kalıcı yazılır,
+// sonra (gerekirse DE sözlüğü yüklenip) arayüz çevrilir: yenileme ya da sayfa değişimi ağ
+// isteğini beklemeden seçimi korur.
+export function useLangState(first) {
+  const [lang, setLangState] = useState(first ?? initialLang);
+  const setLang = useCallback(async (l) => {
+    if (!LANGS.includes(l)) return;
+    try {
+      localStorage.setItem(LANG_KEY, l);
+    } catch {
+      /* depolama kapalı: seçim yalnızca bu sekmede geçerli */
+    }
+    await loadLang(l).catch(() => {}); // yüklenemezse DE arayüz İngilizce metinlerle açılır
+    setLangState(l);
+  }, []);
+  return [lang, setLang];
+}
+
+// Kayıtlı seçim (yoksa null) — App, hesaptaki dili buna göre senkronlar.
+export function savedLang() {
+  try {
+    const v = localStorage.getItem(LANG_KEY);
+    return LANGS.includes(v) ? v : null;
+  } catch {
+    return null;
+  }
 }
 
 const STR = {

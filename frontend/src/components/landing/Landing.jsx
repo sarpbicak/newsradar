@@ -256,10 +256,7 @@ export default function Landing({ lang, setLang }) {
   }, [below]);
 
   // Dil: landing'de oturum yok — yalnızca cihaz tercihi (uygulama girişte backend'e yazar).
-  function onLang(l) {
-    localStorage.setItem("nr_lang", l);
-    setLang(l);
-  }
+  const onLang = setLang;
 
   useEffect(() => {
     let alive = true;

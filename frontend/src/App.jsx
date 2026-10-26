@@ -11,7 +11,7 @@ import FeedbackWidget from "./components/FeedbackWidget.jsx";
 import AppHeader, { refreshQuota, resetText } from "./components/AppHeader.jsx";
 import { DataSources, useIsMobile } from "./components/ui.jsx";
 import { WRAP } from "./components/NavBar.jsx";
-import { LANGS, fmtMsg, refreshParts, useI18n } from "./i18n.jsx";
+import { fmtMsg, refreshParts, savedLang, useI18n } from "./i18n.jsx";
 import "./appStrings.js"; // hata kodu / bayrak / olay metinleri (landing paketine girmez)
 import { ArrowDown, RotateCcw } from "lucide-react";
 import { navigate, usePath } from "./router.js";
@@ -171,20 +171,18 @@ export default function App({ setLang }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authed, user?.id, loadCards]);
 
-  // Dili uygula: ÖNCE backend'e kaydet (bekle) → sonra UI dilini çevir + veriyi yeni
-  // dilde YENİDEN ÇEK. Backend AI içeriğini user.language'e göre döndürdüğü için, önce
-  // POST /users/me/language tamamlanmadan çekersek eski dil gelir. Detay sayfası da
-  // `lang` prop'u değişince kendini yeniler (EntityDetail). Geçişte kısa fade.
+  // Dili uygula: seçim ANINDA kalıcı (localStorage) ve arayüz çevrilir (setLang, i18n);
+  // hesaba/oturuma yazma arka planda. Kartlar ?lang= ile zaten ekrandaki dilde gelir, POST'u
+  // beklemek gerekmez. (Eskiden önce POST bekleniyordu: sunucu yavaşken tıklama "çalışmıyor"
+  // görünüyor, bu sırada yenileyen ya da sayfa değiştiren kullanıcının seçimi kayboluyordu.)
+  // Detay sayfası `lang` değişince kendini yeniler (EntityDetail). Geçişte kısa fade.
   const applyLang = useCallback(async (l) => {
     if (l === lang) return;
     setSwitchingLang(true);            // içerik kısaca soluklaşsın (kullanıcı değişimi görsün)
-    try {
-      await api.setLanguage(l);        // KALICI: get_current_user artık yeni dili okur
-    } catch {
-      /* token yoksa/hatalıysa yoksay — UI dili yine de değişsin */
-    }
-    localStorage.setItem("nr_lang", l);
-    setLang(l);                        // i18n stringleri + provider (detay refetch tetikler)
+    await setLang(l);
+    const saved = api.setLanguage(l)   // hesap/oturum: sohbet ve e-postalar bu dili okur
+      .then(() => setUser((u) => (u ? { ...u, language: l } : u)))
+      .catch(() => {});                // token yoksa/hatalıysa: oturum açılınca senkron efekti yazar
     if (authed) {
       try {
         await loadCards();            // kartlar/durum/öneriler yeni dilde
@@ -192,6 +190,7 @@ export default function App({ setLang }) {
         /* loadCards kendi hatasını setLoadError ile yönetir */
       }
     }
+    await saved;
     setSwitchingLang(false);           // fade geri
   }, [lang, setLang, authed, loadCards]);
 
@@ -201,8 +200,7 @@ export default function App({ setLang }) {
   // başına bir kez.)
   useEffect(() => {
     if (!user) return;
-    const saved = localStorage.getItem("nr_lang");
-    const want = LANGS.includes(saved) ? saved : lang;
+    const want = savedLang() || lang;
     if (want !== user.language) {
       api.setLanguage(want)
         .then(() => setUser((u) => (u ? { ...u, language: want } : u)))
