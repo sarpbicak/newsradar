@@ -6,7 +6,10 @@ import React, { useEffect, useState } from "react";
 import { Copy, Trash2, X } from "lucide-react";
 import { api } from "../api.js";
 import { timeAgo } from "./ui.jsx";
-import { tt, fmtDate, fmtDateTime, fmtPct } from "../i18n.jsx";
+import { tt, fmtDate, fmtDateTime, fmtPct, getLang } from "../i18n.jsx";
+import { fmtMoney } from "../money.js";
+
+const usd = (v) => fmtMoney(v, "USD", getLang());
 import { Button, Card, Chip, ConfirmDialog, ErrorState, Input, Modal, ModalHeader, Skeleton, Toast, cx } from "./kit.jsx";
 import { displayName } from "./EntityCard.jsx";
 import AdminEntities from "./AdminEntities.jsx";
@@ -262,12 +265,12 @@ export default function AdminPanel({ currentUserId }) {
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard
           label={tt("adm.costBudget")}
-          value={cap > 0 ? `$${stats.cost_today_usd.toFixed(2)}/$${cap.toFixed(2)}` : `$${stats.cost_today_usd.toFixed(2)}`}
+          value={cap > 0 ? `${usd(stats.cost_today_usd)} / ${usd(cap)}` : usd(stats.cost_today_usd)}
           hint={`${stats.budget_exceeded ? tt("adm.budgetFull") : cap > 0 ? tt("adm.dailyCap") : tt("adm.unlimited")} · ${tt("adm.tokenK", { n: (stats.tokens_today / 1000).toFixed(0) })}`}
           tone={stats.budget_exceeded ? "neg" : undefined}
         />
-        <StatCard label={tt("adm.cost7")} value={`$${(stats.cost_week_usd ?? 0).toFixed(2)}`} hint={tt("adm.tokenK", { n: ((stats.tokens_week ?? 0) / 1000).toFixed(0) })} />
-        <StatCard label={tt("adm.cost30")} value={`$${stats.cost_month_usd.toFixed(2)}`} hint={tt("adm.tokenK", { n: (stats.tokens_month / 1000).toFixed(0) })} />
+        <StatCard label={tt("adm.cost7")} value={usd(stats.cost_week_usd ?? 0)} hint={tt("adm.tokenK", { n: ((stats.tokens_week ?? 0) / 1000).toFixed(0) })} />
+        <StatCard label={tt("adm.cost30")} value={usd(stats.cost_month_usd)} hint={tt("adm.tokenK", { n: (stats.tokens_month / 1000).toFixed(0) })} />
         <StatCard
           label={tt("adm.cacheHit")}
           value={stats.cache_hit_rate_7d == null ? "—" : fmtPct(stats.cache_hit_rate_7d * 100, { signed: false })}

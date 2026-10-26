@@ -7,7 +7,8 @@
 // p = 1 → son kare (reduced-motion, motor yok, ekran dışı).
 import React, { useLayoutEffect, useRef, useState } from "react";
 import { MessageSquare } from "lucide-react";
-import { fmtInt, fmtPct, useI18n } from "../../i18n.jsx";
+import { fmtInt, fmtPct, getLang, useI18n } from "../../i18n.jsx";
+import { fmtMoney } from "../../money.js";
 import { LabelChip } from "../kit.jsx";
 import { NewsPill, riskColor, whyQuestion } from "../ui.jsx";
 import { ease, seg } from "../../motion.js";
@@ -189,7 +190,7 @@ export function SceneVerdict({ data, p }) {
           {a.headline_verdict && <p className="mt-3 font-display text-xl font-semibold leading-snug text-slate-100">{a.headline_verdict}</p>}
           {e.price != null && (
             <p className="mt-3 flex flex-wrap items-baseline gap-x-2 text-sm">
-              <span className="font-mono font-semibold text-slate-100">${e.price.toFixed(2)}</span>
+              <span className="font-mono font-semibold text-slate-100">{fmtMoney(e.price, e.currency || "USD", getLang())}</span>
               {e.change_percent != null && (
                 <span className={`font-mono ${e.change_percent >= 0 ? "text-emerald-500" : "text-rose-500"}`}>{fmtPct(e.change_percent, { digits: 2 })}</span>
               )}

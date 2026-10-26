@@ -193,8 +193,8 @@ export function Tabs({ items, value, onChange, variant = "underline", label, cla
             className={
               underline
                 ? cx(
-                    "tap relative -mb-px inline-flex h-11 items-center gap-2 whitespace-nowrap px-3 text-sm font-medium transition-colors duration-hover ease-std",
-                    "after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-accent after:transition-transform after:duration-hover",
+                    "tap relative -mb-px inline-flex h-11 items-center gap-2 whitespace-nowrap px-2.5 text-sm font-medium transition-colors duration-hover ease-std sm:px-3",
+                    "after:absolute after:inset-x-2.5 after:bottom-0 sm:after:inset-x-3 after:h-0.5 after:bg-accent after:transition-transform after:duration-hover",
                     on ? "text-slate-100 after:scale-x-100" : "text-slate-500 after:scale-x-0 hover:text-slate-200"
                   )
                 : cx(

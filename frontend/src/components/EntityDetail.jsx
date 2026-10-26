@@ -20,7 +20,7 @@ import AnalystConsensus from "./AnalystConsensus.jsx";
 import Gauges from "./Gauges.jsx";
 import { PriceRow, displayName, marketLabel, noAnalysisText, symbolOf } from "./EntityCard.jsx";
 import { Button, Card, ErrorState, Modal, Skeleton, Tabs } from "./kit.jsx";
-import { tt, fmtDate, fmtInt, parseUtc } from "../i18n.jsx";
+import { tt, fmtDate, fmtInt, fmtPct, parseUtc } from "../i18n.jsx";
 
 const TimeSeriesCharts = lazy(() => import("./TimeSeriesCharts.jsx"));
 
@@ -450,8 +450,8 @@ function SummaryTab({ a, entity, riskHistory = [], articles = [], analyzedCount,
                 <span style={{ width: `${pct(dist.negative)}%`, background: C.neg }} />
               </div>
               <p className="mt-2 text-micro tabular-nums text-slate-400">
-                <span className="text-emerald-600">{tt("sum.sentPos")} %{pct(dist.positive)}</span> · {tt("sum.sentNeu")} %{pct(dist.neutral)} ·{" "}
-                <span className="text-rose-600">{tt("sum.sentNeg")} %{pct(dist.negative)}</span>
+                <span className="text-emerald-600">{tt("sum.sentPos")} {fmtPct(pct(dist.positive), { signed: false })}</span> · {tt("sum.sentNeu")} {fmtPct(pct(dist.neutral), { signed: false })} ·{" "}
+                <span className="text-rose-600">{tt("sum.sentNeg")} {fmtPct(pct(dist.negative), { signed: false })}</span>
               </p>
             </>
           ) : (

@@ -7,6 +7,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { fmtPct, useI18n } from "../../i18n.jsx";
+import { fmtMoney } from "../../money.js";
 import { Button, LabelChip } from "../kit.jsx";
 import { NewsPill, riskColor } from "../ui.jsx";
 import { clamp01 } from "../../motion.js";
@@ -46,7 +47,7 @@ function Radar() {
 const MIN_OPACITY = 0.6;
 const CALM_MQ = "(max-width: 768px), (hover: none)";
 
-function LiveCard({ demo, t }) {
+function LiveCard({ demo, t, lang }) {
   const e = demo.entity;
   const a = e.analysis || {};
   const risk = a.risk_score;
@@ -78,7 +79,7 @@ function LiveCard({ demo, t }) {
       )}
       {e.price != null && (
         <p className="mt-3 flex items-baseline gap-2 font-mono text-sm">
-          <span className="font-semibold text-slate-100">${e.price.toFixed(2)}</span>
+          <span className="font-semibold text-slate-100">{fmtMoney(e.price, e.currency || "USD", lang)}</span>
           {e.change_percent != null && (
             <span className={e.change_percent >= 0 ? "text-emerald-500" : "text-rose-500"}>{fmtPct(e.change_percent, { digits: 2 })}</span>
           )}
@@ -109,7 +110,7 @@ function Flow({ headlines, t }) {
 }
 
 export default function Hero({ demo, onAnchor, onApp }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const ref = useRef(null);
   const title = useRef(null);
   const rest = useRef(null);
@@ -193,14 +194,16 @@ export default function Hero({ demo, onAnchor, onApp }) {
           </div>
         </div>
         <div className="relative mx-auto w-full max-w-[460px] lg:max-w-none">
-          <div ref={radar} className="pointer-events-none absolute left-1/2 top-1/2 -z-20 aspect-square w-[170%]" style={{ marginLeft: "-85%", marginTop: "-85%" }}>
+          {/* Mobilde merkez sabit noktada (kart yüksekliğine bağlı değil): iskelet → kart geçişinde
+              radar kaymasın (CLS). Geniş ekranda kartın dikey ortası. */}
+          <div ref={radar} className="pointer-events-none absolute left-1/2 top-[11.25rem] -z-20 aspect-square w-[170%] lg:top-1/2" style={{ marginLeft: "-85%", marginTop: "-85%" }}>
             <Radar />
           </div>
           <div ref={visual} className="relative mx-auto max-w-[440px]">
             {demo ? (
               <div className="lx-intro-up" style={{ "--at": "var(--at-card)" }}>
                 <Flow headlines={demo.headlines} t={t} />
-                <LiveCard demo={demo} t={t} />
+                <LiveCard demo={demo} t={t} lang={lang} />
               </div>
             ) : demo === null ? (
               <div className="skeleton h-[300px] w-full rounded-card" aria-hidden="true" />
