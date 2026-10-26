@@ -1,4 +1,5 @@
-// i18n bütünlüğü (tarayıcı gerekmez): yenileme özeti metni ve anahtar çakışması.
+// i18n bütünlüğü (tarayıcı gerekmez): yenileme özeti metni, anahtar çakışması, kodda kullanılan
+// anahtarların varlığı.
 import { test, expect } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
@@ -17,9 +18,7 @@ test("biten yenilemenin özeti kuyruk durumunu ('Sıradasın') içermez", () => 
   expect(refreshParts({ ...sm, queued: 1 }, ttFor("tr")).at(-1)).toBe("1 makale sonraki taramada");
 });
 
-// Aynı anahtar iki kez tanımlanırsa JS nesnesinde ikincisi SESSİZCE birincinin yerine geçer
-// (kök neden: 'notice.queued' hem özet sayacı hem kuyruk durumu için kullanılmıştı).
-test("i18n anahtarları tek tanımlı (sözlük + bileşenlerin addStrings blokları)", () => {
+function sourceFiles() {
   const files = [];
   const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).forEach((e) => {
     const p = path.join(d, e.name);
@@ -27,6 +26,23 @@ test("i18n anahtarları tek tanımlı (sözlük + bileşenlerin addStrings blokl
     else if (/\.jsx?$/.test(e.name)) files.push(p);
   });
   walk(SRC);
+  return files;
+}
+
+function definedKeys(files) {
+  const keys = new Set();
+  for (const f of files) {
+    const text = fs.readFileSync(f, "utf8");
+    if (!/STR = \{|addStrings\(\{/.test(text)) continue;
+    for (const m of text.matchAll(/^\s+"([a-zA-Z][\w.]*)": \{ tr:/gm)) keys.add(m[1]);
+  }
+  return keys;
+}
+
+// Aynı anahtar iki kez tanımlanırsa JS nesnesinde ikincisi SESSİZCE birincinin yerine geçer
+// (kök neden: 'notice.queued' hem özet sayacı hem kuyruk durumu için kullanılmıştı).
+test("i18n anahtarları tek tanımlı (sözlük + bileşenlerin addStrings blokları)", () => {
+  const files = sourceFiles();
   const seen = new Map();
   const dups = [];
   for (const f of files) {
@@ -40,4 +56,20 @@ test("i18n anahtarları tek tanımlı (sözlük + bileşenlerin addStrings blokl
   }
   expect(dups).toEqual([]);
   expect(seen.size).toBeGreaterThan(500);
+});
+
+// Sabit anahtarla çağrılan t("…") / tt("…") sözlükte yoksa ekranda anahtarın kendisi görünür
+// (kök neden: 'chat.qWhy' üçe bölünmüş, landing ve "nasıl çalışır" eski anahtarı kullanıyordu).
+test("kodda sabit yazılan her i18n anahtarı sözlükte var", () => {
+  const files = sourceFiles();
+  const keys = definedKeys(files);
+  const missing = [];
+  for (const f of files) {
+    const text = fs.readFileSync(f, "utf8");
+    for (const m of text.matchAll(/\b(?:t|tt|tr)\("([a-z][\w]*\.[\w.]+)"/g)) {
+      const k = m[1];
+      if (!keys.has(k) && !keys.has(`${k}_one`)) missing.push(`${k} (${path.relative(SRC, f)})`);
+    }
+  }
+  expect([...new Set(missing)]).toEqual([]);
 });

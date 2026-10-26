@@ -10,7 +10,7 @@ import { ArrowDown, ArrowUp, BarChart3, ChevronLeft, Eye, FileText, GitFork, Inf
 import { api } from "../api.js";
 import {
   HorizonToggle, InfoTip, NewsPill, RelTime, RiskChange, divergence, effectiveHorizon, hasHorizons, horizonName, horizonOf,
-  newsSignal, riskColor,
+  riskColor, whyQuestion,
   sentimentLabel, targetOf, useHorizon, useIsMobile, verdictInfo,
 } from "./ui.jsx";
 import { C } from "../theme.js";
@@ -48,10 +48,7 @@ function chatSuggestions(entity, horizon) {
   const a = entity.analysis;
   if (!a) return [];
   const name = displayName(entity);
-  const hz = newsSignal(a, entity.evidence_strength, horizon).level;
-  const dir = hz ?? (a.stance === "bullish" ? 1 : a.stance === "bearish" ? -1 : 0);
-  const why = dir > 0 ? "chat.qWhyPos" : dir < 0 ? "chat.qWhyNeg" : "chat.qWhyMixed";
-  const qs = [tt(why, { name })];
+  const qs = [whyQuestion(a, entity.evidence_strength, horizon, { name })];
   if (entity.type === "ticker" && targetOf(entity.analyst) != null) qs.push(tt("chat.qGap"));
   else qs.push(tt("chat.qRisk", { name }));
   qs.push(tt("chat.qWatch"));

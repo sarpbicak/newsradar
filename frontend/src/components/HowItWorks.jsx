@@ -10,7 +10,7 @@ import { MessageSquare, X } from "lucide-react";
 import { api } from "../api.js";
 import { useI18n, fmtInt, fmtPct, getLang } from "../i18n.jsx";
 import { fmtMoney } from "../money.js";
-import { StatusTag, stanceLabel, targetOf } from "./ui.jsx";
+import { StatusTag, targetOf, whyQuestion } from "./ui.jsx";
 import { navigate } from "../router.js";
 import { Button, LabelChip, Modal, Skeleton } from "./kit.jsx";
 
@@ -86,7 +86,7 @@ export function MiniCard({ entity, t, animate }) {
 function AskPanel({ entity, t }) {
   const a = entity.analysis;
   const qs = [
-    t("chat.qWhy", { name: entity.name, stance: stanceLabel(a?.stance).toLowerCase() }),
+    whyQuestion(a, entity.evidence_strength, "short", { name: entity.name }),
     t("chat.qWatch"),
   ];
   return (

@@ -9,7 +9,7 @@ import React, { useLayoutEffect, useRef, useState } from "react";
 import { MessageSquare } from "lucide-react";
 import { fmtInt, fmtPct, useI18n } from "../../i18n.jsx";
 import { LabelChip } from "../kit.jsx";
-import { NewsPill, riskColor, stanceLabel } from "../ui.jsx";
+import { NewsPill, riskColor, whyQuestion } from "../ui.jsx";
 import { ease, seg } from "../../motion.js";
 
 const symbolOf = (e) => `${e.type === "ticker" ? "$" : "#"}${e.query}`;
@@ -167,7 +167,7 @@ export function SceneVerdict({ data, p }) {
   const e = data.entity;
   const a = e.analysis || {};
   const kept = data.headlines.filter((h) => h.label !== "irrelevant").slice(0, 3);
-  const question = t("chat.qWhy", { name: e.name, stance: stanceLabel(a.stance).toLowerCase() });
+  const question = whyQuestion(a, e.evidence_strength, "short", { name: e.name });
   const words = leadSentences(a.ai_take || a.summary).split(/\s+/).filter(Boolean);
   const risk = a.risk_score;
 

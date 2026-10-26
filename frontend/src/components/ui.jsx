@@ -273,6 +273,14 @@ export function newsSignal(a, evidence, horizon) {
   return { level: sig.key, label: sig.label, text: tt("news.label", { v: sig.label }), color: sig.color };
 }
 
+// "Haberler neden olumlu/olumsuz/karışık?" sorusu: görünen haber etiketiyle aynı yön (seçili vadenin
+// hükmü; yetersiz veride genel yön). Pano sohbet çipleri ve landing/nasıl çalışır örnekleri ortak.
+export function whyQuestion(a, evidence, horizon, vars) {
+  const level = newsSignal(a, evidence, horizon).level;
+  const dir = level ?? (a?.stance === "bullish" ? 1 : a?.stance === "bearish" ? -1 : 0);
+  return tt(dir > 0 ? "chat.qWhyPos" : dir < 0 ? "chat.qWhyNeg" : "chat.qWhyMixed", vars);
+}
+
 // Analist görüşü: Finnhub tavsiyelerinin ağırlıklı skoru (güçlü al +2 … güçlü sat −2) → 5 kademe.
 export function analystLevel(an) {
   const total = an?.total || 0;
