@@ -13,7 +13,7 @@ from ..config import get_settings
 from ..markets import market_of
 from ..analysis.schemas import apply_texts
 from ..db.models import ALL_LANGUAGES, AnalystSnapshot, Article, Entity, EntityAnalysis, PriceSnapshot
-from ..languages import UI_LANGUAGES
+from ..languages import effective_language
 from .schemas import (
     AnalysisOut,
     AnalystOut,
@@ -29,16 +29,13 @@ from .schemas import (
 )
 
 
-ANALYSIS_LANGUAGES = UI_LANGUAGES
-
-
 def content_language(user, lang: str | None = None) -> str:
     """AI içeriğinin dili: istekte geçerli `?lang=tr|en|de` varsa o (arayüzün o anki dili —
-    POST /users/me/language ile yarışmaz), yoksa kullanıcının kayıtlı dili."""
+    POST /users/me/language ile yarışmaz), yoksa kullanıcının kayıtlı dili. DE kapalıyken de → en."""
     v = (lang or "").strip().lower()
-    if v in ANALYSIS_LANGUAGES:
-        return v
-    return (getattr(user, "language", None) or "tr")
+    if v in ("tr", "en", "de"):
+        return effective_language(v)
+    return effective_language(getattr(user, "language", None))
 
 
 def _for_language(q, language: str | None):

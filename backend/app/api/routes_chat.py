@@ -16,6 +16,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..languages import user_language
 from .errors import ApiError
 from ..analysis.claude_client import ClaudeError, MissingAPIKeyError
 from ..analysis.llm import get_llm_provider
@@ -110,7 +111,7 @@ def chat(
     if not messages or messages[0]["role"] != "user":
         raise ApiError(code="chat_bad_request", status_code=400, detail="İlk mesaj 'user' olmalı ve boş olamaz.")
 
-    language = getattr(user, "language", "tr") or "tr"
+    language = user_language(user)
     context = _build_context(db, entity, language)
     # Sohbet çıktısı kullanıcının arayüz diline uysun (SYSTEM_PROMPT artık dil-nötr).
     system = (

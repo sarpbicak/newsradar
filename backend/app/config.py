@@ -34,6 +34,9 @@ class Settings:
         # Kod kalır, varsayılan KAPALI: anahtar kelimeli şirketler GDELT'ten haber alır.
         # on → anahtar kelimeli şirketler yeniden NewsAPI kullanır (ücretli plan ya da yerel deneme).
         self.newsapi_enabled: bool = _env("NEWSRADAR_NEWSAPI_ENABLED", "off").lower() == "on"
+        # Almanca (arayüz dili + DE çevirisi) geçici olarak kapalı; on → açık (app/languages.py).
+        # Frontend'de karşılığı VITE_ENABLE_DE (build sırasında).
+        self.enable_de: bool = _env("NEWSRADAR_ENABLE_DE", "off").lower() == "on"
         # GDELT istekleri arası en az bekleme (sn): önceki yanıtın bitişinden ölçülür. Birden çok
         # keyword/ABD dışı şirkette her ek şirket yenilemeye yaklaşık bu kadar süre ekler.
         self.gdelt_interval_seconds: float = float(_env("NEWSRADAR_GDELT_INTERVAL_SECONDS", "5"))

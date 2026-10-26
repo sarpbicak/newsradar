@@ -26,6 +26,7 @@ export const TARGETS = {
     webPort: 4174,
     apiPort: 8899,
     tls: false,
+    de: true,   // Almanca açık (DE testleri burada); prod düzeni canlı gibi kapalı
     cookie: { NEWSRADAR_COOKIE_SECURE: "off", NEWSRADAR_COOKIE_SAMESITE: "lax", NEWSRADAR_COOKIE_DOMAIN: "" },
   },
   prod: {
@@ -34,6 +35,7 @@ export const TARGETS = {
     webPort: 4443,
     apiPort: 8443,
     tls: true,
+    de: false,
     cookie: { NEWSRADAR_COOKIE_SECURE: "on", NEWSRADAR_COOKIE_SAMESITE: "lax", NEWSRADAR_COOKIE_DOMAIN: ".newsradar.test" },
   },
 };
@@ -93,6 +95,7 @@ function startApi(t) {
       // (ikinci kullanıcı "sırada") gözlenebilsin.
       NEWSRADAR_FAKE_REFRESH_SECONDS: process.env.NEWSRADAR_FAKE_REFRESH_SECONDS || "3",
       FRONTEND_URL: t.web,
+      NEWSRADAR_ENABLE_DE: t.de ? "on" : "off",
     },
   });
   child.on("exit", (code) => process.exit(code ?? 1));
@@ -105,7 +108,7 @@ function startWeb(t) {
   execFileSync("npx", ["vite", "build", "--outDir", out, "--emptyOutDir", "--logLevel", "warn"], {
     cwd: FRONTEND,
     stdio: "inherit",
-    env: { ...process.env, VITE_API_URL: t.api },
+    env: { ...process.env, VITE_API_URL: t.api, VITE_ENABLE_DE: t.de ? "on" : "" },
   });
   const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml",
     ".png": "image/png", ".ico": "image/x-icon", ".json": "application/json", ".webmanifest": "application/manifest+json",

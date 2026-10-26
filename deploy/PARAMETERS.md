@@ -93,6 +93,7 @@ Varsayılanlar Render'a göre ayarlıdır. AWS'de bu değerleri vermek gerekir.
 | `NEWSRADAR_BACKFILL_MAX_ARTICLES` | Geriye dönük doldurmada kaydedilecek en fazla eski haber (yeni şirket başına en fazla bu kadar ek makale analizi). İsteğe bağlı. | String | `20` | `20` |
 | `NEWSRADAR_GDELT_INTERVAL_SECONDS` | GDELT istekleri arası en az bekleme (sn), önceki yanıtın bitişinden ölçülür; istekler tek sırada gider, hız sınırı yanıtında bir kez (aralığın iki katı, en az 10 sn) bekleyip yeniden denenir. Her ek anahtar kelimeli/ABD dışı şirket yenilemeye yaklaşık bu kadar süre ekler. İsteğe bağlı. | String | `5` | `5` |
 | `NEWSRADAR_NEWSAPI_ENABLED` | NewsAPI'yi kullan (`on`/`off`). NewsAPI'nin ücretsiz Developer planı production kullanımını yasaklar; varsayılan `off`: anahtar kelimeli ve ABD dışı şirketler GDELT'ten haber alır. `on` yalnızca ücretli planla ya da yerel denemede. İsteğe bağlı. | String | `off` | `off` |
+| `NEWSRADAR_ENABLE_DE` | Almanca (`on`/`off`). Varsayılan `off`: arayüz dili ve AI içeriği yalnızca TR/EN, DE çeviri çağrısı yapılmaz, e-postalar ve hata mesajları TR/EN, daha önce DE seçmiş kullanıcı EN okunur. Açarken frontend build'inde `VITE_ENABLE_DE=on` de verilmeli. İsteğe bağlı. | String | `off` | `off` |
 | `NEWSAPI_DAILY_LIMIT` | NewsAPI'nin günlük istek sınırı (ücretsiz katmanda yaklaşık 100). | String | `100` | `100` |
 | `NEWSRADAR_BATCH_SIZE` | Tek LLM çağrısında analiz edilen makale sayısı. | String | `10` | `10` |
 | `NEWSRADAR_MAX_ARTICLES_PER_ENTITY` | Bir yenilemede entity başına makale tavanı (0 = sınırsız). | String | `200` | `200` |
@@ -112,6 +113,7 @@ Bunlar ya `docker-compose.yml` / Dockerfile tarafından sabitlenir, ya yalnızca
 | `FRONTEND_URL` | Render | CORS origin'lerinin eski adı. `NEWSRADAR_CORS_ORIGINS` ile birleştirilir. AWS'de gerekmez. | `https://newsradar-web.onrender.com` |
 | `VITE_API_URL` | frontend build (CloudFront) | Build sırasında frontend'e gömülen API adresi. Sır değildir. | `https://api.newsradarapp.com` |
 | `VITE_API_BASE` | frontend build | `VITE_API_URL`'in eski adı (geriye uyum). | — |
+| `VITE_ENABLE_DE` | frontend build | Almanca arayüz (`on` ile açık; varsayılan kapalı: seçicide DE yok, tarayıcı dili de olsa EN). Backend'deki `NEWSRADAR_ENABLE_DE` ile birlikte açılır. | boş (kapalı) |
 | `AWS_REGION` | backup/restore/load-secrets (host) | AWS bölgesi. | `eu-central-1` |
 | `LOG_FILE` | backup/restore (host) | Log'un ayrıca yazıldığı dosya. systemd birimi bunu ayarlar. | `/var/log/newsradar/backup.log` |
 | `SAFETY_DIR` | restore.sh (host) | Restore öncesi DB kopyalarının klasörü. | `deploy/local-backups/pre-restore` |

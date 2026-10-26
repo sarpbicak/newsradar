@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from ..languages import user_language
 from ..db.database import get_db
 from ..db.models import ALL_LANGUAGES, Article, DiscardedArticle, Entity, EntityAnalysis, User
 from ..seed import DEFAULT_WATCHLIST
@@ -55,7 +56,7 @@ def _pick_entity(db: Session, language: str) -> Entity | None:
 
 @router.get("/how-it-works", response_model=HowItWorksOut)
 def how_it_works(db: Session = Depends(get_db, scope="function"), user: User = Depends(get_current_user)) -> HowItWorksOut:
-    return build_how_it_works(db, getattr(user, "language", "tr") or "tr")
+    return build_how_it_works(db, user_language(user))
 
 
 def build_how_it_works(db: Session, lang: str) -> HowItWorksOut:

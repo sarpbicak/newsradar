@@ -34,7 +34,7 @@ from .routes_auth import (
 )
 from .schemas import EmailIn, RegisterIn, ResetPasswordIn, TokenIn, UserLoginIn, UserOut, UserTokenOut
 from .usage import record_event
-from ..languages import normalize_language
+from ..languages import normalize_language, user_language
 
 router = APIRouter(prefix="/users", tags=["users"])
 logger = logging.getLogger("newsradar.security")
@@ -82,7 +82,7 @@ def _user_out(u: User) -> UserOut:
         is_anonymous=u.is_anonymous,
         created_at=u.created_at, last_login_at=u.last_login_at,
         guide_dismissed=u.guide_dismissed, tutorial_done=u.tutorial_done,
-        language=getattr(u, "language", "tr") or "tr",
+        language=user_language(u),
         email=getattr(u, "email", None),
         email_verified=bool(getattr(u, "email", None) and getattr(u, "email_verified_at", None)),
     )

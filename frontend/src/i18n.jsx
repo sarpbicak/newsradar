@@ -5,7 +5,17 @@
 // (loadLang) → TR/EN ilk yüklemesi büyümez. e2e/i18n.spec.js üç dilin eksiksizliğini denetler.
 import React, { createContext, useCallback, useContext, useState } from "react";
 
-export const LANGS = ["tr", "en", "de"];
+// Almanca geçici olarak KAPALI: build sırasında VITE_ENABLE_DE=on ile açılır (backend'de
+// NEWSRADAR_ENABLE_DE). Kapalıyken seçicide DE yok, tarayıcı dili de olsa EN, eski DE tercihi
+// EN'e düşer. Sözlük (locales/de.json) ve kod yerinde kalır.
+let deFlag = "";
+try {
+  deFlag = import.meta.env.VITE_ENABLE_DE || "";
+} catch {
+  /* Vite dışı (Node testleri): kapalı */
+}
+export const DE_ENABLED = ["on", "1", "true"].includes(String(deFlag).toLowerCase());
+export const LANGS = DE_ENABLED ? ["tr", "en", "de"] : ["tr", "en"];
 const LOCALES = { tr: "tr-TR", en: "en-US", de: "de-DE" };
 // Dil → Intl yereli (sayı, para, tarih, göreli zaman).
 export const localeOf = (lang) => LOCALES[lang] || "en-US";
@@ -23,17 +33,22 @@ export function getLang() {
 const LANG_KEY = "nr_lang";
 
 // İlk dil: kullanıcının seçimi (localStorage) her zaman önce; yoksa tarayıcı dili
-// (de → DE, tr → TR, diğerleri → EN).
+// (de → DE [DE kapalıyken EN], tr → TR, diğerleri → EN).
 export function initialLang() {
   try {
     const saved = localStorage.getItem(LANG_KEY);
     if (LANGS.includes(saved)) return saved;
+    if (saved === "de") {
+      // Almanca kapalı: daha önce DE seçmiş kullanıcının tercihi EN'e düşer (hesaba da App yazar).
+      localStorage.setItem(LANG_KEY, "en");
+      return "en";
+    }
   } catch {
     /* depolama kapalı */
   }
   const prefs = typeof navigator === "undefined" ? [] : navigator.languages?.length ? navigator.languages : [navigator.language];
   const first = String(prefs[0] || "").toLowerCase();
-  if (first.startsWith("de")) return "de";
+  if (first.startsWith("de")) return DE_ENABLED ? "de" : "en";
   if (first.startsWith("tr")) return "tr";
   return "en";
 }

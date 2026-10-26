@@ -28,6 +28,7 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from ..config import get_settings
+from ..languages import de_enabled
 from ..messages import msg
 from ..db.database import session_scope
 from ..db.models import (
@@ -97,7 +98,12 @@ MAX_DISCARDED_PER_ENTITY = 50  # entity başına saklanan elenen-makale kaydı
 # Yeni bir dil eklenince mevcut kayıtlar yeniden DEĞERLENDİRİLMEZ: eksik dil, kayıttaki EN
 # metinden çevrilip eklenir (_backfill_translations; yalnızca çeviri maliyeti).
 ASSESSMENT_SOURCE_LANG = "en"
-ASSESSMENT_LANGUAGES = ("en", "tr", "de")
+
+
+def assessment_languages() -> tuple[str, ...]:
+    """Değerlendirme metninin tutulduğu diller. DE kapalıyken (NEWSRADAR_ENABLE_DE) DE çevirisi
+    YAPILMAZ: ne yeni değerlendirmede ne eksik dil tamamlamada (maliyet yok)."""
+    return ("en", "tr", "de") if de_enabled() else ("en", "tr")
 # GEREKSİZ DEĞERLENDİRMEYİ ATLA (en büyük maliyet kazancı): entity değerlendirmesi
 # yalnızca (a) son değerlendirmeden sonra yeni analiz edilmiş makale varsa, (b) fiyat
 # o zamandan beri ≥ |%3| oynadıysa ya da (c) son değerlendirme 24 saatten eskiyse yapılır.
@@ -842,7 +848,7 @@ def _missing_translations(entity_id: int) -> tuple[int, dict, list[str]] | None:
         )
         texts = (last.texts or {}) if last is not None else {}
         source = texts.get(ASSESSMENT_SOURCE_LANG)
-        missing = [lang for lang in ASSESSMENT_LANGUAGES if lang not in texts]
+        missing = [lang for lang in assessment_languages() if lang not in texts]
         if last is None or not source or not missing:
             return None
         return last.id, dict(source), missing
@@ -892,7 +898,7 @@ def _assess_and_translate(assess_client, translate_client, build_fn, payload, na
     clean = apply_horizon_floor(sanitize_entity_analysis(adata, ASSESSMENT_SOURCE_LANG), horizon_counts(used))
     source = localizable_texts(clean)
     translations = {ASSESSMENT_SOURCE_LANG: source}
-    for lang in ASSESSMENT_LANGUAGES:
+    for lang in assessment_languages():
         if lang != ASSESSMENT_SOURCE_LANG:
             tr = _translate_texts(translate_client, source, lang, name)
             if tr is not None:

@@ -17,6 +17,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
+from .languages import user_language
 from .config import get_settings
 from .db.models import EmailToken, RateEvent, User
 from .email_templates import message
@@ -114,7 +115,7 @@ def verification_sends_today(db: Session, user: User) -> int:
 def prepare_verification(db: Session, user: User):
     """Doğrulama token'ı üretir; gönderimi yapan çağrılabilir döner (BackgroundTasks)."""
     raw = create_token(db, user, "verify", user.email)
-    msg = message("verify", user.language or "tr", user.email, user.username, _link("/verify-email", raw))
+    msg = message("verify", user_language(user), user.email, user.username, _link("/verify-email", raw))
     return lambda: send_email(msg)
 
 
@@ -133,5 +134,5 @@ def verify_email(db: Session, raw: str) -> User | None:
 # --------------------------- Şifre sıfırlama --------------------------- #
 def prepare_reset(db: Session, user: User):
     raw = create_token(db, user, "reset", user.email)
-    msg = message("reset", user.language or "tr", user.email, user.username, _link("/reset-password", raw))
+    msg = message("reset", user_language(user), user.email, user.username, _link("/reset-password", raw))
     return lambda: send_email(msg)

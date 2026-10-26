@@ -21,11 +21,10 @@ from ..db.database import get_db
 from ..db.models import Article, EntityAnalysis
 from .routes_how import build_how_it_works
 from .schemas import HowItWorksOut, PublicStatsOut
-from ..languages import UI_LANGUAGES
+from ..languages import effective_language, ui_languages
 
 router = APIRouter(prefix="/public", tags=["public"])
 
-LANGUAGES = list(UI_LANGUAGES)   # arayüz + AI değerlendirmesi dilleri
 CACHE = "public, max-age=300"
 
 
@@ -39,14 +38,14 @@ def public_stats(response: Response, db: Session = Depends(get_db, scope="functi
         select(func.count(func.distinct(func.lower(func.trim(Article.source))))).where(func.trim(Article.source) != "")
     ) or 0
     response.headers["Cache-Control"] = CACHE
-    return PublicStatsOut(articles_analyzed=analyzed, assessments=assessments, news_sources=sources, languages=LANGUAGES)
+    return PublicStatsOut(articles_analyzed=analyzed, assessments=assessments, news_sources=sources, languages=list(ui_languages()))
 
 
 @router.get("/how-it-works", response_model=HowItWorksOut)
 def public_how_it_works(response: Response, lang: str = Query("en", pattern="^(tr|en|de)$"),
                         db: Session = Depends(get_db, scope="function")) -> HowItWorksOut:
     response.headers["Cache-Control"] = CACHE
-    return build_how_it_works(db, lang)
+    return build_how_it_works(db, effective_language(lang))
 
 
 @router.get("/features")

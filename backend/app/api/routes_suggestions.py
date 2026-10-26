@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from sqlalchemy import exists
 
+from ..languages import user_language
 from .errors import ApiError
 from ..db.database import get_db
 from ..db.models import Entity, Suggestion, SuggestionDismissal, User
@@ -216,7 +217,7 @@ def add_suggestion(
                 add_to_watchlist(db, user.id, existing.id)
             record_event(db, user.id, "add_suggestion", {"entity_id": existing.id, "name": existing.name})
             db.commit()
-            return entity_card(db, existing, user.language)
+            return entity_card(db, existing, user_language(user))
 
         entity = Entity(name=sug.name.strip(), display_name=display_name_for(sug.name),
                         type=etype, query=query, language=language)
@@ -235,9 +236,9 @@ def add_suggestion(
                 add_to_watchlist(db, user.id, existing.id)
             record_event(db, user.id, "add_suggestion", {"entity_id": existing.id, "name": existing.name})
             db.commit()
-            return entity_card(db, existing, user.language)
+            return entity_card(db, existing, user_language(user))
 
         add_to_watchlist(db, user.id, entity.id)
         record_event(db, user.id, "add_suggestion", {"entity_id": entity.id, "name": entity.name})
         db.commit()
-        return entity_card(db, entity, user.language)
+        return entity_card(db, entity, user_language(user))

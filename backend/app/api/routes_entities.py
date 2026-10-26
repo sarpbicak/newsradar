@@ -16,6 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from ..languages import user_language
 from .errors import ApiError
 from ..config import get_settings
 from ..db.database import get_db
@@ -169,7 +170,7 @@ def create_entity(
             record_event(db, user.id, "add_entity",
                          {"entity_id": existing.id, "name": existing.name, "pool_hit": True})
             db.commit()
-            return entity_card(db, existing, user.language)
+            return entity_card(db, existing, user_language(user))
 
         # YENİ entity (havuzda yok) → sistem-geneli günlük ekleme sınırını uygula.
         if not _daily_new_entity_ok(db, user):
@@ -197,12 +198,12 @@ def create_entity(
                 add_to_watchlist(db, user.id, existing.id)
             record_event(db, user.id, "add_entity", {"entity_id": existing.id, "name": existing.name})
             db.commit()
-            return entity_card(db, existing, user.language)
+            return entity_card(db, existing, user_language(user))
 
         add_to_watchlist(db, user.id, entity.id)
         record_event(db, user.id, "add_entity", {"entity_id": entity.id, "name": entity.name})
         db.commit()
-        return entity_card(db, entity, user.language)
+        return entity_card(db, entity, user_language(user))
 
 
 @router.delete("/{entity_id}", status_code=204)

@@ -23,6 +23,7 @@ for sfx in ("", "-wal", "-shm"):
         os.remove(_db + sfx)
     except FileNotFoundError:
         pass
+os.environ["NEWSRADAR_ENABLE_DE"] = "on"  # Almanca bayrağı açıkken (DE testleri)
 os.environ.update(
     NEWSRADAR_DB=_db, APP_PASSWORD="genelsifre", APP_SECRET="de-secret-1234567890",
     ADMIN_USERNAME="rootadmin", NEWSRADAR_SCHEDULER="off", NEWSRADAR_SEED_ON_START="off",
