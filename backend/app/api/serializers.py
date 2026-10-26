@@ -305,7 +305,8 @@ def _market_fields(entity: Entity, language: str) -> dict:
     if entity.type != "ticker":
         return {}
     m = market_of(entity.query)
-    return {"exchange": m.exchange, "country": m.country(language), "currency": m.currency, "us_market": m.is_us}
+    return {"market": m.code, "exchange": m.exchange, "country": m.country(language), "currency": m.currency,
+            "us_market": m.is_us}
 
 
 def _news_window_days(entity: Entity) -> int:

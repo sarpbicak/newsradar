@@ -14,6 +14,7 @@ import {
 } from "./ui.jsx";
 import { Card, Chip, cx } from "./kit.jsx";
 import { tt, fmtPct, getLang } from "../i18n.jsx";
+import { exchangeName } from "../appStrings.js";
 import { fmtMoney } from "../money.js";
 import { C } from "../theme.js";
 
@@ -28,7 +29,9 @@ export function noAnalysisText(card, short = false) {
 export const displayName = (e) => e.display_name || e.name;
 export const symbolOf = (e) => `${e.type === "ticker" ? "$" : "#"}${e.query}`;
 // ABD dışı hissede borsa · ülke ("XETRA · Almanya"); ABD ve keyword'de null (gürültü olmasın).
-export const marketLabel = (e) => (e.us_market === false && e.exchange ? `${e.exchange} · ${e.country}` : null);
+// Borsa adı kullanıcının dilinde (pazar kodu → exchange.<kod>); bilinmeyen kodda backend'in adı.
+export const exchangeOf = (e) => exchangeName(e.market, e.exchange);
+export const marketLabel = (e) => (e.us_market === false && e.exchange ? `${exchangeOf(e)} · ${e.country}` : null);
 
 // Analist dağılımı (al → sat) ve baskın görüşün TAVSİYE GİBİ OKUNMAYAN etiketi.
 const ANALYST_SEG = [
@@ -74,7 +77,7 @@ export function PriceRow({ entity, size = "md", muted = false }) {
   if (price == null) {
     return (
       <p className="text-meta text-slate-500">
-        {entity.us_market === false ? tt("card.noPriceExchange", { exchange: entity.exchange }) : tt("card.noPrice")} · {tt("card.newsOnly")}
+        {entity.us_market === false ? tt("card.noPriceExchange", { exchange: exchangeOf(entity) }) : tt("card.noPrice")} · {tt("card.newsOnly")}
       </p>
     );
   }
@@ -170,7 +173,7 @@ export default function EntityCard({ card, onOpen }) {
           <div className="break-words font-display text-base font-medium leading-tight text-slate-100">{displayName(card)}</div>
           <div className="mt-1 font-mono text-micro text-slate-500">
             {symbolOf(card)}
-            {marketLabel(card) && <span className="font-sans"> · {card.exchange}</span>}
+            {marketLabel(card) && <span className="font-sans"> · {exchangeOf(card)}</span>}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">

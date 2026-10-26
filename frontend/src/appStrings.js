@@ -1,11 +1,52 @@
 // Yalnızca uygulamada (App) gereken metinler: backend hata kodları, oturum/sohbet hataları, risk
 // bayrağı ve olay tipi adları. Landing'in ilk paketine girmesin diye sözlüğe App paketi yüklenince
 // eklenir. Yalnızca App.jsx içe aktarır (başka tembel paket de aktarırsa ayrı küçük paket olur ve
-// /app'in kritik yoluna bir istek ekler).
+// /app'in kritik yoluna bir istek ekler). Borsa adları da burada (yalnızca uygulamada gösterilir).
 // Almancaları locales/de.json'da.
-import { addStrings } from "./i18n.jsx";
+import { addStrings, tt } from "./i18n.jsx";
+
+// Borsa adı kullanıcının dilinde (exchange.<pazar kodu>); bilinmeyen kodda backend'in adı.
+export function exchangeName(market, fallback) {
+  const k = `exchange.${market}`;
+  const v = market ? tt(k) : k;
+  return v === k ? fallback : v;
+}
 
 addStrings({
+  // ---- Borsa adları (pazar kodu → backend/app/markets.py; i18n testi her kodu denetler) ----
+  "exchange.US": { tr: "NYSE / Nasdaq", en: "NYSE / Nasdaq" },
+  "exchange.IS": { tr: "Borsa İstanbul", en: "Borsa Istanbul" },
+  "exchange.DE": { tr: "XETRA", en: "XETRA" },
+  "exchange.F": { tr: "Frankfurt", en: "Frankfurt" },
+  "exchange.VI": { tr: "Viyana Borsası", en: "Vienna Stock Exchange" },
+  "exchange.SW": { tr: "SIX Swiss Exchange", en: "SIX Swiss Exchange" },
+  "exchange.AS": { tr: "Euronext Amsterdam", en: "Euronext Amsterdam" },
+  "exchange.PA": { tr: "Euronext Paris", en: "Euronext Paris" },
+  "exchange.BR": { tr: "Euronext Brüksel", en: "Euronext Brussels" },
+  "exchange.LS": { tr: "Euronext Lizbon", en: "Euronext Lisbon" },
+  "exchange.MI": { tr: "Borsa Italiana", en: "Borsa Italiana" },
+  "exchange.MC": { tr: "Bolsa de Madrid", en: "Bolsa de Madrid" },
+  "exchange.L": { tr: "Londra (LSE)", en: "London (LSE)" },
+  "exchange.ST": { tr: "Nasdaq Stockholm", en: "Nasdaq Stockholm" },
+  "exchange.HE": { tr: "Nasdaq Helsinki", en: "Nasdaq Helsinki" },
+  "exchange.CO": { tr: "Nasdaq Kopenhag", en: "Nasdaq Copenhagen" },
+  "exchange.OL": { tr: "Oslo Børs", en: "Oslo Børs" },
+  "exchange.WA": { tr: "GPW (Varşova)", en: "GPW (Warsaw)" },
+  "exchange.AT": { tr: "Atina Borsası", en: "Athens Stock Exchange" },
+  "exchange.TO": { tr: "Toronto (TSX)", en: "Toronto (TSX)" },
+  "exchange.V": { tr: "TSX Venture", en: "TSX Venture" },
+  "exchange.T": { tr: "Tokyo", en: "Tokyo" },
+  "exchange.HK": { tr: "Hong Kong", en: "Hong Kong" },
+  "exchange.KS": { tr: "Kore Borsası", en: "Korea Exchange" },
+  "exchange.SS": { tr: "Şanghay", en: "Shanghai" },
+  "exchange.SZ": { tr: "Shenzhen", en: "Shenzhen" },
+  "exchange.TW": { tr: "Tayvan", en: "Taiwan" },
+  "exchange.SI": { tr: "Singapur (SGX)", en: "Singapore (SGX)" },
+  "exchange.AX": { tr: "Avustralya (ASX)", en: "Australia (ASX)" },
+  "exchange.NS": { tr: "Hindistan (NSE)", en: "India (NSE)" },
+  "exchange.BO": { tr: "Bombay (BSE)", en: "Bombay (BSE)" },
+  "exchange.SA": { tr: "B3 (São Paulo)", en: "B3 (São Paulo)" },
+  "exchange.MX": { tr: "Meksika Borsası", en: "Mexican Stock Exchange" },
   // ---- Risk bayrakları ve olay tipleri (makale analizi) ----
   "flag.regulatory": { tr: "düzenleme", en: "regulatory" },
   "flag.competition": { tr: "rekabet", en: "competition" },

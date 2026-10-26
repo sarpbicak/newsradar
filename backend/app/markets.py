@@ -13,7 +13,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class Market:
     code: str            # "US" ya da son ek ("DE", "IS", "T")
-    exchange: str        # insan-okur borsa adı
+    exchange: str        # borsa adı (Türkçe yedek; arayüz exchange.<code> anahtarıyla dile göre gösterir)
     country_tr: str
     country_en: str
     country_de: str

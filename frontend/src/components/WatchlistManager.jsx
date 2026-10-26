@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { api } from "../api.js";
 import { useI18n } from "../i18n.jsx";
+import { exchangeName } from "../appStrings.js";
 import { Button, Field, Input, Select } from "./kit.jsx";
 import { displayName } from "./EntityCard.jsx";
 
@@ -159,7 +160,7 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
                     </span>
                     {/* "SAP SE · XETRA · Almanya"; ABD dışında fiyat/analist yok notu */}
                     <span className="mt-0.5 block text-micro text-slate-500">
-                      {r.exchange_name} · {r[`country_${lang}`] || r.country_en}
+                      {exchangeName(r.market, r.exchange_name)} · {r[`country_${lang}`] || r.country_en}
                       {!r.us_supported && <> · {t("wl.nonUsShort")}</>}
                     </span>
                   </button>

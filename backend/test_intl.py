@@ -154,6 +154,7 @@ check(c_tr.exchange == "XETRA" and c_tr.country == "Almanya" and c_en.country ==
       and c_tr.currency == "EUR" and c_tr.us_market is False, "kart: XETRA · Almanya/Germany · EUR, us_market=False")
 check(c_tr.price is None and c_tr.analyst is None, "kart: fiyat ve analist yok (arayüz 'veri yok')")
 check(c_us.us_market is True and c_us.price == 300.0 and c_us.currency == "USD", "ABD kartı: fiyat var, USD")
+check(c_tr.market == "DE" and c_us.market == "US", "kart: pazar kodu (arayüz borsa adını dile göre çevirir)")
 
 print("== E: GDELT")
 with SessionLocal() as s:

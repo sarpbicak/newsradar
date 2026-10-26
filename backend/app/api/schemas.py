@@ -320,6 +320,9 @@ class EntityCardOut(BaseModel):
     no_analysis_reason: str | None = None
     # Hisse pazarı (app.markets): borsa adı, ülke (istenen dilde), para birimi. us_market=False →
     # fiyat/analist yuvası boş, arayüz "veri yok" gösterir. Keyword'de hepsi None.
+    # market: pazar kodu ("US", "DE", "IS"…) → arayüz borsa adını kullanıcının dilinde gösterir
+    # (exchange.<kod>); exchange (Türkçe ad) yedek.
+    market: str | None = None
     exchange: str | None = None
     country: str | None = None
     currency: str | None = None
@@ -476,7 +479,7 @@ class SymbolResultOut(BaseModel):
     type: str
     market: str              # "US" ya da yabancı borsa son eki (IS, DE, T...)
     us_supported: bool       # fiyat/analist verisi var mı (bugün yalnızca ABD; diğerlerinde "veri yok")
-    exchange_name: str       # insan-okur borsa adı ("NYSE / Nasdaq", "XETRA", "Borsa İstanbul"...)
+    exchange_name: str       # borsa adı, yedek (arayüz market koduyla kullanıcının dilinde gösterir)
     country_tr: str = ""     # "Almanya"
     country_en: str = ""     # "Germany"
     country_de: str = ""     # "Deutschland"

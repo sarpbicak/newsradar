@@ -133,3 +133,24 @@ test("DE: sözlükten metin, tekil/çoğul ve de-DE biçimleri", async () => {
   expect(timeAgo(new Date(Date.now() - 10 * 1000).toISOString())).toBe("gerade eben");
   I18nProvider({ lang: "tr", setLang: () => {}, children: null });
 });
+
+// Borsa adları dile göre: backend/app/markets.py'deki her pazar kodunun exchange.<kod> anahtarı
+// TR, EN ve DE'de var (yeni borsa eklenip çevirisi unutulursa kırılır).
+test("her borsanın adı TR, EN ve DE'de var", async () => {
+  const markets = fs.readFileSync(path.join(SRC, "../../backend/app/markets.py"), "utf8");
+  const codes = [...markets.matchAll(/Market\("([A-Z]+)",/g)].map((m) => m[1]);
+  expect(codes.length).toBeGreaterThan(30);
+  const all = new Map(entries(sourceFiles()).map((e) => [e.key, e]));
+  const missing = codes.filter((c) => {
+    const e = all.get(`exchange.${c}`);
+    return !e || !e.tr || !e.en || !DE[`exchange.${c}`];
+  });
+  expect(missing).toEqual([]);
+  const { exchangeName } = await import("../src/appStrings.js");
+  await loadLang("de");
+  I18nProvider({ lang: "de", setLang: () => {}, children: null });
+  expect(exchangeName("L", "Londra (LSE)")).toBe("London (LSE)");
+  expect(exchangeName("ZZ", "Bilinmeyen")).toBe("Bilinmeyen"); // bilinmeyen kod → backend adı
+  I18nProvider({ lang: "tr", setLang: () => {}, children: null });
+  expect(exchangeName("L", "x")).toBe("Londra (LSE)");
+});

@@ -18,7 +18,7 @@ import ArticleTable from "./ArticleTable.jsx";
 import ChatPanel from "./ChatPanel.jsx";
 import AnalystConsensus from "./AnalystConsensus.jsx";
 import Gauges from "./Gauges.jsx";
-import { PriceRow, displayName, marketLabel, noAnalysisText, symbolOf } from "./EntityCard.jsx";
+import { PriceRow, displayName, exchangeOf, marketLabel, noAnalysisText, symbolOf } from "./EntityCard.jsx";
 import { Button, Card, ErrorState, Modal, Skeleton, Tabs } from "./kit.jsx";
 import { tt, fmtDate, fmtInt, fmtPct, parseUtc } from "../i18n.jsx";
 
@@ -199,7 +199,7 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
               </div>
             ) : (
               <p className="text-meta text-slate-500">
-                {entity.us_market === false ? tt("detail.noPriceExchange", { exchange: entity.exchange }) : tt("detail.noPrice")}
+                {entity.us_market === false ? tt("detail.noPriceExchange", { exchange: exchangeOf(entity) }) : tt("detail.noPrice")}
               </p>
             )
           ) : (
