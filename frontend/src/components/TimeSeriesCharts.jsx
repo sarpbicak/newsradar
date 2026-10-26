@@ -8,7 +8,7 @@
 //     olmayan günde çizgi yok (tek kalan nokta küçük işaretle görünür).
 // Aralık seçici (7g/30g/90g/Tümü): yalnızca VERİ OLAN günler gösterilir (boş gün satırı yok);
 // veri olmayan aralık pasif; eksen verinin başladığı günden başlar ("Veri … beri" notu).
-// Fırça (brush) ve çift eksen yok. Eksen/ızgara çok soluk, rakamlar mono. Her grafiğin kısa
+// Fırça (brush) ve çift eksen yok. Eksen/ızgara çok soluk, rakamlar hizalı (Inter, tabular-nums). Her grafiğin kısa
 // metin özeti var (görünür + ekran okuyucu).
 import React, { useMemo, useState } from "react";
 import {
@@ -42,7 +42,8 @@ const RANGES = [
   { key: "all", tkey: "chart.rangeAll", days: Infinity },
 ];
 const RISK_JUMP = 15; // ardışık iki değerlendirme arasında bu kadar puan = "risk sıçraması"
-const MONO = { fontFamily: '"JetBrains Mono", ui-monospace, monospace', fontSize: 11, fill: C.muted };
+// Eksen rakamları metinle aynı font (Inter), hizalı rakamlar (tabular-nums).
+const MONO = { fontFamily: "Inter, system-ui, sans-serif", fontSize: 11, fill: C.muted, style: { fontVariantNumeric: "tabular-nums" } };
 
 function dayStart(iso) {
   const d = parseUtc(iso);
@@ -171,7 +172,7 @@ function Tip({ active, payload, events, currency }) {
     <div className="max-w-72 rounded-control bg-raised px-3 py-2 text-micro text-slate-300 ring-1 ring-ink-500">
       <div className="font-medium text-slate-100">{fmtDay(r.ts)}</div>
       {r.price != null && (
-        <div className="mt-1 font-mono tabular-nums">
+        <div className="mt-1 tabular-nums">
           {fmtPrice(r.price, currency)}
           {r.chg != null && (
             <span className={r.chg >= 0 ? "text-emerald-600" : "text-rose-600"}> {fmtPct(r.chg, { digits: 1 })}</span>

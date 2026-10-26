@@ -51,7 +51,7 @@ function Bar({ analyst }) {
 // Tutarlar hedef/fiyat para biriminde, tam sayı (dile uygun biçim; dönüşüm yok).
 const money0 = (v, cur) => fmtMoney(v, cur, getLang(), { digits: 0 });
 
-// Manşet: "Analistlerin ortalama hedefi $329, şu anki fiyatın %31 üstünde." Rakamlar mono.
+// Manşet: "Analistlerin ortalama hedefi $329, şu anki fiyatın %31 üstünde." Rakamlar hizalı (tabular-nums).
 function Headline({ mean, price, median, cur }) {
   const diff = ((mean - price) / price) * 100;
   const key = Math.abs(diff) < 0.5 ? "an.headlineAt" : diff > 0 ? "an.headlineAbove" : "an.headlineBelow";
@@ -60,9 +60,9 @@ function Headline({ mean, price, median, cur }) {
   return (
     <h3 className="max-w-3xl font-display text-2xl font-medium leading-snug text-slate-100 sm:text-[1.75rem]">
       {pre}
-      <span className="font-mono text-[0.9em] tabular-nums">{money0(mean, cur)}</span>
+      <span className="text-[0.9em] tabular-nums">{money0(mean, cur)}</span>
       {mid}
-      {post != null && <span className="font-mono text-[0.9em] tabular-nums">{fmtPct(Math.abs(diff), { signed: false })}</span>}
+      {post != null && <span className="text-[0.9em] tabular-nums">{fmtPct(Math.abs(diff), { signed: false })}</span>}
       {post}
     </h3>
   );
@@ -85,7 +85,7 @@ function LabeledRange({ low, high, mean, price, median = false, dim = false, cur
       <div className="relative h-14">
         {price != null && (
           <span className={`absolute top-0 whitespace-nowrap text-micro text-slate-300 ${align(p(price))}`} style={{ left: `${p(price)}%` }}>
-            {tt("an.now")} <span className="font-mono tabular-nums text-slate-100">{money0(price, cur)}</span>
+            {tt("an.now")} <span className="tabular-nums text-slate-100">{money0(price, cur)}</span>
           </span>
         )}
         <div className={`absolute inset-x-0 top-7 h-2 rounded-[2px] bg-ink-700 ${dim ? "opacity-50" : ""}`}>
@@ -97,12 +97,12 @@ function LabeledRange({ low, high, mean, price, median = false, dim = false, cur
       </div>
       <div className="relative h-5">
         <span className={`absolute top-0 whitespace-nowrap text-micro font-medium text-accent ${align(p(mean))}`} style={{ left: `${p(mean)}%` }}>
-          {tt(median ? "an.median" : "an.average")} <span className="font-mono tabular-nums">{money0(mean, cur)}</span>
+          {tt(median ? "an.median" : "an.average")} <span className="tabular-nums">{money0(mean, cur)}</span>
         </span>
       </div>
       <div className="mt-2 flex justify-between text-micro text-slate-500">
-        <span>{tt("an.lowest")} <span className="font-mono tabular-nums text-slate-300">{money0(low, cur)}</span></span>
-        <span>{tt("an.highest")} <span className="font-mono tabular-nums text-slate-300">{money0(high, cur)}</span></span>
+        <span>{tt("an.lowest")} <span className="tabular-nums text-slate-300">{money0(low, cur)}</span></span>
+        <span>{tt("an.highest")} <span className="tabular-nums text-slate-300">{money0(high, cur)}</span></span>
       </div>
     </div>
   );
@@ -120,7 +120,7 @@ function StackedBar({ analyst, dim = false }) {
         return (
           <div
             key={sg.key}
-            className="flex items-center justify-center font-mono text-micro font-semibold tabular-nums"
+            className="flex items-center justify-center text-micro font-semibold tabular-nums"
             style={{ width: `${pct}%`, background: sg.color, color: C.onStrong }}
             title={`${tt(sg.tkey)}: ${n} (${Math.round(pct)}%)`}
           >
@@ -142,7 +142,7 @@ function PeriodColumns({ history }) {
         const label = parseUtc(h.period).toLocaleDateString(loc, { month: "short", timeZone: "UTC" });
         return (
           <div key={h.period} className="flex w-16 flex-col items-center gap-1.5" title={`${label}: ${total}`}>
-            <span className="font-mono text-micro tabular-nums text-slate-300">{total}</span>
+            <span className="text-micro tabular-nums text-slate-300">{total}</span>
             <div className="flex h-24 w-11 flex-col-reverse overflow-hidden rounded-[2px] bg-ink-700">
               {SEGMENTS.map((sg) => (h[sg.key] ? <div key={sg.key} style={{ height: `${(h[sg.key] / total) * 100}%`, background: sg.color }} /> : null))}
             </div>
@@ -225,7 +225,7 @@ export default function AnalystConsensus({ analyst, price, type, compact = false
         )}
         {hasRec && (
           <p className="mt-2 text-meta text-slate-400">
-            <span className="font-mono tabular-nums">{analyst.total}</span> {tt("an.analystsWord")} · <span style={{ color: lean.color }}>{lean.short}</span>
+            <span className="tabular-nums">{analyst.total}</span> {tt("an.analystsWord")} · <span style={{ color: lean.color }}>{lean.short}</span>
           </p>
         )}
       </section>
@@ -246,7 +246,7 @@ export default function AnalystConsensus({ analyst, price, type, compact = false
               {SEGMENTS.map((sg) => (
                 <span key={sg.key} className="inline-flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-[2px]" style={{ background: sg.color }} aria-hidden="true" />
-                  {tt(sg.tkey)} <span className="font-mono font-semibold tabular-nums text-slate-200">{analyst[sg.key] || 0}</span>
+                  {tt(sg.tkey)} <span className="font-semibold tabular-nums text-slate-200">{analyst[sg.key] || 0}</span>
                 </span>
               ))}
             </p>

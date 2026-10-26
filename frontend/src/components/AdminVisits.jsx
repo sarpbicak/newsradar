@@ -36,7 +36,8 @@ addStrings({
   "vis.aria": { tr: "Son 30 gün: {v} benzersiz ziyaretçi, {p} görüntüleme.", en: "Last 30 days: {v} unique visitors, {p} page views." },
 });
 
-const MONO = { fontFamily: '"JetBrains Mono", ui-monospace, monospace', fontSize: 11, fill: C.muted };
+// Eksen rakamları metinle aynı font (Inter), hizalı rakamlar (tabular-nums).
+const MONO = { fontFamily: "Inter, system-ui, sans-serif", fontSize: 11, fill: C.muted, style: { fontVariantNumeric: "tabular-nums" } };
 const fmtDay = (iso) => parseUtc(`${iso}T12:00:00Z`).toLocaleDateString(localeOf(getLang()), { day: "numeric", month: "short" });
 
 function Tip({ active, payload }) {
@@ -54,7 +55,7 @@ function Stat({ label, value, hint }) {
   return (
     <div className="min-w-0">
       <div className="text-micro font-medium text-slate-500">{label}</div>
-      <div className="mt-1 font-mono text-xl font-semibold tabular-nums text-slate-100">{value}</div>
+      <div className="mt-1 text-xl font-semibold tabular-nums text-slate-100">{value}</div>
       {hint && <div className="mt-0.5 text-micro text-slate-500">{hint}</div>}
     </div>
   );
@@ -103,7 +104,7 @@ export default function AdminVisits() {
               {data.top_referrers.map((r) => (
                 <li key={r.domain} className="flex items-baseline justify-between gap-3 py-2 text-meta">
                   <span className="truncate text-slate-200">{r.domain}</span>
-                  <span className="shrink-0 font-mono tabular-nums text-slate-400">{fmtInt(r.visitors)}</span>
+                  <span className="shrink-0 tabular-nums text-slate-400">{fmtInt(r.visitors)}</span>
                 </li>
               ))}
             </ol>

@@ -62,7 +62,7 @@ function LiveCard({ demo, t, lang }) {
       </div>
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <span className="lx-display text-[2rem] text-slate-100">{e.name}</span>
-        <span className="font-mono text-sm text-slate-500">{e.type === "ticker" ? "$" : "#"}{e.query}</span>
+        <span className="tabular-nums text-sm text-slate-500">{e.type === "ticker" ? "$" : "#"}{e.query}</span>
         {e.analysis && <NewsPill a={a} evidence={e.evidence_strength} horizon="short" />}
       </div>
       {a.headline_verdict && (
@@ -78,7 +78,7 @@ function LiveCard({ demo, t, lang }) {
         </div>
       )}
       {e.price != null && (
-        <p className="mt-3 flex items-baseline gap-2 font-mono text-sm">
+        <p className="mt-3 flex items-baseline gap-2 tabular-nums text-sm">
           <span className="font-semibold text-slate-100">{fmtMoney(e.price, e.currency || "USD", lang)}</span>
           {e.change_percent != null && (
             <span className={e.change_percent >= 0 ? "text-emerald-500" : "text-rose-500"}>{fmtPct(e.change_percent, { digits: 2 })}</span>

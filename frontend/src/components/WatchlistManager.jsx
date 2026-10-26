@@ -156,7 +156,7 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
                   >
                     <span className="flex items-center justify-between gap-2">
                       <span className="truncate text-slate-200">{r.description}</span>
-                      <span className="shrink-0 font-mono text-slate-400">{r.symbol}</span>
+                      <span className="shrink-0 tabular-nums text-slate-400">{r.symbol}</span>
                     </span>
                     {/* "SAP SE · XETRA · Almanya"; ABD dışında fiyat/analist yok notu */}
                     <span className="mt-0.5 block text-micro text-slate-500">
@@ -205,7 +205,7 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
           {cards.map((c) => (
             <li key={c.id} className="inline-flex items-center gap-2 rounded-control bg-ink-800 py-1 pl-3 pr-1 text-meta ring-1 ring-inset ring-ink-600">
               <span className="text-slate-200">{displayName(c)}</span>
-              <span className="font-mono text-micro text-slate-500">
+              <span className="tabular-nums text-micro text-slate-500">
                 {c.type === "ticker" ? "$" : "#"}
                 {c.query}
               </span>

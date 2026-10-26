@@ -50,7 +50,7 @@ export function MiniCard({ entity, t, animate }) {
     <div className={`rounded-card bg-ink-800 ring-1 ring-ink-600 p-4 ${animate ? "hiw-card-in" : ""}`}>
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-display text-base font-medium text-slate-100">{entity.name}</span>
-        <span className="font-mono text-xs text-slate-500">
+        <span className="tabular-nums text-xs text-slate-500">
           {entity.type === "ticker" ? "$" : "#"}{entity.query}
         </span>
         {a && <StatusTag stance={a.stance} evidence={entity.evidence_strength} />}
@@ -60,18 +60,18 @@ export function MiniCard({ entity, t, animate }) {
       )}
       {entity.price != null && (
         <p className="mt-2 flex flex-wrap items-baseline gap-x-1.5 text-xs">
-          <span className="font-mono font-semibold text-slate-100">{fmtMoney(entity.price, entity.currency || "USD", getLang())}</span>
+          <span className="tabular-nums font-semibold text-slate-100">{fmtMoney(entity.price, entity.currency || "USD", getLang())}</span>
           {entity.change_percent != null && (
-            <span className={`font-mono ${entity.change_percent >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+            <span className={`tabular-nums ${entity.change_percent >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
               {fmtPct(entity.change_percent, { digits: 2 })}
             </span>
           )}
           {targetOf(an) != null && (
             <>
               <span className="text-slate-500">→ {t("detail.target")}</span>
-              <span className="font-mono font-semibold text-slate-100">{fmtMoney(targetOf(an), entity.currency || "USD", getLang())}</span>
+              <span className="tabular-nums font-semibold text-slate-100">{fmtMoney(targetOf(an), entity.currency || "USD", getLang())}</span>
               {an.upside_percent != null && (
-                <span className={`font-mono font-semibold ${an.upside_percent >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                <span className={`tabular-nums font-semibold ${an.upside_percent >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
                   {fmtPct(an.upside_percent)}
                 </span>
               )}

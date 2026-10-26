@@ -2,8 +2,6 @@
 @import "@fontsource/inter/400.css";
 @import "@fontsource/inter/500.css";
 @import "@fontsource/inter/600.css";
-@import "@fontsource/jetbrains-mono/400.css";
-@import "@fontsource/jetbrains-mono/500.css";
 
 /* Başlık fontu: Inter Display (OFL, kendi sunucumuzda). Yalnızca 500 ve 600; Latin + Türkçe alt
    kümesi (~22 KB/ağırlık). General Sans/Satoshi lisansı herkese açık depoda dağıtıma izin vermiyor. */
@@ -204,7 +202,7 @@ html:lang(de) :is(h1, h2, .lx-display, .lx-mega) {
   hyphens: manual;
 }
 
-/* Teknik/mono ve display fontları için yardımcı sınıflar */
+/* Display fontu için yardımcı sınıf */
 .font-display {
   font-family: "Inter Display", Inter, system-ui, sans-serif;
   letter-spacing: -0.012em;
@@ -348,6 +346,12 @@ html:lang(de) :is(h1, h2, .lx-display, .lx-mega) {
    küçük ikon + açıklamaya döner (container query) — içeriğin başladığı hiza hiç değişmez. */
 .card-cq { container-type: inline-size; }
 .chip-compact { display: none; }
+/* Kart skalası başlığı: dar kartta (telefon) hedef ("hedef $442 (+%19)") analist sayısının altına,
+   sağa iner; masaüstü kartında (~20rem iç genişlik) aynı satırda. */
+@container (max-width: 19rem) {
+  .scale-target { flex-basis: 100%; margin-left: 0; text-align: right; }
+  .scale-dot { display: none; }
+}
 @container (max-width: 23rem) {
   .chip-full { display: none; }
   .chip-compact { display: inline-flex; }
@@ -403,7 +407,7 @@ html.lenis, html.lenis body { height: auto; }
 }
 
 /* Tipografi: başlık Inter Display (akışkan, sıkı; büyük boyutta 500, kalın değil), metin Inter
-   18–20px. Mono yalnızca fiyat, sembol ve tablo rakamında; büyük sayaçlar başlık fontuyla. */
+   18–20px. Rakamlar her yerde metinle aynı sans font, hizalı (tabular-nums); büyük sayaçlar başlık fontuyla. */
 .lx-display {
   font-family: "Inter Display", Inter, system-ui, sans-serif;
   font-weight: 500;

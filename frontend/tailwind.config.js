@@ -42,7 +42,9 @@ export default {
         sans: ["Inter", "system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"],
         // Başlıklar ve hüküm cümleleri (landing + uygulama). Serif yok.
         display: ["Inter Display", "Inter", "system-ui", "sans-serif"],
-        mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+        // Rakamlar her yerde sans + tabular-nums; mono yalnızca eş genişliğin işe yaradığı yerde
+        // (geçici şifre/sembol giriş alanı, teknik hata detayı) ve sistem fontuyla (dosya yok).
+        mono: ["ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "monospace"],
       },
       // Uygulama yazı ölçeği (index.css --fs-*): sayfa 30 · hüküm 28 · kart 21 · gövde 15 · yardımcı 13 · etiket 12
       fontSize: {

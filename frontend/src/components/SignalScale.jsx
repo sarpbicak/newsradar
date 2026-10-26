@@ -69,7 +69,7 @@ function Track({ active, height = "h-2" }) {
 
 const pos = (m) => `calc(${PCT(m.level)}% + ${m.offset}px)`;
 
-export function SignalScale({ a, entity, horizon }) {
+export function SignalScale({ a, entity, horizon, stale = false }) {
   const { markers, noNews, newsName, aria, activeLevels } = scaleModel(a, entity, horizon);
   const target = targetOf(entity.analyst);
   const up = entity.analyst?.upside_percent;
@@ -112,12 +112,26 @@ export function SignalScale({ a, entity, horizon }) {
         </div>
       </div>
       {money && (
-        <p className="mt-1.5 text-meta text-slate-400" title={targetSourceLabel(entity.analyst)}>
-          {tt("scale.target")} <span className="font-mono font-semibold tabular-nums text-slate-100">{money}</span>
-          {up != null && <span className="font-mono tabular-nums"> ({fmtPct(up)})</span>}
+        <p
+          className={`mt-1.5 text-meta ${stale ? "text-slate-500" : "text-slate-400"}`}
+          title={stale ? `${targetSourceLabel(entity.analyst)} · ${tt("detail.targetStale")}` : targetSourceLabel(entity.analyst)}
+        >
+          {tt("scale.target")} <span className={`font-semibold tabular-nums ${stale ? "text-slate-400" : "text-slate-100"}`}>{money}</span>
+          {up != null && <span className="tabular-nums"> ({fmtPct(up)})</span>}
         </p>
       )}
     </section>
+  );
+}
+
+// "hedef $442 (+%19)" — kaynak (FMP, medyan/ortalama) yalnızca ipucunda.
+export function TargetInline({ analyst, currency, label = "card.targetShort" }) {
+  const up = analyst?.upside_percent;
+  return (
+    <span className="tabular-nums" title={targetSourceLabel(analyst)}>
+      {tt(label)} <span className="font-semibold text-slate-200">{fmtMoney(targetOf(analyst), currency || "USD", getLang(), { digits: 0 })}</span>
+      {up != null && ` (${fmtPct(up)})`}
+    </span>
   );
 }
 
@@ -128,14 +142,21 @@ export function SignalScaleCompact({ a, entity, horizon }) {
   if (!markers.some((m) => m.key === "an")) return null;
   return (
     <div role="img" aria-label={aria}>
-      <div className="flex items-center gap-3 text-micro text-slate-500" aria-hidden="true">
+      {/* Başlık: açıklama · sağda "54 analist · hedef $442 (+%19)"; dar ekranda hedef alta iner. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-micro text-slate-500">
         {markers.map((m) => (
-          <span key={m.key} className="inline-flex items-center gap-1.5">
+          <span key={m.key} className="inline-flex items-center gap-1.5" aria-hidden="true">
             <Shape kind={m.key} size={8} />
             {m.key === "news" ? tt("scale.newsShort") : tt("scale.analystsShort")}
           </span>
         ))}
         <span className="ml-auto tabular-nums">{tt("card.analysts", { n: entity.analyst.total })}</span>
+        {targetOf(entity.analyst) != null && (
+          <span className="scale-target relative z-10 -ml-2">
+            <span className="scale-dot">· </span>
+            <TargetInline analyst={entity.analyst} currency={entity.currency} />
+          </span>
+        )}
       </div>
       <div className="relative mt-1.5 py-[3px]" aria-hidden="true">
         <Track active={activeLevels} height="h-1" />

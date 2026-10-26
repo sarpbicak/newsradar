@@ -1,6 +1,6 @@
 // Admin paneli — yalnızca is_admin kullanıcı görür (backend 403 ile korur). Ayrı pakette (lazy).
 // Sistem sağlığı · genel istatistik · maliyet · model kırılımı · geri bildirim kutusu · en çok
-// takip/görüntülenen · kullanıcı tablosu (tıklanınca detay). Ortak bileşenler; sayılar mono.
+// takip/görüntülenen · kullanıcı tablosu (tıklanınca detay). Ortak bileşenler; sayılar hizalı (tabular-nums).
 // Onaylar ortak ConfirmDialog, geçici şifre ortak Modal, hatalar ortak Toast.
 import React, { useEffect, useState } from "react";
 import { Copy, Trash2, X } from "lucide-react";
@@ -59,7 +59,7 @@ function StatCard({ label, value, hint, tone }) {
     <Card className="p-5">
       <div className="text-micro font-medium text-slate-500">{label}</div>
       {/* Dar ekranda sayı ortadan bölünmesin: yalnızca "/" sonrasında satır kırılabilir. */}
-      <div className={cx("mt-2 break-words font-mono text-xl font-semibold tabular-nums sm:text-2xl", toneText)}>
+      <div className={cx("mt-2 break-words text-xl font-semibold tabular-nums sm:text-2xl", toneText)}>
         {typeof value === "string" ? value.replaceAll("/", "/\u200b") : value}
       </div>
       {hint && <div className={cx("mt-1 text-micro", tone === "neg" ? "text-rose-600" : "text-slate-500")}>{hint}</div>}
@@ -129,14 +129,14 @@ export function HealthBanner({ health }) {
           {tt("adm.healthLastOk")}: <span className="text-slate-300">{h.last_ok_at ? timeAgo(h.last_ok_at) : tt("adm.healthNever")}</span>
         </span>
         <span>
-          {tt("adm.healthQuota24h")}: <span className={cx("font-mono", quota > 0 ? "font-semibold text-rose-600" : "text-slate-300")}>{quota}</span>
+          {tt("adm.healthQuota24h")}: <span className={cx("tabular-nums", quota > 0 ? "font-semibold text-rose-600" : "text-slate-300")}>{quota}</span>
         </span>
         <span>
-          {tt("adm.healthErr24h")}: <span className={cx("font-mono", errs > 0 ? "font-semibold text-amber-600" : "text-slate-300")}>{errs}</span>
+          {tt("adm.healthErr24h")}: <span className={cx("tabular-nums", errs > 0 ? "font-semibold text-amber-600" : "text-slate-300")}>{errs}</span>
         </span>
         {h.last_status_code ? (
           <span>
-            {tt("adm.healthCode")}: <span className="font-mono text-slate-300">{h.last_status_code}</span>
+            {tt("adm.healthCode")}: <span className="tabular-nums text-slate-300">{h.last_status_code}</span>
           </span>
         ) : null}
       </div>
@@ -330,7 +330,7 @@ export default function AdminPanel({ currentUserId }) {
                 <th className="py-2 text-right font-medium">USD</th>
               </tr>
             </thead>
-            <tbody className="font-mono tabular-nums text-slate-300">
+            <tbody className="tabular-nums text-slate-300">
               {stats.model_breakdown.map((m) => (
                 <tr key={m.model}>
                   <td className="py-1.5 pr-3">{m.model}</td>
@@ -363,7 +363,7 @@ export default function AdminPanel({ currentUserId }) {
             <div className="flex flex-wrap gap-2">
               {stats.most_followed.map((e) => (
                 <Chip key={`${e.type}:${e.name}`} tone="neutral" size="md">
-                  <span className="font-mono text-micro text-slate-500">{e.type === "ticker" ? "$" : "#"}</span>
+                  <span className="tabular-nums text-micro text-slate-500">{e.type === "ticker" ? "$" : "#"}</span>
                   {displayName(e)}
                   <span className="text-micro tabular-nums text-slate-500">{tt("adm.person", { n: e.followers })}</span>
                 </Chip>
@@ -377,7 +377,7 @@ export default function AdminPanel({ currentUserId }) {
             <div className="flex flex-wrap gap-2">
               {stats.top_entities.map((e) => (
                 <Chip key={e.name} tone="neutral" size="md">
-                  {e.name} <span className="font-mono font-semibold text-slate-100">{e.count}</span>
+                  {e.name} <span className="tabular-nums font-semibold text-slate-100">{e.count}</span>
                 </Chip>
               ))}
             </div>
@@ -415,9 +415,9 @@ export default function AdminPanel({ currentUserId }) {
                 <td className="max-w-56 truncate px-4 py-2.5 text-slate-400" title={u.email || undefined}>{u.email || "—"}</td>
                 <td className="px-4 py-2.5 text-slate-500">{fmtDate(u.created_at)}</td>
                 <td className="px-4 py-2.5 text-slate-500">{u.last_login_at ? timeAgo(u.last_login_at) : "—"}</td>
-                <td className="px-4 py-2.5 text-right font-mono tabular-nums text-slate-300">{u.login_count}</td>
-                <td className="px-4 py-2.5 text-right font-mono tabular-nums text-slate-300">{u.refresh_count}</td>
-                <td className="px-4 py-2.5 text-right font-mono tabular-nums text-slate-300">{u.total_events}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-slate-300">{u.login_count}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-slate-300">{u.refresh_count}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-slate-300">{u.total_events}</td>
                 <td className="px-4 py-2.5 text-slate-500">{u.last_active_at ? timeAgo(u.last_active_at) : tt("adm.never")}</td>
                 <td className="px-5 py-2.5 text-right">
                   <div className="flex items-center justify-end gap-1">
@@ -567,7 +567,7 @@ function UserDetail({ userId, onClose }) {
                 {Object.keys(data.event_counts).length === 0 && <span className="text-meta text-slate-500">{tt("adm.noActions")}</span>}
                 {Object.entries(data.event_counts).map(([t, c]) => (
                   <Chip key={t} tone="neutral" size="md">
-                    {eventLabel(t)} <span className="font-mono font-semibold text-slate-100">{c}</span>
+                    {eventLabel(t)} <span className="tabular-nums font-semibold text-slate-100">{c}</span>
                   </Chip>
                 ))}
               </div>
@@ -578,7 +578,7 @@ function UserDetail({ userId, onClose }) {
                 <div className="flex flex-wrap gap-2">
                   {data.top_entities.map((e) => (
                     <Chip key={e.name} tone="neutral" size="md">
-                      {e.name} <span className="font-mono font-semibold text-slate-100">{e.count}</span>
+                      {e.name} <span className="tabular-nums font-semibold text-slate-100">{e.count}</span>
                     </Chip>
                   ))}
                 </div>
@@ -593,7 +593,7 @@ function UserDetail({ userId, onClose }) {
                   {data.watchlist.map((e) => (
                     <Chip key={`${e.type}:${e.query}`} tone="neutral" size="md">
                       {displayName(e)}
-                      <span className="font-mono text-micro text-slate-500">
+                      <span className="tabular-nums text-micro text-slate-500">
                         {e.type === "ticker" ? "$" : "#"}
                         {e.query}
                       </span>

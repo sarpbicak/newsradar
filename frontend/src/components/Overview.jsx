@@ -44,7 +44,7 @@ function StarterChip({ s, onAdd, adding }) {
   return (
     <ChipButton icon={Plus} onClick={() => onAdd(s)} disabled={adding === s.query}>
       {s.name}
-      <span className="font-mono text-micro font-normal text-slate-500">
+      <span className="tabular-nums text-micro font-normal text-slate-500">
         {s.type === "ticker" ? "$" : "#"}
         {s.query}
       </span>

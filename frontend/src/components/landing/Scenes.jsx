@@ -44,7 +44,7 @@ export function SceneAdd({ data, p }) {
         >
           <div className={`flex min-h-[52px] items-center justify-between gap-3 px-4 text-base ${picked ? "bg-ink-700" : ""}`}>
             <span className="truncate text-slate-100">{e.name}</span>
-            <span className="shrink-0 font-mono text-sm text-slate-400">{e.query}</span>
+            <span className="shrink-0 tabular-nums text-sm text-slate-400">{e.query}</span>
           </div>
         </div>
       </div>
@@ -55,7 +55,7 @@ export function SceneAdd({ data, p }) {
           style={{ ...shown(chip), transform: `scale(${0.85 + 0.15 * chip})` }}
         >
           {e.name}
-          <span className="font-mono text-sm text-slate-500">{symbolOf(e)}</span>
+          <span className="tabular-nums text-sm text-slate-500">{symbolOf(e)}</span>
         </span>
       </div>
     </div>
@@ -184,15 +184,15 @@ export function SceneVerdict({ data, p }) {
         <div className="rounded-card border border-ink-600 bg-ink-800 p-5" style={{ ...shown(card), transform: `scale(${0.96 + 0.04 * card})` }}>
           <div className="flex flex-wrap items-center gap-2.5">
             <span className="font-display text-xl font-semibold text-slate-100">{e.name}</span>
-            <span className="font-mono text-sm text-slate-500">{symbolOf(e)}</span>
+            <span className="tabular-nums text-sm text-slate-500">{symbolOf(e)}</span>
             {e.analysis && <NewsPill a={a} evidence={e.evidence_strength} horizon="short" />}
           </div>
           {a.headline_verdict && <p className="mt-3 font-display text-xl font-semibold leading-snug text-slate-100">{a.headline_verdict}</p>}
           {e.price != null && (
             <p className="mt-3 flex flex-wrap items-baseline gap-x-2 text-sm">
-              <span className="font-mono font-semibold text-slate-100">{fmtMoney(e.price, e.currency || "USD", getLang())}</span>
+              <span className="tabular-nums font-semibold text-slate-100">{fmtMoney(e.price, e.currency || "USD", getLang())}</span>
               {e.change_percent != null && (
-                <span className={`font-mono ${e.change_percent >= 0 ? "text-emerald-500" : "text-rose-500"}`}>{fmtPct(e.change_percent, { digits: 2 })}</span>
+                <span className={`tabular-nums ${e.change_percent >= 0 ? "text-emerald-500" : "text-rose-500"}`}>{fmtPct(e.change_percent, { digits: 2 })}</span>
               )}
             </p>
           )}

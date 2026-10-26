@@ -181,7 +181,7 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
         <header className="space-y-4">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <h1 className="font-display text-xl font-semibold text-slate-100">{name}</h1>
-            <span className="font-mono text-meta text-slate-500">{symbolOf(entity)}</span>
+            <span className="tabular-nums text-meta text-slate-500">{symbolOf(entity)}</span>
             {marketLabel(entity) && <span className="text-meta text-slate-500">{marketLabel(entity)}</span>}
             {a && (
               <span className="inline-flex flex-wrap items-center gap-2">
@@ -194,9 +194,7 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
           {a?.headline_verdict && <p className="max-w-4xl font-display text-verdict font-medium text-slate-100">{a.headline_verdict}</p>}
           {isTicker ? (
             entity.price != null ? (
-              <div title={stale ? tt("detail.targetStale") : undefined}>
-                <PriceRow entity={entity} size="lg" muted={stale} />
-              </div>
+              <PriceRow entity={entity} size="lg" />
             ) : (
               <p className="text-meta text-slate-500">
                 {entity.us_market === false ? tt("detail.noPriceExchange", { exchange: exchangeOf(entity) }) : tt("detail.noPrice")}
@@ -401,7 +399,7 @@ function SummaryTab({ a, entity, riskHistory = [], articles = [], analyzedCount,
             {tt(fellBackFrom === "long" ? "hz.fallbackToShort" : "hz.fallbackToLong")}
           </p>
         )}
-        <SignalScale a={a} entity={entity} horizon={horizon} />
+        <SignalScale a={a} entity={entity} horizon={horizon} stale={targetIsStale(entity.analyst)} />
         {divNote && (
           <p className="flex items-start gap-2 text-meta text-slate-400">
             <GitFork className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />

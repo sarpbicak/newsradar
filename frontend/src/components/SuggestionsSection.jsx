@@ -33,7 +33,7 @@ export default function SuggestionsSection({ suggestions, onAdd, onDismiss, embe
               <div className="flex items-start justify-between gap-2">
                 <div className="flex flex-wrap items-baseline gap-2">
                   <span className="font-display text-base font-medium text-slate-100">{s.name}</span>
-                  {s.ticker && <span className="font-mono text-micro text-slate-500">${s.ticker}</span>}
+                  {s.ticker && <span className="tabular-nums text-micro text-slate-500">${s.ticker}</span>}
                 </div>
                 <Chip tone="neutral">{t("sug.mentioned", { n: s.mention_count })}</Chip>
               </div>

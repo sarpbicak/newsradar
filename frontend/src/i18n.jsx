@@ -163,7 +163,7 @@ const STR = {
   "card.fewNews": { tr: "Son {days} günde bu şirket hakkında yeterli haber bulunamadı. Yeni haber çıktıkça otomatik güncellenecek.", en: "Not enough news about this company in the last {days} days. It will update automatically as new articles come out." },
   "card.newsCount_one": { tr: "1 haber", en: "1 article" },
   "card.analysts_one": { tr: "1 analist", en: "1 analyst" },
-  "card.now": { tr: "şimdi", en: "now" },
+  "card.today": { tr: "bugün", en: "today" },
   "card.noTarget": { tr: "hedef yok", en: "no target" },
   "card.noPrice": { tr: "Fiyat verisi yok", en: "No price data" },
   "card.noPriceExchange": { tr: "{exchange} için fiyat verisi yok", en: "No price data for {exchange}" },

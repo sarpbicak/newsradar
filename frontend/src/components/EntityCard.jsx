@@ -1,20 +1,18 @@
-// Pano kartı — landing hero'daki canlı karar kartının dili (araç ölçeğinde):
-//  1) durum etiketi (dolgulu, anlamsal) + varsa ikincil bilgi çipi · sağda kısa ad + sembol
-//  2) hüküm cümlesi (Inter Display ~21px, kesilmez)
-//  3) fiyat satırı: $212.21 → $339 +60% (çerçevesiz; altında "şimdi / analist hedefi")
-//  4) analist dağılımı: "Analistler: alım yönlü" + ince bar + analist sayısı
-//  5) meta (vade · haber sayısı · yön değişti) — en alta yapışır; kartlar aynı yükseklikte.
+// Pano kartı, yukarıdan aşağı: ad/sembol · haber etiketi (+ yön değiştiyse küçük işaret) ve vade
+// seçici · hüküm cümlesi · fiyat ("$372.22 −0,63% bugün", tek satır) · kompakt skala (başlığında
+// "54 analist · hedef $442 (+%19)") · ayrışma notu (varsa). Alt grup en alta yapışır; aynı
+// satırdaki kartlar eşit yükseklikte. Makale sayısı yalnızca detayda.
 // Renk göstergesi: üst kenarda ince (2px) anlamsal çizgi. Kısa ad: display_name, yoksa ad
 // (iki satıra kadar sarar, asla kesilmez).
 import React from "react";
-import { Activity, ArrowLeftRight, ArrowRight, Compass, GitFork, Lock, TrendingUp, Zap } from "lucide-react";
+import { Activity, ArrowLeftRight, Compass, GitFork, Lock, RotateCw, TrendingUp, Zap } from "lucide-react";
 import {
-  AnimatedNumber, HorizonToggle, NewsPill, divergenceText, hasHorizons, newsSignal, riskColor, stanceLabel, targetOf, targetSourceLabel,
+  AnimatedNumber, HorizonToggle, NewsPill, divergenceText, hasHorizons, newsSignal, riskColor, stanceLabel, targetOf,
   useHorizon,
 } from "./ui.jsx";
 import { Card, Chip, cx } from "./kit.jsx";
 import { tt, fmtPct, getLang, localeOf, parseUtc } from "../i18n.jsx";
-import { SignalScaleCompact } from "./SignalScale.jsx";
+import { SignalScaleCompact, TargetInline } from "./SignalScale.jsx";
 import { exchangeName } from "../appStrings.js";
 import { fmtMoney } from "../money.js";
 import { C } from "../theme.js";
@@ -43,12 +41,16 @@ export const marketLabel = (e) => (e.us_market === false && e.exchange ? `${exch
 // "yön 24 Eki'de değişti" / "direction changed on 24 Oct" / "Richtung am 24. Okt. geändert".
 // Türkçede bulunma eki ayın tam adının okunuşuna göre (Ekim'de, Kasım'da, Aralık'ta).
 const TR_LOC = { oca: "ta", şub: "ta", mar: "ta", nis: "da", may: "ta", haz: "da", tem: "da", ağu: "ta", eyl: "de", eki: "de", kas: "da", ara: "ta" };
-// Yön değişikliği: tarihli kısa not; ipucunda önceki → yeni yön. Tarih yoksa (eski API) tarihsiz.
-export function StanceChange({ delta, stance, className = "text-amber-600", prefix = " · " }) {
-  const tip = delta?.previous_stance ? tt("card.directionChangedTip", { from: stanceLabel(delta.previous_stance), to: stanceLabel(stance) }) : undefined;
+// Yön değişikliği: haber etiketinin yanında küçük işaret (↻); ipucunda tarih ve önceki → yeni
+// yön, ekran okuyucuya aynı metin. Tarih yoksa (eski API) tarihsiz.
+export function StanceMark({ delta, stance, className = "" }) {
+  const when = delta?.changed_at ? changedOnText(delta.changed_at) : tt("card.directionChangedNoDate");
+  const dirs = delta?.previous_stance ? tt("card.directionChangedTip", { from: stanceLabel(delta.previous_stance), to: stanceLabel(stance) }) : "";
+  const text = dirs ? `${when} · ${dirs}` : when;
   return (
-    <span className={className} title={tip}>
-      {prefix}{delta?.changed_at ? changedOnText(delta.changed_at) : tt("card.directionChangedNoDate")}
+    <span className={cx("relative z-10 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-control text-amber-600", className)} title={text}>
+      <RotateCw className="h-3.5 w-3.5" aria-hidden="true" />
+      <span className="sr-only">{text}</span>
     </span>
   );
 }
@@ -62,13 +64,11 @@ export function changedOnText(iso) {
   return tt("card.directionChanged", { date: `${label}'${TR_LOC[m] || "de"}` });
 }
 
-// Fiyat satırı: şimdi → analist hedefi (kart ve detay aynı dil).
-// muted: hedef verisi eski (detay) — renkler soluk ama AA (slate-500), opaklık değil.
-export function PriceRow({ entity, size = "md", muted = false }) {
+// Fiyat satırı (kart, detay aynı dil): "$372.22 −0,63% bugün", tek satır, alt etiket yok.
+// Analist hedefi burada değil, skalanın başlığında / altında.
+export function PriceRow({ entity, size = "md" }) {
   const price = entity.price;
   const chg = entity.change_percent;
-  const target = targetOf(entity.analyst);
-  const upside = entity.analyst?.upside_percent;
   // ABD dışı borsa: fiyat/analist kaynağı yok (yuva boş) → borsayı adıyla söyle.
   if (price == null) {
     return (
@@ -80,32 +80,17 @@ export function PriceRow({ entity, size = "md", muted = false }) {
   // Fiyat kendi para biriminde, dile uygun ondalıkla (dönüşüm yok).
   const cur = entity.currency || "USD";
   const lang = getLang();
-  const num = cx(size === "lg" ? "text-title" : "text-body", muted && "!text-slate-500");
-  const tone = (v) => (muted ? "text-slate-500" : v >= 0 ? "text-emerald-600" : "text-rose-600");
   return (
-    <div className="flex items-start gap-3">
-      <div>
-        <div className={cx("flex items-baseline gap-2 font-mono font-semibold tabular-nums text-slate-100", num)}>
-          <AnimatedNumber value={price} format={(v) => fmtMoney(v, cur, lang)} />
-          {chg != null && <span className={cx("text-meta font-medium", tone(chg))}>{fmtPct(chg, { digits: 2 })}</span>}
-        </div>
-        <div className="text-micro text-slate-500">{tt("card.now")}</div>
-      </div>
-      {target != null && (
-        <>
-          <ArrowRight className={cx("h-4 w-4 shrink-0 text-slate-600", size === "lg" ? "mt-2" : "mt-1")} aria-hidden="true" />
-          <div>
-            <div className={cx("flex items-baseline gap-2 font-mono font-semibold tabular-nums text-slate-100", num)}>
-              {fmtMoney(target, cur, lang, { digits: 0 })}
-              {upside != null && <span className={cx("text-meta font-medium", tone(upside))}>{fmtPct(upside)}</span>}
-            </div>
-            <div className="text-micro text-slate-500" title={targetSourceLabel(entity.analyst)}>{tt("card.analystTarget")}</div>
-          </div>
-        </>
-      )}
-    </div>
+    <p className={cx("flex flex-wrap items-baseline gap-x-2 tabular-nums", size === "lg" ? "text-title" : "text-body")}>
+      <span className="font-semibold text-slate-100">
+        <AnimatedNumber value={price} format={(v) => fmtMoney(v, cur, lang)} />
+      </span>
+      {chg != null && <span className={cx("text-meta font-medium", chg >= 0 ? "text-emerald-600" : "text-rose-600")}>{fmtPct(chg, { digits: 2 })}</span>}
+      <span className="text-meta text-slate-500">{tt("card.today")}</span>
+    </p>
   );
 }
+
 
 function PrivateLine({ drivers }) {
   return (
@@ -167,9 +152,9 @@ export default function EntityCard({ card, onOpen }) {
       <div className="flex min-h-14 items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="break-words font-display text-base font-medium leading-tight text-slate-100">{displayName(card)}</div>
-          <div className="mt-1 font-mono text-micro text-slate-500">
+          <div className="mt-1 text-micro text-slate-500">
             {symbolOf(card)}
-            {marketLabel(card) && <span className="font-sans"> · {exchangeOf(card)}</span>}
+            {marketLabel(card) && <span> · {exchangeOf(card)}</span>}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -179,7 +164,10 @@ export default function EntityCard({ card, onOpen }) {
       </div>
       {a && (
         <div className="-mt-1 flex flex-wrap items-center justify-between gap-2">
-          <NewsPill a={a} evidence={card.evidence_strength} horizon={horizon} />
+          <span className="flex min-w-0 items-center gap-1">
+            <NewsPill a={a} evidence={card.evidence_strength} horizon={horizon} />
+            {changed && <StanceMark delta={card.delta} stance={a.stance} />}
+          </span>
           {hasHorizons(a) && <HorizonToggle value={horizon} onChange={setHorizon} compact className="relative z-10" />}
         </div>
       )}
@@ -191,7 +179,13 @@ export default function EntityCard({ card, onOpen }) {
             {card.type === "ticker" ? (
               <>
                 <PriceRow entity={card} />
-                {card.analyst?.total > 0 && <SignalScaleCompact a={a} entity={card} horizon={horizon} />}
+                {card.analyst?.total > 0 ? (
+                  <SignalScaleCompact a={a} entity={card} horizon={horizon} />
+                ) : (
+                  targetOf(card.analyst) != null && (
+                    <p className="text-micro text-slate-500"><TargetInline analyst={card.analyst} currency={card.currency} label="card.analystTargetCap" /></p>
+                  )
+                )}
               </>
             ) : (
               <PrivateLine drivers={a.top_drivers} />
@@ -202,10 +196,6 @@ export default function EntityCard({ card, onOpen }) {
                 {diverge}
               </p>
             )}
-            <p className="text-micro text-slate-500">
-              {tt("card.newsCount", { n: card.evidence_count })}
-              {changed && <StanceChange delta={card.delta} stance={a.stance} />}
-            </p>
           </div>
         </>
       ) : (
@@ -220,7 +210,7 @@ export default function EntityCard({ card, onOpen }) {
 }
 
 // Liste satırı: ince renk göstergesi · kısa ad · sembol · tek satır değerlendirme (tooltip'te
-// tamamı) · sağda risk skoru (mono) ve varsa "yön değişti". Satırlar ince çizgilerle ayrılır (tablo).
+// tamamı) · sağda risk skoru (hizalı rakamlar) ve varsa yön değişikliği işareti (↻). Satırlar ince çizgilerle ayrılır (tablo).
 // Mobilde değerlendirme adın altına iner (iki satıra kadar).
 export function EntityRow({ card, onOpen }) {
   const a = card.analysis;
@@ -239,7 +229,7 @@ export function EntityRow({ card, onOpen }) {
       <span className="min-w-0 flex-1 md:flex md:items-center md:gap-4">
         <span className="flex items-baseline gap-2 md:w-56 md:shrink-0">
           <span className="break-words font-display text-sm font-medium text-slate-100">{displayName(card)}</span>
-          <span className="shrink-0 font-mono text-micro text-slate-500">{symbolOf(card)}</span>
+          <span className="shrink-0 text-micro text-slate-500">{symbolOf(card)}</span>
         </span>
         {a && (
           <span className="mt-1 flex md:mt-0 md:w-60 md:min-w-fit md:shrink-0">
@@ -248,9 +238,9 @@ export function EntityRow({ card, onOpen }) {
         )}
         <span className="mt-0.5 line-clamp-2 text-meta text-slate-400 md:mt-0 md:line-clamp-1 md:flex-1">{verdict}</span>
       </span>
-      {changed && <StanceChange delta={card.delta} stance={a.stance} prefix="" className="hidden shrink-0 text-micro font-medium text-amber-600 md:inline" />}
+      {changed && <StanceMark delta={card.delta} stance={a.stance} className="hidden md:inline-flex" />}
       {a && (
-        <span className="w-8 shrink-0 text-right font-mono text-meta font-semibold tabular-nums" style={{ color: riskColor(a.risk_score) }} title={tt("sum.riskLabel")}>
+        <span className="w-8 shrink-0 text-right text-meta font-semibold tabular-nums" style={{ color: riskColor(a.risk_score) }} title={tt("sum.riskLabel")}>
           {a.risk_score}
         </span>
       )}

@@ -44,7 +44,7 @@ function Row({ row, onSaved }) {
       <form onSubmit={save} className="grid gap-2 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto] sm:items-center">
         <div className="min-w-0">
           <div className="truncate text-meta text-slate-200" title={row.name}>{row.name}</div>
-          <div className="font-mono text-micro text-slate-500">
+          <div className="tabular-nums text-micro text-slate-500">
             {row.type === "ticker" ? "$" : "#"}{row.query} · {tt("ent.followers", { n: row.followers })}
           </div>
         </div>
