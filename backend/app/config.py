@@ -30,6 +30,9 @@ class Settings:
         self.anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "").strip()
         self.finnhub_api_key: str = os.getenv("FINNHUB_API_KEY", "").strip()
         self.newsapi_key: str = os.getenv("NEWSAPI_KEY", "").strip()
+        # GNews: anahtar kelimeli ve ABD dışı şirketlerin BİRİNCİL haber kaynağı (ücretsiz plan,
+        # 12 saat gecikmeli). Boşsa sessizce GDELT kullanılır (app/providers/gnews.py).
+        self.gnews_api_key: str = os.getenv("NEWSRADAR_GNEWS_API_KEY", "").strip()
         # NewsAPI ücretsiz Developer planı production kullanımını YASAKLAR (yalnızca geliştirme).
         # Kod kalır, varsayılan KAPALI: anahtar kelimeli şirketler GDELT'ten haber alır.
         # on → anahtar kelimeli şirketler yeniden NewsAPI kullanır (ücretli plan ya da yerel deneme).

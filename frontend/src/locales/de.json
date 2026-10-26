@@ -321,6 +321,7 @@
  "msg.connection_error": "{source}: Verbindungsfehler.",
  "msg.gdelt_busy": "Die Nachrichtenquelle (GDELT) ist gerade ausgelastet. Bei der nächsten Aktualisierung wird es erneut versucht.",
  "msg.gdelt_blocked": "Die Nachrichtenquelle (GDELT) begrenzt die Anfragen. Wir pausieren eine Weile und zeigen die vorhandenen Nachrichten.",
+ "msg.gnews_error": "Die Nachrichtenquelle (GNews) hat nicht geantwortet (HTTP {status}): {detail}",
  "msg.gdelt_error": "Die Nachrichtenquelle (GDELT) hat auf diese Suche nicht geantwortet.",
  "msg.no_data": "Keine {source}-Daten für {symbol}.",
  "msg.bad_response": "{source} hat eine unerwartete Antwort geschickt ({symbol}).",

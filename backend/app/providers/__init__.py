@@ -14,6 +14,7 @@ from .base import (
 from .registry import (
     get_analyst_provider,
     get_price_provider,
+    fallback_provider_for,
     get_provider_for,
     get_target_provider,
     price_provider_for,
@@ -33,6 +34,7 @@ __all__ = [
     "ProviderResult",
     "get_analyst_provider",
     "get_price_provider",
+    "fallback_provider_for",
     "get_provider_for",
     "get_target_provider",
     "price_provider_for",

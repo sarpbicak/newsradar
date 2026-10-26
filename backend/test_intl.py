@@ -24,7 +24,8 @@ for sfx in ("", "-wal", "-shm"):
     except FileNotFoundError:
         pass
 os.environ.update(NEWSRADAR_DB=_db, NEWSRADAR_SCHEDULER="off", NEWSRADAR_SEED_ON_START="off",
-                  FINNHUB_API_KEY="fake-key", FMP_API_KEY="fake-key", NEWSAPI_KEY="", APP_SECRET="x")
+                  FINNHUB_API_KEY="fake-key", FMP_API_KEY="fake-key", NEWSAPI_KEY="", APP_SECRET="x",
+                  NEWSRADAR_GNEWS_API_KEY="")
 
 import app.providers.gdelt as gd  # noqa: E402
 from app import gdelt_breaker  # noqa: E402

@@ -39,6 +39,7 @@ Boş bırakılırsa ilgili özellik kapanır ama uygulama çalışmaya devam ede
 |---|---|---|---|---|
 | `FINNHUB_API_KEY` | Ticker haberleri ve analist tavsiyesi. Yoksa ticker sağlayıcısı atlanır. | SecureString | boş | `c1ab…` |
 | `NEWSAPI_KEY` | NewsAPI anahtarı; yalnızca `NEWSRADAR_NEWSAPI_ENABLED=on` iken kullanılır (varsayılan: keyword haberleri GDELT'ten, anahtarsız). | SecureString | boş | `0f9e…` |
+| `NEWSRADAR_GNEWS_API_KEY` | GNews anahtarı: anahtar kelimeli ve ABD dışı şirketlerin birincil haber kaynağı (ücretsiz plan: günde 100 istek, haberler 12 saat gecikmeli, yalnızca ticari olmayan kullanım). Anahtar `X-Api-Key` başlığıyla gider, URL'ye ve loglara girmez. Boşsa sessizce GDELT kullanılır; GNews hata verirse ya da kotası dolarsa GDELT yedektir (devre kesici kapalıysa). | SecureString | boş | `a1b2…` |
 | `FMP_API_KEY` | Analist hedef fiyatı. Yoksa hedef fiyat gösterilmez. | SecureString | boş | `Xy7…` |
 | `APP_PASSWORD` | Eski genel giriş şifresi (`/auth/login`). Site herkese açık olduğu için artık zorunlu değil. | SecureString | boş | `<parola>` |
 | `NEWSRADAR_LLM_API_KEY` | OpenAI uyumlu yedek LLM anahtarı. Yalnızca `NEWSRADAR_LLM_PROVIDER≠anthropic` iken kullanılır. | SecureString | boş | `sk-or-v1-…` |

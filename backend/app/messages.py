@@ -27,6 +27,7 @@ _TR = {
     "http_error": "{source} hatası ({status}) — {symbol} atlandı.",
     "connection_error": "{source} bağlantı/çözümleme hatası: {error}",
     "gdelt_busy": "Haber kaynağı (GDELT) şu an yoğun; bir sonraki yenilemede tekrar denenecek.",
+    "gnews_error": "Haber kaynağı (GNews) yanıt vermedi (HTTP {status}): {detail}",
     "gdelt_blocked": "Haber kaynağı (GDELT) istekleri sınırladı; bir süre istek atılmayacak (devre kesici).",
     "gdelt_error": "Haber kaynağı (GDELT) bu aramayı yanıtlamadı: {detail}",
     "no_data": "{symbol} için {source} verisi yok.",

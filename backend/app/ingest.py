@@ -20,7 +20,8 @@ from .config import get_settings
 from .db.models import Article, Entity, EntityAnalysis, url_hash
 from .messages import msg, render
 from . import gdelt_breaker
-from .providers import get_provider_for
+from .providers import fallback_provider_for, get_provider_for
+from .providers.base import ProviderResult
 from .quota import newsapi_usage, record_call
 
 # Manuel yenilemede keyword entity bu kadar süre içinde çekildiyse NewsAPI'ye gidilmez.
@@ -114,7 +115,10 @@ def fetch_for_entity(
             logger.info("[%s] %s", entity.name, render(m))
             return result
 
-    outcome = provider.fetch(entity, fetch_since)
+    if provider.name == "gnews":
+        outcome = _fetch_gnews(session, entity, provider, fetch_since)
+    else:
+        outcome = provider.fetch(entity, fetch_since)
 
     # NewsAPI'ye gerçekten gidildiyse kotadan düş; ham 429'u anlaşılır mesaja çevir.
     if is_newsapi and provider.is_available():
@@ -201,6 +205,24 @@ def fetch_for_entity(
         f" UYARI: {'; '.join(render(w) for w in result.warnings)}" if result.warnings else "",
     )
     return result
+
+
+def _fetch_gnews(session: Session, entity: Entity, gnews, since: datetime):
+    """Birincil GNews; hata verirse yedek GDELT (devre kesici kapalıysa). GNews hatası kullanıcıya
+    uyarı olarak gösterilmez (yedek çalıştıysa haberler gelir; çalışmadıysa kartta sakin not)."""
+    outcome = gnews.fetch(entity, since)
+    if not outcome.warning:
+        return outcome
+    logger.info("[%s] GNews kullanılamadı (%s) → GDELT yedeği", entity.name, render(outcome.warning))
+    return _fetch_fallback(session, entity, since)
+
+
+def _fetch_fallback(session: Session, entity: Entity, since: datetime):
+    """Yedek kaynak (GDELT). Devre kesici açıksa istek yok, uyarı yok (boş sonuç)."""
+    fallback = fallback_provider_for(entity)
+    if fallback is None or gdelt_breaker.is_open(session):
+        return ProviderResult(provider=fallback.name if fallback else "gnews")
+    return fallback.fetch(entity, since)
 
 
 def _needs_backfill(session: Session, entity: Entity, settings) -> bool:

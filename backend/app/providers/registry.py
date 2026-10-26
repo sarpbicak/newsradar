@@ -1,7 +1,9 @@
 """Sağlayıcı kayıt defteri: entity'ye göre haber / fiyat / analist kaynağını seçer.
 
-Haber: ABD hissesi → Finnhub company-news; anahtar kelime ve ABD dışı hisse → GDELT
-(NEWSRADAR_NEWSAPI_ENABLED=on ise anahtar kelime NewsAPI). Fiyat ve analist: pazar başına
+Haber: ABD hissesi → Finnhub company-news; anahtar kelime ve ABD dışı hisse → GNews
+(NEWSRADAR_GNEWS_API_KEY varsa; yoksa sessizce GDELT). GNews kotası dolarsa ya da hata verirse
+alım katmanı GDELT'i yedek olarak dener (devre kesici kapalıysa) — fallback_provider_for.
+NEWSRADAR_NEWSAPI_ENABLED=on ise anahtar kelime NewsAPI. Fiyat ve analist: pazar başına
 yuva — ABD için mevcut kaynaklar (Finnhub fiyat/tavsiye, FMP hedef); diğer pazarlarda yuva BOŞ
 (ücretli kaynak eklenmedi) → bu şirketlerde "veri yok". Yeni kaynak = INTL_* yuvasına bir
 PriceProvider/AnalystProvider (pazar kodu → sağlayıcı).
@@ -18,10 +20,12 @@ from .finnhub_analyst import FinnhubAnalystProvider
 from .finnhub_price import FinnhubPriceProvider
 from .fmp_analyst import FMPAnalystProvider
 from .gdelt import GdeltProvider
+from .gnews import GNewsProvider
 from .newsapi import NewsApiProvider
 
 _FINNHUB_NEWS = FinnhubProvider()
 _GDELT = GdeltProvider()
+_GNEWS = GNewsProvider()
 _NEWSAPI = NewsApiProvider()
 
 _PRICE_PROVIDER: PriceProvider = FinnhubPriceProvider()
@@ -35,13 +39,24 @@ INTL_PRICE_PROVIDERS: dict[str, PriceProvider] = {}
 INTL_ANALYST_PROVIDERS: dict[str, AnalystProvider] = {}
 
 
+def _open_news() -> NewsProvider:
+    """Anahtar kelimeli / ABD dışı şirketin haber kaynağı: GNews (anahtar varsa), yoksa GDELT."""
+    return _GNEWS if _GNEWS.is_available() else _GDELT
+
+
 def get_provider_for(entity: Entity) -> NewsProvider | None:
-    """Bir entity için haber sağlayıcı (tip eşleşmezse None)."""
+    """Bir entity için BİRİNCİL haber sağlayıcı (tip eşleşmezse None)."""
     if entity.type == "ticker":
-        return _FINNHUB_NEWS if market_of(entity.query).is_us else _GDELT
+        return _FINNHUB_NEWS if market_of(entity.query).is_us else _open_news()
     if entity.type == "keyword":
-        return _NEWSAPI if get_settings().newsapi_enabled else _GDELT
+        return _NEWSAPI if get_settings().newsapi_enabled else _open_news()
     return None
+
+
+def fallback_provider_for(entity: Entity) -> NewsProvider | None:
+    """Birincil GNews ise yedek: GDELT (alım katmanı devre kesiciye bakar); diğerlerinde yok."""
+    primary = get_provider_for(entity)
+    return _GDELT if primary is not None and primary.name == _GNEWS.name else None
 
 
 def _intl(slots: dict, entity: Entity):
@@ -81,6 +96,8 @@ def get_target_provider() -> AnalystProvider:
 def provider_status() -> dict[str, bool]:
     """UI/uyarı için: sağlayıcıların anahtarı var mı? NewsAPI yalnızca açıkken listelenir."""
     status = {_FINNHUB_NEWS.name: _FINNHUB_NEWS.is_available(), _GDELT.name: True}
+    if _GNEWS.is_available():
+        status[_GNEWS.name] = True
     if get_settings().newsapi_enabled:
         status[_NEWSAPI.name] = _NEWSAPI.is_available()
     status[_TARGET_PROVIDER.name] = _TARGET_PROVIDER.is_available()
