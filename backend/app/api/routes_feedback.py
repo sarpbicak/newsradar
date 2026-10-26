@@ -10,6 +10,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
+from .errors import ApiError
 from ..config import get_settings
 from ..db.database import get_db
 from ..db.models import Feedback, User
@@ -60,7 +61,7 @@ def submit_feedback(
     """Geri bildirim kaydet. Anon ya da kayıtlı; user_id varsa bağlanır."""
     ip = get_client_ip(request)
     if not _feedback_limiter.allow(ip):
-        raise HTTPException(
+        raise ApiError(code="feedback_rate",
             status_code=429,
             detail="Çok fazla geri bildirim gönderildi, biraz sonra tekrar deneyin.",
         )

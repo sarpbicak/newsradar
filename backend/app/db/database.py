@@ -6,11 +6,11 @@ import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from fastapi import HTTPException
 from sqlalchemy import create_engine, event
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
+from ..api.errors import ApiError
 from ..config import get_settings
 
 _settings = get_settings()
@@ -161,7 +161,7 @@ def get_db() -> Iterator[Session]:
         except SQLAlchemyError as exc:
             session.rollback()
             logger.exception("İstek sonu commit başarısız — değişiklikler geri alındı.")
-            raise HTTPException(
+            raise ApiError(code="save_failed",
                 status_code=500,
                 detail="Değişiklik kaydedilemedi, lütfen tekrar deneyin.",
             ) from exc

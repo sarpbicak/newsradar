@@ -1,4 +1,4 @@
-"""E-posta şablonları (TR/EN) — sade HTML + düz metin.
+"""E-posta şablonları (TR/EN/DE) — sade HTML + düz metin. Almanca metinler app/locales'ten.
 
 Sitenin açık temasıyla uyumlu: beyaz kart, ince kenar, vurgu rengi tek düğmede; logo METİN
 ("NewsRadar"), görsel/izleme pikseli yok. Kullanıcı girdisi (kullanıcı adı) HTML'e kaçışlı girer.
@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from html import escape
 
+from .locales import email_de
 from .mailer import EmailMessage
 
 _ACCENT = "#0E7490"   # açık temadaki vurgu (AA, beyaz zeminde)
@@ -59,13 +60,25 @@ _FOOTER = {
 }
 
 
+_FIELDS = ("subject", "hello", "body", "button", "expires", "ignore")
+
+
+def _texts(kind: str, lang: str) -> tuple[dict, str]:
+    """(şablon metinleri, alt not). DE: app/locales/email.de.json (tek kaynak: frontend de.json)."""
+    if lang == "de":
+        de = email_de()
+        return {f: de[f"email.{kind}.{f}"] for f in _FIELDS}, de["email.footer"]
+    lang = "en" if lang == "en" else "tr"
+    return TEXTS[kind][lang], _FOOTER[lang]
+
+
 def render(kind: str, lang: str, name: str, link: str) -> tuple[str, str, str]:
     """(konu, düz metin, html)."""
-    lang = "en" if lang == "en" else "tr"
-    t = TEXTS[kind][lang]
+    lang = lang if lang in ("tr", "en", "de") else "tr"
+    t, footer = _texts(kind, lang)
     hello = t["hello"].format(name=name)
     text = "\n\n".join([
-        "NewsRadar", hello, t["body"], link, t["expires"], t["ignore"], "—", _FOOTER[lang],
+        "NewsRadar", hello, t["body"], link, t["expires"], t["ignore"], "—", footer,
     ])
     e = escape
     html = f"""<!doctype html>
@@ -83,7 +96,7 @@ def render(kind: str, lang: str, name: str, link: str) -> tuple[str, str, str]:
 <p style="margin:0 0 20px;font-size:13px;color:{_MUTED};">{e(t["ignore"])}</p>
 <p style="margin:0 0 4px;font-size:12px;color:{_MUTED};word-break:break-all;">{e(link)}</p>
 </td></tr>
-<tr><td style="padding:16px 28px 24px;border-top:1px solid {_LINE};font-size:12px;color:{_MUTED};">{e(_FOOTER[lang])}</td></tr>
+<tr><td style="padding:16px 28px 24px;border-top:1px solid {_LINE};font-size:12px;color:{_MUTED};">{e(footer)}</td></tr>
 </table></td></tr></table></body></html>"""
     return t["subject"], text, html
 

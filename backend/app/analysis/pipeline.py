@@ -93,9 +93,11 @@ ASSESSMENT_READ_CAP = 200
 MAX_ANALYSIS_HISTORY = 100  # entity başına saklanacak en fazla değerlendirme kaydı
 MAX_DISCARDED_PER_ENTITY = 50  # entity başına saklanan elenen-makale kaydı
 # TEK KAYNAK: değerlendirme şirket başına BİR KEZ, kaynak dilde (EN: haberlerin çoğu İngilizce,
-# çıktı tokeni Türkçeden az) üretilir; diğer dil yalnızca metin çevirisidir (makale modeli).
+# çıktı tokeni Türkçeden az) üretilir; diğer diller yalnızca metin çevirisidir (makale modeli).
+# Yeni bir dil eklenince mevcut kayıtlar yeniden DEĞERLENDİRİLMEZ: eksik dil, kayıttaki EN
+# metinden çevrilip eklenir (_backfill_translations; yalnızca çeviri maliyeti).
 ASSESSMENT_SOURCE_LANG = "en"
-ASSESSMENT_LANGUAGES = ("en", "tr")
+ASSESSMENT_LANGUAGES = ("en", "tr", "de")
 # GEREKSİZ DEĞERLENDİRMEYİ ATLA (en büyük maliyet kazancı): entity değerlendirmesi
 # yalnızca (a) son değerlendirmeden sonra yeni analiz edilmiş makale varsa, (b) fiyat
 # o zamandan beri ≥ |%3| oynadıysa ya da (c) son değerlendirme 24 saatten eskiyse yapılır.
@@ -164,6 +166,8 @@ _BANNED_NOTE = {
     "en": ("NOTE: The previous attempt used a banned boilerplate phrase ({found}). Do NOT use ANY "
            "of these or close variants: {phrases}. Convey the direction through this company's "
            "concrete event, not a stock phrase."),
+    "de": ("NOTE: The previous German translation used a banned boilerplate phrase ({found}). Do NOT "
+           "use ANY of these or close variants: {phrases}. Translate the concrete event instead."),
 }
 _MARKUP_NOTE = {
     "tr": ("NOT: Önceki denemede bir metin alanının İÇİNE etiket/XML yazıldı (ör. '</summary>', "
@@ -180,6 +184,9 @@ _LANG_NOTE = {
     "en": ("NOTE: The previous attempt mixed Turkish into the English text ({found}). Write ALL "
            "text fields ONLY in English; no Turkish words or Turkish letters (ğ, ş, ı, ü, ö, ç). "
            "Only proper nouns (company/product/person) stay as they are."),
+    "de": ("NOTE: The previous German translation contained non-German words ({found}). Write ALL "
+           "fields ONLY in German; no English words (already, however, although, because, while, "
+           "which, the) and no Turkish. Only proper nouns stay as they are."),
 }
 # Vade hükmü etken yönleriyle çelişiyor → bir kez yeniden iste; yine çelişirse "mixed".
 _HORIZON_NOTE = {
@@ -441,6 +448,7 @@ class AnalyzeTotals:
     llm_articles: int = 0       # bu taramada LLM'e gidip yanıtı alınan makale (tutulan + elenen)
     discarded: int = 0          # relevance < eşik → elenen
     entity_assessments: int = 0  # entity-başı değerlendirme üretilen
+    translations_backfilled: int = 0  # yeniden değerlendirmesiz eklenen çeviri (dil başına)
     expired: int = 0            # lookback dışına düştüğü için LLM'e gönderilmeyecek (bu taramada işaretlenen)
     assessments_skipped: int = 0  # yeni veri olmadığı için atlanan değerlendirme (dil başına)
     returned: int = 0           # Claude'un döndürdüğü toplam analiz (teşhis)
@@ -712,9 +720,9 @@ def _read_assessment_payload(entity_id: int) -> list[dict]:
 def _assessment_due(entity_id: int) -> str | None:
     """Yeni (tek kaynak) değerlendirme gerekiyorsa SEBEBİNİ, gerekmiyorsa None döndürür.
 
-    Dil başına değil ŞİRKET başına: TR ve EN aynı kaydı paylaşır. Yalnızca eski dil başına
-    kayıtları olan şirket ilk yenilemede tek kaynağa geçer; çevirisi eksik kalan kayıt da
-    yeniden üretilir (kullanıcı başka dilin hükmünü hiç görmesin)."""
+    Dil başına değil ŞİRKET başına: tüm diller aynı kaydı paylaşır. Yalnızca eski dil başına
+    kayıtları olan şirket ilk yenilemede tek kaynağa geçer. Çevirisi eksik dil yeniden
+    değerlendirme SEBEBİ DEĞİLDİR: _backfill_translations kayıttaki EN metinden tamamlar."""
     now = datetime.now(timezone.utc)
     with session_scope() as session:
         last = session.scalar(
@@ -725,9 +733,8 @@ def _assessment_due(entity_id: int) -> str | None:
         )
         if last is None:
             return "tek kaynak değerlendirme yok"
-        missing = [lang for lang in ASSESSMENT_LANGUAGES if lang not in (last.texts or {})]
-        if missing:
-            return f"çeviri eksik ({', '.join(missing)})"
+        if ASSESSMENT_SOURCE_LANG not in (last.texts or {}):
+            return "kaynak dil metni yok"
         last_at = last.created_at
         if now - last_at > timedelta(hours=ASSESSMENT_MAX_AGE_HOURS):
             return f"son değerlendirme {ASSESSMENT_MAX_AGE_HOURS} saatten eski"
@@ -822,6 +829,60 @@ def _translate_texts(client, source: dict, target: str, name: str) -> dict | Non
     elif best_notes:
         logger.warning("[%s] çeviride kalan sorun (%s): %s", name, target, " | ".join(best_notes))
     return best
+
+
+def _missing_translations(entity_id: int) -> tuple[int, dict, list[str]] | None:
+    """Son tek kaynak kayıtta eksik diller: (kayıt_id, EN_metinler, eksik_diller) ya da None."""
+    with session_scope() as session:
+        last = session.scalar(
+            select(EntityAnalysis)
+            .where(EntityAnalysis.entity_id == entity_id, EntityAnalysis.language == ALL_LANGUAGES)
+            .order_by(EntityAnalysis.created_at.desc())
+            .limit(1)
+        )
+        texts = (last.texts or {}) if last is not None else {}
+        source = texts.get(ASSESSMENT_SOURCE_LANG)
+        missing = [lang for lang in ASSESSMENT_LANGUAGES if lang not in texts]
+        if last is None or not source or not missing:
+            return None
+        return last.id, dict(source), missing
+
+
+def _store_translations(analysis_id: int, translations: dict[str, dict]) -> None:
+    """Çevirileri kaydın `texts` alanına ekler (hüküm/risk/yönlere dokunmaz)."""
+    with session_scope() as session:
+        row = session.get(EntityAnalysis, analysis_id)
+        if row is None:
+            return
+        texts = dict(row.texts or {})
+        texts.update(translations)
+        row.texts = texts
+
+
+def _backfill_translations(translate_client, entity_id: int, name: str) -> list[str]:
+    """Yeniden değerlendirme GEREKMEYEN şirkette eksik dilleri (ör. yeni eklenen DE) kayıttaki
+    EN metinden çevirir. Yalnızca çeviri çağrısı (makale modeli). Başarısız dil yazılmaz,
+    arayüz "bu dilde henüz yok" gösterir; sonraki yenileme yeniden dener. Eklenen diller döner."""
+    found = _missing_translations(entity_id)
+    if found is None:
+        return []
+    analysis_id, source, missing = found
+    done = _translate_missing(translate_client, source, missing, name)
+    if done:
+        _store_translations(analysis_id, done)
+    return list(done)
+
+
+def _translate_missing(translate_client, source: dict, missing: list[str], name: str) -> dict[str, dict]:
+    """Eksik dillerin çevirisi (DB'ye dokunmaz); başarısız dil sonuçta yer almaz."""
+    done = {}
+    for lang in missing:
+        out = _translate_texts(translate_client, source, lang, name)
+        if out is not None:
+            done[lang] = out
+    if done:
+        logger.info("[%s] eksik çeviri tamamlandı: %s", name, ", ".join(done))
+    return done
 
 
 def _assess_and_translate(assess_client, translate_client, build_fn, payload, name):
@@ -1178,6 +1239,23 @@ async def analyze_all_async(
                     _note_quota(exc)  # değerlendirme _call'ı kullanmaz → burada işaretle
                 except ClaudeError as exc:
                     totals.warnings.append(msg("assessment_failed", t["name"], lang=ASSESSMENT_SOURCE_LANG, error=exc))
+        elif not needed and not _quota_stopped["flag"]:
+            # Değerlendirme güncel ama bir dil eksik (ör. DE yeni eklendi / çeviri başarısızdı):
+            # yalnızca o dili EN metinden çevir.
+            async with db_lock:
+                pending = await asyncio.to_thread(_missing_translations, t["id"])
+            if pending is not None and not await asyncio.to_thread(_over_budget):
+                analysis_id, source, missing = pending
+                try:
+                    async with sem:
+                        added = await asyncio.to_thread(
+                            _translate_missing, translate_client, source, missing, t["name"])
+                    if added:
+                        async with db_lock:
+                            await asyncio.to_thread(_store_translations, analysis_id, added)
+                    totals.translations_backfilled += len(added)
+                except ProviderQuotaError as exc:
+                    _note_quota(exc)
 
         done += 1
         _step(t["id"], t["name"], "done", frac=1.0)
@@ -1329,5 +1407,7 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient, assess_client=None
             totals.entity_assessments += 1
         except ClaudeError as exc:
             totals.warnings.append(msg("assessment_failed", name, lang=ASSESSMENT_SOURCE_LANG, error=exc))
+    elif not needed:
+        totals.translations_backfilled += len(_backfill_translations(translate_client, entity_id, name))
 
     return totals

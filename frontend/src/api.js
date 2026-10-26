@@ -46,18 +46,28 @@ function authHeaders(extra = {}) {
   return h;
 }
 
+// Makinece okunur hata kodları → kullanıcının dilinde mesaj. Özel eşlemeler (mükerrer şirket)
+// + genel kural: backend `code` → `err.<code>` (backend/app/api/errors.py). Anahtar yoksa
+// backend'in `detail` metni.
+const CODE_MESSAGES = { duplicate_entity: "wl.duplicate", already_in_watchlist: "wl.alreadyIn" };
+export function codeMessage(code, params) {
+  if (!code) return null;
+  const key = CODE_MESSAGES[code] || `err.${code}`;
+  const s = tt(key, params || {});
+  return s === key ? null : s;
+}
+
 async function parseError(res, fallback) {
   let detail = fallback || res.statusText;
   try {
-    detail = (await res.json()).detail || detail;
+    const body = await res.json();
+    detail = codeMessage(body.code, body.params) || body.detail || detail;
   } catch {
     /* yoksay */
   }
   return detail;
 }
 
-// Makinece okunur hata kodları → kullanıcının dilinde mesaj (ör. mükerrer şirket: 409).
-const CODE_MESSAGES = { duplicate_entity: "wl.duplicate", already_in_watchlist: "wl.alreadyIn" };
 async function apiError(res) {
   let body = null;
   try {
@@ -65,9 +75,9 @@ async function apiError(res) {
   } catch {
     /* gövde yok */
   }
-  const key = body && CODE_MESSAGES[body.code];
   const dup = body?.duplicate_of;
-  const msg = key ? tt(key, { name: dup?.display_name || dup?.name || "" }) : body?.detail || res.statusText;
+  const coded = body && codeMessage(body.code, { ...(body.params || {}), name: dup?.display_name || dup?.name || "" });
+  const msg = coded || body?.detail || res.statusText;
   const err = new Error(typeof msg === "string" ? msg : res.statusText);
   err.code = body?.code;
   err.status = res.status;
@@ -84,7 +94,7 @@ async function req(path, options = {}) {
   if (res.status === 401) {
     setUserToken(null); // kişisel oturum düştü → App yeni anon oturum başlatır
     onUnauthorized?.();
-    throw new Error("Oturum geçersiz. Lütfen tekrar deneyin.");
+    throw new Error(tt("api.sessionInvalid"));
   }
   if (!res.ok) throw await apiError(res);
   if (res.status === 204) return null;
@@ -104,7 +114,7 @@ export async function bootstrapSession() {
     headers: { "Content-Type": "application/json" },
     credentials: "include", // HttpOnly device cookie yaz/oku
   });
-  if (!res.ok) throw new Error(await parseError(res, "Oturum başlatılamadı."));
+  if (!res.ok) throw new Error(await parseError(res, tt("api.sessionStartFailed")));
   const data = await res.json();
   setUserToken(data.token);
   return data.user;
@@ -129,7 +139,7 @@ async function userAuth(path, body) {
     credentials: "include",
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(await parseError(res, "İşlem başarısız."));
+  if (!res.ok) throw new Error(await parseError(res, tt("api.requestFailed")));
   const data = await res.json();
   setUserToken(data.token);
   return data.user;
@@ -299,11 +309,11 @@ export async function streamChat({ entityId, messages, onDelta, onError, onDone 
   if (res.status === 401) {
     setUserToken(null);
     onUnauthorized?.();
-    onError?.("Oturum geçersiz. Lütfen tekrar giriş yapın.");
+    onError?.(tt("err.session_invalid"));
     return;
   }
   if (!res.ok || !res.body) {
-    onError?.(`Sohbet başlatılamadı (${res.status}).`);
+    onError?.(tt("api.chatStartFailed", { status: res.status }));
     return;
   }
 
@@ -335,7 +345,7 @@ export async function streamChat({ entityId, messages, onDelta, onError, onDone 
         /* yoksay */
       }
       if (event === "delta") onDelta?.(payload.text || "");
-      else if (event === "error") onError?.(payload.message || "Bilinmeyen hata");
+      else if (event === "error") onError?.(codeMessage(payload.code) || payload.message || tt("api.unknownError"));
       else if (event === "done") onDone?.();
     }
   }

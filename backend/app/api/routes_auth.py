@@ -21,6 +21,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from .errors import ApiError
 from ..config import get_settings
 from ..db.database import get_db
 from ..db.models import User
@@ -78,7 +79,7 @@ def get_current_user(
     settings = get_settings()
     if not settings.app_secret:
         raise HTTPException(status_code=503, detail="APP_SECRET/APP_PASSWORD ayarlanmamış; giriş devre dışı.")
-    invalid = HTTPException(status_code=401, detail="Geçersiz veya süresi dolmuş oturum. Lütfen tekrar giriş yapın.")
+    invalid = ApiError(code="session_invalid", status_code=401, detail="Geçersiz veya süresi dolmuş oturum. Lütfen tekrar giriş yapın.")
 
     token = _bearer(authorization)
     parts = token.split(".") if token else []
@@ -113,7 +114,7 @@ def get_current_user(
 def require_admin(user: User = Depends(get_current_user)) -> User:
     """Admin-only uçlar için: kullanıcı admin değilse 403."""
     if not user.is_admin:
-        raise HTTPException(status_code=403, detail="Bu alan yalnızca yöneticiye açık.")
+        raise ApiError(code="admin_only", status_code=403, detail="Bu alan yalnızca yöneticiye açık.")
     return user
 
 
@@ -142,11 +143,11 @@ def login(payload: LoginIn, request: Request) -> LoginOut:
     ip = get_client_ip(request)
     locked = login_limiter.locked_seconds(ip)
     if locked:
-        raise HTTPException(status_code=429, detail=f"Çok fazla deneme. {locked // 60 + 1} dk sonra tekrar deneyin.")
+        raise ApiError(code="too_many_attempts", params={"minutes": locked // 60 + 1}, status_code=429, detail=f"Çok fazla deneme. {locked // 60 + 1} dk sonra tekrar deneyin.")
     # Sabit-zamanlı karşılaştırma (zamanlama saldırısına karşı).
     if not hmac.compare_digest(payload.password, settings.app_password):
         login_limiter.record_failure(ip)
-        raise HTTPException(status_code=401, detail="Yanlış şifre.")
+        raise ApiError(code="wrong_password", status_code=401, detail="Yanlış şifre.")
     login_limiter.record_success(ip)
     return LoginOut(token=_expected_token(settings.app_password))
 
@@ -164,6 +165,6 @@ def require_auth(authorization: str | None = Header(default=None)) -> None:
         token = authorization[7:].strip()
     expected = _expected_token(settings.app_password)
     if not token or not hmac.compare_digest(token, expected):
-        raise HTTPException(
+        raise ApiError(code="session_invalid",
             status_code=401, detail="Geçersiz veya eksik oturum. Lütfen giriş yapın."
         )

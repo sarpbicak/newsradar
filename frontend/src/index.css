@@ -191,6 +191,19 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Almanca: uzun bileşik kelimeler (Beobachtungsliste, Benachrichtigungen) dar buton, sekme ve
+   kartlarda taşmasın → tarayıcı hecelemesi (<html lang="de">, I18nProvider), son çare kırma. */
+html:lang(de) body {
+  -webkit-hyphens: auto;
+  hyphens: auto;
+  overflow-wrap: break-word;
+}
+/* Büyük başlıklarda heceleme çirkin durur ("Dutzen-de") → yalnızca boşlukta kırılır. */
+html:lang(de) :is(h1, h2, .lx-display, .lx-mega) {
+  -webkit-hyphens: manual;
+  hyphens: manual;
+}
+
 /* Teknik/mono ve display fontları için yardımcı sınıflar */
 .font-display {
   font-family: "Inter Display", Inter, system-ui, sans-serif;

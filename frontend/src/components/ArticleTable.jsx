@@ -4,7 +4,7 @@
 import React, { useMemo, useState } from "react";
 import { ChevronRight, ExternalLink } from "lucide-react";
 import { RelTime, eventLabel, flagLabel, sentimentLabel } from "./ui.jsx";
-import { getLang, tt, useI18n } from "../i18n.jsx";
+import { getLang, localeOf, tt, useI18n } from "../i18n.jsx";
 import { Button, Card, Chip, LabelChip, Select } from "./kit.jsx";
 
 const RISK_FLAGS = ["regulatory","competition","financial","legal","product","supply_chain","macro","reputation"];
@@ -20,7 +20,7 @@ function SourceCount({ n }) {
 }
 
 // Seçenek metnini cümle başı büyük harfle göster ("Tüm risk bayrakları", "Makro").
-const cap = (s) => (s ? s.charAt(0).toLocaleUpperCase(getLang() === "tr" ? "tr-TR" : "en-US") + s.slice(1) : s);
+const cap = (s) => (s ? s.charAt(0).toLocaleUpperCase(localeOf(getLang())) + s.slice(1) : s);
 
 export default function ArticleTable({ articles }) {
   const { t } = useI18n();

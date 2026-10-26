@@ -9,10 +9,12 @@ IP yalnızca oturum-oluşturma hız sınırı için (ephemeral); KİMLİK olarak
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from .errors import ApiError
+from ..languages import language_from_accept
 from ..config import get_settings
 from ..db.database import get_db
 from ..db.models import User
@@ -55,21 +57,20 @@ def bootstrap(request: Request, response: Response, db: Session = Depends(get_db
         # Yeni anon oturum — kötüye kullanım/maliyet koruması.
         ip = get_client_ip(request)
         if not anon_create_limiter.allow(ip):
-            raise HTTPException(
+            raise ApiError(code="session_rate",
                 status_code=429,
                 detail="Çok fazla yeni oturum açıldı, biraz sonra tekrar deneyin.",
             )
         if settings.max_users > 0:
             n = db.scalar(select(func.count()).select_from(User)) or 0
             if n >= settings.max_users:
-                raise HTTPException(
+                raise ApiError(code="site_full",
                     status_code=503,
                     detail="Site şu an dolu, biraz sonra tekrar deneyin.",
                 )
         device_id = new_device_id()
-        # Tarayıcı dilini varsayılan öner (Accept-Language "tr..." → tr, aksi halde en).
-        accept = (request.headers.get("accept-language") or "").strip().lower()
-        default_lang = "tr" if accept.startswith("tr") else "en"
+        # Tarayıcı dilini varsayılan öner (Accept-Language de → de, tr → tr, diğerleri → en).
+        default_lang = language_from_accept(request.headers.get("accept-language"))
         user = create_anonymous_user(db, device_id, language=default_lang)
 
     _set_device_cookie(response, device_id)  # süreyi her ziyarette tazele

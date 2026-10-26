@@ -4,7 +4,7 @@
 // compact=true: kart için kısa gösterim. false: detay için tam gösterim + hedef aralık barı.
 import React from "react";
 import { BarChart3 } from "lucide-react";
-import { fmtDate, fmtMonth, fmtPct, getLang, parseUtc, tt } from "../i18n.jsx";
+import { fmtDate, fmtMonth, fmtPct, getLang, localeOf, parseUtc, tt } from "../i18n.jsx";
 import { C, cssColor } from "../theme.js";
 import { fmtMoney } from "../money.js";
 import { EmptyState } from "./kit.jsx";
@@ -134,7 +134,7 @@ function StackedBar({ analyst, dim = false }) {
 
 // Dönemlere göre dağılım: küçük yığılmış sütunlar (Finnhub aylık dönemleri).
 function PeriodColumns({ history }) {
-  const loc = getLang() === "tr" ? "tr-TR" : "en-US";
+  const loc = localeOf(getLang());
   return (
     <div className="mt-3 flex items-end gap-3">
       {history.map((h) => {

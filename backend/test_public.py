@@ -81,7 +81,7 @@ with TestClient(app) as c:
     check(d["articles_analyzed"] == 3, f"analiz edilen haber = 3 (analyzed=True) ({d['articles_analyzed']})")
     check(d["assessments"] == 3, f"AI değerlendirmesi = 3 (tüm diller) ({d['assessments']})")
     check(d["news_sources"] == 2, f"farklı haber kaynağı = 2 (boş sayılmaz, harf/boşluk farkı tek) ({d['news_sources']})")
-    check(d["languages"] == ["tr", "en"], f"diller ({d['languages']})")
+    check(d["languages"] == ["tr", "en", "de"], f"diller ({d['languages']})")
     check(set(d) == {"articles_analyzed", "assessments", "news_sources", "languages"}, f"yalnızca toplamlar ({sorted(d)})")
 
     print("== C+D: /public/how-it-works (oturumsuz)")
@@ -91,7 +91,7 @@ with TestClient(app) as c:
         check(r.status_code == 200 and d["available"] and d["entity"]["query"] == "NVDA",
               f"lang={lang}: NVIDIA seçildi, seed dışı SecretStartup değil ({d.get('entity') and d['entity']['query']})")
         check(d["entity"]["analysis"]["headline_verdict"] == f"Verdict {lang}.", f"lang={lang}: değerlendirme o dilde")
-    check(c.get("/public/how-it-works", params={"lang": "de"}).status_code == 422, "geçersiz dil → 422")
+    check(c.get("/public/how-it-works", params={"lang": "fr"}).status_code == 422, "geçersiz dil (fr) → 422")
     body = c.get("/public/how-it-works", params={"lang": "en"}).text
     check("alice" not in body and "bob" not in body and "SecretStartup" not in body, "yanıtta kullanıcı/özel şirket yok")
     check(c.get("/how-it-works").status_code == 401, "oturumlu /how-it-works hâlâ korumalı (401)")

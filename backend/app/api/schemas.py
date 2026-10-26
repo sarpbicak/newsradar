@@ -479,6 +479,7 @@ class SymbolResultOut(BaseModel):
     exchange_name: str       # insan-okur borsa adı ("NYSE / Nasdaq", "XETRA", "Borsa İstanbul"...)
     country_tr: str = ""     # "Almanya"
     country_en: str = ""     # "Germany"
+    country_de: str = ""     # "Deutschland"
     currency: str = "USD"    # fiyatın para birimi (ISO 4217)
     suggested_language: str  # haber dili ipucu (IS→tr, DE→de, diğerleri en)
 

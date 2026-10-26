@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from .errors import ApiError
 from ..db.database import get_db
 from ..db.models import Article, Entity, User
 from ..watchlist import in_watchlist
@@ -29,7 +30,7 @@ def entity_dashboard(
     # İZOLASYON: kullanıcının kendi listesinde OLMAYAN entity'nin detayına erişemez.
     # Var olmayan gibi 404 (varlığını bile sızdırma — başkasının takip ettiği ortaya çıkmasın).
     if entity is None or not in_watchlist(db, user.id, entity_id):
-        raise HTTPException(status_code=404, detail="Entity bulunamadı.")
+        raise ApiError(code="entity_not_found", status_code=404, detail="Entity bulunamadı.")
     record_event(db, user.id, "view_entity", {"entity_id": entity.id, "name": entity.name})
 
     articles = db.scalars(

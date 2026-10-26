@@ -130,9 +130,18 @@ def language_line(language: str) -> str:
     )
 
 
-# Çıktı dili direktifi (KATI). Entity değerlendirmesi hem tr hem en üretilir; makale
+# Çıktı dili direktifi (KATI). Entity değerlendirmesi EN üretilir, TR/DE çeviridir; makale
 # analizi + sohbet çağıranın diline göre. Özel adlar (şirket/ürün/kişi) olduğu gibi kalır.
 def output_language_directive(out_lang: str) -> str:
+    if (out_lang or "tr").lower() == "de":
+        return (
+            "ÇIKTI DİLİ (KATI): TÜM metin alanları ve sohbet cevapları AKICI, DOĞAL ve SADE "
+            "ALMANCA olacak; okura 'du' diye hitap et (Sie değil). YALNIZCA Almanca yaz: "
+            "İngilizce bağlaç/zarf (already, however, although, because, while, which, the) ve "
+            "Türkçe kelime KARIŞTIRMA; kaynak haber İngilizce ya da Türkçe olsa bile Almancaya "
+            "çevir. Uzun tire (—) kullanma. Yalnızca özel adlar (şirket/ürün/kişi) olduğu gibi "
+            "kalır. Göndermeden önce her cümlenin tamamen Almanca olduğunu kontrol et."
+        )
     if (out_lang or "tr").lower() == "en":
         return (
             "ÇIKTI DİLİ (KATI): TÜM metin alanları (rationale, summary, ai_take, "
@@ -457,6 +466,20 @@ def entity_assessment_rules(out_lang: str) -> str:
 # risk, yönler ve enum'lar istemde YOKTUR → çeviri onları değiştiremez.
 def build_translation_prompt(texts: dict, target: str = "tr") -> str:
     payload = json.dumps(texts, ensure_ascii=False, indent=1)
+    if (target or "tr").lower() == "de":
+        return (
+            "Translate every field of the JSON below into natural, plain German and return it "
+            "with the 'record_translation' tool.\n"
+            "RULES: keep the meaning exactly (do not add, drop or soften anything; do not change "
+            "whether something is good or bad for the company); same number of list items in the "
+            "same order; keep names, products, tickers and numbers as they are; every non-empty "
+            "field is a complete sentence ending with '.', '!' or '?'; empty fields stay empty. "
+            "Everyday German a high-school student understands: avoid 'Volatilität', 'Momentum', "
+            "'Konsolidierung', 'Bewertungsniveau', 'Katalysator'. If the reader is addressed, use "
+            "'du', never 'Sie'. Write ONLY German: no English words (already, however, although, "
+            "because, while, which, the). No em dashes (—). No first person. Never use these "
+            "phrases: " + ", ".join(f"'{p}'" for p in BANNED_PHRASES["de"]) + ".\n\nJSON:\n" + payload
+        )
     if (target or "tr").lower() == "en":
         return (
             "Translate every field of the JSON below into natural, plain English and return it "

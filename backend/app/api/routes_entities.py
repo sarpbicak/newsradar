@@ -10,12 +10,13 @@ from __future__ import annotations
 import threading
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from .errors import ApiError
 from ..config import get_settings
 from ..db.database import get_db
 from ..db.models import Entity, User
@@ -155,7 +156,7 @@ def create_entity(
 
         ok, limit = can_add_entity(db, user)
         if not ok:
-            raise HTTPException(
+            raise ApiError(code="watchlist_limit", params={"limit": limit},
                 status_code=403,
                 detail=f"En fazla {limit} şirket takip edebilirsiniz. Yeni eklemek için birini çıkarın.",
             )
@@ -172,7 +173,7 @@ def create_entity(
 
         # YENİ entity (havuzda yok) → sistem-geneli günlük ekleme sınırını uygula.
         if not _daily_new_entity_ok(db, user):
-            raise HTTPException(
+            raise ApiError(code="daily_add_cap",
                 status_code=429,
                 detail="Bugün için yeni şirket ekleme sınırı doldu, yarın tekrar deneyin.",
             )
@@ -191,7 +192,7 @@ def create_entity(
                 select(Entity).where(Entity.type == payload.type, Entity.query == payload.query)
             )
             if existing is None:
-                raise HTTPException(status_code=409, detail="Şirket eklenemedi.")
+                raise ApiError(code="entity_add_failed", status_code=409, detail="Şirket eklenemedi.")
             if not in_watchlist(db, user.id, existing.id):
                 add_to_watchlist(db, user.id, existing.id)
             record_event(db, user.id, "add_entity", {"entity_id": existing.id, "name": existing.name})
@@ -216,7 +217,7 @@ def delete_entity(
     (recompute_active) — silinmez, veri başkası tekrar eklerse hazır durur.
     """
     if not remove_from_watchlist(db, user.id, entity_id):
-        raise HTTPException(status_code=404, detail="Bu şirket izleme listenizde değil.")
+        raise ApiError(code="not_in_watchlist", status_code=404, detail="Bu şirket izleme listenizde değil.")
     entity = db.get(Entity, entity_id)
     name = entity.name if entity else None
     record_event(db, user.id, "remove_entity", {"entity_id": entity_id, "name": name})

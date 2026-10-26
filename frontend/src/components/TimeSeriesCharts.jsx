@@ -28,7 +28,7 @@ import {
   YAxis,
 } from "recharts";
 import { BarChart3 } from "lucide-react";
-import { tt, parseUtc, getLang, fmtPct } from "../i18n.jsx";
+import { tt, parseUtc, getLang, fmtPct, localeOf } from "../i18n.jsx";
 import { fmtMoney } from "../money.js";
 import { C } from "../theme.js";
 import { Card, EmptyState, Tabs } from "./kit.jsx";
@@ -48,7 +48,7 @@ function dayStart(iso) {
   const d = parseUtc(iso);
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
-const locale = () => (getLang() === "tr" ? "tr-TR" : "en-US");
+const locale = () => localeOf(getLang());
 const fmtDay = (ts) => new Date(ts).toLocaleDateString(locale(), { day: "numeric", month: "short" });
 // Fiyat kendi para biriminde, dile uygun ondalıkla (grafik eksen/ipucu/etiket aynı biçim).
 const fmtPrice = (v, cur) => fmtMoney(v, cur, getLang());

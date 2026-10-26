@@ -75,6 +75,7 @@ def search_symbols(query: str, limit: int = 8) -> list[dict]:
                 "exchange_name": m.exchange,
                 "country_tr": m.country_tr,
                 "country_en": m.country_en,
+                "country_de": m.country_de,
                 "currency": m.currency,
                 "suggested_language": m.news_lang,
             }

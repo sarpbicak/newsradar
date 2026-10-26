@@ -13,6 +13,7 @@ from ..config import get_settings
 from ..markets import market_of
 from ..analysis.schemas import apply_texts
 from ..db.models import ALL_LANGUAGES, AnalystSnapshot, Article, Entity, EntityAnalysis, PriceSnapshot
+from ..languages import UI_LANGUAGES
 from .schemas import (
     AnalysisOut,
     AnalystOut,
@@ -28,11 +29,11 @@ from .schemas import (
 )
 
 
-ANALYSIS_LANGUAGES = ("tr", "en")
+ANALYSIS_LANGUAGES = UI_LANGUAGES
 
 
 def content_language(user, lang: str | None = None) -> str:
-    """AI içeriğinin dili: istekte geçerli `?lang=tr|en` varsa o (arayüzün o anki dili —
+    """AI içeriğinin dili: istekte geçerli `?lang=tr|en|de` varsa o (arayüzün o anki dili —
     POST /users/me/language ile yarışmaz), yoksa kullanıcının kayıtlı dili."""
     v = (lang or "").strip().lower()
     if v in ANALYSIS_LANGUAGES:
@@ -53,7 +54,7 @@ def _latest_analysis(session: Session, entity_id: int, language: str | None = No
     Yeni kayıtlar tek kaynak ("all"): TR ve EN aynı hükmü okur, metin `texts[dil]`'den gelir.
     En son tek kaynak kaydın bu dilde metni yoksa (çeviri başarısız) None: kart analizsiz döner
     + `analysis_missing_language=True` — eski dil kaydına düşüp FARKLI bir hüküm göstermez.
-    Eksik çeviri bir sonraki yenilemede tamamlanır (pipeline._assessment_due).
+    Eksik çeviri bir sonraki yenilemede tamamlanır (pipeline._backfill_translations).
     language=None → dilden bağımsız en son kayıt (yalnızca dil-nötr iç kullanım)."""
     q = _for_language(select(EntityAnalysis).where(EntityAnalysis.entity_id == entity_id), language)
     row = session.scalar(q.order_by(EntityAnalysis.created_at.desc()))

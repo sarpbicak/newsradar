@@ -143,9 +143,8 @@ export default function AccountModal({ mode: initialMode, onClose, onDone, user,
         : await userLogin(username.trim(), password);
       onDone(u);
     } catch (e2) {
-      // Sunucu e-posta hataları Türkçe gelir → kullanıcının diline çevir.
-      const mailErr = /e-posta/i.test(e2.message);
-      setErr(mailErr && e2.status === 409 ? t("acc.emailTaken") : mailErr && e2.status === 422 ? t("acc.emailInvalid") : e2.message);
+      // Sunucu hataları kodlu gelir; api.js mesajı zaten kullanıcının dilinde verir.
+      setErr(e2.message);
     } finally {
       setBusy(false);
     }

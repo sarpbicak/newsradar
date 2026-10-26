@@ -101,7 +101,7 @@ function ResetPassword() {
       await resetPassword(token, pw);
       setDone(true);
     } catch (e2) {
-      setErr(e2.status === 400 ? t("link.badReset") : e2.message);
+      setErr(e2.status === 400 ? t("link.badReset") : e2.code === "password_short" ? t("link.pwShort", { n: MIN_PASSWORD_LEN }) : e2.message);
     } finally {
       setBusy(false);
     }

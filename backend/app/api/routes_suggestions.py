@@ -7,13 +7,14 @@ burada, LİSTELEME anında yapılır.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from sqlalchemy import exists
 
+from .errors import ApiError
 from ..db.database import get_db
 from ..db.models import Entity, Suggestion, SuggestionDismissal, User
 from ..entity_names import company_keys, display_name_for, entity_keys
@@ -149,7 +150,7 @@ def dismiss_suggestion(
     """Öneriyi YALNIZCA bu kullanıcı için kapatır (KİŞİSEL — başkasını etkilemez)."""
     sug = db.get(Suggestion, suggestion_id)
     if sug is None:
-        raise HTTPException(status_code=404, detail="Öneri bulunamadı.")
+        raise ApiError(code="suggestion_not_found", status_code=404, detail="Öneri bulunamadı.")
     already = db.scalar(select(exists().where(
         SuggestionDismissal.user_id == user.id,
         SuggestionDismissal.suggestion_id == suggestion_id,
@@ -182,14 +183,14 @@ def add_suggestion(
     """
     sug = db.get(Suggestion, suggestion_id)
     if sug is None:
-        raise HTTPException(status_code=404, detail="Öneri bulunamadı.")
+        raise ApiError(code="suggestion_not_found", status_code=404, detail="Öneri bulunamadı.")
 
     # Kota yarışına karşı: create_entity ile AYNI kilit + commit-kilit-içinde deseni
     # (öneriyle ekleme de kişi-başı entity limitini eşzamanlı isteklerle aşamasın).
     with _add_lock:
         ok, limit = can_add_entity(db, user)
         if not ok:
-            raise HTTPException(
+            raise ApiError(code="watchlist_limit", params={"limit": limit},
                 status_code=403,
                 detail=f"En fazla {limit} şirket takip edebilirsiniz. Yeni eklemek için birini çıkarın.",
             )
@@ -228,7 +229,7 @@ def add_suggestion(
                 select(Entity).where(Entity.type == etype, Entity.query == query)
             )
             if existing is None:
-                raise HTTPException(status_code=409, detail="Entity eklenemedi.")
+                raise ApiError(code="entity_add_failed", status_code=409, detail="Entity eklenemedi.")
             _dismiss_for_user(db, user.id, suggestion_id)
             if not in_watchlist(db, user.id, existing.id):
                 add_to_watchlist(db, user.id, existing.id)

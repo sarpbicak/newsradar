@@ -16,6 +16,7 @@ class Market:
     exchange: str        # insan-okur borsa adı
     country_tr: str
     country_en: str
+    country_de: str
     currency: str        # ISO 4217 (fiyat kaynağı geldiğinde gösterim bu birimle; dönüşüm yok)
     news_lang: str       # haber dili ipucu (en/de/tr)
 
@@ -24,45 +25,45 @@ class Market:
         return self.code == "US"
 
     def country(self, lang: str) -> str:
-        return self.country_en if lang == "en" else self.country_tr
+        return {"en": self.country_en, "de": self.country_de}.get(lang, self.country_tr)
 
 
-US = Market("US", "NYSE / Nasdaq", "ABD", "United States", "USD", "en")
+US = Market("US", "NYSE / Nasdaq", "ABD", "United States", "USA", "USD", "en")
 
 # Finnhub son eki → pazar. Kaynak: Finnhub sembol biçimi (Ticker.ExchangeCode).
 _SUFFIX: dict[str, Market] = {m.code: m for m in (
-    Market("IS", "Borsa İstanbul", "Türkiye", "Türkiye", "TRY", "tr"),
-    Market("DE", "XETRA", "Almanya", "Germany", "EUR", "de"),
-    Market("F", "Frankfurt", "Almanya", "Germany", "EUR", "de"),
-    Market("VI", "Wiener Börse", "Avusturya", "Austria", "EUR", "de"),
-    Market("SW", "SIX Swiss Exchange", "İsviçre", "Switzerland", "CHF", "de"),
-    Market("AS", "Euronext Amsterdam", "Hollanda", "Netherlands", "EUR", "en"),
-    Market("PA", "Euronext Paris", "Fransa", "France", "EUR", "en"),
-    Market("BR", "Euronext Brüksel", "Belçika", "Belgium", "EUR", "en"),
-    Market("LS", "Euronext Lizbon", "Portekiz", "Portugal", "EUR", "en"),
-    Market("MI", "Borsa Italiana", "İtalya", "Italy", "EUR", "en"),
-    Market("MC", "Bolsa de Madrid", "İspanya", "Spain", "EUR", "en"),
-    Market("L", "Londra (LSE)", "Birleşik Krallık", "United Kingdom", "GBP", "en"),
-    Market("ST", "Nasdaq Stockholm", "İsveç", "Sweden", "SEK", "en"),
-    Market("HE", "Nasdaq Helsinki", "Finlandiya", "Finland", "EUR", "en"),
-    Market("CO", "Nasdaq Kopenhag", "Danimarka", "Denmark", "DKK", "en"),
-    Market("OL", "Oslo Børs", "Norveç", "Norway", "NOK", "en"),
-    Market("WA", "GPW (Varşova)", "Polonya", "Poland", "PLN", "en"),
-    Market("AT", "Atina Borsası", "Yunanistan", "Greece", "EUR", "en"),
-    Market("TO", "Toronto (TSX)", "Kanada", "Canada", "CAD", "en"),
-    Market("V", "TSX Venture", "Kanada", "Canada", "CAD", "en"),
-    Market("T", "Tokyo", "Japonya", "Japan", "JPY", "en"),
-    Market("HK", "Hong Kong", "Hong Kong", "Hong Kong", "HKD", "en"),
-    Market("KS", "Kore Borsası", "Güney Kore", "South Korea", "KRW", "en"),
-    Market("SS", "Şanghay", "Çin", "China", "CNY", "en"),
-    Market("SZ", "Shenzhen", "Çin", "China", "CNY", "en"),
-    Market("TW", "Tayvan", "Tayvan", "Taiwan", "TWD", "en"),
-    Market("SI", "Singapur (SGX)", "Singapur", "Singapore", "SGD", "en"),
-    Market("AX", "Avustralya (ASX)", "Avustralya", "Australia", "AUD", "en"),
-    Market("NS", "Hindistan (NSE)", "Hindistan", "India", "INR", "en"),
-    Market("BO", "Bombay (BSE)", "Hindistan", "India", "INR", "en"),
-    Market("SA", "B3 (São Paulo)", "Brezilya", "Brazil", "BRL", "en"),
-    Market("MX", "Meksika Borsası", "Meksika", "Mexico", "MXN", "en"),
+    Market("IS", "Borsa İstanbul", "Türkiye", "Türkiye", "Türkei", "TRY", "tr"),
+    Market("DE", "XETRA", "Almanya", "Germany", "Deutschland", "EUR", "de"),
+    Market("F", "Frankfurt", "Almanya", "Germany", "Deutschland", "EUR", "de"),
+    Market("VI", "Wiener Börse", "Avusturya", "Austria", "Österreich", "EUR", "de"),
+    Market("SW", "SIX Swiss Exchange", "İsviçre", "Switzerland", "Schweiz", "CHF", "de"),
+    Market("AS", "Euronext Amsterdam", "Hollanda", "Netherlands", "Niederlande", "EUR", "en"),
+    Market("PA", "Euronext Paris", "Fransa", "France", "Frankreich", "EUR", "en"),
+    Market("BR", "Euronext Brüksel", "Belçika", "Belgium", "Belgien", "EUR", "en"),
+    Market("LS", "Euronext Lizbon", "Portekiz", "Portugal", "Portugal", "EUR", "en"),
+    Market("MI", "Borsa Italiana", "İtalya", "Italy", "Italien", "EUR", "en"),
+    Market("MC", "Bolsa de Madrid", "İspanya", "Spain", "Spanien", "EUR", "en"),
+    Market("L", "Londra (LSE)", "Birleşik Krallık", "United Kingdom", "Vereinigtes Königreich", "GBP", "en"),
+    Market("ST", "Nasdaq Stockholm", "İsveç", "Sweden", "Schweden", "SEK", "en"),
+    Market("HE", "Nasdaq Helsinki", "Finlandiya", "Finland", "Finnland", "EUR", "en"),
+    Market("CO", "Nasdaq Kopenhag", "Danimarka", "Denmark", "Dänemark", "DKK", "en"),
+    Market("OL", "Oslo Børs", "Norveç", "Norway", "Norwegen", "NOK", "en"),
+    Market("WA", "GPW (Varşova)", "Polonya", "Poland", "Polen", "PLN", "en"),
+    Market("AT", "Atina Borsası", "Yunanistan", "Greece", "Griechenland", "EUR", "en"),
+    Market("TO", "Toronto (TSX)", "Kanada", "Canada", "Kanada", "CAD", "en"),
+    Market("V", "TSX Venture", "Kanada", "Canada", "Kanada", "CAD", "en"),
+    Market("T", "Tokyo", "Japonya", "Japan", "Japan", "JPY", "en"),
+    Market("HK", "Hong Kong", "Hong Kong", "Hong Kong", "Hongkong", "HKD", "en"),
+    Market("KS", "Kore Borsası", "Güney Kore", "South Korea", "Südkorea", "KRW", "en"),
+    Market("SS", "Şanghay", "Çin", "China", "China", "CNY", "en"),
+    Market("SZ", "Shenzhen", "Çin", "China", "China", "CNY", "en"),
+    Market("TW", "Tayvan", "Tayvan", "Taiwan", "Taiwan", "TWD", "en"),
+    Market("SI", "Singapur (SGX)", "Singapur", "Singapore", "Singapur", "SGD", "en"),
+    Market("AX", "Avustralya (ASX)", "Avustralya", "Australia", "Australien", "AUD", "en"),
+    Market("NS", "Hindistan (NSE)", "Hindistan", "India", "Indien", "INR", "en"),
+    Market("BO", "Bombay (BSE)", "Hindistan", "India", "Indien", "INR", "en"),
+    Market("SA", "B3 (São Paulo)", "Brezilya", "Brazil", "Brasilien", "BRL", "en"),
+    Market("MX", "Meksika Borsası", "Meksika", "Mexico", "Mexiko", "MXN", "en"),
 )}
 
 

@@ -1,11 +1,42 @@
 // Basit i18n katmanı: tr/en sözlükleri + useI18n() hook + dil-farkında tarih/zaman.
 // Kodda sabit metin kalmasın diye tüm arayüz metinleri buradan t(key) ile çekilir.
+// Almanca (de): TÜM metinler tek dosyada, locales/de.json (anahtar → metin; bir Almanca
+// konuşan kontrol edebilsin diye). Yalnızca dil DE olunca ayrı paket olarak yüklenir
+// (loadLang) → TR/EN ilk yüklemesi büyümez. e2e/i18n.spec.js üç dilin eksiksizliğini denetler.
 import React, { createContext, useContext } from "react";
+
+export const LANGS = ["tr", "en", "de"];
+const LOCALES = { tr: "tr-TR", en: "en-US", de: "de-DE" };
+// Dil → Intl yereli (sayı, para, tarih, göreli zaman).
+export const localeOf = (lang) => LOCALES[lang] || "en-US";
 
 // Modül-düzeyi geçerli dil — hook kullanamayan yardımcılar (timeAgo/fmtDate) buradan okur.
 let _lang = "tr";
 export function getLang() {
   return _lang;
+}
+
+// İlk dil: kullanıcının seçimi (localStorage) her zaman önce; yoksa tarayıcı dili
+// (de → DE, tr → TR, diğerleri → EN).
+export function initialLang() {
+  try {
+    const saved = localStorage.getItem("nr_lang");
+    if (LANGS.includes(saved)) return saved;
+  } catch {
+    /* depolama kapalı */
+  }
+  const prefs = typeof navigator === "undefined" ? [] : navigator.languages?.length ? navigator.languages : [navigator.language];
+  const first = String(prefs[0] || "").toLowerCase();
+  if (first.startsWith("de")) return "de";
+  if (first.startsWith("tr")) return "tr";
+  return "en";
+}
+
+// Almanca sözlük (locales/de.json) — ilk kullanımda dinamik import. loadLang bitmeden dil
+// "de"ye çevrilmemeli (main.jsx ve dil değiştiriciler bekler); yüklenmemişse EN gösterilir.
+let DE = null;
+export async function loadLang(lang) {
+  if (lang === "de" && !DE) DE = (await import("./locales/de.json", { with: { type: "json" } })).default;
 }
 
 const STR = {
@@ -716,6 +747,11 @@ const STR = {
   "ev.email_verified": { tr: "e-posta doğrulama", en: "email verified" },
   "ev.password_reset_requested": { tr: "şifre sıfırlama isteği", en: "password reset requested" },
   "ev.rename_entity": { tr: "şirket adı düzenleme", en: "rename company" },
+
+  // ---- Göreli zaman ----
+  "time.never": { tr: "hiç", en: "never" },
+  "time.justNow": { tr: "az önce", en: "just now" },
+  "a11y.explain": { tr: "açıklama", en: "explanation" },
 };
 
 const Ctx = createContext({ lang: "tr", t: (k) => k, setLang: () => {} });
@@ -756,9 +792,15 @@ export function addStrings(entries) {
 }
 
 function render(key, lang, vars) {
-  const one = vars && vars.n === 1 ? STR[`${key}_one`] : null;
-  const entry = one || STR[key];
-  let s = entry ? entry[lang] ?? entry.tr : key;
+  const single = vars && vars.n === 1;
+  let s;
+  if (lang === "de" && DE) s = (single ? DE[`${key}_one`] : undefined) ?? DE[key];
+  if (s == null) {
+    const one = single ? STR[`${key}_one`] : null;
+    const entry = one || STR[key];
+    // DE sözlüğü yüklenmemiş/eksikse İngilizce (Türkçe değil) gösterilir.
+    s = entry ? entry[lang === "de" ? "en" : lang] ?? entry.tr : key;
+  }
   if (vars) for (const k in vars) s = s.split(`{${k}}`).join(String(vars[k]));
   return s;
 }
@@ -836,7 +878,7 @@ export function fmtCompact(value) {
 }
 
 // Dil-farkında tarih/zaman yardımcıları (locale'e göre biçim).
-const LOCALE = () => (_lang === "tr" ? "tr-TR" : "en-US");
+const LOCALE = () => localeOf(_lang);
 export function fmtDate(iso) {
   if (!iso) return "—";
   return parseUtc(iso).toLocaleDateString(LOCALE(), { day: "2-digit", month: "short" });
@@ -851,9 +893,9 @@ export function fmtDateTime(iso) {
 // Göreli zaman, dile uygun ("2 saat önce" / "2 hours ago", "dün" / "yesterday"); 30 günden
 // eskiyse kısa tarih. Tam tarih için fmtDateTime (ör. title).
 export function timeAgo(iso) {
-  if (!iso) return _lang === "tr" ? "hiç" : "never";
+  if (!iso) return tt("time.never");
   const diff = (Date.now() - parseUtc(iso).getTime()) / 1000;
-  if (diff < 60) return _lang === "tr" ? "az önce" : "just now";
+  if (diff < 60) return tt("time.justNow");
   if (diff > 30 * 86400) return fmtDate(iso);
   const rtf = new Intl.RelativeTimeFormat(LOCALE(), { numeric: "auto" });
   if (diff < 3600) return rtf.format(-Math.floor(diff / 60), "minute");

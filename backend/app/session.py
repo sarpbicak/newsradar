@@ -17,6 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .db.models import User
+from .languages import normalize_language
 
 
 def new_device_id() -> str:
@@ -46,7 +47,7 @@ def create_anonymous_user(db: Session, device_id: str, language: str = "tr") -> 
         password_hash=hash_password(secrets.token_urlsafe(16)),  # login'de kullanılamaz
         is_anonymous=True,
         device_id_hash=dh,
-        language=language if language in ("tr", "en") else "tr",
+        language=normalize_language(language),
     )
     db.add(user)
     db.flush()

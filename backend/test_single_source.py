@@ -72,6 +72,10 @@ def tr_of(v):
     return TR_WORDS.get(v, f"Türkçe karşılık ({len(v)} harf).") if v else ""
 
 
+def de_of(v):
+    return f"Deutsche Fassung ({len(v)} Zeichen)." if v else ""
+
+
 class Fake:
     model = "fake"
 
@@ -83,7 +87,10 @@ class Fake:
         if tool["name"] == TRANSLATION_TOOL["name"]:
             self.translate += 1
             src, _ = json.JSONDecoder().raw_decode(user.split("JSON:\n", 1)[1])
-            out = {k: ([tr_of(x) for x in v] if isinstance(v, list) else tr_of(v)) for k, v in src.items()}
+            conv = de_of if "plain German" in user else tr_of
+            out = {k: ([conv(x) for x in v] if isinstance(v, list) else conv(v)) for k, v in src.items()}
+            if self.bad > 0 and conv is de_of:
+                return out
             if self.bad > 0:
                 self.bad -= 1
                 out["top_drivers"] = out["top_drivers"][:1]  # madde eksik → geçersiz
@@ -122,8 +129,8 @@ asyncio.run(analyze_all_async(f, entity_ids={tid}))
 with session_scope() as s:
     rows = s.scalars(select(EntityAnalysis).where(EntityAnalysis.entity_id == tid)).all()
     langs = [(r.language, sorted(r.texts or {})) for r in rows]
-check(f.assess == 1 and f.translate == 1, f"1 değerlendirme + 1 çeviri çağrısı ({f.assess}, {f.translate})")
-check(langs == [("all", ["en", "tr"])], f"tek kayıt, iki dilin metni ({langs})")
+check(f.assess == 1 and f.translate == 2, f"1 değerlendirme + 2 çeviri çağrısı (TR, DE) ({f.assess}, {f.translate})")
+check(langs == [("all", ["de", "en", "tr"])], f"tek kayıt, üç dilin metni ({langs})")
 
 print("== B: TR ve EN aynı hüküm ==")
 tr, en = cards(tid)
@@ -136,6 +143,12 @@ check([d.direction for d in ta.long_term.drivers] == [d.direction for d in ea.lo
 check(len(ta.what_to_verify) == len(ea.what_to_verify) == 2, "aynı takip listesi (madde sayısı)")
 check(ta.top_drivers[0] == "Teslimatlar yüzde 8 düştü." and ea.top_drivers[0] == "Deliveries fell 8%.",
       "metinler kendi dilinde")
+with session_scope() as s:
+    de = entity_card(s, s.get(Entity, tid), "de")
+check(de.analysis is not None and de.analysis_language == "de" and de.analysis.risk_score == 63
+      and de.analysis.stance == "bearish" and de.analysis.short_term.verdict == "negative"
+      and de.analysis.top_drivers[0].startswith("Deutsche Fassung"),
+      "DE: aynı hüküm/risk, metin Almanca")
 check(ta.long_term.drivers[0].text.startswith("Türkçe karşılık") and ea.long_term.drivers[0].text == "Megapack orders rose 40%.",
       "vade etken metinleri de çevrildi")
 check(tr.analysis_language == "tr" and en.analysis_language == "en" and not tr.analysis_missing_language,
@@ -156,14 +169,15 @@ bid = mk_entity("Bad", "BAD")
 f = Fake(bad_translations=2)
 asyncio.run(analyze_all_async(f, entity_ids={bid}))
 tr3, en3 = cards(bid)
-check(f.translate == 2, f"geçersiz çeviri bir kez yeniden istendi ({f.translate})")
+check(f.translate == 3, f"geçersiz TR çevirisi bir kez yeniden istendi, DE bir kez ({f.translate})")
 check(en3.analysis is not None and tr3.analysis is None and tr3.analysis_missing_language,
       "TR yazılmadı → TR kart 'bu dilde yok' (başka hüküm yok), EN normal")
 f = Fake()
 asyncio.run(analyze_all_async(f, entity_ids={bid}))
 tr4, _ = cards(bid)
-check(f.assess == 1 and tr4.analysis is not None and tr4.analysis.risk_score == en3.analysis.risk_score,
-      "sonraki yenileme eksik çeviriyi tamamladı")
+check(f.assess == 0 and f.translate == 1 and tr4.analysis is not None
+      and tr4.analysis.risk_score == en3.analysis.risk_score,
+      f"sonraki yenileme eksik TR çevirisini yeniden değerlendirmeden tamamladı ({f.assess}, {f.translate})")
 
 print("== E: Ask AI aynı kaynaktan ==")
 db = SessionLocal()

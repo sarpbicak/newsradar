@@ -1,8 +1,8 @@
-import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
+import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 import { trackView } from "./api.js";
 import ReactDOM from "react-dom/client";
 import Landing from "./components/landing/Landing.jsx";
-import { I18nProvider } from "./i18n.jsx";
+import { I18nProvider, initialLang, loadLang } from "./i18n.jsx";
 import { ThemeProvider } from "./theme.js";
 import { isAppPath, shouldSkipLanding, usePath } from "./router.js";
 import { applyMotionVars } from "./motion.js";
@@ -21,12 +21,16 @@ const LINK_PAGES = { "/verify-email": "verify", "/reset-password": "reset" };
 if (shouldSkipLanding()) window.history.replaceState(null, "", "/app");
 
 // Dil durumu en üstte tutulur (I18nProvider sağlar); landing ve App onu okur/değiştirir.
+// Seçim (localStorage) her zaman önce; yoksa tarayıcı dili (de → DE, tr → TR, diğerleri → EN).
+// Almanca sözlük ayrı pakette: dil ona çevrilmeden önce yüklenir (setLang bekler).
+const FIRST_LANG = initialLang();
+
 function Root() {
-  const [lang, setLang] = useState(() => {
-    const saved = localStorage.getItem("nr_lang");
-    if (saved === "tr" || saved === "en") return saved;
-    return (navigator.language || "").toLowerCase().startsWith("tr") ? "tr" : "en";
-  });
+  const [lang, setLangState] = useState(FIRST_LANG);
+  const setLang = useCallback(async (l) => {
+    await loadLang(l).catch(() => {}); // yüklenemezse DE arayüz İngilizce metinlerle açılır
+    setLangState(l);
+  }, []);
   const path = usePath();
   const inApp = isAppPath(path);
   const linkKind = LINK_PAGES[path];
@@ -60,8 +64,13 @@ function Root() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <Root />
-  </React.StrictMode>
-);
+function mount() {
+  ReactDOM.createRoot(document.getElementById("root")).render(
+    <React.StrictMode>
+      <Root />
+    </React.StrictMode>
+  );
+}
+// TR/EN beklemeden; DE sözlüğü yüklenince (hata olursa yine de, EN metinlerle).
+if (FIRST_LANG === "de") loadLang("de").catch(() => {}).finally(mount);
+else mount();

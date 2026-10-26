@@ -1,7 +1,7 @@
 """Gereksiz değerlendirmeyi atlama — sahte client (gerçek API yok, izole temp DB).
 
 Doğrular:
-  (A) ilk tarama → TEK değerlendirme (EN) + TR metin çevirisi (Haiku) — tek kayıt
+  (A) ilk tarama → TEK değerlendirme (EN) + TR ve DE metin çevirisi (Haiku) — tek kayıt
   (B) yeni veri yok → 0 değerlendirme çağrısı, log: "[X] değerlendirme atlandı: yeni veri yok"
   (C) fiyat ≥ %3 oynadı → yeniden değerlendirme; %2 → atlanır
   (D) son değerlendirme 24 saatten eski → yeniden değerlendirme
@@ -56,9 +56,10 @@ lg.addHandler(cap); lg.setLevel(logging.INFO)
 
 
 def fake_translation(user):
-    """Çeviri istemindeki JSON'u alır, her metni 'TR ' önekiyle döndürür (yapı aynı)."""
+    """Çeviri istemindeki JSON'u alır, her metni hedef dilde sahte metne çevirir (yapı aynı)."""
     src, _ = json.JSONDecoder().raw_decode(user.split("JSON:\n", 1)[1])
-    return {k: ([f"TR {x}" for x in v] if isinstance(v, list) else (f"TR {v}" if v else ""))
+    conv = (lambda x: f"Deutscher Text ({len(x)}).") if "plain German" in user else (lambda x: f"TR {x}")
+    return {k: ([conv(x) for x in v] if isinstance(v, list) else (conv(v) if v else ""))
             for k, v in src.items()}
 
 
@@ -107,11 +108,11 @@ def run():
 print("== A: ilk tarama ==")
 fc, t = run()
 check(fc.assess_calls == 1 and t.entity_assessments == 1, f"tek değerlendirme ({fc.assess_calls})")
-check(fc.translate_calls == 1, f"TR için tek çeviri çağrısı ({fc.translate_calls})")
+check(fc.translate_calls == 2, f"TR ve DE için birer çeviri çağrısı ({fc.translate_calls})")
 with session_scope() as s:
     rows = s.query(EntityAnalysis).filter_by(entity_id=eid).all()
-check(len(rows) == 1 and rows[0].language == "all" and set(rows[0].texts) == {"en", "tr"},
-      f"tek kayıt, iki dilin metni ({[(r.language, sorted(r.texts or {})) for r in rows]})")
+check(len(rows) == 1 and rows[0].language == "all" and set(rows[0].texts) == {"en", "tr", "de"},
+      f"tek kayıt, üç dilin metni ({[(r.language, sorted(r.texts or {})) for r in rows]})")
 
 print("== B: yeni veri yok ==")
 fc, t = run()

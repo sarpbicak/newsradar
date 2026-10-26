@@ -5,7 +5,7 @@
 import React, { useEffect, useState } from "react";
 import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "../api.js";
-import { addStrings, fmtInt, fmtPct, getLang, parseUtc, tt } from "../i18n.jsx";
+import { addStrings, fmtInt, fmtPct, getLang, localeOf, parseUtc, tt } from "../i18n.jsx";
 import { C } from "../theme.js";
 import { Card, Skeleton } from "./kit.jsx";
 
@@ -37,7 +37,7 @@ addStrings({
 });
 
 const MONO = { fontFamily: '"JetBrains Mono", ui-monospace, monospace', fontSize: 11, fill: C.muted };
-const fmtDay = (iso) => parseUtc(`${iso}T12:00:00Z`).toLocaleDateString(getLang() === "tr" ? "tr-TR" : "en-US", { day: "numeric", month: "short" });
+const fmtDay = (iso) => parseUtc(`${iso}T12:00:00Z`).toLocaleDateString(localeOf(getLang()), { day: "numeric", month: "short" });
 
 function Tip({ active, payload }) {
   if (!active || !payload?.length) return null;

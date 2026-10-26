@@ -1,7 +1,7 @@
 // Paylaşılan UI atomları: rozetler, göstergeler, çipler.
 import React, { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowDown, ArrowUp, Minus, TrendingDown, TrendingUp } from "lucide-react";
-import { fmtDateTime, fmtPct, getLang, tt, timeAgo as _timeAgo } from "../i18n.jsx";
+import { fmtDateTime, fmtPct, getLang, localeOf, tt, timeAgo as _timeAgo } from "../i18n.jsx";
 import { C, cssColor } from "../theme.js";
 
 // timeAgo dil-farkında sürümü i18n'de; geriye uyum için buradan da dışa aç.
@@ -94,11 +94,10 @@ export { Skeleton } from "./kit.jsx";
 
 // --- Yön (stance) rozeti ---
 const STANCE = {
-  bullish: { label: "YÜKSELİŞ", cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" },
-  neutral: { label: "NÖTR", cls: "bg-slate-500/15 text-slate-300 border-slate-500/30" },
-  bearish: { label: "DÜŞÜŞ", cls: "bg-rose-500/15 text-rose-300 border-rose-500/30" },
+  bullish: { cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" },
+  neutral: { cls: "bg-slate-500/15 text-slate-300 border-slate-500/30" },
+  bearish: { cls: "bg-rose-500/15 text-rose-300 border-rose-500/30" },
 };
-const CONVICTION = { low: "düşük", medium: "orta", high: "yüksek" };
 
 export function stanceLabel(stance) {
   return tt(`stance.${STANCE[stance] ? stance : "neutral"}`);
@@ -130,7 +129,7 @@ export function InfoTip({ text, className = "" }) {
     <span className={`relative inline-flex ${className}`}>
       <button
         type="button"
-        aria-label="açıklama"
+        aria-label={tt("a11y.explain")}
         onClick={(e) => {
           e.stopPropagation();
           e.preventDefault();
@@ -497,7 +496,7 @@ export function SentimentGauge({ value }) {
       <div className="flex justify-between text-[10px] text-slate-500 mb-1">
         <span>−</span>
         <span className="text-slate-400">
-          {tt("gauge.sentiment")} {value == null ? "–" : v.toFixed(2)}
+          {tt("gauge.sentiment")} {value == null ? "–" : v.toLocaleString(localeOf(getLang()), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
         <span>+</span>
       </div>
@@ -523,20 +522,11 @@ export function TrendArrow({ trend }) {
   );
 }
 
-// --- Risk bayrağı çipi (iki dilli) ---
-const FLAG_LABELS = {
-  regulatory: { tr: "düzenleme", en: "regulatory" },
-  competition: { tr: "rekabet", en: "competition" },
-  financial: { tr: "finansal", en: "financial" },
-  legal: { tr: "hukuki", en: "legal" },
-  product: { tr: "ürün", en: "product" },
-  supply_chain: { tr: "tedarik", en: "supply chain" },
-  macro: { tr: "makro", en: "macro" },
-  reputation: { tr: "itibar", en: "reputation" },
-};
+// --- Risk bayrağı çipi (flag.<kod>; bilinmeyen kod olduğu gibi) ---
 export function flagLabel(f) {
-  const e = FLAG_LABELS[f];
-  return e ? e[getLang()] || e.tr : f;
+  const k = `flag.${f}`;
+  const v = tt(k);
+  return v === k ? f : v;
 }
 export function FlagChip({ flag }) {
   return (
@@ -546,16 +536,11 @@ export function FlagChip({ flag }) {
   );
 }
 
-const EVENT_LABELS = {
-  earnings: { tr: "bilanço", en: "earnings" }, product: { tr: "ürün", en: "product" },
-  regulation: { tr: "düzenleme", en: "regulation" }, lawsuit: { tr: "dava", en: "lawsuit" },
-  partnership: { tr: "ortaklık", en: "partnership" }, funding: { tr: "yatırım", en: "funding" },
-  macro: { tr: "makro", en: "macro" }, leadership: { tr: "yönetim", en: "leadership" },
-  other: { tr: "diğer", en: "other" },
-};
 export function eventLabel(e) {
-  const x = EVENT_LABELS[e];
-  return x ? x[getLang()] || x.tr : e || "–";
+  if (!e) return "–";
+  const k = `event.${e}`;
+  const v = tt(k);
+  return v === k ? e : v;
 }
 
 

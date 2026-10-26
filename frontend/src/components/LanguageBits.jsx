@@ -1,8 +1,8 @@
 // Dil seçimi öğeleri: inline SVG bayraklar (emoji DEĞİL), ilk-giriş modalı, header
 // değiştirici. Bayraklar küçük, yuvarlatılmış, ince kenarlıklı (beyaz kısımlar kaybolmasın).
 import React from "react";
-import { useI18n } from "../i18n.jsx";
-import { Modal } from "./kit.jsx";
+import { LANGS, useI18n } from "../i18n.jsx";
+import { Menu, MenuItem, Modal } from "./kit.jsx";
 
 const flagWrap = "inline-block overflow-hidden rounded-[3px] ring-1 ring-slate-500/30";
 
@@ -41,8 +41,26 @@ export function FlagGB({ className = "h-4 w-6" }) {
   );
 }
 
+// Almanya bayrağı — siyah, kırmızı, altın yatay şeritler.
+export function FlagDE({ className = "h-4 w-6" }) {
+  return (
+    <span className={`${flagWrap} ${className}`}>
+      <svg viewBox="0 0 30 20" className="h-full w-full" preserveAspectRatio="xMidYMid slice">
+        <rect width="30" height="20" fill="#000" />
+        <rect y="6.67" width="30" height="6.67" fill="#DD0000" />
+        <rect y="13.33" width="30" height="6.67" fill="#FFCE00" />
+      </svg>
+    </span>
+  );
+}
+
+const FLAGS = { tr: FlagTR, en: FlagGB, de: FlagDE };
+// Dil adları kendi dilinde (hangi arayüz dilinde olursa olsun aynı; çeviri gerekmez).
+export const LANG_NAMES = { tr: "Türkçe", en: "English", de: "Deutsch" };
+
 export function Flag({ lang, className }) {
-  return lang === "tr" ? <FlagTR className={className} /> : <FlagGB className={className} />;
+  const F = FLAGS[lang] || FlagGB;
+  return <F className={className} />;
 }
 
 // İlk giriş: sade dil seçim modalı (tek tıkla geçer; seçim yapılmadan kapanmaz).
@@ -65,14 +83,13 @@ export function LanguageModal({ onSelect }) {
       </h2>
       <p className="mb-6 mt-1.5 text-center text-meta text-slate-500">{t("langmodal.subtitle")}</p>
       <div className="space-y-2.5">
-        {opt("tr", "Türkçe")}
-        {opt("en", "English")}
+        {LANGS.map((l) => <React.Fragment key={l}>{opt(l, LANG_NAMES[l])}</React.Fragment>)}
       </div>
     </Modal>
   );
 }
 
-// Header'daki değiştirici — iki küçük bayrak butonu (tooltip'te dil adı).
+// Header'daki değiştirici — üç küçük bayrak butonu (tooltip'te dil adı).
 // size="lg": mobil çekmecede tema kontrolüyle aynı ölçü (48px).
 export function LanguageSwitcher({ lang, onChange, size = "md" }) {
   const lg = size === "lg";
@@ -85,7 +102,8 @@ export function LanguageSwitcher({ lang, onChange, size = "md" }) {
         title={label}
         aria-label={label}
         aria-pressed={on}
-        className={`tap-sq inline-flex items-center justify-center rounded-control transition duration-hover ease-std ${lg ? "h-12 w-12" : "h-10 w-10"} ${
+        lang={l}
+        className={`tap-sq inline-flex items-center justify-center rounded-control transition duration-hover ease-std ${lg ? "h-12 w-12" : "h-10 w-9 sm:w-10"} ${
           on ? "bg-ink-700" : "opacity-55 hover:bg-ink-700 hover:opacity-100"
         }`}
       >
@@ -95,8 +113,48 @@ export function LanguageSwitcher({ lang, onChange, size = "md" }) {
   };
   return (
     <div className={`inline-flex items-center ${lg ? "gap-1" : "gap-0.5"}`}>
-      {btn("tr", "Türkçe")}
-      {btn("en", "English")}
+      {LANGS.map((l) => <React.Fragment key={l}>{btn(l, LANG_NAMES[l])}</React.Fragment>)}
     </div>
+  );
+}
+
+// Dar ekran (landing nav, <640px): üç bayrak sığmaz → geçerli bayrak + açılır menü (klavye: Esc,
+// ok tuşları; Menu bileşeni). Geniş ekranda LanguageSwitcher (üç bayrak) kullanılır.
+export function LanguageMenu({ lang, onChange }) {
+  const { t } = useI18n();
+  const label = `${t("header.language")}: ${LANG_NAMES[lang]}`;
+  return (
+    <Menu
+      label={t("header.language")}
+      className="w-44"
+      button={({ open, toggle }) => (
+        <button
+          type="button"
+          onClick={toggle}
+          title={label}
+          aria-label={label}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          className="tap-sq inline-flex h-10 w-10 items-center justify-center rounded-control transition duration-hover ease-std hover:bg-ink-700"
+        >
+          <Flag lang={lang} className="h-4 w-6" />
+        </button>
+      )}
+    >
+      {LANGS.map((l) => (
+        <MenuItem
+          key={l}
+          role="menuitemradio"
+          aria-checked={lang === l}
+          lang={l}
+          onClick={() => onChange(l)}
+          className={lang === l ? "font-semibold text-slate-100" : ""}
+        >
+          <Flag lang={l} className="h-3.5 w-5" />
+          <span className="flex-1">{LANG_NAMES[l]}</span>
+          {lang === l && <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden="true" />}
+        </MenuItem>
+      ))}
+    </Menu>
   );
 }

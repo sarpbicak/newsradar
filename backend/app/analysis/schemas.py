@@ -20,7 +20,7 @@ from ..db.models import (
     SENTIMENT_TRENDS,
     STANCES,
 )
-from .text_quality import PROMPT_LIMITS, clip_to_sentence, hard_cap, strip_markup_leak
+from .text_quality import PROMPT_LIMITS, clip_to_sentence, hard_cap, strip_markup_leak, text_lang
 
 logger = logging.getLogger("newsradar.schemas")
 
@@ -534,16 +534,21 @@ TRANSLATION_TOOL = {
 }
 
 
+_DE_PERCENT = re.compile(r"(\d) ?%")
+
+
 def sanitize_translation(raw: object, source: dict, language: str) -> dict | None:
     """Çeviri çıktısını doğrular: her alan var, listeler kaynakla aynı uzunlukta, kaynakta dolu
     olan alan boş değil. Geçersizse None (çağıran yeniden dener ya da çeviriyi yazmaz)."""
     if not isinstance(raw, dict):
         return None
-    lang = "en" if language == "en" else "tr"
+    lang = text_lang(language)
 
     def clip(field: str, value: object) -> str:
         label = f"{field}/{lang}/çeviri"
         text = strip_markup_leak(str(value or "").strip(), label)
+        if lang == "de":  # Almanca yazım "8 %": sayı ile % arasında bölünmez boşluk (satır kırılmasın)
+            text = _DE_PERCENT.sub("\\1\u00a0%", text)
         return clip_to_sentence(text, hard_cap(field, lang), label)
 
     out: dict = {}

@@ -12,7 +12,7 @@ import { fmtCompact, useI18n } from "../../i18n.jsx";
 import { navigate } from "../../router.js";
 import { Button } from "../kit.jsx";
 import NavBar, { Brand, NavLink, WRAP } from "../NavBar.jsx";
-import { LanguageSwitcher } from "../LanguageBits.jsx";
+import { LanguageMenu, LanguageSwitcher } from "../LanguageBits.jsx";
 import { ThemeMenu } from "../ThemeToggle.jsx";
 import { DataSources } from "../ui.jsx";
 
@@ -62,7 +62,12 @@ function Nav({ lang, onLang, onAnchor }) {
       <NavLink href="#stack" onClick={onAnchor}>
         {t("land.nav.stack")}
       </NavLink>
-      <LanguageSwitcher lang={lang} onChange={onLang} />
+      <span className="hidden sm:inline-flex">
+        <LanguageSwitcher lang={lang} onChange={onLang} />
+      </span>
+      <span className="sm:hidden">
+        <LanguageMenu lang={lang} onChange={onLang} />
+      </span>
       <ThemeMenu />
       <AppButton className="nav-text">
         <span className="sm:hidden">{t("land.openAppShort")}</span>

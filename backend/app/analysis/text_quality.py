@@ -8,8 +8,8 @@ Ana kural: kullanıcının gördüğü hiçbir alan cümle ortasında bitmez.
 - Şablon kalıpları: BANNED_PATTERNS (regex denetim; okunur hali BANNED_PHRASES prompt'a
   yasak olarak yazılır, eval'de denetlenir) ve
   entity'ler arasında tekrar eden 3+ kelimelik öbekler (repeated_ngrams).
-- Dil sızıntısı (language_leak_hits): TR metinde İngilizce işlev kelimesi, EN metinde Türkçe
-  kelime/harf → değerlendirme bir kez notla yeniden istenir.
+- Dil sızıntısı (language_leak_hits): TR/DE metinde İngilizce işlev kelimesi, EN metinde Türkçe
+  kelime/harf, DE metinde Türkçe harf → değerlendirme/çeviri bir kez notla yeniden istenir.
 - Şablon çöküşü (headline_openings): aynı taramada >3 entity'nin hükmü aynı ilk 3 kelimeyle
   başlıyorsa uyarı loglanır.
 """
@@ -24,14 +24,14 @@ logger = logging.getLogger("newsradar.text")
 
 # Prompt'ta modele verilen hedef sınırlar (kelime).
 PROMPT_LIMITS = {
-    "headline_verdict": {"tr": 14, "en": 16},
+    "headline_verdict": {"tr": 14, "en": 16, "de": 14},
     "ai_take": 100,
 }
 
 # Koddaki EMNİYET tavanları (kelime). Normalde prompt sınırları yeter; bunlar yalnızca
 # model kuralı ciddi biçimde aştığında devreye girer.
 HARD_CAPS = {
-    "headline_verdict": {"tr": 28, "en": 30},
+    "headline_verdict": {"tr": 28, "en": 30, "de": 28},
     "ai_take": 180,
     "summary": 120,
     "invalidation": 60,
@@ -41,10 +41,16 @@ HARD_CAPS = {
 }
 
 
+def text_lang(language: str | None) -> str:
+    """Kalite kuralları için dil anahtarı: tr | en | de (bilinmeyen → tr)."""
+    lang = (language or "tr").lower()
+    return lang if lang in ("tr", "en", "de") else "tr"
+
+
 def hard_cap(field: str, language: str) -> int:
     cap = HARD_CAPS[field]
     if isinstance(cap, dict):
-        return cap["en" if (language or "tr").lower() == "en" else "tr"]
+        return cap[text_lang(language)]
     return cap
 
 
@@ -70,6 +76,12 @@ BANNED_PHRASES = {
         "mixed news", "… is mixed: / … is mixed,", "news is balanced / news balanced",
         "first person (I/I'm/I can't/my view/in my opinion)",
         "self-limiting closers (not financial/investment advice, as an AI)",
+    ],
+    "de": [
+        "überwiegend/größtenteils/weitgehend/insgesamt/eher positiv/negativ/optimistisch/pessimistisch",
+        "gemischte Nachrichten / gemischte Nachrichtenlage", "die Nachrichtenlage ist gemischt/ausgeglichen",
+        "erste Person (ich/meiner Meinung nach/meine Einschätzung)",
+        "einschränkende Schlusssätze (keine Anlageberatung, als KI)",
     ],
 }
 _GAP = r"(?:\s+[^\W\d_]+)?\s+"  # en fazla bir ara kelime
@@ -108,6 +120,16 @@ BANNED_PATTERNS = {
         re.compile(r"\b(?:my|in\s+my)\s+(?:view|opinion|assessment|analysis|knowledge|data)\b", re.IGNORECASE),
         re.compile(r"\b(?:not|isn't|isn’t|is\s+not)\s+(?:financial|investment)\s+advice\b", re.IGNORECASE),
         re.compile(r"\bas\s+an\s+AI\b", re.IGNORECASE),
+    ],
+    "de": [
+        re.compile(r"\b(?:überwiegend|größtenteils|weitgehend|insgesamt|eher)" + _GAP
+                   + r"(?:positiv|negativ|optimistisch|pessimistisch)\w*", re.IGNORECASE),
+        re.compile(r"\bgemischte\w*\s+(?:Nachrichten\w*|Nachrichtenlage)\b", re.IGNORECASE),
+        re.compile(r"\bNachrichtenlage\s+(?:ist|bleibt)" + _GAP + r"(?:gemischt|ausgeglichen)\b", re.IGNORECASE),
+        # Erste Person (das Pronomen "ich"; "Ich" am Satzanfang ebenso) + einschränkende Schlusssätze.
+        re.compile(r"\b(?:ich|meiner\s+Meinung|meine\s+Einschätzung|meines\s+Erachtens)\b", re.IGNORECASE),
+        re.compile(r"\bkeine\s+(?:Anlage|Finanz|Investment)beratung\b", re.IGNORECASE),
+        re.compile(r"\bals\s+KI\b", re.IGNORECASE),
     ],
 }
 
@@ -188,7 +210,7 @@ def unterminated_fields(data: dict) -> list[tuple[str, str]]:
 def banned_phrase_hits(text: str, language: str) -> list[str]:
     """Metinde BULUNAN yasaklı ifadeler (eşleşen metin, küçük harf, tekrarsız, sırayla)."""
     hits: list[str] = []
-    lang = "en" if language == "en" else "tr"
+    lang = text_lang(language)
     for rx in BANNED_PATTERNS[lang]:
         for m in rx.finditer(text or ""):
             raw = m.group(0)
@@ -211,8 +233,11 @@ def tr_lower(text: str) -> str:
 #    harfli "The" (The Verge, The Information gibi yayın/ürün adları) sayılmaz.
 #  - EN: Türkçe'ye özgü harf (ğ ş ı, ayrıca ü ö ç) içeren KÜÇÜK harfle başlayan kelime
 #    (büyük harfle başlayan "Türk Telekom", "Koç" özel addır) ya da yaygın Türkçe kelime.
+#  - DE: İngilizce işlev kelimeleri (Almancada da kelime olan "still", "also" hariç) ve Türkçeye
+#    özgü harf (ğ ş ı ç) içeren küçük harfli kelime.
 LEAK_WORDS = {
     "tr": ("already", "however", "although", "because", "while", "still", "which", "also", "the"),
+    "de": ("already", "however", "although", "because", "while", "which", "the"),
     "en": ("ve", "ile", "için", "ama", "ancak", "değil", "gibi", "çok", "daha", "olarak",
            "bir", "bu", "şirketin", "haberler"),
 }
@@ -224,15 +249,22 @@ _EN_IN_TR = re.compile(
 _TR_WORD_IN_EN = re.compile(_B + r"(?:" + "|".join(LEAK_WORDS["en"]) + r")" + _E)
 _TR_CHAR_WORD = re.compile(_B + r"[a-zğüşıöç][\w]*" + _E)
 _TR_CHARS = set("ğüşıöçİĞÜŞÖÇ")
+_EN_IN_DE = re.compile(_B + r"(?:(?i:already|however|although|because|while|which)|the)" + _E)
+_TR_ONLY_CHARS = set("ğşıçĞŞİÇ")  # Almancada olmayan Türkçe harfler (ü ö Almancada da var)
 
 
 def language_leak_hits(text: str, language: str) -> list[str]:
     """Hedef dile ait OLMAYAN kelimeler (küçük harf, tekrarsız, sırayla). Boş = temiz."""
     text = text or ""
-    if (language or "tr").lower() == "en":
+    lang = text_lang(language)
+    if lang == "en":
         found = [m.group(0) for m in _TR_WORD_IN_EN.finditer(text)]
         found += [m.group(0) for m in _TR_CHAR_WORD.finditer(text)
                   if _TR_CHARS & set(m.group(0))]
+    elif lang == "de":
+        found = [m.group(0) for m in _EN_IN_DE.finditer(text)]
+        found += [m.group(0) for m in _TR_CHAR_WORD.finditer(text)
+                  if _TR_ONLY_CHARS & set(m.group(0))]
     else:
         found = [m.group(0) for m in _EN_IN_TR.finditer(text)]
     out: list[str] = []

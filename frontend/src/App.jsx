@@ -12,7 +12,8 @@ import AppHeader, { refreshQuota, resetText } from "./components/AppHeader.jsx";
 import { LanguageModal } from "./components/LanguageBits.jsx";
 import { DataSources, useIsMobile } from "./components/ui.jsx";
 import { WRAP } from "./components/NavBar.jsx";
-import { fmtMsg, refreshParts, useI18n } from "./i18n.jsx";
+import { LANGS, fmtMsg, refreshParts, useI18n } from "./i18n.jsx";
+import "./appStrings.js"; // hata kodu / bayrak / olay metinleri (landing paketine girmez)
 import { ArrowDown, RotateCcw } from "lucide-react";
 import { navigate, usePath } from "./router.js";
 
@@ -133,7 +134,7 @@ export default function App({ setLang }) {
         try {
           u = await bootstrapSession();
         } catch (e) {
-          if (alive) setLoadError(`Oturum başlatılamadı: ${e.message}`);
+          if (alive) setLoadError(t("api.sessionStartFailedMsg", { m: e.message }));
         }
       }
       if (alive) {
@@ -205,7 +206,7 @@ export default function App({ setLang }) {
   useEffect(() => {
     if (!user) return;
     const saved = localStorage.getItem("nr_lang");
-    if (saved && (saved === "tr" || saved === "en") && saved !== user.language) {
+    if (LANGS.includes(saved) && saved !== user.language) {
       api.setLanguage(saved)
         .then(() => setUser((u) => (u ? { ...u, language: saved } : u)))
         .catch(() => {});
@@ -632,7 +633,8 @@ export default function App({ setLang }) {
 
       {/* Footer — landing footer'ının sade hali. */}
       <footer className="border-t border-ink-600">
-        <div className={`${WRAP} flex flex-col gap-3 py-8 text-micro text-slate-500 sm:flex-row sm:items-center sm:justify-between`}>
+        {/* Mobil: alt boşluk yüzen butonlar (geri bildirim, KI fragen) ve Safari adres çubuğu son satırı örtmesin diye. */}
+        <div className={`${WRAP} flex flex-col gap-3 pb-[calc(env(safe-area-inset-bottom)+8rem)] pt-8 text-micro text-slate-500 sm:flex-row sm:items-center sm:justify-between md:pb-8`}>
           <div>
             <span className="font-display text-sm font-medium text-slate-300">{t("land.footer.built", { name: "Sarp Bıçak" })}</span>
             <span className="ml-2 text-micro text-slate-500">{t("land.footer.place")}</span>

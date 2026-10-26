@@ -11,11 +11,12 @@ from __future__ import annotations
 import json
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .errors import ApiError
 from ..analysis.claude_client import ClaudeError, MissingAPIKeyError
 from ..analysis.llm import get_llm_provider
 from ..analysis.prompts import SYSTEM_PROMPT, output_language_directive, utc_context_line
@@ -94,7 +95,7 @@ def chat(
     # edebilir. Aksi halde başkasının takip ettiği varlığın haber/analiz bağlamı
     # sohbete sızardı. dashboard ucuyla aynı davranış: yoksa/erişilemezse 404.
     if entity is None or not in_watchlist(db, user.id, entity.id):
-        raise HTTPException(status_code=404, detail="Entity bulunamadı.")
+        raise ApiError(code="entity_not_found", status_code=404, detail="Entity bulunamadı.")
     # Bu kayıt (ve get_current_user'ın last_active_at'i) get_db (scope="function")
     # tarafından StreamingResponse DÖNMEDEN, yani akış başlamadan commit edilir.
     record_event(db, user.id, "chat", {"entity_id": entity.id, "name": entity.name})
@@ -107,7 +108,7 @@ def chat(
         if role in ("user", "assistant") and isinstance(content, str) and content.strip():
             messages.append({"role": role, "content": content})
     if not messages or messages[0]["role"] != "user":
-        raise HTTPException(status_code=400, detail="İlk mesaj 'user' olmalı ve boş olamaz.")
+        raise ApiError(code="chat_bad_request", status_code=400, detail="İlk mesaj 'user' olmalı ve boş olamaz.")
 
     language = getattr(user, "language", "tr") or "tr"
     context = _build_context(db, entity, language)
@@ -130,7 +131,7 @@ def chat(
             client = get_llm_provider("chat")
         except MissingAPIKeyError as exc:
             _log.warning("chat: sağlayıcı yok: %s", exc)
-            yield _sse("error", {"message": "Sohbet şu an kullanılamıyor."})
+            yield _sse("error", {"message": "Sohbet şu an kullanılamıyor.", "code": "chat_unavailable"})
             return
         try:
             for text in client.stream_chat(system=system, messages=messages, max_tokens=4096):
@@ -138,10 +139,10 @@ def chat(
             yield _sse("done", {})
         except ClaudeError as exc:
             _log.warning("chat: LLM hatası: %s", exc)
-            yield _sse("error", {"message": "Sohbet yanıtı alınamadı, lütfen tekrar deneyin."})
+            yield _sse("error", {"message": "Sohbet yanıtı alınamadı, lütfen tekrar deneyin.", "code": "chat_failed"})
         except Exception as exc:  # noqa: BLE001 — beklenmedik hata sızdırma, logla
             _log.exception("chat: beklenmedik hata")
-            yield _sse("error", {"message": "Beklenmedik bir hata oluştu."})
+            yield _sse("error", {"message": "Beklenmedik bir hata oluştu.", "code": "unexpected"})
 
     return StreamingResponse(
         event_stream(),

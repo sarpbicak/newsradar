@@ -32,6 +32,7 @@ from . import (
     routes_users,
 )
 from ..security import install_log_masking
+from .errors import ApiError, api_error_handler
 from .routes_auth import get_current_user
 
 logging.basicConfig(level=logging.INFO)
@@ -127,6 +128,8 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="NewsRadar API", version="1.0", lifespan=lifespan)
+# Kodlu kullanıcı hataları: {"detail", "code", "params"} (metin frontend'de, kullanıcının dilinde).
+app.add_exception_handler(ApiError, api_error_handler)
 
 
 # Temel güvenlik header'ları — her yanıta eklenir (ucuz sertleştirme).

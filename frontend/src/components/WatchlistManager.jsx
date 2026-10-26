@@ -159,7 +159,7 @@ export default function WatchlistManager({ cards, onCreate, onDelete, embedded =
                     </span>
                     {/* "SAP SE · XETRA · Almanya"; ABD dışında fiyat/analist yok notu */}
                     <span className="mt-0.5 block text-micro text-slate-500">
-                      {r.exchange_name} · {lang === "en" ? r.country_en : r.country_tr}
+                      {r.exchange_name} · {r[`country_${lang}`] || r.country_en}
                       {!r.us_supported && <> · {t("wl.nonUsShort")}</>}
                     </span>
                   </button>

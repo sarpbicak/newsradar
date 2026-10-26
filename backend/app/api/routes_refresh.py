@@ -5,10 +5,11 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from .errors import ApiError
 from .. import scheduler
 from ..config import get_settings
 from ..db.database import get_db
@@ -119,7 +120,7 @@ def refresh(
     # Kişi başı günlük elle yenileme kotası (admin muaf). Hak dolduysa sıraya bile girmez.
     ok, limit, used = _refresh_quota(db, user)
     if not ok:
-        raise HTTPException(
+        raise ApiError(code="refresh_daily_limit", params={"used": used, "limit": limit},
             status_code=429,
             detail=(f"Günlük yenileme limitine ulaştınız ({used}/{limit}). "
                     "Otomatik güncelleme arka planda 6 saatte bir çalışıyor."),
@@ -158,9 +159,9 @@ def cancel_refresh(user: User = Depends(get_current_user)) -> Response:
     204: iptal edildi · 409: işi zaten çalışıyor (durdurulamaz) · 404: etkin işi yok."""
     outcome = refresh_queue.cancel_user(user.id)
     if outcome == "running":
-        raise HTTPException(status_code=409, detail="Yenilemeniz zaten çalışıyor, iptal edilemez.")
+        raise ApiError(code="refresh_cannot_cancel", status_code=409, detail="Yenilemeniz zaten çalışıyor, iptal edilemez.")
     if outcome == "none":
-        raise HTTPException(status_code=404, detail="Sırada bekleyen bir yenilemeniz yok.")
+        raise ApiError(code="refresh_not_queued", status_code=404, detail="Sırada bekleyen bir yenilemeniz yok.")
     return Response(status_code=204)
 
 

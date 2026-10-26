@@ -174,13 +174,36 @@ with session_scope() as s:
     s.add(mk(kid, "tr", "Anthropic hükmü.", at=now() - timedelta(hours=1)))
 fc = FakeClient()
 totals = asyncio.run(analyze_all_async(fc, entity_ids={kid}))
-check(fc.langs == ["en", "çeviri"], f"eski TR kaydı → tek değerlendirme (EN) + TR çevirisi ({fc.langs})")
+check(fc.langs == ["en", "çeviri", "çeviri"], f"eski TR kaydı → tek değerlendirme (EN) + TR ve DE çevirisi ({fc.langs})")
 check(totals.assessments_skipped == 0, f"atlanan yok (atlanan={totals.assessments_skipped})")
 check(any("[Anthropic] değerlendirme yapılacak: tek kaynak değerlendirme yok" in m for m in cap_msgs),
       "log: geçiş sebebi yazıldı")
 fc2 = FakeClient()
 totals2 = asyncio.run(analyze_all_async(fc2, entity_ids={kid}))
 check(fc2.langs == [] and totals2.assessments_skipped == 1, f"tek kaynak varken yeni veri yok → atlandı ({fc2.langs})")
+
+print("== E: yeni dil (DE) eksik → yalnızca çeviri, yeniden değerlendirme yok ==")
+with session_scope() as s:
+    row = s.scalars(select(EntityAnalysis).where(EntityAnalysis.entity_id == kid, EntityAnalysis.language == "all")
+                    .order_by(EntityAnalysis.created_at.desc())).first()
+    texts = dict(row.texts)
+    texts.pop("de")          # DE eklenmeden önceki kayıt gibi: yalnızca en + tr
+    row.texts = texts
+    before = (row.id, row.risk_score, row.stance, texts["en"]["headline_verdict"])
+fc3 = FakeClient()
+totals3 = asyncio.run(analyze_all_async(fc3, entity_ids={kid}))
+with session_scope() as s:
+    rows = s.scalars(select(EntityAnalysis).where(EntityAnalysis.entity_id == kid, EntityAnalysis.language == "all")).all()
+    row = rows[-1]
+    after = (row.id, row.risk_score, row.stance, row.texts["en"]["headline_verdict"])
+    langs = sorted(row.texts)
+check(fc3.langs == ["çeviri"] and totals3.translations_backfilled == 1 and totals3.assessments_skipped == 1,
+      f"yalnızca bir çeviri çağrısı ({fc3.langs}, eklenen={totals3.translations_backfilled})")
+check(len(rows) == 1 and after == before and langs == ["de", "en", "tr"],
+      f"aynı kayıt, hüküm/risk değişmedi, DE eklendi ({langs})")
+fc4 = FakeClient()
+asyncio.run(analyze_all_async(fc4, entity_ids={kid}))
+check(fc4.langs == [], f"üç dil tamamken çağrı yok ({fc4.langs})")
 
 print("=" * 50)
 print(f"SONUÇ: {PASS} geçti, {FAIL} başarısız")

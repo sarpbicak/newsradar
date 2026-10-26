@@ -242,7 +242,7 @@ export function EntityRow({ card, onOpen }) {
           <span className="shrink-0 font-mono text-micro text-slate-500">{symbolOf(card)}</span>
         </span>
         {a && (
-          <span className="mt-1 flex md:mt-0 md:w-60 md:shrink-0">
+          <span className="mt-1 flex md:mt-0 md:w-60 md:min-w-fit md:shrink-0">
             <NewsPill a={a} evidence={card.evidence_strength} horizon={horizon} />
           </span>
         )}

@@ -19,6 +19,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from .errors import ApiError
 from .. import account_mail
 from ..config import get_settings
 from ..db.database import get_db, session_scope
@@ -33,6 +34,7 @@ from .routes_auth import (
 )
 from .schemas import EmailIn, RegisterIn, ResetPasswordIn, TokenIn, UserLoginIn, UserOut, UserTokenOut
 from .usage import record_event
+from ..languages import normalize_language
 
 router = APIRouter(prefix="/users", tags=["users"])
 logger = logging.getLogger("newsradar.security")
@@ -52,7 +54,7 @@ _register_lock = threading.Lock()
 def _check_locked(request: Request) -> None:
     locked = login_limiter.locked_seconds(get_client_ip(request))
     if locked:
-        raise HTTPException(status_code=429, detail=f"Çok fazla deneme. {locked // 60 + 1} dk sonra tekrar deneyin.")
+        raise ApiError(code="too_many_attempts", params={"minutes": locked // 60 + 1}, status_code=429, detail=f"Çok fazla deneme. {locked // 60 + 1} dk sonra tekrar deneyin.")
 
 
 def _record_register_failed(reason: str, attempted: str, request: Request) -> None:
@@ -105,10 +107,10 @@ def _require_email(raw: str | None, db: Session, exclude_id: int | None = None) 
     """Kayıt/ekleme için e-posta: zorunlu, biçimli, benzersiz (küçük harfe göre)."""
     email = normalize_email(raw)
     if email is None:
-        raise HTTPException(status_code=422, detail="Geçerli bir e-posta adresi gir.")
+        raise ApiError(code="email_invalid", status_code=422, detail="Geçerli bir e-posta adresi gir.")
     other = _find_by_email(db, email)
     if other is not None and other.id != exclude_id:
-        raise HTTPException(status_code=409, detail="Bu e-posta adresi zaten kayıtlı.")
+        raise ApiError(code="email_taken", status_code=409, detail="Bu e-posta adresi zaten kayıtlı.")
     return email
 
 
@@ -126,13 +128,13 @@ def register(payload: RegisterIn, request: Request, background: BackgroundTasks,
     username = payload.username.strip()
     if not _USERNAME_RE.match(username):
         _record_register_failed("invalid_username", username, request)
-        raise HTTPException(
+        raise ApiError(code="username_invalid",
             status_code=422,
             detail="Kullanıcı adı 3–30 karakter olmalı; yalnızca harf, rakam ve alt çizgi.",
         )
     if len(payload.password) < MIN_PASSWORD_LEN:
         _record_register_failed("short_password", username, request)
-        raise HTTPException(
+        raise ApiError(code="password_short", params={"n": MIN_PASSWORD_LEN},
             status_code=422, detail=f"Şifre en az {MIN_PASSWORD_LEN} karakter olmalı."
         )
 
@@ -143,13 +145,13 @@ def register(payload: RegisterIn, request: Request, background: BackgroundTasks,
             n = db.scalar(select(func.count()).select_from(User)) or 0
             if n >= settings.max_users:
                 _record_register_failed("limit", username, request)
-                raise HTTPException(
+                raise ApiError(code="user_limit",
                     status_code=403,
                     detail="Kullanıcı limiti dolu. Yönetici ile iletişime geçin.",
                 )
         if _find_by_username_ci(db, username) is not None:
             _record_register_failed("duplicate", username, request)
-            raise HTTPException(status_code=409, detail="Bu kullanıcı adı zaten alınmış.")
+            raise ApiError(code="username_taken", status_code=409, detail="Bu kullanıcı adı zaten alınmış.")
         try:
             email = _require_email(payload.email, db)
         except HTTPException:
@@ -170,7 +172,7 @@ def register(payload: RegisterIn, request: Request, background: BackgroundTasks,
         except IntegrityError:
             db.rollback()
             _record_register_failed("duplicate", username, request)
-            raise HTTPException(status_code=409, detail="Bu kullanıcı adı ya da e-posta zaten kayıtlı.")
+            raise ApiError(code="username_or_email_taken", status_code=409, detail="Bu kullanıcı adı ya da e-posta zaten kayıtlı.")
 
         user.last_login_at = datetime.now(timezone.utc)
         record_event(db, user.id, "login", {"via": "register"})
@@ -194,7 +196,7 @@ def login(payload: UserLoginIn, request: Request, db: Session = Depends(get_db, 
     # IP kilidi VEYA hesap kilidi (hesap kilidi XFF spoofing'i etkisiz kılar).
     locked = login_limiter.locked_seconds(ip) or account_limiter.locked_seconds(akey)
     if locked:
-        raise HTTPException(status_code=429, detail=f"Çok fazla deneme. {locked // 60 + 1} dk sonra tekrar deneyin.")
+        raise ApiError(code="too_many_attempts", params={"minutes": locked // 60 + 1}, status_code=429, detail=f"Çok fazla deneme. {locked // 60 + 1} dk sonra tekrar deneyin.")
     # Kullanıcı adı YA DA e-posta ile giriş ("@" içeriyorsa e-posta; kullanıcı adı regex'i "@" içermez).
     if "@" in attempted:
         em = normalize_email(attempted)
@@ -222,7 +224,7 @@ def login(payload: UserLoginIn, request: Request, db: Session = Depends(get_db, 
                 if admin is not None:
                     record_event(s2, admin.id, "login_failed",
                                  {"ip": ip, "username": attempted[:50], "unknown": True})
-        raise HTTPException(status_code=401, detail="Kullanıcı adı veya şifre hatalı.")
+        raise ApiError(code="login_invalid", status_code=401, detail="Kullanıcı adı veya şifre hatalı.")
     login_limiter.record_success(ip)
     account_limiter.record_success(akey)  # başarılı giriş → hesap kilidini temizle
     user.last_login_at = datetime.now(timezone.utc)
@@ -244,15 +246,15 @@ def upgrade(payload: RegisterIn, background: BackgroundTasks, user: User = Depen
     Yalnızca anonim kullanıcı için. Kullanıcı adı + şifre belirlenir; device_id_hash
     korunur (aynı cihazda hatırlanmaya devam). Şifre değiştiği için TAZE token döner."""
     if not user.is_anonymous:
-        raise HTTPException(status_code=409, detail="Bu hesap zaten kalıcı.")
+        raise ApiError(code="already_permanent", status_code=409, detail="Bu hesap zaten kalıcı.")
     username = payload.username.strip()
     if not _USERNAME_RE.match(username):
-        raise HTTPException(status_code=422,
+        raise ApiError(code="username_invalid", status_code=422,
                             detail="Kullanıcı adı 3–30 karakter; yalnızca harf, rakam, alt çizgi.")
     if len(payload.password) < MIN_PASSWORD_LEN:
-        raise HTTPException(status_code=422, detail=f"Şifre en az {MIN_PASSWORD_LEN} karakter olmalı.")
+        raise ApiError(code="password_short", params={"n": MIN_PASSWORD_LEN}, status_code=422, detail=f"Şifre en az {MIN_PASSWORD_LEN} karakter olmalı.")
     if _find_by_username_ci(db, username) is not None:
-        raise HTTPException(status_code=409, detail="Bu kullanıcı adı zaten alınmış.")
+        raise ApiError(code="username_taken", status_code=409, detail="Bu kullanıcı adı zaten alınmış.")
     user.email = _require_email(payload.email, db)
     user.username = username
     user.password_hash = hash_password(payload.password)
@@ -270,7 +272,7 @@ def set_email(payload: EmailIn, background: BackgroundTasks, user: User = Depend
     """E-posta ekle/değiştir (eski hesaplarda boş olabilir). Yalnızca kalıcı hesap.
     Adres değişince doğrulama sıfırlanır ve yeni adrese doğrulama bağlantısı gider."""
     if user.is_anonymous:
-        raise HTTPException(status_code=403, detail="Önce hesap oluştur.")
+        raise ApiError(code="account_required", status_code=403, detail="Önce hesap oluştur.")
     email = _require_email(payload.email, db, exclude_id=user.id)
     changed = email != user.email
     user.email = email
@@ -281,7 +283,7 @@ def set_email(payload: EmailIn, background: BackgroundTasks, user: User = Depend
         db.flush()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Bu e-posta adresi zaten kayıtlı.")
+        raise ApiError(code="email_taken", status_code=409, detail="Bu e-posta adresi zaten kayıtlı.")
     if changed:
         background.add_task(account_mail.prepare_verification(db, user))
     return _user_out(user)
@@ -293,12 +295,12 @@ def resend_verification(background: BackgroundTasks, user: User = Depends(get_cu
                         db: Session = Depends(get_db, scope="function")) -> UserOut:
     """Doğrulama bağlantısını yeniden gönder: 1 dk bekleme süresi, günde en fazla 10."""
     if user.is_anonymous or not user.email:
-        raise HTTPException(status_code=400, detail="Önce bir e-posta adresi ekle.")
+        raise ApiError(code="email_missing", status_code=400, detail="Önce bir e-posta adresi ekle.")
     if user.email_verified_at is not None:
         return _user_out(user)
     wait = account_mail.resend_wait_seconds(db, user)
     if wait or account_mail.verification_sends_today(db, user) >= account_mail.VERIFY_PER_DAY:
-        raise HTTPException(status_code=429, detail="Biraz bekleyip tekrar dene.",
+        raise ApiError(code="resend_wait", status_code=429, detail="Biraz bekleyip tekrar dene.",
                             headers={"Retry-After": str(wait or 3600)})
     background.add_task(account_mail.prepare_verification(db, user))
     return _user_out(user)
@@ -309,7 +311,7 @@ def verify_email(payload: TokenIn, db: Session = Depends(get_db, scope="function
     """Bağlantıdaki token ile e-postayı doğrular (oturum gerekmez; başka cihazda açılabilir)."""
     user = account_mail.verify_email(db, payload.token)
     if user is None:
-        raise HTTPException(status_code=400, detail="Bağlantı geçersiz, kullanılmış ya da süresi dolmuş.")
+        raise ApiError(code="link_invalid", status_code=400, detail="Bağlantı geçersiz, kullanılmış ya da süresi dolmuş.")
     record_event(db, user.id, "email_verified", None)
     return {"ok": True}
 
@@ -328,7 +330,7 @@ def forgot_password(payload: EmailIn, request: Request, background: BackgroundTa
     if not account_mail.rate_allow(db, account_mail.rate_key("forgot:ip", ip),
                                    account_mail.FORGOT_PER_IP_HOUR, timedelta(hours=1)):
         db.commit()
-        raise HTTPException(status_code=429, detail="Çok fazla istek. Biraz sonra tekrar dene.")
+        raise ApiError(code="too_many_requests", status_code=429, detail="Çok fazla istek. Biraz sonra tekrar dene.")
     email = normalize_email(payload.email)
     user = _find_by_email(db, email) if email else None
     if (user is not None and not user.is_anonymous
@@ -347,12 +349,12 @@ def reset_password(payload: ResetPasswordIn, request: Request,
     başka cihazdaki çerez hesabı geri getiremez. Bu cihaz için taze token döner."""
     _check_locked(request)
     if len(payload.password) < MIN_PASSWORD_LEN:
-        raise HTTPException(status_code=422, detail=f"Şifre en az {MIN_PASSWORD_LEN} karakter olmalı.")
+        raise ApiError(code="password_short", params={"n": MIN_PASSWORD_LEN}, status_code=422, detail=f"Şifre en az {MIN_PASSWORD_LEN} karakter olmalı.")
     tok = account_mail.consume_token(db, payload.token, "reset")
     user = db.get(User, tok.user_id) if tok else None
     if user is None:
         login_limiter.record_failure(get_client_ip(request))
-        raise HTTPException(status_code=400, detail="Bağlantı geçersiz, kullanılmış ya da süresi dolmuş.")
+        raise ApiError(code="link_invalid", status_code=400, detail="Bağlantı geçersiz, kullanılmış ya da süresi dolmuş.")
     user.password_hash = hash_password(payload.password)
     user.device_id_hash = None
     account_mail.invalidate_tokens(db, user.id, "reset")
@@ -386,9 +388,8 @@ class LanguageIn(BaseModel):
 @router.post("/me/language", response_model=UserOut)
 def set_language(payload: LanguageIn, user: User = Depends(get_current_user),
                  db: Session = Depends(get_db, scope="function")) -> UserOut:
-    """Arayüz dilini kaydet ("tr" | "en"). Geçersizse tr'ye düşer."""
-    lang = (payload.language or "").strip().lower()
-    user.language = lang if lang in ("tr", "en") else "tr"
+    """Arayüz dilini kaydet ("tr" | "en" | "de"). Geçersizse tr'ye düşer."""
+    user.language = normalize_language(payload.language)
     # YANITTAN ÖNCE commit: arayüz bu yanıtı bekleyip hemen GET /entities çekiyor; commit
     # gecikirse kartlar ESKİ dilde geliyordu (dil karışmasının bir yolu). get_db artık
     # scope="function" ile zaten yanıttan önce commit ediyor; bu açık commit fonksiyon

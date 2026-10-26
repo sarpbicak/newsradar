@@ -8,13 +8,14 @@ from __future__ import annotations
 import secrets
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 import re
 import unicodedata
 
+from .errors import ApiError
 from .. import visits
 from ..anon_cleanup import last_run as anon_cleanup_last_run, purge_user
 from ..db.database import get_db
@@ -106,7 +107,7 @@ def user_detail(user_id: int, db: Session = Depends(get_db, scope="function")) -
     """Tek kullanıcının detaylı kullanımı: eylem dökümü + en çok baktığı şirketler + son eylemler."""
     user = db.get(User, user_id)
     if user is None:
-        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
+        raise ApiError(code="user_not_found", status_code=404, detail="Kullanıcı bulunamadı.")
 
     # Eylem tipine göre adet.
     rows = db.execute(
@@ -166,10 +167,10 @@ def delete_user(
     açık olmayabilir).
     """
     if user_id == admin.id:
-        raise HTTPException(status_code=403, detail="Kendi hesabınızı silemezsiniz.")
+        raise ApiError(code="cannot_delete_self", status_code=403, detail="Kendi hesabınızı silemezsiniz.")
     target = db.get(User, user_id)
     if target is None:
-        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
+        raise ApiError(code="user_not_found", status_code=404, detail="Kullanıcı bulunamadı.")
     username = target.username
 
     # Bağlı kişisel satırlar açıkça silinir, entity'ler havuzda kalır (gerekirse pasif) —
@@ -194,7 +195,7 @@ def reset_password(
     """
     target = db.get(User, user_id)
     if target is None:
-        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
+        raise ApiError(code="user_not_found", status_code=404, detail="Kullanıcı bulunamadı.")
     temp = secrets.token_urlsafe(9)  # ~12 karakter, min 8 şartını karşılar
     target.password_hash = hash_password(temp)
     record_event(db, admin.id, "password_reset",
@@ -306,7 +307,7 @@ def delete_feedback(
     kayda GEÇMEZ (yalnızca id)."""
     fb = db.get(Feedback, feedback_id)
     if fb is None:
-        raise HTTPException(status_code=404, detail="Geri bildirim bulunamadı.")
+        raise ApiError(code="feedback_not_found", status_code=404, detail="Geri bildirim bulunamadı.")
     db.delete(fb)
     record_event(db, admin.id, "delete_feedback", {"feedback_id": feedback_id})
 
@@ -316,7 +317,7 @@ def mark_feedback_read(feedback_id: int, db: Session = Depends(get_db, scope="fu
     """Bir geri bildirimi okundu işaretle (idempotent)."""
     fb = db.get(Feedback, feedback_id)
     if fb is None:
-        raise HTTPException(status_code=404, detail="Geri bildirim bulunamadı.")
+        raise ApiError(code="feedback_not_found", status_code=404, detail="Geri bildirim bulunamadı.")
     fb.is_read = True
 
 
@@ -357,12 +358,12 @@ def set_display_name(entity_id: int, payload: DisplayNameIn, admin: User = Depen
     en fazla 60 karakter; kontrol karakteri yasak."""
     e = db.get(Entity, entity_id)
     if e is None:
-        raise HTTPException(status_code=404, detail="Şirket bulunamadı.")
+        raise ApiError(code="company_not_found", status_code=404, detail="Şirket bulunamadı.")
     raw = re.sub(r"\s+", " ", (payload.display_name or "")).strip()
     if any(unicodedata.category(c).startswith("C") for c in raw):
-        raise HTTPException(status_code=422, detail="Görünen ad kontrol karakteri içeremez.")
+        raise ApiError(code="display_name_control", status_code=422, detail="Görünen ad kontrol karakteri içeremez.")
     if len(raw) > DISPLAY_NAME_MAX:
-        raise HTTPException(status_code=422, detail=f"Görünen ad en fazla {DISPLAY_NAME_MAX} karakter olabilir.")
+        raise ApiError(code="display_name_too_long", params={"max": DISPLAY_NAME_MAX}, status_code=422, detail=f"Görünen ad en fazla {DISPLAY_NAME_MAX} karakter olabilir.")
     old = e.display_name
     e.display_name = raw or display_name_for(e.name)
     record_event(db, admin.id, "rename_entity", {"entity_id": e.id, "from": old, "to": e.display_name, "auto": not raw})
