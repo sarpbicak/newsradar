@@ -422,6 +422,7 @@ const STR = {
   "src.fmp_target": { tr: "FMP hedef fiyat", en: "FMP price target" },
   "src.newsapi": { tr: "NewsAPI", en: "NewsAPI" },
   "src.gdelt": { tr: "GDELT", en: "GDELT" },
+  "src.gnews": { tr: "GNews", en: "GNews" },
   "msg.few_news": { tr: "Son {days} günde yeterli haber bulunamadı. Yeni haber çıktıkça otomatik güncellenecek.", en: "Not enough news in the last {days} days. It will update automatically as new articles come out." },
   "msg.refresh_running": { tr: "Yenileme zaten çalışıyor.", en: "A refresh is already running." },
   "msg.llm_key_missing": { tr: "Analiz motorunun anahtarı tanımlı değil.", en: "The analysis engine's API key is not set." },
@@ -472,7 +473,7 @@ const STR = {
 
   // ---- Footer / gizlilik ----
   "footer.disclaimer": { tr: "Değerlendirmeler haberlere dayanır, fiyat tahmini ya da değerleme sunmaz. Kararlar sana aittir.", en: "Assessments are based on the news and don't predict prices or valuations. Decisions are yours." },
-  "footer.sources": { tr: "Fiyat ve analist verisi: Finnhub, FMP (hedef fiyat, varsa medyan). Haberler: Finnhub, {gdelt}.", en: "Price and analyst data: Finnhub, FMP (price target, median where available). News: Finnhub, {gdelt}." },
+  "footer.sources": { tr: "Fiyat ve analist verisi: Finnhub, FMP (hedef fiyat, varsa medyan). Haberler: Finnhub, GNews, {gdelt}.", en: "Price and analyst data: Finnhub, FMP (price target, median where available). News: Finnhub, GNews, {gdelt}." },
   "footer.privacy": { tr: "Gizlilik", en: "Privacy" },
 
   // ---- Geri bildirim ----
@@ -529,7 +530,7 @@ const STR = {
   "land.step1.title": { tr: "Şirketini ekle", en: "Add a company" },
   "land.step1.body": { tr: "Şirketin adını ya da borsa kodunu yaz. Hesap açman gerekmiyor.", en: "Type the company name or ticker. You don't need an account." },
   "land.step2.title": { tr: "Haberler gelir", en: "The news comes in" },
-  "land.step2.body": { tr: "Finnhub ve GDELT'ten yeni haberler gün boyu gelir.", en: "Fresh articles arrive from Finnhub and GDELT around the clock." },
+  "land.step2.body": { tr: "Finnhub, GNews ve GDELT'ten yeni haberler gün boyu gelir.", en: "Fresh articles arrive from Finnhub, GNews and GDELT around the clock." },
   "land.step3.title": { tr: "AI hepsini okur", en: "AI reads every one" },
   "land.step3.body": { tr: "Her haber olumlu ya da olumsuz olarak işaretlenir. Konuyla ilgisi olmayanlar ayıklanır.", en: "Each article is marked positive or negative. The off-topic ones are dropped." },
   "land.step4.title": { tr: "Değerlendirmeyi okursun", en: "You read the assessment" },

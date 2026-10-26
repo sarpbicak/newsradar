@@ -14,7 +14,7 @@ export default function ArchitectureDiagram() {
   const lanes = [
     { name: t("land.stack.frontend"), nodes: ["React · Vite", "CloudFront", "S3"] },
     { name: t("land.stack.api"), nodes: ["Caddy · TLS", "FastAPI · Docker", "EC2"] },
-    { name: t("land.stack.ai"), nodes: ["Finnhub · NewsAPI", "Claude", t("land.stack.verdict")], key: 1 },
+    { name: t("land.stack.ai"), nodes: ["Finnhub · GNews · GDELT", "Claude", t("land.stack.verdict")], key: 1 },
     { name: t("land.stack.data"), nodes: ["SQLite", t("land.stack.nightly"), "S3"] },
     { name: t("land.stack.delivery"), nodes: ["GitHub Actions", "OIDC", t("land.stack.deploy")] },
   ];

@@ -26,7 +26,7 @@ addStrings({
   "privacy.contactNone": { tr: "Kayıtlı hesabını sildirmek için site yöneticisiyle iletişime geçebilirsin.", en: "To delete your registered account, contact the site admin." },
   "privacy.llmGeneric": { tr: "LLM sağlayıcımız", en: "our LLM provider" },
   "privacy.hostingGeneric": { tr: "bir bulut sağlayıcı", en: "a cloud provider" },
-  "privacy.thirdParty": { tr: "Üçüncü taraflar: fiyat ve analist verisi Finnhub/FMP'den, haberler Finnhub ve GDELT'ten gelir; analiz için metin {llm} üzerinden işlenir. Site {hosting} üzerinde barındırılır; sunucu kayıtları (istek IP'leri dahil) barındırma sağlayıcısının saklama kurallarına tabidir. Verini reklam için kullanmayız, satmayız.", en: "Third parties: price and analyst data come from Finnhub/FMP, news from Finnhub and GDELT; text is processed for analysis via {llm}. The site is hosted on {hosting}; server logs (including request IPs) follow the hosting provider's retention rules. We don't use your data for ads, and we don't sell it." },
+  "privacy.thirdParty": { tr: "Üçüncü taraflar: fiyat ve analist verisi Finnhub/FMP'den, haberler Finnhub, GNews ve GDELT'ten gelir; analiz için metin {llm} üzerinden işlenir. Site {hosting} üzerinde barındırılır; sunucu kayıtları (istek IP'leri dahil) barındırma sağlayıcısının saklama kurallarına tabidir. Verini reklam için kullanmayız, satmayız.", en: "Third parties: price and analyst data come from Finnhub/FMP, news from Finnhub, GNews and GDELT; text is processed for analysis via {llm}. The site is hosted on {hosting}; server logs (including request IPs) follow the hosting provider's retention rules. We don't use your data for ads, and we don't sell it." },
 });
 
 export default function PrivacyModal({ onClose }) {

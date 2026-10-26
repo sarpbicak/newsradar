@@ -17,7 +17,7 @@ NewsRadar collects financial news for a watchlist of companies, has an LLM read 
 
 ## Features
 
-- **Watchlist with two entity types:** `ticker` (public companies, news via Finnhub) and `keyword` (private companies and startups, news via NewsAPI), behind an interchangeable `NewsProvider` interface.
+- **Watchlist with two entity types:** `ticker` (public companies; US news via Finnhub) and `keyword` (private companies and startups), behind an interchangeable `NewsProvider` interface. Keyword and non-US companies get news from GNews (free plan: 100 requests a day, articles delayed by 12 hours, guarded by a daily cap and a per-company interval) with GDELT as the fallback (circuit breaker after a 429).
 - **Scheduled ingestion:** an APScheduler job refreshes news automatically. Articles are de-duplicated by URL hash, so the same article is never analysed (or paid for) twice.
 - **Two-level LLM analysis with structured output**
   - *Per article:* sentiment (−1..1), event type, risk flags, impact horizon, relevance and a short rationale. Off-topic articles are filtered out.
@@ -47,7 +47,7 @@ NewsRadar collects financial news for a watchlist of companies, has an LLM read 
 |---|---|
 | Backend | Python 3.14, FastAPI, SQLAlchemy, SQLite (WAL), APScheduler, Pydantic, bcrypt |
 | LLM | **Anthropic Claude API** (`claude-haiku-5-5` for article analysis, entity assessments and chat; configurable per purpose) behind a provider abstraction |
-| Data sources | Finnhub (ticker news, analyst recommendations), NewsAPI (keyword news), Financial Modeling Prep (price targets) |
+| Data sources | Finnhub (US ticker news, analyst recommendations), GNews (keyword and non-US news, 12h delayed on the free plan), GDELT (fallback), Financial Modeling Prep (price targets) |
 | Frontend | React 18, Vite, Tailwind CSS (CSS-variable themes), Recharts |
 | Infrastructure | AWS: EC2 (t4g, Docker + Caddy), S3 + CloudFront, ECR, Route 53, ACM, SSM Parameter Store, CloudWatch Logs |
 | Delivery | GitHub Actions with OIDC (no stored AWS keys), SSM Run Command, automatic rollback |
@@ -64,7 +64,7 @@ flowchart LR
     api --> db[("SQLite<br/>WAL volume")]
   end
   api --> claude["Claude API"]
-  api --> news["Finnhub · NewsAPI · FMP"]
+  api --> news["Finnhub · GNews · GDELT · FMP"]
   db -->|"nightly sqlite3 .backup"| backup[("S3 backups<br/>versioned · 30 days")]
   params["SSM Parameter Store<br/>SecureString + KMS"] -.->|load-secrets| api
   gha["GitHub Actions<br/>OIDC, no keys"] -->|arm64 image| ecr["ECR<br/>scan on push"]

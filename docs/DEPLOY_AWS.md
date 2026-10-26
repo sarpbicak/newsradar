@@ -355,7 +355,7 @@ put_param BACKUP_BUCKET String "$BACKUP_BUCKET"
 put_param BACKEND_IMAGE String "$BACKEND_IMAGE"
 
 # --- 2. Sırlar (isteğe bağlı; boş bırakılan özellik kapanır) ---
-for n in FINNHUB_API_KEY NEWSAPI_KEY FMP_API_KEY APP_PASSWORD NEWSRADAR_LLM_API_KEY; do put_param "$n" SecureString; done
+for n in FINNHUB_API_KEY NEWSAPI_KEY FMP_API_KEY APP_PASSWORD NEWSRADAR_LLM_API_KEY NEWSRADAR_GNEWS_API_KEY; do put_param "$n" SecureString; done
 
 # --- 3. AWS profili ---
 put_param NEWSRADAR_COOKIE_SAMESITE String lax
