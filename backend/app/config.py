@@ -40,6 +40,8 @@ class Settings:
         # GDELT istekleri arası en az bekleme (sn): önceki yanıtın bitişinden ölçülür. Birden çok
         # keyword/ABD dışı şirkette her ek şirket yenilemeye yaklaşık bu kadar süre ekler.
         self.gdelt_interval_seconds: float = float(_env("NEWSRADAR_GDELT_INTERVAL_SECONDS", "5"))
+        # GDELT devre kesici: 429 alınınca bu kadar saat GDELT'e hiç istek atılmaz (app/gdelt_breaker.py).
+        self.gdelt_block_hours: float = float(_env("NEWSRADAR_GDELT_BLOCK_HOURS", "6"))
         # FMP (Financial Modeling Prep) — GERÇEK analist hedef fiyatı (Finnhub'da premium).
         # Yoksa hedef fiyat gösterilmez (tavsiye/haber etkilenmez).
         self.fmp_api_key: str = os.getenv("FMP_API_KEY", "").strip()

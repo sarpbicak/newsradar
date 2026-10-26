@@ -445,6 +445,7 @@ const STR = {
   "msg.http_error": { tr: "{source} hatası ({status}): {symbol} atlandı.", en: "{source} error ({status}): {symbol} skipped." },
   "msg.connection_error": { tr: "{source} bağlantı hatası.", en: "{source} connection error." },
   "msg.gdelt_busy": { tr: "Haber kaynağı (GDELT) şu an yoğun; bir sonraki yenilemede tekrar denenecek.", en: "The news source (GDELT) is busy right now; it will be retried on the next refresh." },
+  "msg.gdelt_blocked": { tr: "Haber kaynağı (GDELT) istekleri sınırladı; bir süre istek atılmayacak, mevcut haberler gösteriliyor.", en: "The news source (GDELT) is limiting requests; we'll pause requests for a while and show the news we already have." },
   "msg.gdelt_error": { tr: "Haber kaynağı (GDELT) bu aramayı yanıtlamadı.", en: "The news source (GDELT) didn't answer this search." },
   "msg.no_data": { tr: "{symbol} için {source} verisi yok.", en: "No {source} data for {symbol}." },
   "msg.bad_response": { tr: "{source} beklenmeyen yanıt döndü ({symbol}).", en: "{source} returned an unexpected response ({symbol})." },

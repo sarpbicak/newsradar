@@ -329,6 +329,7 @@
  "msg.http_error": "{source}-Fehler ({status}): {symbol} übersprungen.",
  "msg.connection_error": "{source}: Verbindungsfehler.",
  "msg.gdelt_busy": "Die Nachrichtenquelle (GDELT) ist gerade ausgelastet. Bei der nächsten Aktualisierung wird es erneut versucht.",
+ "msg.gdelt_blocked": "Die Nachrichtenquelle (GDELT) begrenzt die Anfragen. Wir pausieren eine Weile und zeigen die vorhandenen Nachrichten.",
  "msg.gdelt_error": "Die Nachrichtenquelle (GDELT) hat auf diese Suche nicht geantwortet.",
  "msg.no_data": "Keine {source}-Daten für {symbol}.",
  "msg.bad_response": "{source} hat eine unerwartete Antwort geschickt ({symbol}).",
@@ -686,6 +687,7 @@
  "exchange.BO": "Bombay (BSE)",
  "exchange.SA": "B3 (São Paulo)",
  "exchange.MX": "Mexikanische Börse",
+ "card.newsPaused": "Die Nachrichtenquelle für dieses Unternehmen ist vorübergehend nicht verfügbar. Du siehst die vorhandenen Nachrichten.",
  "flag.regulatory": "Regulierung",
  "flag.competition": "Wettbewerb",
  "flag.financial": "Finanzen",
@@ -840,5 +842,10 @@
  "email.reset.button": "Neues Passwort festlegen",
  "email.reset.expires": "Der Link ist 1 Stunde gültig und funktioniert nur einmal. Wenn du dein Passwort änderst, wirst du auf deinen anderen Geräten abgemeldet.",
  "email.reset.ignore": "Wenn du das nicht angefordert hast, kannst du diese E-Mail ignorieren. Dein Passwort bleibt, wie es ist.",
- "email.footer": "Du bekommst diese E-Mail, weil sie dein NewsRadar-Konto betrifft. Wir verschicken keine Werbe-E-Mails."
+ "email.footer": "Du bekommst diese E-Mail, weil sie dein NewsRadar-Konto betrifft. Wir verschicken keine Werbe-E-Mails.",
+ "adm.gdeltTitle": "Nachrichtenquelle (GDELT)",
+ "adm.gdeltOk": "Läuft, Anfragen normal.",
+ "adm.gdeltOpen": "Sperre aktiv: keine Anfragen an GDELT (bis {until}).",
+ "adm.gdeltLast429": "Letzter 429",
+ "adm.gdeltNote": "Stichwort- und Nicht-US-Unternehmen behalten in dieser Zeit ihre vorhandenen Nachrichten."
 }

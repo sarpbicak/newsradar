@@ -185,6 +185,14 @@ class AdminHealthOut(BaseModel):
     errors_24h: int = 0                    # son 24 saatteki diğer LLM hataları
 
 
+class AdminGdeltOut(BaseModel):
+    """GDELT devre kesici durumu (admin paneli)."""
+
+    open: bool = False                     # şu an GDELT'e istek atılmıyor mu
+    until: datetime | None = None          # devre ne zamana kadar açık
+    last_429_at: datetime | None = None    # son hız sınırı/engel yanıtı
+
+
 class AdminStatsOut(BaseModel):
     """Genel istatistikler."""
 
@@ -213,6 +221,7 @@ class AdminStatsOut(BaseModel):
     # Sistem sağlığı (LLM): son çağrı sonucu + son 24s kota/hata sayısı. Sorunu
     # kullanıcıdan önce admin görsün (ör. OpenRouter kota/bakiye limiti).
     health: AdminHealthOut | None = None
+    gdelt: AdminGdeltOut | None = None
 
 
 # --------------------------- Yanıt modelleri --------------------------- #
@@ -328,6 +337,9 @@ class EntityCardOut(BaseModel):
     currency: str | None = None
     us_market: bool | None = None
     news_window_days: int = 2                # haber penceresi (lookback) gün olarak
+    # Haber kaynağı geçici olarak kullanılamıyor (GDELT devre kesici açık): arayüz tek bir sakin not
+    # gösterir, mevcut haberler görünür.
+    news_paused: bool = False
     # Kart hiyerarşisi için türetilmiş "3 saniyelik" alanlar (analiz varsa dolu).
     horizon: str | None = None            # çoğunluk vade: short | medium | long
     evidence_strength: str | None = None  # strong | medium | weak

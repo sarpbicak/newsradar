@@ -20,6 +20,12 @@ import { C } from "../theme.js";
 
 // Analiz yoksa NEDEN: dil eksik · bekleyen haber var (yenileme işe yarar) · pencerede haber yok
 // (yenileme işe yaramaz; yeni haber çıkınca kendiliğinden güncellenir). short: liste satırı.
+// Haber kaynağı geçici olarak kullanılamıyor (GDELT devre kesici): tek, sakin not; mevcut haberler
+// görünmeye devam eder. Yenileme özetinde ayrıca uyarı çıkmaz.
+export function NewsPausedNote({ className = "" }) {
+  return <p className={cx("text-micro text-slate-500", className)}>{tt("card.newsPaused")}</p>;
+}
+
 export function noAnalysisText(card, short = false) {
   if (card.analysis_missing_language) return tt("card.langMissing");
   if (card.no_analysis_reason === "few_news") return tt("card.fewNews", { days: card.news_window_days ?? 2 });
@@ -218,6 +224,7 @@ export default function EntityCard({ card, onOpen }) {
           {noAnalysisText(card)}
         </p>
       )}
+      {card.news_paused && <NewsPausedNote />}
     </Card>
   );
 }

@@ -41,3 +41,12 @@ test("seçili ufukta veri varsa not çıkmaz", async ({ page }) => {
   await expect(page.getByText("Haberler · kısa vade: Olumlu").first()).toBeVisible();
   await expect(page.getByText("henüz yeterli veri yok")).toHaveCount(0);
 });
+
+// GDELT devre kesici açıkken: haber kaynağı geçici olarak kullanılamıyor → tek, sakin not.
+test("haber kaynağı duraklatıldıysa detayda sakin not", async ({ page }) => {
+  await page.addInitScript(() => { localStorage.setItem("nr_lang", "tr"); });
+  const paused = { ...DASHBOARD, entity: { ...DASHBOARD.entity, news_paused: true } };
+  await page.route(/\/entities\/999\/dashboard/, (r) => r.fulfill({ json: paused }));
+  await page.goto("/app/e/999");
+  await expect(page.getByText("Bu şirketin haber kaynağı geçici olarak kullanılamıyor, mevcut haberler gösteriliyor.")).toBeVisible();
+});

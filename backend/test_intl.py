@@ -27,6 +27,7 @@ os.environ.update(NEWSRADAR_DB=_db, NEWSRADAR_SCHEDULER="off", NEWSRADAR_SEED_ON
                   FINNHUB_API_KEY="fake-key", FMP_API_KEY="fake-key", NEWSAPI_KEY="", APP_SECRET="x")
 
 import app.providers.gdelt as gd  # noqa: E402
+from app import gdelt_breaker  # noqa: E402
 import app.symbol_search as ss  # noqa: E402
 from app import analyst as analyst_mod, prices as prices_mod  # noqa: E402
 from app.analysis.pipeline import _prefilter  # noqa: E402
@@ -194,7 +195,7 @@ with SessionLocal() as s:
     check(len(sent) == 2 and slept == [5.0],
           f"aralık önceki yanıtın BİTİŞİNDEN 5 sn (yanıt 3 sn sürse de; eskiden 2 sn beklerdi) ({slept})")
 
-    print("== E2: hız sınırı → bir kez bekleyip yeniden dene")
+    print("== E2: hız sınırı → devre kesici (yeniden deneme yok, 6 saat istek yok)")
     LIMIT = "Please limit requests to one every 5 seconds or contact ..."
     seq = []
 
@@ -204,18 +205,47 @@ with SessionLocal() as s:
         return seq.pop(0)
     gd.httpx.get = seq_get
     gd._cache.clear(); slept.clear(); sent.clear()
-    seq[:] = [Resp(status=200, text=LIMIT), Resp(json_data=GD)]
+    seq[:] = [Resp(status=200, text=LIMIT)]
     r = gd.GdeltProvider().fetch(thy_e, since)
-    check(len(sent) == 2 and len(r.articles) == 2 and not r.warning, "ilk yanıt hız sınırı, yeniden denemede haberler geldi")
-    check(slept == [5.0, 10.0], f"aralık + 10 sn geri çekilme (geri çekilme aralığı zaten aşıyor) ({slept})")
-    gd._cache.clear(); slept.clear(); sent.clear()
-    seq[:] = [Resp(status=429, text="Too many"), Resp(status=200, text=LIMIT)]
-    r = gd.GdeltProvider().fetch(thy_e, since + timedelta(hours=2))
-    check(len(sent) == 2 and r.warning and r.warning["code"] == "gdelt_busy" and not r.articles,
-          "yeniden denemede de hız sınırı → kibar uyarı (gdelt_busy), üçüncü istek yok")
+    check(len(sent) == 1 and r.warning and r.warning["code"] == "gdelt_blocked" and not r.articles,
+          f"hız sınırı yanıtı → yeniden denenmez, devre kesici kodu ({len(sent)} istek)")
+    check(gdelt_breaker.open_in_memory(), "devre bu süreçte hemen açık")
+    r = gd.GdeltProvider().fetch(sap_e, since + timedelta(hours=1))
+    check(len(sent) == 1 and r.warning["code"] == "gdelt_blocked", "devre açıkken başka şirket için de istek yok")
+    gdelt_breaker.reset_memory()
     gd.httpx.get = lambda url, params=None, timeout=None: Resp(status=200, text="The specified phrase is too short.")
     r = gd.GdeltProvider().fetch(thy_e, since + timedelta(hours=1))
-    check(r.warning and r.warning["code"] == "gdelt_error", "düz metin hata → gdelt_error (yeniden deneme yok)")
+    check(r.warning and r.warning["code"] == "gdelt_error" and not gdelt_breaker.open_in_memory(),
+          "düz metin hata → gdelt_error, devre açılmaz")
+
+    print("== E2b: alım (ingest) — kalıcı devre, uyarı yok, kart notu, admin durumu")
+    from app import ingest as ingest_mod  # noqa: E402
+    gd.httpx.get = seq_get; gd._cache.clear(); sent.clear()
+    seq[:] = [Resp(status=429, text="Too many requests")]
+    res = ingest_mod.fetch_for_entity(s, kw_e, manual=True); s.commit()
+    check(len(sent) == 1 and res.warnings == [] and res.fetched == 0,
+          f"429 → uyarı yok (her yenilemede tekrar etmesin) ({res.warnings})")
+    snap = gdelt_breaker.snapshot()
+    hours = (snap["until"] - snap["last_429_at"]).total_seconds() / 3600 if snap["until"] and snap["last_429_at"] else 0
+    check(snap["open"] and snap["last_429_at"] is not None and abs(hours - 6) < 0.01,
+          f"admin: devre açık, son 429 zamanı, 6 saat ({hours:.2f})")
+    gdelt_breaker.reset_memory()   # süreç yeniden başladı: durum DB'den okunur
+    res = ingest_mod.fetch_for_entity(s, thy_e, manual=True)
+    check(len(sent) == 1 and res.warnings == [], "yeniden başlatmadan sonra da (DB) istek yok, uyarı yok")
+    c_kw = entity_card(s, kw_e, "tr"); c_us = entity_card(s, s.get(Entity, us.id), "tr")
+    check(c_kw.news_paused and not c_us.news_paused, "kart: GDELT'li şirkette sakin not (news_paused), ABD hissesinde yok")
+    from app.db.models import ProviderSkip  # noqa: E402
+    s.get(ProviderSkip, gdelt_breaker.KEY).until = datetime.now(timezone.utc) - timedelta(minutes=1); s.commit()
+    gdelt_breaker.reset_memory()
+    gd.httpx.get = fake_get; gd._cache.clear()
+    res = ingest_mod.fetch_for_entity(s, kw_e, manual=True); s.commit()
+    check(len(sent) == 2 and res.fetched == 2 and not gdelt_breaker.is_open(s) and not entity_card(s, kw_e, "tr").news_paused,
+          "süre dolunca istekler yeniden başlar, not kalkar")
+    os.environ["NEWSRADAR_GDELT_BLOCK_HOURS"] = "0.5"; get_settings.cache_clear()
+    until = gdelt_breaker.trip_memory()
+    check(abs((until - datetime.now(timezone.utc)).total_seconds() - 1800) < 5, "NEWSRADAR_GDELT_BLOCK_HOURS=0.5 → 30 dk")
+    gdelt_breaker.reset_memory()
+    os.environ.pop("NEWSRADAR_GDELT_BLOCK_HOURS"); get_settings.cache_clear()
 
     print("== E3: aralık ortam değişkeninden; yenileme süresine etkisi")
     os.environ["NEWSRADAR_GDELT_INTERVAL_SECONDS"] = "2"; get_settings.cache_clear()
@@ -223,10 +253,6 @@ with SessionLocal() as s:
     gd._cache.clear(); slept.clear(); sent.clear(); gd._last_done[0] = clock[0]
     gd.GdeltProvider().fetch(kw_e, since + timedelta(hours=3))
     check(slept == [2.0], f"NEWSRADAR_GDELT_INTERVAL_SECONDS=2 → 2 sn ({slept})")
-    seq[:] = [Resp(status=200, text=LIMIT), Resp(json_data=GD)]
-    gd.httpx.get = seq_get; slept.clear()
-    gd.GdeltProvider().fetch(sap_e, since + timedelta(hours=3))
-    check(10.0 in slept, "kısa aralıkta da geri çekilme en az 10 sn")
     os.environ["NEWSRADAR_GDELT_INTERVAL_SECONDS"] = "5"; get_settings.cache_clear()
     # 4 GDELT şirketi, yanıt 3 sn: toplam = 4×3 + 3×5 = 27 sn (aralık yanıt bitişinden).
     gd.httpx.get = fake_get; gd._cache.clear(); gd._last_done[0] = float("-inf")

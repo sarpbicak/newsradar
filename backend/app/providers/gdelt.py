@@ -16,8 +16,10 @@ keyword verisinde LLM'in alakalı bulduğu haberlerin çoğunun başlığında �
 
 Hız: resmi belge bir sınır belirtmiyor; GDELT aşılınca "limit requests" metni (ya da 429) döner.
 İstekler TEK SIRADA, önceki yanıtın BİTİŞİNDEN en az NEWSRADAR_GDELT_INTERVAL_SECONDS (varsayılan
-5) sonra gider; hız sınırı yanıtında bir kez bekleyip (aralığın iki katı, en az 10 sn) yeniden
-denenir; aynı sorgu 10 dk önbellekten. GDELT hataları düz metin döner (JSON değil) → kibar uyarı.
+5) sonra gider; aynı sorgu 10 dk önbellekten. Hız sınırı/engel yanıtında YENİDEN DENENMEZ: devre
+kesici açılır (app/gdelt_breaker.py) ve NEWSRADAR_GDELT_BLOCK_HOURS boyunca GDELT'e istek atılmaz
+(GDELT sunucu IP'sini engelleyince bekletilmiş tek istek bile 429 alıyordu). GDELT hataları düz
+metin döner (JSON değil) → kibar uyarı.
 """
 
 from __future__ import annotations
@@ -29,6 +31,7 @@ from datetime import datetime, timezone
 
 import httpx
 
+from .. import gdelt_breaker
 from ..config import get_settings
 from ..db.models import Entity
 from ..entity_names import readable_name
@@ -41,7 +44,6 @@ logger = logging.getLogger("newsradar.providers")
 _URL = "https://api.gdeltproject.org/api/v2/doc/doc"
 _LANGS = ("english", "german", "turkish")   # haber dili filtresi: en / de / tr
 _MAX_RECORDS = 75
-RATE_LIMIT_BACKOFF_MIN_S = 10.0              # hız sınırı yanıtında yeniden denemeden önce en az
 CACHE_TTL_S = 600
 
 # Tek sıra: kilit İSTEK SÜRESİNCE tutulur (aynı anda tek GDELT isteği). _last_done = önceki
@@ -135,19 +137,18 @@ class GdeltProvider(NewsProvider):
         params = {"query": query, "mode": "artlist", "format": "json", "maxrecords": _MAX_RECORDS,
                   "sort": "datedesc", "startdatetime": start}
         with _lock:
+            # Devre açıksa (bu süreçte 429 görüldü) istek atma; kilitte bekleyen diğer şirketler dahil.
+            if gdelt_breaker.open_in_memory():
+                return ProviderResult(provider=self.name, warning=msg(gdelt_breaker.CODE))
             try:
                 resp = self._request(params)
-                if self._rate_limited(resp):
-                    # Bir kez bekleyip yeniden dene (aralığın iki katı, en az 10 sn).
-                    wait = max(RATE_LIMIT_BACKOFF_MIN_S, 2 * self._interval())
-                    logger.warning("[gdelt] hız sınırı ('%s') → %.0f sn bekleyip bir kez yeniden", query, wait)
-                    time.sleep(wait)
-                    resp = self._request(params)
             except httpx.HTTPError as exc:
                 return ProviderResult(provider=self.name, warning=msg("connection_error", source="gdelt", error=exc))
-        if self._rate_limited(resp):
-            logger.warning("[gdelt] yeniden denemede de hız sınırı ('%s')", query)
-            return ProviderResult(provider=self.name, warning=msg("gdelt_busy"))
+            if self._rate_limited(resp):
+                gdelt_breaker.trip_memory()
+                logger.warning("[gdelt] hız sınırı/engel (HTTP %s, '%s') → devre açıldı, yeniden denenmiyor",
+                               resp.status_code, query)
+                return ProviderResult(provider=self.name, warning=msg(gdelt_breaker.CODE, status=resp.status_code))
         if resp.status_code >= 400:
             return ProviderResult(provider=self.name, warning=msg("http_error", source="gdelt",
                                                                     status=resp.status_code, symbol=terms[0]))

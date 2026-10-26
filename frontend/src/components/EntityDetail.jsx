@@ -18,7 +18,7 @@ import ArticleTable from "./ArticleTable.jsx";
 import ChatPanel from "./ChatPanel.jsx";
 import AnalystConsensus from "./AnalystConsensus.jsx";
 import Gauges from "./Gauges.jsx";
-import { PriceRow, displayName, exchangeOf, marketLabel, noAnalysisText, symbolOf } from "./EntityCard.jsx";
+import { NewsPausedNote, PriceRow, displayName, exchangeOf, marketLabel, noAnalysisText, symbolOf } from "./EntityCard.jsx";
 import { Button, Card, ErrorState, Modal, Skeleton, Tabs } from "./kit.jsx";
 import { tt, fmtDate, fmtInt, fmtPct, parseUtc } from "../i18n.jsx";
 
@@ -207,6 +207,7 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
               <Lock className="h-3.5 w-3.5" aria-hidden="true" /> {tt("detail.notPublic")}
             </p>
           )}
+          {entity.news_paused && <NewsPausedNote className="text-meta" />}
           {a && (
             <p className="text-micro text-slate-500">
               {(() => {

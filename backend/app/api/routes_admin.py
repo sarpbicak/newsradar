@@ -29,11 +29,13 @@ from ..db.models import (
 )
 from .routes_auth import hash_password, require_admin
 from .routes_feedback import device_from_user_agent
+from .. import gdelt_breaker
 from .schemas import (
     AdminEntityRow,
     DisplayNameIn,
     AdminEventOut,
     AdminFeedbackOut,
+    AdminGdeltOut,
     AdminHealthOut,
     AdminStatsOut,
     AdminUserDetail,
@@ -262,6 +264,7 @@ def stats(db: Session = Depends(get_db, scope="function")) -> AdminStatsOut:
         model_breakdown=_budget.usage_breakdown(month_ago),
         unread_feedback=unread_feedback,
         health=AdminHealthOut(**health_snapshot()),
+        gdelt=AdminGdeltOut(**gdelt_breaker.snapshot()),
     )
 
 

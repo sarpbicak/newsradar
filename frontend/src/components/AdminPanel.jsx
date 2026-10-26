@@ -6,7 +6,7 @@ import React, { useEffect, useState } from "react";
 import { Copy, Trash2, X } from "lucide-react";
 import { api } from "../api.js";
 import { timeAgo } from "./ui.jsx";
-import { tt, fmtDate, fmtDateTime, fmtPct, getLang } from "../i18n.jsx";
+import { addStrings, tt, fmtDate, fmtDateTime, fmtPct, getLang } from "../i18n.jsx";
 import { fmtMoney } from "../money.js";
 
 const usd = (v) => fmtMoney(v, "USD", getLang());
@@ -63,6 +63,39 @@ function StatCard({ label, value, hint, tone }) {
         {typeof value === "string" ? value.replaceAll("/", "/\u200b") : value}
       </div>
       {hint && <div className={cx("mt-1 text-micro", tone === "neg" ? "text-rose-600" : "text-slate-500")}>{hint}</div>}
+    </Card>
+  );
+}
+
+// GDELT devre kesici durumu (yalnızca admin panelinde → tembel pakette).
+addStrings({
+  "adm.gdeltTitle": { tr: "Haber kaynağı (GDELT)", en: "News source (GDELT)" },
+  "adm.gdeltOk": { tr: "Çalışıyor, istekler normal.", en: "Working, requests are normal." },
+  "adm.gdeltOpen": { tr: "Devre açık: GDELT'e istek atılmıyor ({until} saatine kadar).", en: "Circuit open: no requests to GDELT (until {until})." },
+  "adm.gdeltLast429": { tr: "Son 429", en: "Last 429" },
+  "adm.gdeltNote": { tr: "Anahtar kelimeli ve ABD dışı şirketler bu sürede mevcut haberleriyle kalır.", en: "Keyword and non-US companies keep their existing news meanwhile." },
+});
+
+// GDELT: son hız sınırı/engel (429) ve devre açık mı. Açıkken GDELT'e hiç istek atılmaz.
+export function GdeltBanner({ gdelt }) {
+  const g = gdelt || {};
+  const edge = g.open ? "bg-amber-500" : "bg-emerald-500";
+  return (
+    <Card className="relative overflow-hidden p-5">
+      <span className={cx("absolute inset-y-0 left-0 w-0.5", edge)} aria-hidden="true" />
+      <div className="flex items-center gap-2 text-micro font-medium text-slate-500">
+        <span className={cx("h-2 w-2 rounded-full", edge)} aria-hidden="true" />
+        {tt("adm.gdeltTitle")}
+      </div>
+      <div className="mt-1.5 font-display text-base font-medium text-slate-100">
+        {g.open ? tt("adm.gdeltOpen", { until: fmtDateTime(g.until) }) : tt("adm.gdeltOk")}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-micro text-slate-500">
+        <span>
+          {tt("adm.gdeltLast429")}: <span className="text-slate-300">{g.last_429_at ? timeAgo(g.last_429_at) : tt("adm.healthNever")}</span>
+        </span>
+        {g.open && <span>{tt("adm.gdeltNote")}</span>}
+      </div>
     </Card>
   );
 }
@@ -243,6 +276,7 @@ export default function AdminPanel({ currentUserId }) {
 
       {/* SİSTEM SAĞLIĞI (LLM) — sorunu kullanıcıdan önce gör. */}
       <HealthBanner health={stats.health} />
+      <GdeltBanner gdelt={stats.gdelt} />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard

@@ -47,6 +47,8 @@ addStrings({
   "exchange.BO": { tr: "Bombay (BSE)", en: "Bombay (BSE)" },
   "exchange.SA": { tr: "B3 (São Paulo)", en: "B3 (São Paulo)" },
   "exchange.MX": { tr: "Meksika Borsası", en: "Mexican Stock Exchange" },
+  // ---- Haber kaynağı geçici olarak kullanılamıyor (GDELT devre kesici) ----
+  "card.newsPaused": { tr: "Bu şirketin haber kaynağı geçici olarak kullanılamıyor, mevcut haberler gösteriliyor.", en: "This company's news source is temporarily unavailable; showing the news we already have." },
   // ---- Risk bayrakları ve olay tipleri (makale analizi) ----
   "flag.regulatory": { tr: "düzenleme", en: "regulatory" },
   "flag.competition": { tr: "rekabet", en: "competition" },

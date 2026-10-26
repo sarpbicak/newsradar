@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from .config import get_settings
 from .db.models import Article, Entity, EntityAnalysis, url_hash
 from .messages import msg, render
+from . import gdelt_breaker
 from .providers import get_provider_for
 from .quota import newsapi_usage, record_call
 
@@ -90,6 +91,13 @@ def fetch_for_entity(
         result.warnings.append(msg("no_provider", type=entity.type))
         return result
 
+    # GDELT devre kesici: 429'dan sonra NEWSRADAR_GDELT_BLOCK_HOURS boyunca hiç istek yok; şirket
+    # mevcut haberleriyle kalır. Uyarı YOK (her yenilemede tekrarlamasın) — kartta sakin bir not
+    # (news_paused) ve admin panelinde durum görünür.
+    if provider.name == "gdelt" and gdelt_breaker.is_open(session):
+        logger.info("[%s] GDELT devre kesici açık — haber çekilmedi", entity.name)
+        return result
+
     is_newsapi = provider.name == "newsapi"
     if is_newsapi and provider.is_available():
         # Tazelik: manuel yenilemede taze veri varsa NewsAPI'ye gitme.
@@ -118,6 +126,9 @@ def fetch_for_entity(
         ):
             outcome.warning = _quota_msg(newsapi_usage(session))
 
+    if outcome.warning and outcome.warning.get("code") == gdelt_breaker.CODE:
+        gdelt_breaker.persist(session, outcome.warning.get("params", {}).get("status"))
+        outcome.warning = None
     if outcome.warning:
         # NewsAPI kota mesajı NORMAL (kota koruması) → info; diğerleri gerçek hata → warning.
         if outcome.warning.get("code") == "newsapi_quota":
