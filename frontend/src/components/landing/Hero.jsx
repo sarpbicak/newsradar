@@ -1,6 +1,7 @@
 // Hero (tam ekran). Açılış BİR KEZ oynar (CSS, ≤1.5 s): başlık satırları maskeden, ardından cümle,
 // buton ve canlı kart. Çıkış kaydırmaya bağlı (scrub): başlık hafifçe küçülüp yukarı kayar ve
-// soluklaşır; radar ve kart farklı hızlarda kayar (parallax). Geri kaydırınca eski haline döner.
+// en fazla ~0,6 opaklığa iner; radar ve kart farklı hızlarda kayar (parallax). Mobilde/dokunmatikte
+// içerik hiç solmaz (opaklık 1), yalnızca birkaç piksel kayar. Geri kaydırınca eski haline döner.
 // Canlı kart ve etrafında akan başlıklar GERÇEK veri (/public/how-it-works); örnek yoksa yalnızca
 // radar kalır. Sürekli döngüler (radar taraması, akan başlıklar) hero ekran dışındayken durur.
 import React, { useEffect, useRef, useState } from "react";
@@ -12,25 +13,26 @@ import { clamp01 } from "../../motion.js";
 import { scrub, useScrub } from "./scroll.js";
 
 // Teknik radar: ince halkalar, dış halkada ölçek işaretleri (5°'de bir, 30°'de uzun), artı
-// çizgileri ve dönen tek bir ince çizgi. Işıma/dolgu yok.
+// çizgileri ve dönen tek bir ince çizgi. Işıma/dolgu yok. Mobilde (index.css .lx-radar) dış halka
+// ve işaretler gizlenir, kalan çizgiler incelir.
 const TICKS = Array.from({ length: 72 }, (_, i) => i * 5);
 function Radar() {
   return (
     <div className="absolute inset-0" aria-hidden="true">
-      <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full text-signal-ink" fill="none" stroke="currentColor">
-        {[49.5, 37, 24.5, 12].map((r) => (
-          <circle key={r} cx="50" cy="50" r={r} strokeWidth="0.1" strokeOpacity="0.3" />
+      <svg viewBox="0 0 100 100" className="lx-radar absolute inset-0 h-full w-full text-signal-ink" fill="none" stroke="currentColor">
+        {[49.5, 37, 24.5, 12].map((r, i) => (
+          <circle key={r} className={i === 0 ? "lx-radar-outer" : "lx-radar-line"} cx="50" cy="50" r={r} strokeWidth="0.1" strokeOpacity="0.3" />
         ))}
         {TICKS.map((d) => {
           const long = d % 30 === 0;
           const a = (d * Math.PI) / 180;
           const r1 = 49.5, r2 = long ? 47.3 : 48.4;
           return (
-            <line key={d} x1={50 + r1 * Math.sin(a)} y1={50 - r1 * Math.cos(a)} x2={50 + r2 * Math.sin(a)} y2={50 - r2 * Math.cos(a)}
+            <line key={d} className="lx-radar-outer" x1={50 + r1 * Math.sin(a)} y1={50 - r1 * Math.cos(a)} x2={50 + r2 * Math.sin(a)} y2={50 - r2 * Math.cos(a)}
               strokeWidth={long ? 0.16 : 0.09} strokeOpacity={long ? 0.5 : 0.3} />
           );
         })}
-        <path d="M50 0.5V99.5M0.5 50H99.5" strokeWidth="0.08" strokeOpacity="0.2" strokeDasharray="0.6 0.9" />
+        <path className="lx-radar-line" d="M50 0.5V99.5M0.5 50H99.5" strokeWidth="0.08" strokeOpacity="0.2" strokeDasharray="0.6 0.9" />
         {[[66, 30], [31, 62], [72, 71]].map(([x, y]) => (
           <circle key={`${x}-${y}`} cx={x} cy={y} r="0.7" fill="currentColor" fillOpacity="0.5" stroke="none" />
         ))}
@@ -39,6 +41,10 @@ function Radar() {
     </div>
   );
 }
+
+// Çıkışta içerik masaüstünde en fazla bu opaklığa iner; mobil/dokunmatikte hiç solmaz.
+const MIN_OPACITY = 0.6;
+const CALM_MQ = "(max-width: 768px), (hover: none)";
 
 function LiveCard({ demo, t }) {
   const e = demo.entity;
@@ -83,14 +89,16 @@ function LiveCard({ demo, t }) {
 }
 
 // Kartın arkasında yavaşça yukarı akan gerçek başlıklar (kesintisiz döngü için liste iki kez).
+// Mobilde kart genişliğinde kırpılır (yanlardan taşmaz), daha soluktur ve kartın üst/altında
+// yalnızca kısa bir şerit görünür; kart opak olduğundan metinle üst üste binmez.
 function Flow({ headlines, t }) {
   const items = [...headlines, ...headlines, ...headlines].slice(0, Math.max(6, headlines.length * 2));
   const loop = [...items, ...items];
   return (
-    <div className="lx-fade-y pointer-events-none absolute -inset-x-3 -inset-y-8 -z-10 overflow-hidden sm:-inset-x-6 lg:-inset-y-28" aria-hidden="true">
+    <div className="lx-fade-y lx-flow-band pointer-events-none absolute -inset-y-14 inset-x-0 -z-10 overflow-hidden opacity-50 sm:-inset-x-6 sm:-inset-y-8 sm:opacity-100 lg:-inset-y-28" aria-hidden="true">
       <div className="lx-flow space-y-3">
         {loop.map((h, i) => (
-          <div key={i} className={`flex items-center gap-3 rounded-card border border-ink-600 bg-ink-800 px-4 py-3 ${i % 2 ? "ml-6" : "mr-6"}`}>
+          <div key={i} className={`flex items-center gap-3 rounded-card border border-ink-600 bg-ink-800 px-4 py-3 ${i % 2 ? "ml-4 sm:ml-6" : "mr-4 sm:mr-6"}`}>
             <LabelChip label={h.label} t={t} />
             <span className="truncate text-sm text-slate-300">{h.title}</span>
           </div>
@@ -119,8 +127,9 @@ export default function Hero({ demo, onAnchor, onApp }) {
     return () => io.disconnect();
   }, []);
 
-  useScrub(ref, (engine, el) =>
-    scrub(engine, {
+  useScrub(ref, (engine, el) => {
+    const calm = window.matchMedia(CALM_MQ);
+    return scrub(engine, {
       trigger: el,
       start: "top top",
       end: "bottom top",
@@ -132,14 +141,22 @@ export default function Hero({ demo, onAnchor, onApp }) {
           node.style.transform = p === 0 ? "" : tr;
           node.style.opacity = p === 0 ? "" : op;
         };
-        set(title.current, `translate3d(0, ${-p * 110}px, 0) scale(${1 - 0.1 * p})`, 1 - 0.8 * p);
-        set(rest.current, `translate3d(0, ${-p * 70}px, 0)`, clamp01(1 - 1.6 * p));
-        set(radar.current, `translate3d(0, ${p * 180}px, 0) scale(${1 + 0.08 * p})`, 1 - 0.5 * p);
-        set(visual.current, `translate3d(0, ${-p * 60}px, 0)`, clamp01(1 - 1.1 * p));
-        set(cue.current, "", clamp01(1 - 5 * p));
+        if (calm.matches) {
+          // Mobil/dokunmatik: okunabilirlik önce — solma yok, yalnızca birkaç piksel kayma.
+          set(title.current, `translate3d(0, ${-p * 12}px, 0) scale(${1 - 0.02 * p})`, 1);
+          set(rest.current, `translate3d(0, ${-p * 8}px, 0)`, 1);
+          set(radar.current, `translate3d(0, ${p * 40}px, 0)`, 1);
+          set(visual.current, `translate3d(0, ${-p * 6}px, 0)`, 1);
+          return;
+        }
+        set(title.current, `translate3d(0, ${-p * 110}px, 0) scale(${1 - 0.1 * p})`, 1 - (1 - MIN_OPACITY) * p);
+        set(rest.current, `translate3d(0, ${-p * 70}px, 0)`, Math.max(MIN_OPACITY, 1 - 1.6 * p));
+        set(radar.current, `translate3d(0, ${p * 180}px, 0) scale(${1 + 0.08 * p})`, 1 - 0.4 * p);
+        set(visual.current, `translate3d(0, ${-p * 60}px, 0)`, Math.max(MIN_OPACITY, 1 - 1.1 * p));
+        set(cue.current, "", clamp01(1 - 5 * p)); // "kaydır" işareti (dekoratif) tamamen kaybolur
       },
-    })
-  );
+    });
+  });
 
   const lines = [t("land.hero.l1"), t("land.hero.l2"), t("land.hero.l3")].filter(Boolean);
   return (

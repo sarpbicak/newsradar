@@ -269,7 +269,7 @@ export default function EntityDetail({ entityId, lang, onBack, isAdmin = false }
       )}
       {a && !isDesktop && (
         <>
-          <Button variant="primary" icon={MessageSquare} onClick={() => setSheetOpen(true)} className="fixed bottom-[max(5rem,calc(env(safe-area-inset-bottom)+4rem))] right-[max(1rem,env(safe-area-inset-right))] z-40">
+          <Button variant="primary" icon={MessageSquare} onClick={() => setSheetOpen(true)} className="fixed bottom-[calc(env(safe-area-inset-bottom)+5rem)] right-[calc(env(safe-area-inset-right)+1rem)] z-40">
             {tt("chat.askAi")}
           </Button>
           {sheetOpen && (

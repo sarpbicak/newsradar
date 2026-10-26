@@ -343,7 +343,7 @@ export function Toast({ tone = "info", title, onClose, inline = false, className
 // flex-col-reverse: en yeni bildirim en altta, gözün ilk düştüğü yerde.
 export function ToastStack({ children }) {
   return (
-    <div className="pointer-events-none fixed inset-x-4 bottom-[calc(max(1rem,env(safe-area-inset-bottom))+6.5rem)] z-[60] flex flex-col-reverse gap-2 sm:bottom-6 sm:left-6 sm:right-auto sm:w-96">
+    <div className="pointer-events-none fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+8.5rem)] z-[60] flex flex-col-reverse gap-2 sm:bottom-6 sm:left-6 sm:right-auto sm:w-96">
       {children}
     </div>
   );

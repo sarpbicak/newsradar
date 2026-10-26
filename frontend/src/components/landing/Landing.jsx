@@ -108,7 +108,7 @@ function Stats() {
       ]
     : null;
   return (
-    <section className={`${WRAP} py-32 lg:py-44`} aria-labelledby="stats-title">
+    <section className={`${WRAP} py-20 sm:py-32 lg:py-44`} aria-labelledby="stats-title">
       <Lines id="stats-title" lines={[t("land.stats.title")]} className="lx-h2 text-slate-100" />
       <Reveal as="p" className="lx-body mt-6 max-w-xl text-slate-400">
         {t("land.stats.sub")}
@@ -140,16 +140,16 @@ function Stats() {
 function Stack() {
   const { t } = useI18n();
   return (
-    <section id="stack" tabIndex={-1} className="scroll-mt-16 border-t border-ink-600 py-32 outline-none lg:py-44" aria-labelledby="stack-title">
+    <section id="stack" tabIndex={-1} className="scroll-mt-16 border-t border-ink-600 py-20 outline-none sm:py-32 lg:py-44" aria-labelledby="stack-title">
       <div className={WRAP}>
         <Lines id="stack-title" lines={[t("land.stack.title")]} className="lx-h2 text-slate-100" />
         <Reveal as="p" className="lx-body mt-6 max-w-2xl text-slate-400">
           {t("land.stack.sub")}
         </Reveal>
-        <div className="mt-16 lg:mt-20">
+        <div className="mt-10 sm:mt-16 lg:mt-20">
           <ArchitectureDiagram />
         </div>
-        <Reveal className="mt-12">
+        <Reveal className="mt-8 sm:mt-12">
           <a href={GITHUB_REPO_URL} target="_blank" rel="noreferrer" className="link-u inline-flex min-h-[44px] items-center gap-2.5 text-[17px] font-medium text-slate-200">
             <GitHubIcon /> {t("land.stack.repo")} <span aria-hidden="true">↗</span>
           </a>
@@ -160,7 +160,7 @@ function Stack() {
 }
 
 // "Neden yaptım": kapanıştan önce kısa kişisel not. Metin i18n'de (land.why.body, TR/EN ayrı);
-// boşsa bölüm hiç çizilmez. /sarp.jpg varsa yanında küçük yuvarlak fotoğraf, yoksa gizlenir.
+// boşsa bölüm DOM'a hiç girmez. /sarp.jpg varsa yanında küçük yuvarlak fotoğraf, yoksa gizlenir.
 // TODO(sarp): kendi metnim
 function Why() {
   const { t } = useI18n();
@@ -168,7 +168,7 @@ function Why() {
   const body = t("land.why.body").trim();
   if (!body) return null;
   return (
-    <section className="border-t border-ink-600 py-24 lg:py-32" aria-labelledby="why-title">
+    <section className="border-t border-ink-600 py-16 sm:py-24 lg:py-32" aria-labelledby="why-title">
       <div className={`${WRAP} grid gap-8 md:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] md:gap-12`}>
         <h2 id="why-title" className="font-display text-2xl font-medium text-slate-100">{t("land.why.title")}</h2>
         <div className="flex items-start gap-5">
@@ -195,10 +195,10 @@ function Why() {
 function Closing() {
   const { t } = useI18n();
   return (
-    <section className="lx-clip-x border-t border-ink-600 py-32 lg:py-48">
+    <section className="lx-clip-x border-t border-ink-600 py-20 sm:py-32 lg:py-48">
       <div className={WRAP}>
         <Lines lines={[t("land.cta.title")]} className="lx-h1 text-slate-100" drift={6} />
-        <Reveal className="mt-12">
+        <Reveal className="mt-8 sm:mt-12">
           <AppButton size="lg">
             {t("land.openApp")} <ArrowRight className="h-5 w-5" aria-hidden="true" />
           </AppButton>
@@ -212,7 +212,7 @@ function Footer({ onPrivacy }) {
   const { t } = useI18n();
   return (
     <footer className="border-t border-ink-600">
-      <div className={`${WRAP} flex flex-col gap-6 py-10 sm:flex-row sm:items-end sm:justify-between`}>
+      <div className={`${WRAP} flex flex-col gap-6 pb-[calc(env(safe-area-inset-bottom)+72px)] pt-10 sm:flex-row md:pb-10 sm:items-end sm:justify-between`}>
         <div>
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <span className="font-display text-lg font-medium text-slate-100">{t("land.footer.built", { name: "Sarp Bıçak" })}</span>

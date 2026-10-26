@@ -183,7 +183,7 @@ function StackedScene({ index, demo }) {
 function Stacked({ demo }) {
   const { t } = useI18n();
   return (
-    <ol className="mx-auto mt-16 max-w-[760px] space-y-24 px-5 sm:px-8">
+    <ol className="mx-auto mt-10 max-w-[760px] space-y-16 px-5 sm:mt-16 sm:space-y-24 sm:px-8">
       {STEPS.map((n, i) => (
         <li key={n} className="lx-step" data-active="true">
           <StepText n={n} t={t} />
@@ -199,12 +199,12 @@ export default function Walkthrough({ demo }) {
   const desktop = useMedia(DESKTOP_MQ);
   const pinned = desktop && !prefersReducedMotion();
   return (
-    <section id="how-it-works" tabIndex={-1} className="scroll-mt-16 pt-28 outline-none lg:pt-40" aria-labelledby="how-title">
+    <section id="how-it-works" tabIndex={-1} className="scroll-mt-16 pt-16 outline-none sm:pt-28 lg:pt-40" aria-labelledby="how-title">
       <div className="mx-auto max-w-[1360px] px-5 sm:px-8 lg:px-10">
         <Lines id="how-title" lines={[t("land.how.title")]} className="lx-h2 text-slate-100" />
       </div>
       {pinned ? <Pinned demo={demo} /> : <Stacked demo={demo} />}
-      {!pinned && <div className="h-28 lg:h-40" />}
+      {!pinned && <div className="h-16 sm:h-28 lg:h-40" />}
     </section>
   );
 }

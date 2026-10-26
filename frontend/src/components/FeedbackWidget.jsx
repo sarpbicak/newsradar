@@ -77,7 +77,7 @@ export default function FeedbackWidget({ open, onOpenChange, showButton = true }
           size="sm"
           icon={MessageSquare}
           onClick={() => onOpenChange(true)}
-          className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-40 bg-raised md:bottom-6 md:right-6"
+          className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-[calc(env(safe-area-inset-right)+1rem)] z-40 bg-raised md:bottom-6 md:right-6"
         >
           {t("fb.button")}
         </Button>

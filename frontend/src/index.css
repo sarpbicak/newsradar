@@ -445,6 +445,18 @@ html.lenis, html.lenis body { height: auto; }
   transform-origin: bottom center;
 }
 @keyframes lx-spin { to { transform: rotate(1turn); } }
+/* Mobil: daha az ve daha ince halka. Dış halka + ölçek işaretleri gizli, tarama çizgisi ikinci
+   halkada biter; taşan kısımları hero'nun overflow-clip'i kırpar. */
+@media (max-width: 767px) {
+  .lx-radar .lx-radar-outer { display: none; }
+  .lx-radar .lx-radar-line { stroke-width: 0.07; }
+  .lx-sweep::before { top: 13%; height: 37%; }
+  /* Akan başlıklar: kartın üst/altındaki şeritte görünsün diye kenar maskesi kısa. */
+  .lx-fade-y.lx-flow-band {
+    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 7%, #000 93%, transparent);
+    mask-image: linear-gradient(to bottom, transparent, #000 7%, #000 93%, transparent);
+  }
+}
 .lx-flow { animation: lx-flow 42s linear infinite; }
 @keyframes lx-flow { to { transform: translate3d(0, -50%, 0); } }
 .lx-paused .lx-sweep,
