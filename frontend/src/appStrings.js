@@ -52,6 +52,8 @@ addStrings({
   "scale.news": { tr: "Haberler", en: "News" },
   "scale.newsH": { tr: "Haberler ({h})", en: "News ({h})" },
   "scale.analysts": { tr: "Analistler ({n})", en: "Analysts ({n})" },
+  "scale.newsShort": { tr: "Haberler", en: "News" },
+  "scale.analystsShort": { tr: "Analistler", en: "Analysts" },
   "scale.noNews": { tr: "{name}: yeterli veri yok.", en: "{name}: not enough data." },
   "scale.target": { tr: "Analist hedefi", en: "Analyst target" },
   "scale.ariaBoth": { tr: "Haberler {news}, analistler {an}", en: "News {news}, analysts {an}" },

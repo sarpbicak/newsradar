@@ -63,3 +63,14 @@ test("haber verisi yetersizse haber işareti yok, kısa not var", async ({ page 
   await expect(scale.getByText("Haberler (kısa vade): yeterli veri yok.")).toBeVisible();
   await expect(scale.locator(".relative.mt-1 > span.absolute")).toHaveCount(1);
 });
+
+// Pano kartı: kompakt skala (tek çizgi, iki işaret, analist sayısı); eski analist çubuğu yok.
+const card = () => ({ ...dashboard(analysis(NEG, NEG)).entity, priority_score: 3, priority_reason: "divergence", tier: 1 });
+test("pano kartı: kompakt skala, analist sayısı, 'buy-leaning' çubuğu yok", async ({ page }) => {
+  await page.addInitScript(() => { localStorage.setItem("nr_lang", "tr"); localStorage.setItem("nr_horizon", "short"); });
+  await page.route(/\/entities\?lang=/, (r) => r.fulfill({ json: [card()] }));
+  await page.goto("/app");
+  await expect(page.getByRole("img", { name: "Haberler olumsuz, analistler olumlu" }).first()).toBeVisible();
+  await expect(page.getByText("54 analist").first()).toBeVisible();
+  await expect(page.getByText(/buy-leaning|alım yönlü/)).toHaveCount(0);
+});

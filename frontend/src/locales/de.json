@@ -684,6 +684,8 @@
  "scale.news": "Nachrichten",
  "scale.newsH": "Nachrichten ({h})",
  "scale.analysts": "Analysten ({n})",
+ "scale.newsShort": "Nachrichten",
+ "scale.analystsShort": "Analysten",
  "scale.noNews": "{name}: zu wenig Daten.",
  "scale.target": "Analystenziel",
  "scale.ariaBoth": "Nachrichten {news}, Analysten {an}",

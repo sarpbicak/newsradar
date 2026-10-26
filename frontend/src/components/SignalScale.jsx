@@ -2,7 +2,7 @@
 // Haberler = dolu daire, Analistler = içi boş eşkenar dörtgen (yalnızca renge dayanmaz); her
 // işaretin etiketi kendi şeridinde, işaretin hemen yanında → etiketler hiçbir konumda çakışmaz.
 // Aynı kademedeki iki işaret yan yana kayar. Kademe adları yalnızca uçlarda; işaretin kademesi
-// kendi etiketinde. Detay: ~120px.
+// kendi etiketinde. Detay: ~120px (SignalScale); pano kartı: tek çizgi ~32px (SignalScaleCompact).
 // Analist hedefinin kaynağı (FMP, medyan/ortalama) yalnızca ipucunda ve Analistler sekmesinde.
 import React from "react";
 import { fmtPct, getLang, localeOf, tt } from "../i18n.jsx";
@@ -118,5 +118,33 @@ export function SignalScale({ a, entity, horizon }) {
         </p>
       )}
     </section>
+  );
+}
+
+// Pano kartı: tek çizgi, iki işaret, küçük açıklama + analist sayısı (~32px). Yalnızca analist
+// verisi olan hissede (haber yönü kartın üstündeki etikette zaten var).
+export function SignalScaleCompact({ a, entity, horizon }) {
+  const { markers, aria, activeLevels } = scaleModel(a, entity, horizon);
+  if (!markers.some((m) => m.key === "an")) return null;
+  return (
+    <div role="img" aria-label={aria}>
+      <div className="flex items-center gap-3 text-micro text-slate-500" aria-hidden="true">
+        {markers.map((m) => (
+          <span key={m.key} className="inline-flex items-center gap-1.5">
+            <Shape kind={m.key} size={8} />
+            {m.key === "news" ? tt("scale.newsShort") : tt("scale.analystsShort")}
+          </span>
+        ))}
+        <span className="ml-auto tabular-nums">{tt("card.analysts", { n: entity.analyst.total })}</span>
+      </div>
+      <div className="relative mt-1.5 py-[3px]" aria-hidden="true">
+        <Track active={activeLevels} height="h-1" />
+        {markers.map((m) => (
+          <span key={m.key} className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ left: pos(m) }}>
+            <Shape kind={m.key} size={9} />
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }

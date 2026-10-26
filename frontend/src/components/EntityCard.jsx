@@ -14,6 +14,7 @@ import {
 } from "./ui.jsx";
 import { Card, Chip, cx } from "./kit.jsx";
 import { tt, fmtPct, getLang } from "../i18n.jsx";
+import { SignalScaleCompact } from "./SignalScale.jsx";
 import { exchangeName } from "../appStrings.js";
 import { fmtMoney } from "../money.js";
 import { C } from "../theme.js";
@@ -38,39 +39,6 @@ export const symbolOf = (e) => `${e.type === "ticker" ? "$" : "#"}${e.query}`;
 // Borsa adı kullanıcının dilinde (pazar kodu → exchange.<kod>); bilinmeyen kodda backend'in adı.
 export const exchangeOf = (e) => exchangeName(e.market, e.exchange);
 export const marketLabel = (e) => (e.us_market === false && e.exchange ? `${exchangeOf(e)} · ${e.country}` : null);
-
-// Analist dağılımı (al → sat) ve baskın görüşün TAVSİYE GİBİ OKUNMAYAN etiketi.
-const ANALYST_SEG = [
-  { key: "strong_buy", color: C.posStrong },
-  { key: "buy", color: C.pos },
-  { key: "hold", color: C.subtle },
-  { key: "sell", color: C.neg },
-  { key: "strong_sell", color: C.negStrong },
-];
-export function analystLean(a) {
-  const buyish = a.strong_buy + a.buy;
-  const sellish = a.sell + a.strong_sell;
-  if (buyish > a.hold && buyish >= sellish) return { text: tt("card.buyLean"), color: C.pos };
-  if (sellish > a.hold && sellish > buyish) return { text: tt("card.sellLean"), color: C.neg };
-  return { text: tt("card.holdLean"), color: C.neutral };
-}
-
-export function AnalystBar({ a, className = "" }) {
-  const total = a.total || 1;
-  const lean = analystLean(a);
-  return (
-    <div className={cx("flex items-center gap-3 text-micro", className)}>
-      <span className="whitespace-nowrap font-medium" style={{ color: lean.color }}>{lean.text}</span>
-      <div className="flex h-1 flex-1 overflow-hidden rounded-[2px] bg-ink-700" aria-hidden="true">
-        {ANALYST_SEG.map((s) => {
-          const n = a[s.key] || 0;
-          return n ? <div key={s.key} style={{ width: `${(n / total) * 100}%`, background: s.color }} /> : null;
-        })}
-      </div>
-      <span className="whitespace-nowrap tabular-nums text-slate-500">{tt("card.analysts", { n: a.total })}</span>
-    </div>
-  );
-}
 
 // Fiyat satırı: şimdi → analist hedefi (kart ve detay aynı dil).
 // muted: hedef verisi eski (detay) — renkler soluk ama AA (slate-500), opaklık değil.
@@ -201,7 +169,7 @@ export default function EntityCard({ card, onOpen }) {
             {card.type === "ticker" ? (
               <>
                 <PriceRow entity={card} />
-                {card.analyst?.total > 0 && <AnalystBar a={card.analyst} />}
+                {card.analyst?.total > 0 && <SignalScaleCompact a={a} entity={card} horizon={horizon} />}
               </>
             ) : (
               <PrivateLine drivers={a.top_drivers} />
