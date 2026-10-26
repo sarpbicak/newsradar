@@ -47,6 +47,17 @@ addStrings({
   "exchange.BO": { tr: "Bombay (BSE)", en: "Bombay (BSE)" },
   "exchange.SA": { tr: "B3 (São Paulo)", en: "B3 (São Paulo)" },
   "exchange.MX": { tr: "Meksika Borsası", en: "Mexican Stock Exchange" },
+  // ---- Haber/analist skalası (SignalScale) ----
+  "scale.section": { tr: "Haber yönü ve analist görüşü", en: "News direction and analyst view" },
+  "scale.news": { tr: "Haberler", en: "News" },
+  "scale.newsH": { tr: "Haberler ({h})", en: "News ({h})" },
+  "scale.analysts": { tr: "Analistler ({n})", en: "Analysts ({n})" },
+  "scale.noNews": { tr: "{name}: yeterli veri yok.", en: "{name}: not enough data." },
+  "scale.target": { tr: "Analist hedefi", en: "Analyst target" },
+  "scale.ariaBoth": { tr: "Haberler {news}, analistler {an}", en: "News {news}, analysts {an}" },
+  "scale.ariaNews": { tr: "Haberler {news}", en: "News {news}" },
+  "scale.ariaNoNews": { tr: "Haberler için yeterli veri yok, analistler {an}", en: "Not enough news data, analysts {an}" },
+  "scale.ariaNone": { tr: "Yeterli veri yok", en: "Not enough data" },
   // ---- Haber kaynağı geçici olarak kullanılamıyor (GDELT devre kesici) ----
   "card.newsPaused": { tr: "Bu şirketin haber kaynağı geçici olarak kullanılamıyor, mevcut haberler gösteriliyor.", en: "This company's news source is temporarily unavailable; showing the news we already have." },
   // ---- Risk bayrakları ve olay tipleri (makale analizi) ----

@@ -17,7 +17,7 @@ import { C } from "../theme.js";
 import ArticleTable from "./ArticleTable.jsx";
 import ChatPanel from "./ChatPanel.jsx";
 import AnalystConsensus from "./AnalystConsensus.jsx";
-import Gauges from "./Gauges.jsx";
+import { SignalScale } from "./SignalScale.jsx";
 import { NewsPausedNote, PriceRow, displayName, exchangeOf, marketLabel, noAnalysisText, symbolOf } from "./EntityCard.jsx";
 import { Button, Card, ErrorState, Modal, Skeleton, Tabs } from "./kit.jsx";
 import { tt, fmtDate, fmtInt, fmtPct, parseUtc } from "../i18n.jsx";
@@ -402,7 +402,7 @@ function SummaryTab({ a, entity, riskHistory = [], articles = [], analyzedCount,
             {tt(fellBackFrom === "long" ? "hz.fallbackToShort" : "hz.fallbackToLong")}
           </p>
         )}
-        <Gauges a={a} entity={entity} horizon={horizon} />
+        <SignalScale a={a} entity={entity} horizon={horizon} />
         {divNote && (
           <p className="flex items-start gap-2 text-meta text-slate-400">
             <GitFork className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
