@@ -105,6 +105,7 @@ def _delta_out(
         stance_changed=stance_changed,
         previous_stance=prev.stance if stance_changed else None,
         sentiment_delta=sentiment_delta,
+        changed_at=latest.created_at if stance_changed else None,
     )
 
 

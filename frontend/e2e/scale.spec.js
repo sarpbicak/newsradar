@@ -46,6 +46,7 @@ test("haberler olumsuz, analistler olumlu: tek skala, iki etiketli işaret, hede
   await expect(scale.getByText("FMP")).toHaveCount(0);
   const box = await scale.boundingBox();
   expect(box.height).toBeLessThanOrEqual(128); // ~120px
+  await expect(page.getByText("Haberler ve analistler şu an ayrışıyor.")).toBeVisible();
 });
 
 test("aynı kademedeki iki işaret çakışmaz (yan yana)", async ({ page }) => {
@@ -64,13 +65,25 @@ test("haber verisi yetersizse haber işareti yok, kısa not var", async ({ page 
   await expect(scale.locator(".relative.mt-1 > span.absolute")).toHaveCount(1);
 });
 
-// Pano kartı: kompakt skala (tek çizgi, iki işaret, analist sayısı); eski analist çubuğu yok.
-const card = () => ({ ...dashboard(analysis(NEG, NEG)).entity, priority_score: 3, priority_reason: "divergence", tier: 1 });
-test("pano kartı: kompakt skala, analist sayısı, 'buy-leaning' çubuğu yok", async ({ page }) => {
-  await page.addInitScript(() => { localStorage.setItem("nr_lang", "tr"); localStorage.setItem("nr_horizon", "short"); });
-  await page.route(/\/entities\?lang=/, (r) => r.fulfill({ json: [card()] }));
-  await page.goto("/app");
-  await expect(page.getByRole("img", { name: "Haberler olumsuz, analistler olumlu" }).first()).toBeVisible();
-  await expect(page.getByText("54 analist").first()).toBeVisible();
-  await expect(page.getByText(/buy-leaning|alım yönlü/)).toHaveCount(0);
-});
+// Pano kartı: kompakt skala (tek çizgi, iki işaret, analist sayısı), "analist hedefi" etiketi
+// (kaynak ipucunda), tarihli yön değişikliği (ipucunda önceki → yeni yön), eski analist çubuğu yok.
+const card = (lang) => ({ ...dashboard(analysis(NEG, NEG)).entity, delta: { risk_delta: 5, stance_changed: true, previous_stance: "bullish",
+  sentiment_delta: null, changed_at: "2026-10-24T09:00:00Z" }, priority_score: 3, priority_reason: "stance_reversed", tier: 1, analysis_language: lang });
+for (const [lang, changed, tip, target] of [
+  ["tr", "yön 24 Eki'de değişti", "Yükseliş → Düşüş", "analist hedefi"],
+  ["en", "direction changed on 24 Oct", "Bullish → Bearish", "analyst target"],
+]) {
+  test(`pano kartı (${lang}): kompakt skala, tarihli yön notu, analist hedefi`, async ({ page }) => {
+    await page.addInitScript((l) => { localStorage.setItem("nr_lang", l); localStorage.setItem("nr_horizon", "short"); }, lang);
+    await page.route(/\/entities\?lang=/, (r) => r.fulfill({ json: [card(lang)] }));
+    await page.goto("/app");
+    const note = page.getByText(changed).first();
+    await expect(note).toBeVisible();
+    await expect(note).toHaveAttribute("title", tip);
+    const t = page.getByText(target, { exact: true }).first();
+    await expect(t).toHaveAttribute("title", lang === "tr" ? "Medyan hedef, FMP" : "Median target, FMP");
+    await expect(page.getByRole("img", { name: lang === "tr" ? "Haberler olumsuz, analistler olumlu" : "News negative, analysts positive" }).first()).toBeVisible();
+    await expect(page.getByText(lang === "tr" ? "54 analist" : "54 analysts").first()).toBeVisible();
+    await expect(page.getByText(/buy-leaning|alım yönlü/)).toHaveCount(0);
+  });
+}

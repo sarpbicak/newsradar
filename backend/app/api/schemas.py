@@ -275,6 +275,7 @@ class DeltaOut(BaseModel):
     stance_changed: bool
     previous_stance: str | None        # yalnızca değiştiyse dolu
     sentiment_delta: float | None      # snapshot avg_sentiment farkı (yoksa None)
+    changed_at: datetime | None = None  # yön değiştiyse: yeni yönün geldiği değerlendirmenin zamanı
 
 
 class AnalystOut(BaseModel):

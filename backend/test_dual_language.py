@@ -110,6 +110,8 @@ def main():
           "TR latest/previous ikisi de TR (dil karışmadı)")
     check(delta_tr is not None and delta_tr.risk_delta == 30 and delta_tr.stance_changed,
           f"TR delta TR-içi hesaplandı (risk_delta=30, stance değişti): {delta_tr.risk_delta if delta_tr else None}")
+    check(delta_tr.changed_at == latest_tr.created_at and delta_tr.previous_stance is not None,
+          "yön değiştiyse tarih (yeni değerlendirmenin zamanı) ve önceki yön dolu")
     check(prev_en is None, "EN tek kayıt → önceki yok (TR ile karşılaştırmıyor)")
     check(len(rh_tr) == 2 and len(rh_en) == 1,
           f"risk_history dil filtreli (tr={len(rh_tr)}, en={len(rh_en)}) — noktalar ikiye katlanmıyor")

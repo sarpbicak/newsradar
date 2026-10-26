@@ -9,11 +9,11 @@
 import React from "react";
 import { Activity, ArrowLeftRight, ArrowRight, Compass, GitFork, Lock, TrendingUp, Zap } from "lucide-react";
 import {
-  AnimatedNumber, HorizonToggle, NewsPill, divergenceText, hasHorizons, newsSignal, riskColor, targetOf, targetSourceLabel,
+  AnimatedNumber, HorizonToggle, NewsPill, divergenceText, hasHorizons, newsSignal, riskColor, stanceLabel, targetOf, targetSourceLabel,
   useHorizon,
 } from "./ui.jsx";
 import { Card, Chip, cx } from "./kit.jsx";
-import { tt, fmtPct, getLang } from "../i18n.jsx";
+import { tt, fmtPct, getLang, localeOf, parseUtc } from "../i18n.jsx";
 import { SignalScaleCompact } from "./SignalScale.jsx";
 import { exchangeName } from "../appStrings.js";
 import { fmtMoney } from "../money.js";
@@ -39,6 +39,28 @@ export const symbolOf = (e) => `${e.type === "ticker" ? "$" : "#"}${e.query}`;
 // Borsa adı kullanıcının dilinde (pazar kodu → exchange.<kod>); bilinmeyen kodda backend'in adı.
 export const exchangeOf = (e) => exchangeName(e.market, e.exchange);
 export const marketLabel = (e) => (e.us_market === false && e.exchange ? `${exchangeOf(e)} · ${e.country}` : null);
+
+// "yön 24 Eki'de değişti" / "direction changed on 24 Oct" / "Richtung am 24. Okt. geändert".
+// Türkçede bulunma eki ayın tam adının okunuşuna göre (Ekim'de, Kasım'da, Aralık'ta).
+const TR_LOC = { oca: "ta", şub: "ta", mar: "ta", nis: "da", may: "ta", haz: "da", tem: "da", ağu: "ta", eyl: "de", eki: "de", kas: "da", ara: "ta" };
+// Yön değişikliği: tarihli kısa not; ipucunda önceki → yeni yön. Tarih yoksa (eski API) tarihsiz.
+export function StanceChange({ delta, stance, className = "text-amber-600", prefix = " · " }) {
+  const tip = delta?.previous_stance ? tt("card.directionChangedTip", { from: stanceLabel(delta.previous_stance), to: stanceLabel(stance) }) : undefined;
+  return (
+    <span className={className} title={tip}>
+      {prefix}{delta?.changed_at ? changedOnText(delta.changed_at) : tt("card.directionChangedNoDate")}
+    </span>
+  );
+}
+
+export function changedOnText(iso) {
+  const lang = getLang();
+  const d = parseUtc(iso);
+  const label = d.toLocaleDateString(lang === "en" ? "en-GB" : localeOf(lang), { day: "numeric", month: "short" });
+  if (lang !== "tr") return tt("card.directionChanged", { date: label });
+  const m = label.split(" ").pop().toLocaleLowerCase("tr-TR").replace(".", "");
+  return tt("card.directionChanged", { date: `${label}'${TR_LOC[m] || "de"}` });
+}
 
 // Fiyat satırı: şimdi → analist hedefi (kart ve detay aynı dil).
 // muted: hedef verisi eski (detay) — renkler soluk ama AA (slate-500), opaklık değil.
@@ -77,7 +99,7 @@ export function PriceRow({ entity, size = "md", muted = false }) {
               {fmtMoney(target, cur, lang, { digits: 0 })}
               {upside != null && <span className={cx("text-meta font-medium", tone(upside))}>{fmtPct(upside)}</span>}
             </div>
-            <div className="text-micro text-slate-500">{targetSourceLabel(entity.analyst)}</div>
+            <div className="text-micro text-slate-500" title={targetSourceLabel(entity.analyst)}>{tt("card.analystTarget")}</div>
           </div>
         </>
       )}
@@ -182,7 +204,7 @@ export default function EntityCard({ card, onOpen }) {
             )}
             <p className="text-micro text-slate-500">
               {tt("card.newsCount", { n: card.evidence_count })}
-              {changed && <span className="text-amber-600"> · {tt("card.stanceChanged")}</span>}
+              {changed && <StanceChange delta={card.delta} stance={a.stance} />}
             </p>
           </div>
         </>
@@ -226,7 +248,7 @@ export function EntityRow({ card, onOpen }) {
         )}
         <span className="mt-0.5 line-clamp-2 text-meta text-slate-400 md:mt-0 md:line-clamp-1 md:flex-1">{verdict}</span>
       </span>
-      {changed && <span className="hidden shrink-0 text-micro font-medium text-amber-600 md:inline">{tt("card.stanceChanged")}</span>}
+      {changed && <StanceChange delta={card.delta} stance={a.stance} prefix="" className="hidden shrink-0 text-micro font-medium text-amber-600 md:inline" />}
       {a && (
         <span className="w-8 shrink-0 text-right font-mono text-meta font-semibold tabular-nums" style={{ color: riskColor(a.risk_score) }} title={tt("sum.riskLabel")}>
           {a.risk_score}

@@ -9,7 +9,7 @@ import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, BarChart3, ChevronLeft, Eye, FileText, GitFork, Info, Lock, MessageSquare, Minus, Newspaper, Sparkles, TrendingUp } from "lucide-react";
 import { api } from "../api.js";
 import {
-  HorizonToggle, InfoTip, NewsPill, RelTime, RiskChange, divergence, effectiveHorizon, hasHorizons, horizonName, horizonOf,
+  HorizonToggle, InfoTip, NewsPill, RelTime, RiskChange, divergenceText, effectiveHorizon, hasHorizons, horizonName, horizonOf,
   riskColor, whyQuestion,
   sentimentLabel, targetOf, useHorizon, useIsMobile, verdictInfo,
 } from "./ui.jsx";
@@ -390,8 +390,7 @@ function SummaryTab({ a, entity, riskHistory = [], articles = [], analyzedCount,
   const follow = [...(a.what_to_verify || []), ...(a.invalidation ? [a.invalidation] : [])];
   const dirs = a.driver_directions || [];
   const horizons = hasHorizons(a);
-  const div = divergence(a, entity.evidence_strength, entity.analyst, horizon);
-  const divNote = [div.horizons && tt("div.horizons"), div.vsAnalysts && tt("gauge.diverge")].filter(Boolean).join(" ");
+  const divNote = divergenceText(a, entity.evidence_strength, entity.analyst, horizon);
   return (
     <div className="space-y-8">
       {/* Göstergeler + (ayrışma varsa) tek nötr not — kart notunun detaydaki karşılığı. */}
