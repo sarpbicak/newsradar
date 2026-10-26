@@ -33,6 +33,10 @@ class Settings:
         # GNews: anahtar kelimeli ve ABD dışı şirketlerin BİRİNCİL haber kaynağı (ücretsiz plan,
         # 12 saat gecikmeli). Boşsa sessizce GDELT kullanılır (app/providers/gnews.py).
         self.gnews_api_key: str = os.getenv("NEWSRADAR_GNEWS_API_KEY", "").strip()
+        # GNews kota koruması (ücretsiz plan günde 100): güvenli günlük sınır (UTC gün) ve şirket
+        # başına en az aralık (saat; bu sürede DB'deki haberler kullanılır). app/gnews_quota.py.
+        self.gnews_daily_limit: int = int(_env("NEWSRADAR_GNEWS_DAILY_LIMIT", "80"))
+        self.gnews_entity_interval_hours: float = float(_env("NEWSRADAR_GNEWS_ENTITY_INTERVAL_HOURS", "2"))
         # NewsAPI ücretsiz Developer planı production kullanımını YASAKLAR (yalnızca geliştirme).
         # Kod kalır, varsayılan KAPALI: anahtar kelimeli şirketler GDELT'ten haber alır.
         # on → anahtar kelimeli şirketler yeniden NewsAPI kullanır (ücretli plan ya da yerel deneme).

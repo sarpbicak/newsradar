@@ -193,6 +193,19 @@ class AdminGdeltOut(BaseModel):
     last_429_at: datetime | None = None    # son hız sınırı/engel yanıtı
 
 
+class AdminGnewsOut(BaseModel):
+    """GNews kota durumu (admin paneli)."""
+
+    configured: bool = False               # anahtar var mı (yoksa GDELT kullanılır)
+    used_today: int = 0                    # bugün (UTC) atılan GNews isteği
+    limit: int = 0                         # güvenli günlük sınır (NEWSRADAR_GNEWS_DAILY_LIMIT)
+    remaining: int = 0
+    resets_at: datetime | None = None      # sonraki 00:00 UTC
+    blocked: bool = False                  # GNews 403 (günlük kota) → gün sonuna kadar istek yok
+    last_error_status: int | None = None   # son hatanın HTTP durumu (0 = ağ hatası)
+    last_error_at: datetime | None = None
+
+
 class AdminStatsOut(BaseModel):
     """Genel istatistikler."""
 
@@ -222,6 +235,7 @@ class AdminStatsOut(BaseModel):
     # kullanıcıdan önce admin görsün (ör. OpenRouter kota/bakiye limiti).
     health: AdminHealthOut | None = None
     gdelt: AdminGdeltOut | None = None
+    gnews: AdminGnewsOut | None = None
 
 
 # --------------------------- Yanıt modelleri --------------------------- #

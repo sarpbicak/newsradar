@@ -13,7 +13,7 @@ from ..config import get_settings
 from ..markets import market_of
 from ..analysis.schemas import apply_texts
 from ..db.models import ALL_LANGUAGES, AnalystSnapshot, Article, Entity, EntityAnalysis, PriceSnapshot
-from .. import gdelt_breaker
+from .. import gdelt_breaker, gnews_quota
 from ..providers import get_provider_for
 from ..languages import effective_language
 from .schemas import (
@@ -302,10 +302,15 @@ def _priority(analysis, delta, change_percent, analyst) -> tuple[int, str | None
 
 
 def _news_paused(session: Session, entity: Entity) -> bool:
-    """Haber kaynağı geçici olarak kullanılamıyor mu (GDELT devre kesici açık ve şirket GDELT'ten
-    haber alıyor)? Kart/detay tek bir sakin not gösterir; mevcut haberler görünmeye devam eder."""
+    """Haber kaynağı geçici olarak kullanılamıyor mu? GDELT'li şirkette devre kesici açıksa; GNews'li
+    şirkette GNews'in günlük sınırı dolmuş VE yedek GDELT'in devresi açıksa. Kart/detay tek bir
+    sakin not gösterir; mevcut haberler görünmeye devam eder."""
     provider = get_provider_for(entity)
-    return bool(provider and provider.name == "gdelt" and gdelt_breaker.is_open(session))
+    if provider is None or provider.name not in ("gdelt", "gnews"):
+        return False
+    if provider.name == "gnews" and not gnews_quota.exhausted(session):
+        return False
+    return gdelt_breaker.is_open(session)
 
 
 def _market_fields(entity: Entity, language: str) -> dict:

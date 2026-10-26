@@ -7,6 +7,10 @@ Doğrular:
   (C) GNews hata verirse GDELT yedeği; kullanıcıya uyarı yok
   (D) GNews hata + GDELT devre kesici açık → GDELT'e de istek yok, uyarı yok
   (E) istekler arası en az 1,1 sn (ücretsiz plan 1 istek/sn)
+  (F) günlük sınır (80): dolunca GNews'e istek yok → GDELT; ertesi gün UTC 00:00'da sıfırlanır
+  (G) şirket başına aralık (2 saat): içinde istek yok (DB'deki haberler); başarısız istek aralığı başlatmaz
+  (H) GNews 403 (günlük kota) → gün sonuna kadar istek yok; son hata admin özetinde
+  (I) GNews dolu + GDELT devresi açık → kartta sakin not (news_paused)
 Çalıştır: python test_gnews.py
 """
 import os
@@ -28,7 +32,7 @@ import app.providers.gnews as gn  # noqa: E402
 from app import gdelt_breaker, ingest  # noqa: E402
 from app.config import get_settings  # noqa: E402
 from app.db.database import SessionLocal, init_db  # noqa: E402
-from app.db.models import Article, Entity  # noqa: E402
+from app.db.models import ApiCall, Article, Entity, ProviderSkip  # noqa: E402
 from app.providers import fallback_provider_for, get_provider_for  # noqa: E402
 
 PASS = FAIL = 0
@@ -145,7 +149,8 @@ print("== C: GNews hata → GDELT yedeği, uyarı yok")
 for status, body in ((500, '{"errors": ["Internal error"]}'), (403, '{"errors": ["You have reached your request limit for today"]}')):
     reset(); gn.httpx.get = staticmethod(fake_gnews(status=status, text=body))
     with SessionLocal() as s:
-        s.query(Article).filter(Article.entity_id == kw.id).delete(); s.commit()
+        s.query(Article).filter(Article.entity_id == kw.id).delete()
+        s.query(ApiCall).delete(); s.query(ProviderSkip).delete(); s.commit()   # aralık/kota temiz
         res = ingest.fetch_for_entity(s, s.get(Entity, kw.id), manual=True); s.commit()
         n = s.query(Article).filter(Article.entity_id == kw.id, Article.provider == "gdelt").count()
     check(len(gn_calls) == 1 and len(gd_calls) == 1 and n == 1 and res.warnings == [],
@@ -161,6 +166,7 @@ check(w["code"] == "gnews_error" and w["params"]["status"] == 401 and "gn-secret
 print("== D: GNews hata + GDELT devre açık → istek yok, uyarı yok")
 reset(); gn.httpx.get = staticmethod(fake_gnews(status=500, text="{}"))
 with SessionLocal() as s:
+    s.query(ApiCall).delete(); s.query(ProviderSkip).delete(); s.commit()   # C'nin 403'ü temizlenir
     gdelt_breaker.persist(s); s.commit()
     res = ingest.fetch_for_entity(s, s.get(Entity, thy.id), manual=True); s.commit()
 check(len(gn_calls) == 1 and gd_calls == [] and res.warnings == [], "GDELT'e istek yok, uyarı yok")
@@ -175,6 +181,94 @@ with SessionLocal() as s:
     gn.GNewsProvider().fetch(s.get(Entity, kw.id), since)
     gn.GNewsProvider().fetch(s.get(Entity, thy.id), since)
 check(slept and abs(slept[-1] - 1.1) < 1e-9, f"ikinci istek 1,1 sn bekledi ({slept})")
+
+from app import gnews_quota  # noqa: E402
+from app.api.serializers import entity_card  # noqa: E402
+from app.db.models import ApiCall  # noqa: E402
+
+T0 = datetime(2026, 10, 27, 22, 0, tzinfo=timezone.utc)
+now = [T0]
+gnews_quota._now = lambda: now[0]
+
+
+def clean():
+    reset()
+    with SessionLocal() as s:
+        s.query(ApiCall).delete(); s.query(ProviderSkip).delete(); s.query(Article).delete(); s.commit()
+
+
+def refresh(entity_id):
+    with SessionLocal() as s:
+        res = ingest.fetch_for_entity(s, s.get(Entity, entity_id), manual=True); s.commit()
+        return res
+
+
+print("== F: günlük sınır ve gün dönümü")
+os.environ["NEWSRADAR_GNEWS_DAILY_LIMIT"] = "2"; os.environ["NEWSRADAR_GNEWS_ENTITY_INTERVAL_HOURS"] = "0"; get_settings.cache_clear()
+clean(); gn.httpx.get = staticmethod(fake_gnews())
+refresh(kw.id); refresh(thy.id)
+check(len(gn_calls) == 2 and gd_calls == [], "sınıra kadar GNews (2 istek)")
+res = refresh(fr.id)
+check(len(gn_calls) == 2 and len(gd_calls) == 1 and res.warnings == [], "sınır doldu → GNews'e istek yok, GDELT yedeği, uyarı yok")
+with SessionLocal() as s:
+    check(gnews_quota.used_today(s) == 2 and gnews_quota.exhausted(s), "bugün 2/2, dolu")
+now[0] = T0 + timedelta(hours=2, minutes=1)   # ertesi gün 00:01 UTC
+with SessionLocal() as s:
+    check(gnews_quota.used_today(s) == 0 and not gnews_quota.exhausted(s), "UTC 00:00'da sayaç sıfırlandı")
+refresh(kw.id)
+check(len(gn_calls) == 3, "yeni günde GNews yeniden")
+check(gnews_quota.next_reset(T0) == datetime(2026, 10, 28, tzinfo=timezone.utc), "sıfırlanma: sonraki 00:00 UTC")
+
+print("== G: şirket başına aralık")
+os.environ["NEWSRADAR_GNEWS_DAILY_LIMIT"] = "80"; os.environ["NEWSRADAR_GNEWS_ENTITY_INTERVAL_HOURS"] = "2"; get_settings.cache_clear()
+clean(); now[0] = T0; gn.httpx.get = staticmethod(fake_gnews())
+r1 = refresh(kw.id)
+now[0] = T0 + timedelta(minutes=90)
+r2 = refresh(kw.id)
+with SessionLocal() as s:
+    stored = s.query(Article).filter(Article.entity_id == kw.id).count()
+check(len(gn_calls) == 1 and gd_calls == [] and r2.fetched == 0 and stored == 2,
+      f"90 dk sonra yeni yenileme: GNews'e istek yok, DB'deki 2 haber kullanılıyor ({len(gn_calls)})")
+now[0] = T0 + timedelta(hours=2, minutes=1)
+refresh(kw.id)
+check(len(gn_calls) == 2, "2 saat dolunca yeniden istek")
+clean(); now[0] = T0; gn.httpx.get = staticmethod(fake_gnews(status=500, text="{}"))
+refresh(kw.id)
+gn.httpx.get = staticmethod(fake_gnews())
+now[0] = T0 + timedelta(minutes=10)
+refresh(kw.id)
+check(len(gn_calls) == 2, "başarısız istek aralığı başlatmaz (10 dk sonra yeniden denendi)")
+with SessionLocal() as s:
+    check(gnews_quota.used_today(s) == 2, "başarısız istek de kotadan düşer")
+
+print("== H: GNews 403 → gün sonuna kadar dur; admin özeti")
+clean(); now[0] = T0; gn.httpx.get = staticmethod(fake_gnews(status=403, text='{"errors": ["You have reached your request limit for today"]}'))
+refresh(kw.id)
+gn.httpx.get = staticmethod(fake_gnews())
+now[0] = T0 + timedelta(minutes=30)
+refresh(thy.id)
+check(len(gn_calls) == 1 and len(gd_calls) == 2, "403'ten sonra o gün GNews'e istek yok, GDELT yedeği")
+snap = gnews_quota.snapshot()
+check(snap["configured"] and snap["used_today"] == 1 and snap["remaining"] == 79 and snap["blocked"]
+      and snap["last_error_status"] == 403 and snap["last_error_at"] == T0
+      and snap["resets_at"] == datetime(2026, 10, 28, tzinfo=timezone.utc),
+      f"admin: kullanılan/kalan, engelli, son hata 403 + zaman, sıfırlanma ({snap['used_today']}, {snap['remaining']})")
+now[0] = T0 + timedelta(hours=2, minutes=5)
+refresh(thy.id)
+check(len(gn_calls) == 2, "ertesi gün GNews yeniden")
+
+print("== I: kart notu")
+clean(); now[0] = T0
+os.environ["NEWSRADAR_GNEWS_DAILY_LIMIT"] = "0"; get_settings.cache_clear()
+with SessionLocal() as s:
+    e = s.get(Entity, kw.id)
+    check(not entity_card(s, e, "tr").news_paused, "GNews dolu ama GDELT çalışıyor → not yok")
+    gdelt_breaker.persist(s); s.commit()
+    check(entity_card(s, e, "tr").news_paused and not entity_card(s, s.get(Entity, us.id), "tr").news_paused,
+          "GNews dolu + GDELT devresi açık → not; ABD hissesinde yok")
+os.environ["NEWSRADAR_GNEWS_DAILY_LIMIT"] = "80"; get_settings.cache_clear()
+set_key("")
+check(gnews_quota.snapshot()["configured"] is False, "anahtar yoksa admin: tanımlı değil")
 
 print("=" * 50)
 print(f"SONUÇ: {PASS} geçti, {FAIL} başarısız")

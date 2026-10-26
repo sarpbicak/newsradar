@@ -219,6 +219,9 @@ class ApiCall(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     provider: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
     called_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False, index=True)
+    # GNews: şirket başına en az N saat aralık (app/gnews_quota.py). Başarısız istekte boş kalır
+    # (aralık uygulanmaz, sonraki yenileme yeniden dener; kotadan yine düşer).
+    entity_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
 
 
 class LoginRate(Base):

@@ -856,5 +856,12 @@
  "adm.gdeltOk": "Läuft, Anfragen normal.",
  "adm.gdeltOpen": "Sperre aktiv: keine Anfragen an GDELT (bis {until}).",
  "adm.gdeltLast429": "Letzter 429",
- "adm.gdeltNote": "Stichwort- und Nicht-US-Unternehmen behalten in dieser Zeit ihre vorhandenen Nachrichten."
+ "adm.gdeltNote": "Stichwort- und Nicht-US-Unternehmen behalten in dieser Zeit ihre vorhandenen Nachrichten.",
+ "adm.gnewsTitle": "Nachrichtenquelle (GNews)",
+ "adm.gnewsOff": "Kein API-Schlüssel: Stichwort- und Nicht-US-Unternehmen bekommen Nachrichten von GDELT.",
+ "adm.gnewsUsage": "Heute {used}/{limit} Anfragen · noch {left}",
+ "adm.gnewsFull": "Tageslimit erreicht: GDELT wird als Ersatz genutzt.",
+ "adm.gnewsReset": "Zurückgesetzt",
+ "adm.gnewsLastError": "Letzter Fehler",
+ "adm.gnewsDelay": "Kostenloser Plan: Nachrichten kommen 12 Stunden verzögert."
 }

@@ -73,6 +73,13 @@ addStrings({
   "adm.gdeltOk": { tr: "Çalışıyor, istekler normal.", en: "Working, requests are normal." },
   "adm.gdeltOpen": { tr: "Devre açık: GDELT'e istek atılmıyor ({until} saatine kadar).", en: "Circuit open: no requests to GDELT (until {until})." },
   "adm.gdeltLast429": { tr: "Son 429", en: "Last 429" },
+  "adm.gnewsTitle": { tr: "Haber kaynağı (GNews)", en: "News source (GNews)" },
+  "adm.gnewsOff": { tr: "Anahtar tanımlı değil: anahtar kelimeli ve ABD dışı şirketler GDELT'ten haber alıyor.", en: "No API key: keyword and non-US companies get news from GDELT." },
+  "adm.gnewsUsage": { tr: "Bugün {used}/{limit} istek · kalan {left}", en: "Today {used}/{limit} requests · {left} left" },
+  "adm.gnewsFull": { tr: "Günlük sınır doldu: GDELT yedeği kullanılıyor.", en: "Daily limit reached: using the GDELT fallback." },
+  "adm.gnewsReset": { tr: "Sıfırlanma", en: "Resets" },
+  "adm.gnewsLastError": { tr: "Son hata", en: "Last error" },
+  "adm.gnewsDelay": { tr: "Ücretsiz plan: haberler 12 saat gecikmeli.", en: "Free plan: news is delayed by 12 hours." },
   "adm.gdeltNote": { tr: "Anahtar kelimeli ve ABD dışı şirketler bu sürede mevcut haberleriyle kalır.", en: "Keyword and non-US companies keep their existing news meanwhile." },
 });
 
@@ -96,6 +103,36 @@ export function GdeltBanner({ gdelt }) {
         </span>
         {g.open && <span>{tt("adm.gdeltNote")}</span>}
       </div>
+    </Card>
+  );
+}
+
+// GNews: bugünkü istek sayısı / güvenli sınır, kalan, sıfırlanma (00:00 UTC), son hata.
+export function GnewsBanner({ gnews }) {
+  const g = gnews || {};
+  const full = g.configured && (g.blocked || g.remaining <= 0);
+  const edge = !g.configured ? "bg-slate-500" : full ? "bg-amber-500" : "bg-emerald-500";
+  return (
+    <Card className="relative overflow-hidden p-5">
+      <span className={cx("absolute inset-y-0 left-0 w-0.5", edge)} aria-hidden="true" />
+      <div className="flex items-center gap-2 text-micro font-medium text-slate-500">
+        <span className={cx("h-2 w-2 rounded-full", edge)} aria-hidden="true" />
+        {tt("adm.gnewsTitle")}
+      </div>
+      <div className="mt-1.5 font-display text-base font-medium tabular-nums text-slate-100">
+        {!g.configured ? tt("adm.gnewsOff") : full ? tt("adm.gnewsFull") : tt("adm.gnewsUsage", { used: g.used_today, limit: g.limit, left: g.remaining })}
+      </div>
+      {g.configured && (
+        <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-micro text-slate-500">
+          {full && <span className="tabular-nums">{tt("adm.gnewsUsage", { used: g.used_today, limit: g.limit, left: g.remaining })}</span>}
+          <span>{tt("adm.gnewsReset")}: <span className="text-slate-300">{fmtDateTime(g.resets_at)}</span></span>
+          <span>
+            {tt("adm.gnewsLastError")}:{" "}
+            <span className="tabular-nums text-slate-300">{g.last_error_at ? `HTTP ${g.last_error_status || "—"} · ${timeAgo(g.last_error_at)}` : tt("adm.healthNever")}</span>
+          </span>
+          <span>{tt("adm.gnewsDelay")}</span>
+        </div>
+      )}
     </Card>
   );
 }
@@ -276,6 +313,7 @@ export default function AdminPanel({ currentUserId }) {
 
       {/* SİSTEM SAĞLIĞI (LLM) — sorunu kullanıcıdan önce gör. */}
       <HealthBanner health={stats.health} />
+      <GnewsBanner gnews={stats.gnews} />
       <GdeltBanner gdelt={stats.gdelt} />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

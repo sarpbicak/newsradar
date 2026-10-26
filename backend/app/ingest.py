@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from .config import get_settings
 from .db.models import Article, Entity, EntityAnalysis, url_hash
 from .messages import msg, render
-from . import gdelt_breaker
+from . import gdelt_breaker, gnews_quota
 from .providers import fallback_provider_for, get_provider_for
 from .providers.base import ProviderResult
 from .quota import newsapi_usage, record_call
@@ -116,6 +116,10 @@ def fetch_for_entity(
             return result
 
     if provider.name == "gnews":
+        # Şirket başına aralık: son N saatte başarılı GNews isteği varsa DB'deki haberler yeter.
+        if gnews_quota.recent(session, entity.id):
+            logger.info("[%s] GNews: aralık dolmadı — mevcut haberler kullanılıyor", entity.name)
+            return result
         outcome = _fetch_gnews(session, entity, provider, fetch_since)
     else:
         outcome = provider.fetch(entity, fetch_since)
@@ -208,11 +212,17 @@ def fetch_for_entity(
 
 
 def _fetch_gnews(session: Session, entity: Entity, gnews, since: datetime):
-    """Birincil GNews; hata verirse yedek GDELT (devre kesici kapalıysa). GNews hatası kullanıcıya
-    uyarı olarak gösterilmez (yedek çalıştıysa haberler gelir; çalışmadıysa kartta sakin not)."""
+    """Birincil GNews (kota korumalı: app/gnews_quota.py); kota doluysa ya da hata verirse yedek
+    GDELT (devre kesici kapalıysa). GNews hatası kullanıcıya uyarı olarak gösterilmez (yedek
+    çalıştıysa haberler gelir; çalışmadıysa kartta sakin not)."""
+    if gnews_quota.exhausted(session):
+        logger.info("[%s] GNews günlük sınırı dolu → GDELT yedeği", entity.name)
+        return _fetch_fallback(session, entity, since)
+    call = gnews_quota.record(session, entity.id)   # istekten önce: kotadan düşer
     outcome = gnews.fetch(entity, since)
     if not outcome.warning:
         return outcome
+    gnews_quota.failed(session, call, outcome.warning)
     logger.info("[%s] GNews kullanılamadı (%s) → GDELT yedeği", entity.name, render(outcome.warning))
     return _fetch_fallback(session, entity, since)
 
