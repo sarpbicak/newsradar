@@ -159,10 +159,10 @@ export function useMedia(query) {
 }
 
 // Dokunmatik belirme (bkz. dosya başı): render(p) doğrudan kaydırma ilerlemesiyle, yumuşatmasız.
-function touchScrub(engine, { trigger, start, end, endTrigger, render }) {
+function touchScrub(engine, { trigger, start, end, endTrigger, render, behind = true }) {
   const st = engine.ScrollTrigger.create({
     trigger,
-    start: start === "top bottom" ? `top bottom+=${BEHIND_BAR}` : start,
+    start: behind && start === "top bottom" ? `top bottom+=${BEHIND_BAR}` : start,
     end,
     endTrigger,
     onUpdate: (self) => render(self.progress, self, false),
@@ -182,9 +182,10 @@ function touchScrub(engine, { trigger, start, end, endTrigger, render }) {
 //  reveal: belirme (varsayılan: son hali 1 olanlar) — dokunmatikte touchScrub; diğerleri
 //          (hero çıkışı, yatay kayma, adım adım anlatım) false verir
 //  touchEnd: dokunmatikte aralığın sonu (varsayılan TOUCH_END; endTrigger yalnızca masaüstünde)
-export function scrub(engine, { trigger, start = "top bottom", end = "top 70%", endTrigger, render, rest = 1, restOffscreen = true, smooth = DUR.scrub, reveal = rest === 1, touchEnd = TOUCH_END }) {
+//  touchBehind: dokunmatikte aralık çubuk arkasından (BEHIND_BAR) başlasın; false → tam alt kenar
+export function scrub(engine, { trigger, start = "top bottom", end = "top 70%", endTrigger, render, rest = 1, restOffscreen = true, smooth = DUR.scrub, reveal = rest === 1, touchEnd = TOUCH_END, touchBehind = true }) {
   const { gsap, ScrollTrigger, touch } = engine;
-  if (touch && reveal) return touchScrub(engine, { trigger, start, end: touchEnd, render });
+  if (touch && reveal) return touchScrub(engine, { trigger, start, end: touchEnd, render, behind: touchBehind });
   // Dokunmatik, çift yönlü: aralık BAR kadar erken başlar; ilk BAR px başlangıç karesi (ekran dışı).
   const band = touch && restOffscreen && start.endsWith("bottom") ? engine.bar : 0;
   const state = { p: 0 };

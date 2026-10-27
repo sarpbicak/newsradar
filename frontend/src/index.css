@@ -434,6 +434,7 @@ html.lenis, html.lenis body { height: auto; }
 /* Dokunmatik belirmelerin başlangıç hali — ilk boyamadan önce (html.lx-reveal, index.html).
    Motor öğeyi konumuna göre boyamaya başlayınca (data-rv-js) uygulanmaz. */
 .lx-reveal [data-rv]:not([data-rv-js]) [data-fx="mask"] { transform: translate3d(0, 110%, 0); }
+.lx-reveal [data-rv="rise"]:not([data-rv-js]) > [data-rise-body] { opacity: 0; transform: translate3d(0, 40px, 0); } /* Type.jsx RISE */
 .lx-reveal [data-rv="fade"]:not([data-rv-js]),
 .lx-reveal [data-rv]:not([data-rv-js]) [data-fx="rise"] { opacity: 0; transform: translate3d(0, 20px, 0); }
 .lx-reveal [data-rv]:not([data-rv-js]) [data-fx="line"] { transform: scaleX(0); }

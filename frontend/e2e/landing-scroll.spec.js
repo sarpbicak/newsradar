@@ -38,7 +38,8 @@ function sample(behind = 0) {
   });
 }
 
-// Bölüm başlıkları (h2, adım h3): konum + görünürlük; sayfa yatay taşıyor mu.
+// Bölüm başlıkları (h2, adım h3): konum, görünürlük, opaklık zinciri ve başlık sarmalayıcısının
+// (data-rise-body) dikey kayması; sayfa yatay taşıyor mu.
 function headings() {
   const op = (el) => { let o = 1; for (let e = el; e; e = e.parentElement) o *= +getComputedStyle(e).opacity; return o; };
   const vis = (el) => {
@@ -61,7 +62,9 @@ function headings() {
     overflow: document.documentElement.scrollWidth - window.innerWidth,
     hs: [...document.querySelectorAll("main h2, main h3")].map((el, i) => {
       const r = el.getBoundingClientRect();
-      return { k: `${i}:${(el.id || el.textContent).trim().slice(0, 28)}`, top: r.top, mid: r.top + r.height / 2, v: vis(el) };
+      const wrap = el.closest("[data-rise-body]");
+      const ty = wrap ? new DOMMatrixReadOnly(getComputedStyle(wrap).transform === "none" ? undefined : getComputedStyle(wrap).transform).m42 : 0;
+      return { k: `${i}:${(el.id || el.textContent).trim().slice(0, 28)}`, top: r.top, mid: r.top + r.height / 2, v: vis(el), op: op(el), ty };
     }),
   };
 }
@@ -71,6 +74,15 @@ test("mobil: başlıklar her geçişte konuma göre gelir ve geri gider; ortada 
   test.setTimeout(240_000);
   const { width, height: bar } = page.viewportSize();
   const full = bar + 86; // adres çubuğu küçülmüş
+  // iOS'ta svh adres çubuğundan bağımsızdır (küçük viewport, sabit); emülasyonda viewport'la
+  // değişir ve hero'yu (min-h-[100svh]) uzatıp sayfayı kaydırır. Gerçek cihaz gibi sabitle.
+  await page.addInitScript((h) => {
+    document.addEventListener("DOMContentLoaded", () => {
+      const st = document.createElement("style");
+      st.textContent = `.min-h-\\[100svh\\] { min-height: ${h}px !important; }`;
+      document.head.appendChild(st);
+    });
+  }, bar);
   await page.goto("/?welcome");
   await expect(page.locator("h1")).toBeVisible();
   await page.waitForTimeout(3500); // motor açılıştan sonra yüklenir
@@ -90,7 +102,7 @@ test("mobil: başlıklar her geçişte konuma göre gelir ve geri gider; ortada 
     passes.push({ dir, rows });
   }
 
-  const bad = { "1 girişte artar / geri giderken azalır": [], "2 ortada tam": [], "3 aynı konumda aynı değer": [], "4 yatay taşma yok": [] };
+  const bad = { "1 girişte artar / geri giderken azalır": [], "2 ortada tam": [], "3 aynı konumda aynı değer": [], "4 yatay taşma yok": [], "5 başlık: altta soluk ve aşağıda, ortada yerinde": [] };
   let checked = 0;
   for (const [pi, { dir, rows }] of passes.entries()) {
     const keys = rows[0].hs.map((x) => x.k);
@@ -110,7 +122,13 @@ test("mobil: başlıklar her geçişte konuma göre gelir ve geri gider; ortada 
     }
     for (const r of rows) {
       if (r.overflow > 0) bad["4 yatay taşma yok"].push(`${pi + 1}.${dir} y=${r.y}: +${r.overflow}px`);
-      for (const x of r.hs) if (x.mid > 0.4 * r.vh && x.mid < 0.6 * r.vh && x.v < 0.99) bad["2 ortada tam"].push(`${pi + 1}.${dir} y=${r.y} ${x.k}: ${x.v.toFixed(2)}`);
+      for (const x of r.hs) if (x.mid > 0.45 * r.vh && x.mid < 0.55 * r.vh && x.v < 0.99) bad["2 ortada tam"].push(`${pi + 1}.${dir} y=${r.y} ${x.k}: ${x.v.toFixed(2)}`);
+      // Başlık ekranın alt %20'sinde: opaklık < 0,5 ve sarmalayıcı > 15px aşağıda; ortada 1 ve 0.
+      for (const x of r.hs) {
+        const tag = `${pi + 1}.${dir} y=${r.y} ${x.k}: op ${x.op.toFixed(2)} ty ${x.ty.toFixed(1)}`;
+        if (x.top >= 0.8 * r.vh && x.top < r.vh && !(x.op < 0.5 && x.ty > 15)) bad["5 başlık: altta soluk ve aşağıda, ortada yerinde"].push(tag);
+        if (x.mid > 0.45 * r.vh && x.mid < 0.55 * r.vh && !(x.op >= 0.99 && Math.abs(x.ty) < 0.5)) bad["5 başlık: altta soluk ve aşağıda, ortada yerinde"].push(tag);
+      }
     }
   }
   // Aynı kaydırma konumunda, ekranın orta bölgesindeki başlığın değeri geçişten geçişe aynı.
@@ -124,7 +142,7 @@ test("mobil: başlıklar her geçişte konuma göre gelir ve geri gider; ortada 
   }
   for (const v of Object.values(bad)) v.splice(3); // ilk 3 örnek yeter
   expect(checked, "giriş şeridinden geçen başlık").toBeGreaterThanOrEqual(12);
-  expect(bad).toEqual({ "1 girişte artar / geri giderken azalır": [], "2 ortada tam": [], "3 aynı konumda aynı değer": [], "4 yatay taşma yok": [] });
+  expect(bad).toEqual({ "1 girişte artar / geri giderken azalır": [], "2 ortada tam": [], "3 aynı konumda aynı değer": [], "4 yatay taşma yok": [], "5 başlık: altta soluk ve aşağıda, ortada yerinde": [] });
 });
 
 test("masaüstü: manifesto scrub'ı çift yönlü kalır", async ({ page }, info) => {

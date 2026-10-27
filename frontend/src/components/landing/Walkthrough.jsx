@@ -2,7 +2,7 @@
 // Masaüstü: bölüm ekrana sabitlenir (CSS sticky; uzun kap = 4 adımlık kaydırma aralığı, ilerlemeyi
 // ScrollTrigger ölçer). Solda 4 adım + ilerleme çizgisi, sağda tek uygulama penceresi; pencere
 // adımlar arasında crossfade + hafif ölçekle geçer, sahneler tamamen kaydırmayla oynar/geri sarar.
-// Mobil (ve reduced-motion): sabitleme yok; adım metni kaydırmayla alttan gelir, her adımın
+// Mobil (ve reduced-motion): sabitleme yok; adım numarası, başlığı ve metni kaydırmayla alttan gelir, her adımın
 // altında kendi penceresi, o adımın kaydırma aralığında scrub ile oynar. Motor yoksa her şey son karede, statik.
 // Erişilebilirlik: soluk adım metni de AA (renk geçişi, opaklık değil); pencere içeriği tek
 // görünür sahne dışında aria-hidden.
@@ -11,7 +11,7 @@ import { useI18n } from "../../i18n.jsx";
 import { clamp01, ease, prefersReducedMotion, seg } from "../../motion.js";
 import { SCENES } from "./Scenes.jsx";
 import { DESKTOP_MQ, scrub, useMedia, useScrub } from "./scroll.js";
-import { Lines, Reveal } from "./Type.jsx";
+import { Lines, Rise } from "./Type.jsx";
 
 const STEPS = [1, 2, 3, 4];
 const STEP_VH = 85;   // masaüstünde adım başına kaydırma (vh)
@@ -28,14 +28,22 @@ export function AppWindow({ children, className = "" }) {
 }
 
 // pinned: boyutlar ekran YÜKSEKLİĞİNE göre akışkan — 4 adım kısa dizüstü ekranına da sığsın.
+// Dokunmatikte numara, başlık ve metin her biri kendi konumuna göre 40px alttan gelir (Rise);
+// masaüstünde Rise hareketsiz sarmalayıcıdır.
 function StepText({ n, t, pinned = false }) {
   return (
     <>
-      <div className="lx-step-num text-sm font-medium tabular-nums">0{n}</div>
-      <h3 className={`lx-display ${pinned ? "mt-2 text-[clamp(1.75rem,1rem+2.6vh,3rem)]" : "mt-3 text-[2rem]"}`}>{t(`land.step${n}.title`)}</h3>
-      <p className={`lx-step-body mt-3 max-w-md ${pinned ? "text-[clamp(1rem,0.55rem+1.25vh,1.25rem)] leading-relaxed" : "lx-body"}`}>
-        {t(`land.step${n}.body`)}
-      </p>
+      <Rise>
+        <div className="lx-step-num text-sm font-medium tabular-nums">0{n}</div>
+      </Rise>
+      <Rise>
+        <h3 className={`lx-display ${pinned ? "mt-2 text-[clamp(1.75rem,1rem+2.6vh,3rem)]" : "mt-3 text-[2rem]"}`}>{t(`land.step${n}.title`)}</h3>
+      </Rise>
+      <Rise>
+        <p className={`lx-step-body mt-3 max-w-md ${pinned ? "text-[clamp(1rem,0.55rem+1.25vh,1.25rem)] leading-relaxed" : "lx-body"}`}>
+          {t(`land.step${n}.body`)}
+        </p>
+      </Rise>
     </>
   );
 }
@@ -188,10 +196,7 @@ function Stacked({ demo }) {
     <ol className="mx-auto mt-10 max-w-[760px] space-y-16 px-5 sm:mt-16 sm:space-y-24 sm:px-8">
       {STEPS.map((n, i) => (
         <li key={n} className="lx-step" data-active="true">
-          {/* Adım başlığı ve metni kaydırmayla 20px alttan gelir (Reveal; yalnızca dokunmatikte motor var). */}
-          <Reveal>
-            <StepText n={n} t={t} />
-          </Reveal>
+          <StepText n={n} t={t} />
           {demo ? <StackedScene index={i} demo={demo} /> : demo === null ? <div className="skeleton mt-10 h-[360px] w-full rounded-card" aria-hidden="true" /> : null}
         </li>
       ))}
