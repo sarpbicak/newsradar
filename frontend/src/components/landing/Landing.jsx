@@ -98,6 +98,11 @@ function Stats() {
         render: (p) => {
           const e = ease(p);
           nums.forEach((n) => (n.textContent = fmtCompact(Math.round(Number(n.dataset.count) * e))));
+          if (engine.touch) {
+            // Dokunmatik: rakamlar sayarken 20px alttan gelir (yalnızca transform/opacity).
+            el.style.opacity = p >= 1 ? "" : e;
+            el.style.transform = p >= 1 ? "" : `translate3d(0, ${(1 - e) * 20}px, 0)`;
+          }
         },
       });
     },
@@ -119,7 +124,7 @@ function Stats() {
         {t("land.stats.sub")}
       </Reveal>
       {/* Masaüstünde 4 yan yana, mobilde 2×2. */}
-      <dl ref={ref} className="mt-16 grid grid-cols-2 gap-x-5 gap-y-12 sm:gap-x-8 lg:mt-20 lg:grid-cols-4">
+      <dl ref={ref} data-rv="fade" className="mt-16 grid grid-cols-2 gap-x-5 gap-y-12 sm:gap-x-8 lg:mt-20 lg:grid-cols-4">
         {(items || [0, 1, 2, 3]).map((it, i) => (
           <div key={i} className="flex flex-col-reverse border-t border-ink-600 pt-6">
             {it ? (

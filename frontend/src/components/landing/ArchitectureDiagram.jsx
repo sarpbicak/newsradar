@@ -1,12 +1,13 @@
 // "Altında ne var" — sade mimari şeması. Beş şerit, her biri soldan sağa akan üç düğüm.
 // Kaydırdıkça şeritler sırayla belirir, düğümler gelir ve aradaki çizgiler çizilir (scrub; geri
-// kaydırınca geri sarar). Yalnızca transform/opacity. Model adı ("Claude") landing'de yalnızca burada.
+// kaydırınca geri sarar). Dokunmatikte her şerit kendi konumuna göre (ekranın ortası hep tam). Yalnızca transform/opacity. Model adı ("Claude") landing'de yalnızca burada.
 // Erişilebilirlik: anlamlı liste (ol/li); çizgiler dekoratif.
 import React, { useRef } from "react";
 import { useI18n } from "../../i18n.jsx";
 import { paintSegs, scrub, useScrub } from "./scroll.js";
 
 const LANE = 0.16; // şerit başına ilerleme payı
+const LANE_SPAN = 0.18; // bir şeridin bölütleri [base, base + 0.17] içinde
 
 export default function ArchitectureDiagram() {
   const { t } = useI18n();
@@ -21,17 +22,23 @@ export default function ArchitectureDiagram() {
   useScrub(
     ref,
     (engine, el) => {
+      if (engine.touch) {
+        return [...el.children].map((li, j) => {
+          const nodes = li.querySelectorAll("[data-fx]");
+          return scrub(engine, { trigger: li, render: (q) => paintSegs(nodes, j * LANE + q * LANE_SPAN) });
+        });
+      }
       const nodes = el.querySelectorAll("[data-fx]");
       return scrub(engine, { trigger: el, end: "bottom 75%", render: (p) => paintSegs(nodes, p) });
     },
     [t]
   );
   return (
-    <ol ref={ref} data-rv="" className="divide-y divide-ink-600 border-y border-ink-600" aria-label={t("land.stack.title")}>
+    <ol ref={ref} className="divide-y divide-ink-600 border-y border-ink-600" aria-label={t("land.stack.title")}>
       {lanes.map((lane, j) => {
         const base = j * LANE;
         return (
-          <li key={j} className="grid gap-4 py-6 sm:grid-cols-[10rem_minmax(0,1fr)] sm:items-center sm:py-7">
+          <li key={j} data-rv="" className="grid gap-4 py-6 sm:grid-cols-[10rem_minmax(0,1fr)] sm:items-center sm:py-7">
             <span data-fx="rise" data-seg={`${base},${base + 0.08}`} className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
               {lane.name}
             </span>

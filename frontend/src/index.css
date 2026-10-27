@@ -432,13 +432,14 @@ html.lenis, html.lenis body { height: auto; }
 }
 .lx-line > span { display: block; }
 /* Dokunmatik belirmelerin başlangıç hali — ilk boyamadan önce (html.lx-reveal, index.html).
-   Yüklemede ekranda olan (data-rv-shown) ve motorun boyadığı (data-rv-js) öğelere uygulanmaz. */
-.lx-reveal [data-rv]:not([data-rv-shown]):not([data-rv-js]) [data-fx="mask"] { transform: translate3d(0, 110%, 0); }
-.lx-reveal [data-rv="fade"]:not([data-rv-shown]):not([data-rv-js]),
-.lx-reveal [data-rv]:not([data-rv-shown]):not([data-rv-js]) [data-fx="rise"] { opacity: 0; transform: translate3d(0, 20px, 0); }
-.lx-reveal [data-rv]:not([data-rv-shown]):not([data-rv-js]) [data-fx="line"] { transform: scaleX(0); }
-.lx-reveal [data-rv]:not([data-rv-shown]):not([data-rv-js]) [data-fx="linev"] { transform: scaleY(0); }
-.lx-reveal [data-rv]:not([data-rv-shown]):not([data-rv-js]) [data-w] { opacity: 0.16; }
+   Motor öğeyi konumuna göre boyamaya başlayınca (data-rv-js) uygulanmaz. */
+.lx-reveal [data-rv]:not([data-rv-js]) [data-fx="mask"] { transform: translate3d(0, 110%, 0); }
+.lx-reveal [data-rv="fade"]:not([data-rv-js]),
+.lx-reveal [data-rv]:not([data-rv-js]) [data-fx="rise"] { opacity: 0; transform: translate3d(0, 20px, 0); }
+.lx-reveal [data-rv]:not([data-rv-js]) [data-fx="line"] { transform: scaleX(0); }
+.lx-reveal [data-rv]:not([data-rv-js]) [data-fx="linev"] { transform: scaleY(0); }
+.lx-reveal [data-rv]:not([data-rv-js]) [data-w] { opacity: 0.5; } /* Manifesto DIM_TOUCH (kontrast ≥3:1) */
+.lx-reveal [data-rv]:not([data-rv-js]) [data-w].text-accent { opacity: 0.75; }
 .lx-clip-x { overflow-x: clip; }
 
 /* Hero açılışı — sayfa başına BİR KEZ (toplam ≤ 1.5 s, sabitler motion.js'te). */

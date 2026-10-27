@@ -2,8 +2,8 @@
 // Masaüstü: bölüm ekrana sabitlenir (CSS sticky; uzun kap = 4 adımlık kaydırma aralığı, ilerlemeyi
 // ScrollTrigger ölçer). Solda 4 adım + ilerleme çizgisi, sağda tek uygulama penceresi; pencere
 // adımlar arasında crossfade + hafif ölçekle geçer, sahneler tamamen kaydırmayla oynar/geri sarar.
-// Mobil (ve reduced-motion): sabitleme yok; her adımın altında kendi penceresi, o adımın kaydırma
-// aralığında scrub ile oynar. Motor yoksa her şey son karede, statik.
+// Mobil (ve reduced-motion): sabitleme yok; adım metni kaydırmayla alttan gelir, her adımın
+// altında kendi penceresi, o adımın kaydırma aralığında scrub ile oynar. Motor yoksa her şey son karede, statik.
 // Erişilebilirlik: soluk adım metni de AA (renk geçişi, opaklık değil); pencere içeriği tek
 // görünür sahne dışında aria-hidden.
 import React, { useLayoutEffect, useRef, useState } from "react";
@@ -11,7 +11,7 @@ import { useI18n } from "../../i18n.jsx";
 import { clamp01, ease, prefersReducedMotion, seg } from "../../motion.js";
 import { SCENES } from "./Scenes.jsx";
 import { DESKTOP_MQ, scrub, useMedia, useScrub } from "./scroll.js";
-import { Lines } from "./Type.jsx";
+import { Lines, Reveal } from "./Type.jsx";
 
 const STEPS = [1, 2, 3, 4];
 const STEP_VH = 85;   // masaüstünde adım başına kaydırma (vh)
@@ -82,7 +82,7 @@ function Pinned({ demo }) {
         trigger: el,
         start: "top bottom",
         end: "bottom bottom",
-        once: false, // adımlar geri kaydırınca geri gelir
+        reveal: false, // adımlar geri kaydırınca geri gelir
         render: (p, st, rest) => {
           if (rest) {
             if (drift.current) drift.current.style.transform = "";
@@ -167,6 +167,7 @@ function StackedScene({ index, demo }) {
         trigger: el,
         start: "top bottom",
         end: "center 45%",
+        touchEnd: "center 55%", // ekranın ortasına gelmeden tamam
         render: (q) => setP(Math.round(q * 200) / 200),
       }),
     [demo]
@@ -187,7 +188,10 @@ function Stacked({ demo }) {
     <ol className="mx-auto mt-10 max-w-[760px] space-y-16 px-5 sm:mt-16 sm:space-y-24 sm:px-8">
       {STEPS.map((n, i) => (
         <li key={n} className="lx-step" data-active="true">
-          <StepText n={n} t={t} />
+          {/* Adım başlığı ve metni kaydırmayla 20px alttan gelir (Reveal; yalnızca dokunmatikte motor var). */}
+          <Reveal>
+            <StepText n={n} t={t} />
+          </Reveal>
           {demo ? <StackedScene index={i} demo={demo} /> : demo === null ? <div className="skeleton mt-10 h-[360px] w-full rounded-card" aria-hidden="true" /> : null}
         </li>
       ))}

@@ -8,20 +8,18 @@
 // açıkken sayfa statik ve eksiksiz görünür. Tetik aralığının tamamen altında (ekran dışında)
 // kalan öğeler de son halde bekletilir; ekrana girdikleri an başlangıç karesine geçerler.
 //
-// Dokunmatik / dar ekran (Lenis yok, yerel kaydırma): belirme animasyonları TEK YÖNLÜ — her öğe
-// bir kez belirir ve kalır (geri kaydırınca sönmez). iOS Safari'nin adres çubuğu açılıp
-// kapanınca yükseklik değişir; bu yenileme sayılmaz, yalnızca genişlik değişince (döndürme)
-// tetik noktaları yeniden hesaplanır.
+// Dokunmatik / dar ekran (Lenis yok, yerel kaydırma): belirmeler de masaüstündeki gibi
+// kaydırmaya bağlı, ama YUMUŞATMASIZ ve tamamen KONUMA bağlı (touchScrub): değer yalnızca
+// kaydırma konumundan hesaplanır — aşağı inince ileri, yukarı çıkınca geri, her seferinde; aynı
+// konumda hep aynı değer (titreme yok), "ekran dışı → son hal" bekletmesi yok. Aralık öğe
+// ekranın altından girerken başlar (yüzen yarı saydam Safari çubuğunun arkası, BEHIND_BAR,
+// dahil) ve öğenin üstü ekranın %60'ına gelince biter: ekranın ortasındaki içerik hep tam
+// görünür. iOS Safari'nin adres çubuğu açılıp kapanınca yükseklik değişir; bu yenileme
+// sayılmaz, yalnızca genişlik değişince (döndürme) tetik noktaları yeniden hesaplanır.
 //
 // Dokunmatikte belirmelerin (data-rv) gizli başlangıç hali ilk boyamadan ÖNCE CSS'te
-// (index.html <html class="lx-reveal">, index.css); JS hiçbir öğeyi sonradan gizlemez. iOS
-// Safari'nin yüzen yarı saydam çubuğunun arkası da görünür alandır. Genişletilmiş görünür alan
-// = viewport + üstte ve altta REVEAL_AHEAD pay (altta ayrıca adres çubuğu payı). Belirme öğe bu
-// alana girerken başlar — aşağı inerken alttan, yukarı çıkarken üstten — böylece görünür
-// alana girdiğinde çoktan başlamıştır. Gizli başlangıç haline dönüş (tekrar oynatmak için)
-// YALNIZCA öğe bu alanın tamamen dışına çıkınca: görünürken asla gizlenmez. Yüklemede ekranda
-// ya da payın içinde olan öğe hiç gizlenmez (data-rv-shown). Motor öğeyi boyamaya başlayınca
-// data-rv-js: CSS çekilir, satır içi stil geçerli olur.
+// (index.html <html class="lx-reveal">, index.css); motor öğeyi boyamaya başlayınca data-rv-js:
+// CSS çekilir, konuma göre satır içi stil geçerli olur.
 import { createContext, useContext, useEffect, useLayoutEffect, useState } from "react";
 import { DUR, INTRO_AT, clamp01, ease, prefersReducedMotion, seg } from "../../motion.js";
 
@@ -30,8 +28,9 @@ const LENIS_MQ = "(min-width: 1024px) and (pointer: fine)"; // dışı: dokunmat
 const MIN_BAR = 120; // px; adres çubuğu payının alt sınırı (ölçülemezse de yeter)
 const REVEAL_CLASS = "lx-reveal"; // index.html: dokunmatik + hareket açık
 const dropRevealClass = () => document.documentElement.classList.remove(REVEAL_CLASS);
-// Dokunmatik belirme, öğe görünür alanın altına bu kadar kala başlar (yüzen çubuk payı dahil).
-const revealAhead = () => Math.max(150, Math.round(window.innerHeight * 0.25));
+// Dokunmatik belirme aralığı: öğenin üstü viewport'un bu kadar altındayken başlar (çubuk arkası).
+export const BEHIND_BAR = 150;
+export const TOUCH_END = "top 60%";
 
 // Adres çubuğu payı: en büyük ile en küçük viewport farkı (100lvh − 100svh).
 function addressBar() {
@@ -159,72 +158,33 @@ export function useMedia(query) {
   return match;
 }
 
-// Dokunmatik belirme (bkz. dosya başı). Aşağı iniş ilerlemesi asıl aralıkla (REVEAL_AHEAD kadar
-// erken başlar); yukarı çıkış onun aynası: öğenin altı üst payın sınırından içeri ilerledikçe.
-// Üstte çubuk arkası şeridi yok; yukarı aralığı pay kadar uzun tutulur ki animasyon görünür
-// alana girerken başlamış ama bitmemiş olsun. Bir ziyaret boyunca ilerleme yalnızca artar.
-function touchReveal(engine, { trigger, start, end, endTrigger, render, smooth }) {
-  const { gsap, ScrollTrigger } = engine;
-  const ahead = revealAhead();
-  const state = { p: 0 };
-  let tween = null;
-  let goal = 0; // bu ziyarette ulaşılan en yüksek ilerleme
-  let from = null; // "down" (alttan girdi) | "up" (üstten girdi) | null (alanın dışında, gizli)
-  const down = ScrollTrigger.create({ trigger, start: `${start}+=${ahead}`, end, endTrigger });
-  const draw = (p) => render(p, down, false);
-  const target = (zone) => {
-    const len = Math.max(1, down.end - down.start);
-    const y = zone.scroll();
-    return clamp01(from === "up" ? (zone.end - y) / (len + ahead) : (y - down.start) / len);
-  };
-  const advance = (zone) => {
-    const t = target(zone);
-    if (t <= goal) return;
-    goal = t;
-    tween?.kill();
-    tween = gsap.to(state, { p: t, duration: smooth, ease, onUpdate: () => draw(state.p) });
-  };
-  const reset = () => {
-    tween?.kill();
-    from = null;
-    goal = state.p = 0;
-    draw(0);
-  };
-  const zone = ScrollTrigger.create({
+// Dokunmatik belirme (bkz. dosya başı): render(p) doğrudan kaydırma ilerlemesiyle, yumuşatmasız.
+function touchScrub(engine, { trigger, start, end, endTrigger, render }) {
+  const st = engine.ScrollTrigger.create({
     trigger,
-    start: `top bottom+=${ahead + engine.bar}`,
-    end: `bottom top-=${ahead}`,
-    onEnter: (self) => ((from = "down"), advance(self)),
-    onEnterBack: (self) => ((from = "up"), advance(self)),
-    onLeave: reset,
-    onLeaveBack: reset,
-    onUpdate: (self) => from && advance(self),
-    onRefresh: (self) => from && advance(self),
+    start: start === "top bottom" ? `top bottom+=${BEHIND_BAR}` : start,
+    end,
+    endTrigger,
+    onUpdate: (self) => render(self.progress, self, false),
+    onRefresh: (self) => render(self.progress, self, false),
   });
-  tween?.kill();
-  if (zone.isActive) {
-    from = "down";
-    goal = trigger.hasAttribute?.("data-rv-shown") ? 1 : target(zone);
-  }
   trigger.setAttribute?.("data-rv-js", ""); // bundan sonra satır içi stil geçerli
-  state.p = goal;
-  draw(goal);
+  render(st.progress, st, false);
   return () => {
-    tween?.kill();
-    zone.kill();
-    down.kill();
-    render(1, down, true);
+    st.kill();
+    render(1, st, true);
   };
 }
 
 // Bir kaydırma aralığını render(p)'ye bağlar (p: 0..1, yumuşatılmış).
 //  rest: motor yokken / ekran dışındayken / sökülünce çizilecek hal (varsayılan 1 = son hal)
 //  restOffscreen: aralığın başından önce (öğe henüz ekrana girmemişken) rest'te beklet
-//  once: belirme (varsayılan: son hali 1 olanlar) — dokunmatikte touchReveal; çift yönlü
-//        olması gerekenler (hero çıkışı, yatay kayma, adım adım anlatım) false verir
-export function scrub(engine, { trigger, start = "top bottom", end = "top 70%", endTrigger, render, rest = 1, restOffscreen = true, smooth = DUR.scrub, once = rest === 1 }) {
+//  reveal: belirme (varsayılan: son hali 1 olanlar) — dokunmatikte touchScrub; diğerleri
+//          (hero çıkışı, yatay kayma, adım adım anlatım) false verir
+//  touchEnd: dokunmatikte aralığın sonu (varsayılan TOUCH_END; endTrigger yalnızca masaüstünde)
+export function scrub(engine, { trigger, start = "top bottom", end = "top 70%", endTrigger, render, rest = 1, restOffscreen = true, smooth = DUR.scrub, reveal = rest === 1, touchEnd = TOUCH_END }) {
   const { gsap, ScrollTrigger, touch } = engine;
-  if (touch && once) return touchReveal(engine, { trigger, start, end, endTrigger, render, smooth });
+  if (touch && reveal) return touchScrub(engine, { trigger, start, end: touchEnd, render });
   // Dokunmatik, çift yönlü: aralık BAR kadar erken başlar; ilk BAR px başlangıç karesi (ekran dışı).
   const band = touch && restOffscreen && start.endsWith("bottom") ? engine.bar : 0;
   const state = { p: 0 };
@@ -268,13 +228,6 @@ export function scrub(engine, { trigger, start = "top bottom", end = "top 70%", 
 // Bileşen içinde scrub kurulumu: motor hazır olunca factory(engine, el) çalışır; temizlik döner.
 export function useScrub(ref, factory, deps = []) {
   const engine = useContext(EngineContext);
-  // Dokunmatik belirme: ilk boyamadan önce, ekranda ya da payın içindeyse hiç gizlenmesin.
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el?.hasAttribute("data-rv") || !document.documentElement.classList.contains(REVEAL_CLASS)) return;
-    if (el.getBoundingClientRect().top < window.innerHeight + revealAhead()) el.setAttribute("data-rv-shown", "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!engine || !el) return undefined;
