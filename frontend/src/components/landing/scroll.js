@@ -7,11 +7,30 @@
 // Varsayılan DOM hali = SON hal: motor yüklenmeden, yüklenemezse ya da prefers-reduced-motion
 // açıkken sayfa statik ve eksiksiz görünür. Tetik aralığının tamamen altında (ekran dışında)
 // kalan öğeler de son halde bekletilir; ekrana girdikleri an başlangıç karesine geçerler.
+//
+// Dokunmatik / dar ekran (Lenis yok, yerel kaydırma): belirme animasyonları TEK YÖNLÜ — her öğe
+// bir kez belirir ve kalır (geri kaydırınca sönmez). iOS Safari'nin adres çubuğu açılıp
+// kapanınca yükseklik değişir; bu yenileme sayılmaz, yalnızca genişlik değişince (döndürme)
+// tetik noktaları yeniden hesaplanır. Çubuk küçülünce görünen alan tetik noktasının altına
+// uzar; öğe son halden başlangıç karesine bu yüzden adres çubuğu payı (BAR) kadar ÖNCE, hâlâ
+// en büyük viewport'un da altındayken geçer — ekranda görünürken asla.
 import { createContext, useContext, useEffect, useLayoutEffect, useState } from "react";
-import { DUR, INTRO_AT, ease, prefersReducedMotion, seg } from "../../motion.js";
+import { DUR, INTRO_AT, clamp01, ease, prefersReducedMotion, seg } from "../../motion.js";
 
 export const DESKTOP_MQ = "(min-width: 1024px)";
-const LENIS_MQ = "(min-width: 1024px) and (pointer: fine)";
+const LENIS_MQ = "(min-width: 1024px) and (pointer: fine)"; // dışı: dokunmatik / dar ekran
+const MIN_BAR = 120; // px; adres çubuğu payının alt sınırı (ölçülemezse de yeter)
+
+// Adres çubuğu payı: en büyük ile en küçük viewport farkı (100lvh − 100svh).
+function addressBar() {
+  if (!window.CSS?.supports?.("height", "1lvh")) return MIN_BAR;
+  const probe = document.createElement("div");
+  probe.style.cssText = "position:fixed;top:0;width:0;visibility:hidden;height:calc(100lvh - 100svh)";
+  document.body.appendChild(probe);
+  const h = probe.offsetHeight;
+  probe.remove();
+  return Math.max(MIN_BAR, h);
+}
 
 export const EngineContext = createContext(null);
 
@@ -19,9 +38,19 @@ async function startEngine(root) {
   if (prefersReducedMotion()) return null;
   const [{ gsap }, { ScrollTrigger }] = await Promise.all([import("gsap"), import("gsap/ScrollTrigger")]);
   gsap.registerPlugin(ScrollTrigger);
+  const touch = !window.matchMedia(LENIS_MQ).matches;
   let lenis = null;
   let tick = null;
-  if (window.matchMedia(LENIS_MQ).matches) {
+  let width = window.innerWidth;
+  const onResize = () => {
+    if (window.innerWidth === width) return; // adres çubuğu: yalnızca yükseklik değişti
+    width = window.innerWidth;
+    ScrollTrigger.refresh();
+  };
+  if (touch) {
+    ScrollTrigger.config({ ignoreMobileResize: true, autoRefreshEvents: "visibilitychange,DOMContentLoaded,load" });
+    window.addEventListener("resize", onResize);
+  } else {
     const { default: Lenis } = await import("lenis");
     lenis = new Lenis({ lerp: 0.09 });
     lenis.on("scroll", ScrollTrigger.update);
@@ -30,9 +59,12 @@ async function startEngine(root) {
     gsap.ticker.lagSmoothing(0);
   }
   // İçerik yüksekliği değişince (veri geldi, font yüklendi) tetik noktaları yeniden hesaplanır.
-  // Pencere yeniden boyutlanınca ScrollTrigger zaten kendisi yeniler.
+  // Masaüstünde pencere yeniden boyutlanınca ScrollTrigger zaten kendisi yeniler.
   let timer;
+  let height = root?.offsetHeight;
   const ro = new ResizeObserver(() => {
+    if (root.offsetHeight === height) return;
+    height = root.offsetHeight;
     clearTimeout(timer);
     timer = setTimeout(() => ScrollTrigger.refresh(), 150);
   });
@@ -41,9 +73,13 @@ async function startEngine(root) {
     gsap,
     ScrollTrigger,
     lenis,
+    touch,
+    bar: touch ? addressBar() : 0,
     stop() {
       ro.disconnect();
       clearTimeout(timer);
+      window.removeEventListener("resize", onResize);
+      if (touch) ScrollTrigger.config({ autoRefreshEvents: "visibilitychange,DOMContentLoaded,load,resize" });
       if (tick) gsap.ticker.remove(tick);
       lenis?.destroy();
       ScrollTrigger.getAll().forEach((st) => st.kill());
@@ -113,34 +149,55 @@ export function useMedia(query) {
 // Bir kaydırma aralığını render(p)'ye bağlar (p: 0..1, yumuşatılmış).
 //  rest: motor yokken / ekran dışındayken / sökülünce çizilecek hal (varsayılan 1 = son hal)
 //  restOffscreen: aralığın başından önce (öğe henüz ekrana girmemişken) rest'te beklet
-export function scrub(engine, { trigger, start = "top bottom", end = "top 70%", endTrigger, render, rest = 1, restOffscreen = true, smooth = DUR.scrub }) {
-  const { gsap, ScrollTrigger } = engine;
+//  once: dokunmatikte tek yönlü belirme (varsayılan: son hali 1 olan belirmeler); çift yönlü
+//        olması gerekenler (hero çıkışı, yatay kayma, adım adım anlatım) false verir
+export function scrub(engine, { trigger, start = "top bottom", end = "top 70%", endTrigger, render, rest = 1, restOffscreen = true, smooth = DUR.scrub, once = rest === 1 }) {
+  const { gsap, ScrollTrigger, touch } = engine;
+  const oneShot = touch && once;
+  // Dokunmatikte aralık BAR kadar erken başlar; ilk BAR px başlangıç karesidir (ekran dışı).
+  const band = touch && restOffscreen && start.endsWith("bottom") ? engine.bar : 0;
   const state = { p: 0 };
   let tween = null;
-  const offscreen = (st) => restOffscreen && st.progress === 0 && !st.isActive;
-  const paint = (st) => (offscreen(st) ? render(rest, st, true) : render(state.p, st, false));
+  let goal = 0; // tek yönlüde ulaşılan en yüksek ilerleme
+  const range = band ? (self) => ({ start: self.start + band, end: self.end }) : (self) => self; // render'a asıl aralık
+  const prog = (self) => (band ? clamp01((self.progress * (self.end - self.start) - band) / Math.max(1, self.end - self.start - band)) : self.progress);
+  const offscreen = (st) => restOffscreen && st.progress === 0 && !st.isActive && !(oneShot && goal > 0);
+  const paint = (st) => (offscreen(st) ? render(rest, range(st), true) : render(state.p, range(st), false));
+  const drive = (self, to) => {
+    tween?.kill();
+    tween = gsap.to(state, {
+      p: to,
+      duration: smooth,
+      ease,
+      onUpdate: () => render(state.p, range(self), false),
+      onComplete: () => offscreen(self) && render(rest, range(self), true),
+    });
+  };
   const st = ScrollTrigger.create({
     trigger,
-    start,
+    start: band ? `${start}+=${band}` : start,
     end,
     endTrigger,
     onUpdate: (self) => {
-      tween?.kill();
-      tween = gsap.to(state, {
-        p: self.progress,
-        duration: smooth,
-        ease,
-        onUpdate: () => render(state.p, self, false),
-        onComplete: () => offscreen(self) && render(rest, self, true),
-      });
+      if (!oneShot) return drive(self, prog(self));
+      if (prog(self) > goal) drive(self, (goal = prog(self)));
+      else if (goal === 0 && self.isActive) paint(self); // ekran altı payı: başlangıç karesi
     },
     onRefresh: (self) => {
+      if (oneShot && goal > 0) {
+        if (prog(self) > goal) drive(self, (goal = prog(self)));
+        return;
+      }
       tween?.kill();
-      state.p = self.progress;
+      state.p = prog(self);
       paint(self);
     },
   });
-  state.p = st.progress;
+  // Tek yönlüde: motor yüklendiğinde ekranda ya da üstte olan öğe son halde kalır; yalnızca
+  // henüz altta (görünmeyen) olanlar başlangıç karesine geçip ekrana girince belirir.
+  tween?.kill();
+  if (oneShot && prog(st) > 0) goal = 1;
+  state.p = oneShot ? goal : prog(st);
   paint(st);
   return () => {
     tween?.kill();

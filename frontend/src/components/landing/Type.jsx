@@ -1,7 +1,8 @@
 // Landing'in kaydırmaya bağlı iki yapı taşı:
-//  <Lines>  büyük başlık; satırlar maskeden aşağıdan çıkar (geri kaydırınca iner),
+//  <Lines>  büyük başlık; satırlar maskeden aşağıdan çıkar (masaüstünde geri kaydırınca iner),
 //           drift verilirse kaydırma boyunca yatayda hafifçe kayar.
-//  <Reveal> paragraf/kart/rakam; belirip 20px yukarı kayar (geri kaydırınca geri gider).
+//  <Reveal> paragraf/kart/rakam; belirip 20px yukarı kayar (masaüstünde geri kaydırınca geri gider).
+// Dokunmatikte ikisi de bir kez belirir ve kalır (scroll.js).
 // Motor yoksa / reduced-motion: düz, son halde metin.
 import React, { useRef } from "react";
 import { ease } from "../../motion.js";

@@ -82,6 +82,7 @@ function Pinned({ demo }) {
         trigger: el,
         start: "top bottom",
         end: "bottom bottom",
+        once: false, // adımlar geri kaydırınca geri gelir
         render: (p, st, rest) => {
           if (rest) {
             if (drift.current) drift.current.style.transform = "";

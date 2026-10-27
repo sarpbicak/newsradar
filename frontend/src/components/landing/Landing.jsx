@@ -77,7 +77,7 @@ function Nav({ lang, onLang, onAnchor }) {
   );
 }
 
-// Rakamlar: /public/stats. Sayaçlar kaydırmayla artar, geri kaydırınca azalır. Uydurma yok —
+// Rakamlar: /public/stats. Sayaçlar kaydırmayla artar (masaüstünde geri kaydırınca azalır). Uydurma yok —
 // veri gelmezse bölüm görünmez.
 function Stats() {
   const { t } = useI18n();
@@ -289,12 +289,12 @@ export default function Landing({ lang, setLang }) {
 
   return (
     <EngineContext.Provider value={engine}>
-      <div ref={root} className="lx min-h-dvh">
+      <div ref={root} className="lx min-h-svh">
         <Nav lang={lang} onLang={onLang} onAnchor={onAnchor} />
         <main>
           <Hero demo={demo} onAnchor={onAnchor} onApp={goApp} />
           {/* Yer tutucu: sayfa baştan kaydırılabilir (kaydırma çubuğu sonradan çıkıp hero'yu kaydırmasın). */}
-          {!below && <div style={{ height: "100dvh" }} aria-hidden="true" />}
+          {!below && <div className="h-svh" aria-hidden="true" />}
           {below && (
             <>
               <Manifesto />
