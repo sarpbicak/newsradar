@@ -15,10 +15,13 @@
 //
 // Dokunmatikte belirmelerin (data-rv) gizli başlangıç hali ilk boyamadan ÖNCE CSS'te
 // (index.html <html class="lx-reveal">, index.css); JS hiçbir öğeyi sonradan gizlemez. iOS
-// Safari'nin yüzen yarı saydam çubuğunun arkası da görünür alandır: belirme öğe oraya
-// girmeden REVEAL_AHEAD kadar önce başlar. Yüklemede ekranda ya da bu payın içinde olan öğe
-// hiç gizlenmez (data-rv-shown). Motor öğeyi boyamaya başlayınca data-rv-js: CSS çekilir,
-// satır içi stil geçerli olur.
+// Safari'nin yüzen yarı saydam çubuğunun arkası da görünür alandır. Genişletilmiş görünür alan
+// = viewport + üstte ve altta REVEAL_AHEAD pay (altta ayrıca adres çubuğu payı). Belirme öğe bu
+// alana girerken başlar — aşağı inerken alttan, yukarı çıkarken üstten — böylece görünür
+// alana girdiğinde çoktan başlamıştır. Gizli başlangıç haline dönüş (tekrar oynatmak için)
+// YALNIZCA öğe bu alanın tamamen dışına çıkınca: görünürken asla gizlenmez. Yüklemede ekranda
+// ya da payın içinde olan öğe hiç gizlenmez (data-rv-shown). Motor öğeyi boyamaya başlayınca
+// data-rv-js: CSS çekilir, satır içi stil geçerli olur.
 import { createContext, useContext, useEffect, useLayoutEffect, useState } from "react";
 import { DUR, INTRO_AT, clamp01, ease, prefersReducedMotion, seg } from "../../motion.js";
 
@@ -156,24 +159,79 @@ export function useMedia(query) {
   return match;
 }
 
+// Dokunmatik belirme (bkz. dosya başı). Aşağı iniş ilerlemesi asıl aralıkla (REVEAL_AHEAD kadar
+// erken başlar); yukarı çıkış onun aynası: öğenin altı üst payın sınırından içeri ilerledikçe.
+// Üstte çubuk arkası şeridi yok; yukarı aralığı pay kadar uzun tutulur ki animasyon görünür
+// alana girerken başlamış ama bitmemiş olsun. Bir ziyaret boyunca ilerleme yalnızca artar.
+function touchReveal(engine, { trigger, start, end, endTrigger, render, smooth }) {
+  const { gsap, ScrollTrigger } = engine;
+  const ahead = revealAhead();
+  const state = { p: 0 };
+  let tween = null;
+  let goal = 0; // bu ziyarette ulaşılan en yüksek ilerleme
+  let from = null; // "down" (alttan girdi) | "up" (üstten girdi) | null (alanın dışında, gizli)
+  const down = ScrollTrigger.create({ trigger, start: `${start}+=${ahead}`, end, endTrigger });
+  const draw = (p) => render(p, down, false);
+  const target = (zone) => {
+    const len = Math.max(1, down.end - down.start);
+    const y = zone.scroll();
+    return clamp01(from === "up" ? (zone.end - y) / (len + ahead) : (y - down.start) / len);
+  };
+  const advance = (zone) => {
+    const t = target(zone);
+    if (t <= goal) return;
+    goal = t;
+    tween?.kill();
+    tween = gsap.to(state, { p: t, duration: smooth, ease, onUpdate: () => draw(state.p) });
+  };
+  const reset = () => {
+    tween?.kill();
+    from = null;
+    goal = state.p = 0;
+    draw(0);
+  };
+  const zone = ScrollTrigger.create({
+    trigger,
+    start: `top bottom+=${ahead + engine.bar}`,
+    end: `bottom top-=${ahead}`,
+    onEnter: (self) => ((from = "down"), advance(self)),
+    onEnterBack: (self) => ((from = "up"), advance(self)),
+    onLeave: reset,
+    onLeaveBack: reset,
+    onUpdate: (self) => from && advance(self),
+    onRefresh: (self) => from && advance(self),
+  });
+  tween?.kill();
+  if (zone.isActive) {
+    from = "down";
+    goal = trigger.hasAttribute?.("data-rv-shown") ? 1 : target(zone);
+  }
+  trigger.setAttribute?.("data-rv-js", ""); // bundan sonra satır içi stil geçerli
+  state.p = goal;
+  draw(goal);
+  return () => {
+    tween?.kill();
+    zone.kill();
+    down.kill();
+    render(1, down, true);
+  };
+}
+
 // Bir kaydırma aralığını render(p)'ye bağlar (p: 0..1, yumuşatılmış).
 //  rest: motor yokken / ekran dışındayken / sökülünce çizilecek hal (varsayılan 1 = son hal)
 //  restOffscreen: aralığın başından önce (öğe henüz ekrana girmemişken) rest'te beklet
-//  once: dokunmatikte tek yönlü belirme (varsayılan: son hali 1 olan belirmeler); çift yönlü
+//  once: belirme (varsayılan: son hali 1 olanlar) — dokunmatikte touchReveal; çift yönlü
 //        olması gerekenler (hero çıkışı, yatay kayma, adım adım anlatım) false verir
 export function scrub(engine, { trigger, start = "top bottom", end = "top 70%", endTrigger, render, rest = 1, restOffscreen = true, smooth = DUR.scrub, once = rest === 1 }) {
   const { gsap, ScrollTrigger, touch } = engine;
-  const oneShot = touch && once;
+  if (touch && once) return touchReveal(engine, { trigger, start, end, endTrigger, render, smooth });
   // Dokunmatik, çift yönlü: aralık BAR kadar erken başlar; ilk BAR px başlangıç karesi (ekran dışı).
-  const band = touch && !once && restOffscreen && start.endsWith("bottom") ? engine.bar : 0;
-  // Dokunmatik belirme: başlangıç hali CSS'te; aralık REVEAL_AHEAD kadar erken başlar.
-  const ahead = oneShot && start.endsWith("bottom") ? revealAhead() : 0;
+  const band = touch && restOffscreen && start.endsWith("bottom") ? engine.bar : 0;
   const state = { p: 0 };
   let tween = null;
-  let goal = 0; // tek yönlüde ulaşılan en yüksek ilerleme
   const range = band ? (self) => ({ start: self.start + band, end: self.end }) : (self) => self; // render'a asıl aralık
   const prog = (self) => (band ? clamp01((self.progress * (self.end - self.start) - band) / Math.max(1, self.end - self.start - band)) : self.progress);
-  const offscreen = (st) => !oneShot && restOffscreen && st.progress === 0 && !st.isActive;
+  const offscreen = (st) => restOffscreen && st.progress === 0 && !st.isActive;
   const paint = (st) => (offscreen(st) ? render(rest, range(st), true) : render(state.p, range(st), false));
   const drive = (self, to) => {
     tween?.kill();
@@ -187,29 +245,18 @@ export function scrub(engine, { trigger, start = "top bottom", end = "top 70%", 
   };
   const st = ScrollTrigger.create({
     trigger,
-    start: band || ahead ? `${start}+=${band || ahead}` : start,
+    start: band ? `${start}+=${band}` : start,
     end,
     endTrigger,
-    onUpdate: (self) => {
-      if (!oneShot) return drive(self, prog(self));
-      if (prog(self) > goal) drive(self, (goal = prog(self)));
-    },
+    onUpdate: (self) => drive(self, prog(self)),
     onRefresh: (self) => {
-      if (oneShot) {
-        if (prog(self) > goal) drive(self, (goal = prog(self)));
-        return;
-      }
       tween?.kill();
       state.p = prog(self);
       paint(self);
     },
   });
-  // Tek yönlüde: yüklemede ekranda/payın içinde olan (data-rv-shown) ya da motor geldiğinde
-  // aralığa girmiş öğe son halde kalır; yalnızca uzaktakiler CSS'teki başlangıç halinde bekler.
   tween?.kill();
-  if (oneShot && (st.progress > 0 || st.isActive || trigger.hasAttribute?.("data-rv-shown"))) goal = 1;
-  if (oneShot) trigger.setAttribute?.("data-rv-js", ""); // bundan sonra satır içi stil geçerli
-  state.p = oneShot ? goal : prog(st);
+  state.p = prog(st);
   paint(st);
   return () => {
     tween?.kill();
