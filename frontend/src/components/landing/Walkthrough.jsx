@@ -2,8 +2,8 @@
 // Masaüstü: bölüm ekrana sabitlenir (CSS sticky; uzun kap = 4 adımlık kaydırma aralığı, ilerlemeyi
 // ScrollTrigger ölçer). Solda 4 adım + ilerleme çizgisi, sağda tek uygulama penceresi; pencere
 // adımlar arasında crossfade + hafif ölçekle geçer, sahneler tamamen kaydırmayla oynar/geri sarar.
-// Mobil (ve reduced-motion): sabitleme yok; adım numarası, başlığı ve metni kaydırmayla alttan gelir, her adımın
-// altında kendi penceresi, o adımın kaydırma aralığında scrub ile oynar. Motor yoksa her şey son karede, statik.
+// Mobil (ve reduced-motion): sabitleme yok; her adımın altında kendi penceresi, o adımın kaydırma
+// aralığında scrub ile oynar. Motor yoksa her şey son karede, statik.
 // Erişilebilirlik: soluk adım metni de AA (renk geçişi, opaklık değil); pencere içeriği tek
 // görünür sahne dışında aria-hidden.
 import React, { useLayoutEffect, useRef, useState } from "react";
@@ -11,7 +11,7 @@ import { useI18n } from "../../i18n.jsx";
 import { clamp01, ease, prefersReducedMotion, seg } from "../../motion.js";
 import { SCENES } from "./Scenes.jsx";
 import { DESKTOP_MQ, scrub, useMedia, useScrub } from "./scroll.js";
-import { Lines, Rise } from "./Type.jsx";
+import { Lines } from "./Type.jsx";
 
 const STEPS = [1, 2, 3, 4];
 const STEP_VH = 85;   // masaüstünde adım başına kaydırma (vh)
@@ -28,22 +28,14 @@ export function AppWindow({ children, className = "" }) {
 }
 
 // pinned: boyutlar ekran YÜKSEKLİĞİNE göre akışkan — 4 adım kısa dizüstü ekranına da sığsın.
-// Dokunmatikte numara, başlık ve metin her biri kendi konumuna göre 40px alttan gelir (Rise);
-// masaüstünde Rise hareketsiz sarmalayıcıdır.
 function StepText({ n, t, pinned = false }) {
   return (
     <>
-      <Rise>
-        <div className="lx-step-num text-sm font-medium tabular-nums">0{n}</div>
-      </Rise>
-      <Rise>
-        <h3 className={`lx-display ${pinned ? "mt-2 text-[clamp(1.75rem,1rem+2.6vh,3rem)]" : "mt-3 text-[2rem]"}`}>{t(`land.step${n}.title`)}</h3>
-      </Rise>
-      <Rise>
-        <p className={`lx-step-body mt-3 max-w-md ${pinned ? "text-[clamp(1rem,0.55rem+1.25vh,1.25rem)] leading-relaxed" : "lx-body"}`}>
-          {t(`land.step${n}.body`)}
-        </p>
-      </Rise>
+      <div className="lx-step-num text-sm font-medium tabular-nums">0{n}</div>
+      <h3 className={`lx-display ${pinned ? "mt-2 text-[clamp(1.75rem,1rem+2.6vh,3rem)]" : "mt-3 text-[2rem]"}`}>{t(`land.step${n}.title`)}</h3>
+      <p className={`lx-step-body mt-3 max-w-md ${pinned ? "text-[clamp(1rem,0.55rem+1.25vh,1.25rem)] leading-relaxed" : "lx-body"}`}>
+        {t(`land.step${n}.body`)}
+      </p>
     </>
   );
 }
@@ -90,7 +82,7 @@ function Pinned({ demo }) {
         trigger: el,
         start: "top bottom",
         end: "bottom bottom",
-        reveal: false, // adımlar geri kaydırınca geri gelir
+        once: false, // adımlar geri kaydırınca geri gelir
         render: (p, st, rest) => {
           if (rest) {
             if (drift.current) drift.current.style.transform = "";
@@ -175,7 +167,6 @@ function StackedScene({ index, demo }) {
         trigger: el,
         start: "top bottom",
         end: "center 45%",
-        touchEnd: "center 55%", // ekranın ortasına gelmeden tamam
         render: (q) => setP(Math.round(q * 200) / 200),
       }),
     [demo]

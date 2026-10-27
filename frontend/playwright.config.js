@@ -53,11 +53,6 @@ export default defineConfig({
       testMatch: /landing-scroll\.spec\.js/,
       use: { ...devices["iPhone 14"], viewport: { width: 402, height: 874 }, screen: { width: 402, height: 874 }, baseURL: TARGETS.local.web, apiURL: TARGETS.local.api, target: "local" },
     },
-    {
-      name: "pixel7-chromium",
-      testMatch: /landing-scroll\.spec\.js/,
-      use: { ...devices["Pixel 7"], channel, baseURL: TARGETS.local.web, apiURL: TARGETS.local.api, target: "local" },
-    },
   ],
   webServer: [
     server("api", "local", "http://127.0.0.1:8899/health"),

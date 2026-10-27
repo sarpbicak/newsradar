@@ -8,18 +8,17 @@
 // açıkken sayfa statik ve eksiksiz görünür. Tetik aralığının tamamen altında (ekran dışında)
 // kalan öğeler de son halde bekletilir; ekrana girdikleri an başlangıç karesine geçerler.
 //
-// Dokunmatik / dar ekran (Lenis yok, yerel kaydırma): belirmeler de masaüstündeki gibi
-// kaydırmaya bağlı, ama YUMUŞATMASIZ ve tamamen KONUMA bağlı (touchScrub): değer yalnızca
-// kaydırma konumundan hesaplanır — aşağı inince ileri, yukarı çıkınca geri, her seferinde; aynı
-// konumda hep aynı değer (titreme yok), "ekran dışı → son hal" bekletmesi yok. Aralık öğe
-// ekranın altından girerken başlar (yüzen yarı saydam Safari çubuğunun arkası, BEHIND_BAR,
-// dahil) ve öğenin üstü ekranın %60'ına gelince biter: ekranın ortasındaki içerik hep tam
-// görünür. iOS Safari'nin adres çubuğu açılıp kapanınca yükseklik değişir; bu yenileme
-// sayılmaz, yalnızca genişlik değişince (döndürme) tetik noktaları yeniden hesaplanır.
+// Dokunmatik / dar ekran (Lenis yok, yerel kaydırma): belirme animasyonları TEK YÖNLÜ — her öğe
+// bir kez belirir ve kalır (geri kaydırınca sönmez). iOS Safari'nin adres çubuğu açılıp
+// kapanınca yükseklik değişir; bu yenileme sayılmaz, yalnızca genişlik değişince (döndürme)
+// tetik noktaları yeniden hesaplanır.
 //
 // Dokunmatikte belirmelerin (data-rv) gizli başlangıç hali ilk boyamadan ÖNCE CSS'te
-// (index.html <html class="lx-reveal">, index.css); motor öğeyi boyamaya başlayınca data-rv-js:
-// CSS çekilir, konuma göre satır içi stil geçerli olur.
+// (index.html <html class="lx-reveal">, index.css); JS hiçbir öğeyi sonradan gizlemez. iOS
+// Safari'nin yüzen yarı saydam çubuğunun arkası da görünür alandır: belirme öğe oraya
+// girmeden REVEAL_AHEAD kadar önce başlar. Yüklemede ekranda ya da bu payın içinde olan öğe
+// hiç gizlenmez (data-rv-shown). Motor öğeyi boyamaya başlayınca data-rv-js: CSS çekilir,
+// satır içi stil geçerli olur.
 import { createContext, useContext, useEffect, useLayoutEffect, useState } from "react";
 import { DUR, INTRO_AT, clamp01, ease, prefersReducedMotion, seg } from "../../motion.js";
 
@@ -28,9 +27,8 @@ const LENIS_MQ = "(min-width: 1024px) and (pointer: fine)"; // dışı: dokunmat
 const MIN_BAR = 120; // px; adres çubuğu payının alt sınırı (ölçülemezse de yeter)
 const REVEAL_CLASS = "lx-reveal"; // index.html: dokunmatik + hareket açık
 const dropRevealClass = () => document.documentElement.classList.remove(REVEAL_CLASS);
-// Dokunmatik belirme aralığı: öğenin üstü viewport'un bu kadar altındayken başlar (çubuk arkası).
-export const BEHIND_BAR = 150;
-export const TOUCH_END = "top 60%";
+// Dokunmatik belirme, öğe görünür alanın altına bu kadar kala başlar (yüzen çubuk payı dahil).
+const revealAhead = () => Math.max(150, Math.round(window.innerHeight * 0.25));
 
 // Adres çubuğu payı: en büyük ile en küçük viewport farkı (100lvh − 100svh).
 function addressBar() {
@@ -158,41 +156,24 @@ export function useMedia(query) {
   return match;
 }
 
-// Dokunmatik belirme (bkz. dosya başı): render(p) doğrudan kaydırma ilerlemesiyle, yumuşatmasız.
-function touchScrub(engine, { trigger, start, end, endTrigger, render, behind = true }) {
-  const st = engine.ScrollTrigger.create({
-    trigger,
-    start: behind && start === "top bottom" ? `top bottom+=${BEHIND_BAR}` : start,
-    end,
-    endTrigger,
-    onUpdate: (self) => render(self.progress, self, false),
-    onRefresh: (self) => render(self.progress, self, false),
-  });
-  trigger.setAttribute?.("data-rv-js", ""); // bundan sonra satır içi stil geçerli
-  render(st.progress, st, false);
-  return () => {
-    st.kill();
-    render(1, st, true);
-  };
-}
-
 // Bir kaydırma aralığını render(p)'ye bağlar (p: 0..1, yumuşatılmış).
 //  rest: motor yokken / ekran dışındayken / sökülünce çizilecek hal (varsayılan 1 = son hal)
 //  restOffscreen: aralığın başından önce (öğe henüz ekrana girmemişken) rest'te beklet
-//  reveal: belirme (varsayılan: son hali 1 olanlar) — dokunmatikte touchScrub; diğerleri
-//          (hero çıkışı, yatay kayma, adım adım anlatım) false verir
-//  touchEnd: dokunmatikte aralığın sonu (varsayılan TOUCH_END; endTrigger yalnızca masaüstünde)
-//  touchBehind: dokunmatikte aralık çubuk arkasından (BEHIND_BAR) başlasın; false → tam alt kenar
-export function scrub(engine, { trigger, start = "top bottom", end = "top 70%", endTrigger, render, rest = 1, restOffscreen = true, smooth = DUR.scrub, reveal = rest === 1, touchEnd = TOUCH_END, touchBehind = true }) {
+//  once: dokunmatikte tek yönlü belirme (varsayılan: son hali 1 olan belirmeler); çift yönlü
+//        olması gerekenler (hero çıkışı, yatay kayma, adım adım anlatım) false verir
+export function scrub(engine, { trigger, start = "top bottom", end = "top 70%", endTrigger, render, rest = 1, restOffscreen = true, smooth = DUR.scrub, once = rest === 1 }) {
   const { gsap, ScrollTrigger, touch } = engine;
-  if (touch && reveal) return touchScrub(engine, { trigger, start, end: touchEnd, render, behind: touchBehind });
+  const oneShot = touch && once;
   // Dokunmatik, çift yönlü: aralık BAR kadar erken başlar; ilk BAR px başlangıç karesi (ekran dışı).
-  const band = touch && restOffscreen && start.endsWith("bottom") ? engine.bar : 0;
+  const band = touch && !once && restOffscreen && start.endsWith("bottom") ? engine.bar : 0;
+  // Dokunmatik belirme: başlangıç hali CSS'te; aralık REVEAL_AHEAD kadar erken başlar.
+  const ahead = oneShot && start.endsWith("bottom") ? revealAhead() : 0;
   const state = { p: 0 };
   let tween = null;
+  let goal = 0; // tek yönlüde ulaşılan en yüksek ilerleme
   const range = band ? (self) => ({ start: self.start + band, end: self.end }) : (self) => self; // render'a asıl aralık
   const prog = (self) => (band ? clamp01((self.progress * (self.end - self.start) - band) / Math.max(1, self.end - self.start - band)) : self.progress);
-  const offscreen = (st) => restOffscreen && st.progress === 0 && !st.isActive;
+  const offscreen = (st) => !oneShot && restOffscreen && st.progress === 0 && !st.isActive;
   const paint = (st) => (offscreen(st) ? render(rest, range(st), true) : render(state.p, range(st), false));
   const drive = (self, to) => {
     tween?.kill();
@@ -206,18 +187,29 @@ export function scrub(engine, { trigger, start = "top bottom", end = "top 70%", 
   };
   const st = ScrollTrigger.create({
     trigger,
-    start: band ? `${start}+=${band}` : start,
+    start: band || ahead ? `${start}+=${band || ahead}` : start,
     end,
     endTrigger,
-    onUpdate: (self) => drive(self, prog(self)),
+    onUpdate: (self) => {
+      if (!oneShot) return drive(self, prog(self));
+      if (prog(self) > goal) drive(self, (goal = prog(self)));
+    },
     onRefresh: (self) => {
+      if (oneShot) {
+        if (prog(self) > goal) drive(self, (goal = prog(self)));
+        return;
+      }
       tween?.kill();
       state.p = prog(self);
       paint(self);
     },
   });
+  // Tek yönlüde: yüklemede ekranda/payın içinde olan (data-rv-shown) ya da motor geldiğinde
+  // aralığa girmiş öğe son halde kalır; yalnızca uzaktakiler CSS'teki başlangıç halinde bekler.
   tween?.kill();
-  state.p = prog(st);
+  if (oneShot && (st.progress > 0 || st.isActive || trigger.hasAttribute?.("data-rv-shown"))) goal = 1;
+  if (oneShot) trigger.setAttribute?.("data-rv-js", ""); // bundan sonra satır içi stil geçerli
+  state.p = oneShot ? goal : prog(st);
   paint(st);
   return () => {
     tween?.kill();
@@ -229,6 +221,13 @@ export function scrub(engine, { trigger, start = "top bottom", end = "top 70%", 
 // Bileşen içinde scrub kurulumu: motor hazır olunca factory(engine, el) çalışır; temizlik döner.
 export function useScrub(ref, factory, deps = []) {
   const engine = useContext(EngineContext);
+  // Dokunmatik belirme: ilk boyamadan önce, ekranda ya da payın içindeyse hiç gizlenmesin.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el?.hasAttribute("data-rv") || !document.documentElement.classList.contains(REVEAL_CLASS)) return;
+    if (el.getBoundingClientRect().top < window.innerHeight + revealAhead()) el.setAttribute("data-rv-shown", "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!engine || !el) return undefined;

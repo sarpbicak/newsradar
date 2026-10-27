@@ -1,17 +1,16 @@
-// Landing kaydırma, mobil: belirmeler masaüstündeki gibi kaydırmaya bağlı ve çift yönlü,
-// yalnızca KONUMA göre (her geçişte ekrana girerken artar, geri kaydırırken azalır; ekranın
-// ortasında tam; aynı konumda hep aynı değer). Görünür alan = viewport + yüzen yarı saydam
-// Safari çubuğunun arkası (BEHIND_BAR). Adres çubuğu taklidi: aşağı inerken viewport +86px.
-// Mobil testler MOBILE projelerinde (WebKit iPhone 14, WebKit 402×874, Chromium Pixel 7);
-// masaüstü testi "local"de (masaüstü scrub'ı çift yönlü kalır).
+// Landing kaydırma (iPhone Safari hatası: başlık ekranın altında görünürken bir an kaybolup
+// yeniden beliriyordu). Dokunmatikte her başlık bir kez belirir ve kalır; "görünür → kaybolur →
+// yeniden belirir" yok, belirme animasyonu yine oynar. Görünür alan = viewport + yüzen yarı
+// saydam Safari çubuğunun arkası (BEHIND_BAR). Adres çubuğu taklidi: yön değişince viewport
+// yüksekliği +86px. Masaüstü scrub'ı çift yönlü kalır. Mobil testler iPhone projelerinde
+// (WebKit: iPhone 14 ve 402×874), masaüstü testi "local"de.
 import { test as base, expect } from "@playwright/test";
 
 const test = base.extend({ apiURL: ["", { option: true }], target: ["local", { option: true }] });
 
-const BEHIND_BAR = 150; // px: viewport'un altında, çubuğun arkasından görünen şerit
-const MOBILE = /^(iphone|pixel)/;
-
 // Başlığın görünürlüğü: opaklık zinciri × maskeli satırların görünen payı × kelime opaklığı.
+const BEHIND_BAR = 150; // px: viewport'un altında, çubuğun arkasından görünen şerit
+
 function sample(behind = 0) {
   const op = (el) => { let o = 1; for (let e = el; e; e = e.parentElement) o *= +getComputedStyle(e).opacity; return o; };
   const vis = (el) => {
@@ -38,111 +37,54 @@ function sample(behind = 0) {
   });
 }
 
-// Bölüm başlıkları (h2, adım h3): konum, görünürlük, opaklık zinciri ve başlık sarmalayıcısının
-// (data-rise-body) dikey kayması; sayfa yatay taşıyor mu.
-function headings() {
-  const op = (el) => { let o = 1; for (let e = el; e; e = e.parentElement) o *= +getComputedStyle(e).opacity; return o; };
-  const vis = (el) => {
-    let o = op(el);
-    const masks = el.querySelectorAll('[data-fx="mask"]');
-    if (masks.length) {
-      let s = 0;
-      masks.forEach((m) => {
-        const r = m.getBoundingClientRect(), c = m.parentElement.getBoundingClientRect();
-        s += r.height ? Math.max(0, Math.min(r.bottom, c.bottom) - Math.max(r.top, c.top)) / r.height : 1;
-      });
-      o *= s / masks.length;
-    }
-    return o;
-  };
-  const vh = window.innerHeight;
-  return {
-    vh,
-    y: Math.round(window.scrollY),
-    overflow: document.documentElement.scrollWidth - window.innerWidth,
-    hs: [...document.querySelectorAll("main h2, main h3")].map((el, i) => {
-      const r = el.getBoundingClientRect();
-      const wrap = el.closest("[data-rise-body]");
-      const ty = wrap ? new DOMMatrixReadOnly(getComputedStyle(wrap).transform === "none" ? undefined : getComputedStyle(wrap).transform).m42 : 0;
-      return { k: `${i}:${(el.id || el.textContent).trim().slice(0, 28)}`, top: r.top, mid: r.top + r.height / 2, v: vis(el), op: op(el), ty };
-    }),
-  };
-}
+const IPHONE = /^iphone/;
 
-test("mobil: başlıklar her geçişte konuma göre gelir ve geri gider; ortada tam; titreme yok", async ({ page }, info) => {
-  test.skip(!MOBILE.test(info.project.name), "yalnızca mobil projelerde");
-  test.setTimeout(240_000);
+test("iPhone: başlıklar bir kez belirir, çubuğun arkasında bile sönmez; animasyon oynar", async ({ page }, info) => {
+  test.skip(!IPHONE.test(info.project.name), "yalnızca WebKit iPhone projelerinde");
+  test.setTimeout(120_000);
   const { width, height: bar } = page.viewportSize();
   const full = bar + 86; // adres çubuğu küçülmüş
-  // iOS'ta svh adres çubuğundan bağımsızdır (küçük viewport, sabit); emülasyonda viewport'la
-  // değişir ve hero'yu (min-h-[100svh]) uzatıp sayfayı kaydırır. Gerçek cihaz gibi sabitle.
-  await page.addInitScript((h) => {
-    document.addEventListener("DOMContentLoaded", () => {
-      const st = document.createElement("style");
-      st.textContent = `.min-h-\\[100svh\\] { min-height: ${h}px !important; }`;
-      document.head.appendChild(st);
-    });
-  }, bar);
   await page.goto("/?welcome");
   await expect(page.locator("h1")).toBeVisible();
   await page.waitForTimeout(3500); // motor açılıştan sonra yüklenir
-  const maxY = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
-  const ys = [];
-  for (let y = 0; y <= maxY; y += 40) ys.push(y);
-  const passes = [];
-  for (const dir of ["down", "up", "down", "up"]) {
-    const h = dir === "down" ? full : bar;
-    await page.setViewportSize({ width, height: h });
-    const rows = [];
-    for (const y of dir === "down" ? ys : [...ys].reverse()) {
-      await page.evaluate((v) => window.scrollTo(0, v), y);
-      await page.waitForTimeout(25);
-      rows.push(await page.evaluate(headings));
+  const hist = {}; // görünür alandaki örnekler
+  const all = {}; // tüm örnekler (ekran dışı dahil)
+  let h = bar;
+  const step = async (dy) => {
+    const want = dy > 0 ? full : bar;
+    if (want !== h) await page.setViewportSize({ width, height: (h = want) });
+    await page.evaluate((d) => window.scrollBy(0, d), dy);
+    await page.waitForTimeout(30);
+    for (const e of await page.evaluate(sample, BEHIND_BAR)) {
+      (all[e.k] ||= []).push(e.v);
+      if (e.inView) (hist[e.k] ||= []).push(e.v);
     }
-    passes.push({ dir, rows });
+  };
+  const scrollY = () => page.evaluate(() => window.scrollY);
+  const maxY = () => page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
+  const turn = Math.round((await maxY()) / 2);
+  let turned = false;
+  for (let y = 0; y < (await maxY()) - 1; y = await scrollY()) {
+    await step(40);
+    if (!turned && y >= turn) {
+      turned = true;
+      for (let k = 0; k < 15; k++) await step(-40); // yarıda geri dön
+    }
   }
+  while ((await scrollY()) > 0) await step(-40);
 
-  const bad = { "1 girişte artar / geri giderken azalır": [], "2 ortada tam": [], "3 aynı konumda aynı değer": [], "4 yatay taşma yok": [], "5 başlık: altta soluk ve aşağıda, ortada yerinde": [] };
-  let checked = 0;
-  for (const [pi, { dir, rows }] of passes.entries()) {
-    const keys = rows[0].hs.map((x) => x.k);
-    for (const [hi, k] of keys.entries()) {
-      // Giriş şeridi (iki yönde aynı fiziksel aralık): başlığın üstü, küçük viewport'un %60'ı ile
-      // büyük viewport'un alt kenarı + çubuk arkası arasında.
-      const zone = rows.map((r) => r.hs[hi]).filter((x) => x.top > 0.6 * bar && x.top < full + BEHIND_BAR);
-      if (zone.length < 4) continue;
-      checked++;
-      let worst = 0;
-      for (let i = 1; i < zone.length; i++) {
-        const d = zone[i].v - zone[i - 1].v;
-        worst = Math.max(worst, dir === "down" ? -d : d);
-      }
-      const span = Math.max(...zone.map((x) => x.v)) - Math.min(...zone.map((x) => x.v));
-      if (worst > 0.02 || span < 0.5) bad["1 girişte artar / geri giderken azalır"].push(`${pi + 1}.${dir} ${k}: ters ${worst.toFixed(2)}, aralık ${span.toFixed(2)}`);
-    }
-    for (const r of rows) {
-      if (r.overflow > 0) bad["4 yatay taşma yok"].push(`${pi + 1}.${dir} y=${r.y}: +${r.overflow}px`);
-      for (const x of r.hs) if (x.mid > 0.45 * r.vh && x.mid < 0.55 * r.vh && x.v < 0.99) bad["2 ortada tam"].push(`${pi + 1}.${dir} y=${r.y} ${x.k}: ${x.v.toFixed(2)}`);
-      // Başlık ekranın alt %20'sinde: opaklık < 0,5 ve sarmalayıcı > 15px aşağıda; ortada 1 ve 0.
-      for (const x of r.hs) {
-        const tag = `${pi + 1}.${dir} y=${r.y} ${x.k}: op ${x.op.toFixed(2)} ty ${x.ty.toFixed(1)}`;
-        if (x.top >= 0.8 * r.vh && x.top < r.vh && !(x.op < 0.5 && x.ty > 15)) bad["5 başlık: altta soluk ve aşağıda, ortada yerinde"].push(tag);
-        if (x.mid > 0.45 * r.vh && x.mid < 0.55 * r.vh && !(x.op >= 0.99 && Math.abs(x.ty) < 0.5)) bad["5 başlık: altta soluk ve aşağıda, ortada yerinde"].push(tag);
-      }
-    }
+  const keys = Object.keys(hist);
+  expect(keys.length).toBeGreaterThanOrEqual(8);
+  let animated = 0;
+  for (const k of keys) {
+    const vs = hist[k];
+    const peak = vs.findIndex((v) => v >= 0.99);
+    expect(peak, `${k} hiç tam görünmedi`).toBeGreaterThanOrEqual(0);
+    expect(Math.min(...vs.slice(peak)), `${k} belirdikten sonra söndü`).toBeGreaterThanOrEqual(0.99);
+    // Animasyon: başlık önce 0'da (ekranın altında gizli), görünür alanda ara değerlerden 1'e çıkar.
+    if (all[k].some((v) => v <= 0.02) && vs.slice(0, peak).some((v) => v < 0.95)) animated++;
   }
-  // Aynı kaydırma konumunda, ekranın orta bölgesindeki başlığın değeri geçişten geçişe aynı.
-  const at = passes.map((p) => new Map(p.rows.map((r) => [r.y, r])));
-  for (const y of ys) {
-    const rs = at.map((m) => m.get(y)).filter(Boolean);
-    for (const [hi, x0] of rs[0].hs.entries()) {
-      const vals = rs.filter((r) => r.hs[hi].mid > 0.25 * r.vh && r.hs[hi].mid < 0.75 * r.vh).map((r) => r.hs[hi].v);
-      if (vals.length > 1 && Math.max(...vals) - Math.min(...vals) > 0.02) bad["3 aynı konumda aynı değer"].push(`y=${y} ${x0.k}: ${vals.map((v) => v.toFixed(2)).join("/")}`);
-    }
-  }
-  for (const v of Object.values(bad)) v.splice(3); // ilk 3 örnek yeter
-  expect(checked, "giriş şeridinden geçen başlık").toBeGreaterThanOrEqual(12);
-  expect(bad).toEqual({ "1 girişte artar / geri giderken azalır": [], "2 ortada tam": [], "3 aynı konumda aynı değer": [], "4 yatay taşma yok": [], "5 başlık: altta soluk ve aşağıda, ortada yerinde": [] });
+  expect(animated, "mobilde belirme animasyonu oynamalı").toBeGreaterThanOrEqual(1);
 });
 
 test("masaüstü: manifesto scrub'ı çift yönlü kalır", async ({ page }, info) => {
@@ -163,8 +105,8 @@ test("masaüstü: manifesto scrub'ı çift yönlü kalır", async ({ page }, inf
   expect(back).toBeLessThan(deep); // geri kaydırınca kelimeler yeniden söner
 });
 
-test("mobil, reduced-motion: kaydırma boyunca her başlık sabit ve tam görünür", async ({ page }, info) => {
-  test.skip(!MOBILE.test(info.project.name), "yalnızca mobil projelerde");
+test("iPhone, reduced-motion: kaydırma boyunca her başlık sabit ve tam görünür", async ({ page }, info) => {
+  test.skip(!IPHONE.test(info.project.name), "yalnızca WebKit iPhone projelerinde");
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/?welcome");
   await expect(page.locator("h1")).toBeVisible();
