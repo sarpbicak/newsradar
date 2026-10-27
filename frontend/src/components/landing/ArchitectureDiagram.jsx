@@ -22,7 +22,7 @@ export default function ArchitectureDiagram() {
     ref,
     (engine, el) => {
       const nodes = el.querySelectorAll("[data-fx]");
-      return scrub(engine, { trigger: el, end: "bottom 75%", render: (p) => paintSegs(nodes, p) });
+      return scrub(engine, { trigger: el, end: "bottom 75%", reveal: true, render: (p) => paintSegs(nodes, p) });
     },
     [t]
   );

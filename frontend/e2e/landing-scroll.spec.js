@@ -1,7 +1,8 @@
-// Landing kaydırma (iPhone Safari hatası): dokunmatikte her başlık bir kez belirir ve kalır —
-// geri kaydırınca sönmez, ekrana girerken "görünür → kaybolur → yeniden belirir" yok. Adres
-// çubuğu taklidi: yön değişince viewport yüksekliği 664 ↔ 750. Masaüstü scrub'ı çift yönlü kalır.
-// Mobil test "iphone-webkit" projesinde (WebKit, iPhone 14) koşar; masaüstü testi "local"de.
+// Landing kaydırma (iPhone Safari hatası: başlık ekranın altında görünürken bir an kaybolup
+// animasyonla yeniden beliriyordu). Mobil/dokunmatikte belirme yok: ekrandaki hiçbir başlık
+// hiçbir an 1'in altına inmez. Adres çubuğu taklidi: yön değişince viewport yüksekliği +86px.
+// Masaüstü scrub'ı çift yönlü kalır. Mobil testler iPhone projelerinde (WebKit: iPhone 14 ve
+// 402×874), masaüstü testi "local"de.
 import { test as base, expect } from "@playwright/test";
 
 const test = base.extend({ apiURL: ["", { option: true }], target: ["local", { option: true }] });
@@ -33,8 +34,10 @@ function sample() {
   });
 }
 
-test("iPhone: başlıklar bir kez belirir, geri kaydırınca sönmez", async ({ page }, info) => {
-  test.skip(info.project.name !== "iphone-webkit", "yalnızca WebKit iPhone projesinde");
+const IPHONE = /^iphone/;
+
+test("iPhone: ekrandaki başlıklar kaydırma boyunca hep tam görünür", async ({ page }, info) => {
+  test.skip(!IPHONE.test(info.project.name), "yalnızca WebKit iPhone projelerinde");
   test.setTimeout(120_000);
   const { width, height: bar } = page.viewportSize();
   const full = bar + 86; // adres çubuğu küçülmüş
@@ -65,12 +68,7 @@ test("iPhone: başlıklar bir kez belirir, geri kaydırınca sönmez", async ({ 
 
   const keys = Object.keys(hist);
   expect(keys.length).toBeGreaterThanOrEqual(8);
-  for (const k of keys) {
-    const vs = hist[k];
-    const peak = vs.findIndex((v) => v >= 0.99);
-    expect(peak, `${k} hiç tam görünmedi`).toBeGreaterThanOrEqual(0);
-    expect(Math.min(...vs.slice(peak)), `${k} belirdikten sonra söndü`).toBeGreaterThanOrEqual(0.99);
-  }
+  for (const k of keys) expect(Math.min(...hist[k]), `${k} ekrandayken 1'in altına indi`).toBeGreaterThanOrEqual(0.99);
 });
 
 test("masaüstü: manifesto scrub'ı çift yönlü kalır", async ({ page }, info) => {
@@ -92,7 +90,7 @@ test("masaüstü: manifesto scrub'ı çift yönlü kalır", async ({ page }, inf
 });
 
 test("iPhone, reduced-motion: kaydırma boyunca her başlık sabit ve tam görünür", async ({ page }, info) => {
-  test.skip(info.project.name !== "iphone-webkit", "yalnızca WebKit iPhone projesinde");
+  test.skip(!IPHONE.test(info.project.name), "yalnızca WebKit iPhone projelerinde");
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/?welcome");
   await expect(page.locator("h1")).toBeVisible();

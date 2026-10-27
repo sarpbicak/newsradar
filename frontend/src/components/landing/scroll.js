@@ -14,11 +14,17 @@
 // tetik noktaları yeniden hesaplanır. Çubuk küçülünce görünen alan tetik noktasının altına
 // uzar; öğe son halden başlangıç karesine bu yüzden adres çubuğu payı (BAR) kadar ÖNCE, hâlâ
 // en büyük viewport'un da altındayken geçer — ekranda görünürken asla.
+//
+// Belirme (reveal: başlık maskesi, Reveal, manifesto kelimeleri, mimari şeması) mobil ve
+// dokunmatikte HİÇ kurulmaz: içerik baştan görünür, JS hiçbir zaman gizlemez. iOS Safari'nin
+// yüzen yarı saydam adres çubuğunun arkası da görünür alandır; orada zaten görünen öğe
+// "ekran dışı" sayılıp gizlenir, sonra yeniden belirirdi. Diğer hareketler aynen kalır.
 import { createContext, useContext, useEffect, useLayoutEffect, useState } from "react";
 import { DUR, INTRO_AT, clamp01, ease, prefersReducedMotion, seg } from "../../motion.js";
 
 export const DESKTOP_MQ = "(min-width: 1024px)";
 const LENIS_MQ = "(min-width: 1024px) and (pointer: fine)"; // dışı: dokunmatik / dar ekran
+const NO_REVEAL_MQ = "(pointer: coarse), (max-width: 1024px)"; // belirme yok
 const MIN_BAR = 120; // px; adres çubuğu payının alt sınırı (ölçülemezse de yeter)
 
 // Adres çubuğu payı: en büyük ile en küçük viewport farkı (100lvh − 100svh).
@@ -74,6 +80,7 @@ async function startEngine(root) {
     ScrollTrigger,
     lenis,
     touch,
+    noReveal: window.matchMedia(NO_REVEAL_MQ).matches,
     bar: touch ? addressBar() : 0,
     stop() {
       ro.disconnect();
@@ -151,7 +158,9 @@ export function useMedia(query) {
 //  restOffscreen: aralığın başından önce (öğe henüz ekrana girmemişken) rest'te beklet
 //  once: dokunmatikte tek yönlü belirme (varsayılan: son hali 1 olan belirmeler); çift yönlü
 //        olması gerekenler (hero çıkışı, yatay kayma, adım adım anlatım) false verir
-export function scrub(engine, { trigger, start = "top bottom", end = "top 70%", endTrigger, render, rest = 1, restOffscreen = true, smooth = DUR.scrub, once = rest === 1 }) {
+//  reveal: belirme animasyonu — mobil/dokunmatikte (NO_REVEAL_MQ) hiç kurulmaz, son hal kalır
+export function scrub(engine, { trigger, start = "top bottom", end = "top 70%", endTrigger, render, rest = 1, restOffscreen = true, smooth = DUR.scrub, once = rest === 1, reveal = false }) {
+  if (reveal && engine.noReveal) return () => {};
   const { gsap, ScrollTrigger, touch } = engine;
   const oneShot = touch && once;
   // Dokunmatikte aralık BAR kadar erken başlar; ilk BAR px başlangıç karesidir (ekran dışı).

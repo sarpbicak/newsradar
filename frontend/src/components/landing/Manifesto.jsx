@@ -1,6 +1,6 @@
 // Manifesto: ekranı kaplayan tek cümle. Masaüstünde bölüm sabitlenir (CSS sticky) ve kaydırdıkça
-// kelimeler tek tek soluk halden tam renge geçer; geri kaydırınca yeniden soluklaşır. Mobilde
-// sabitleme yok, aynı geçiş bölümün kendi kaydırma aralığında. [köşeli parantez] = vurgu.
+// kelimeler tek tek soluk halden tam renge geçer; geri kaydırınca yeniden soluklaşır. Mobil ve
+// dokunmatikte geçiş yok: kelimeler baştan tam renkte. [köşeli parantez] = vurgu.
 // Motor yoksa / reduced-motion: tüm kelimeler tam renkte.
 import React, { useRef } from "react";
 import { useI18n } from "../../i18n.jsx";
@@ -34,6 +34,7 @@ export default function Manifesto() {
         trigger: el,
         start: "top bottom",
         end: pinned ? "bottom bottom" : "bottom 60%",
+        reveal: true, // mobil/dokunmatikte kelimeler baştan tam renkte
         render: (p, st, rest) => {
           let q = 1;
           if (!rest) {

@@ -2,7 +2,7 @@
 //  <Lines>  büyük başlık; satırlar maskeden aşağıdan çıkar (masaüstünde geri kaydırınca iner),
 //           drift verilirse kaydırma boyunca yatayda hafifçe kayar.
 //  <Reveal> paragraf/kart/rakam; belirip 20px yukarı kayar (masaüstünde geri kaydırınca geri gider).
-// Dokunmatikte ikisi de bir kez belirir ve kalır (scroll.js).
+// Mobil/dokunmatikte belirme yok: metin baştan görünür (scroll.js, reveal); drift kalır.
 // Motor yoksa / reduced-motion: düz, son halde metin.
 import React, { useRef } from "react";
 import { ease } from "../../motion.js";
@@ -14,7 +14,7 @@ export function Lines({ as: Tag = "h2", lines, className = "", drift = 0, end = 
     ref,
     (engine, el) => {
       const masks = el.querySelectorAll("[data-fx]");
-      const offs = [scrub(engine, { trigger: el, end, render: (p) => paintSegs(masks, p) })];
+      const offs = [scrub(engine, { trigger: el, end, reveal: true, render: (p) => paintSegs(masks, p) })];
       if (drift) {
         // p = 0.5 → yerinde; aralık: başlık ekrana girdiği andan çıktığı ana kadar.
         offs.push(
@@ -50,6 +50,7 @@ export function Reveal({ as: Tag = "div", className = "", end = "top 75%", child
     scrub(engine, {
       trigger: el,
       end,
+      reveal: true,
       render: (p) => {
         const e = ease(p);
         el.style.opacity = e;
