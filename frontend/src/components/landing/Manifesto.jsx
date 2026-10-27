@@ -1,13 +1,13 @@
 // Manifesto: ekranı kaplayan tek cümle. Masaüstünde bölüm sabitlenir (CSS sticky) ve kaydırdıkça
-// kelimeler tek tek soluk halden tam renge geçer; geri kaydırınca yeniden soluklaşır. Mobil ve
-// dokunmatikte geçiş yok: kelimeler baştan tam renkte. [köşeli parantez] = vurgu.
+// kelimeler tek tek soluk halden tam renge geçer; geri kaydırınca yeniden soluklaşır. Mobilde
+// sabitleme yok, aynı geçiş bölümün kendi kaydırma aralığında. [köşeli parantez] = vurgu.
 // Motor yoksa / reduced-motion: tüm kelimeler tam renkte.
 import React, { useRef } from "react";
 import { useI18n } from "../../i18n.jsx";
 import { clamp01, prefersReducedMotion } from "../../motion.js";
 import { DESKTOP_MQ, scrub, useMedia, useScrub } from "./scroll.js";
 
-const DIM = 0.16;
+const DIM = 0.16; // index.css .lx-reveal [data-w] ile aynı
 
 function parse(text) {
   const out = [];
@@ -34,7 +34,6 @@ export default function Manifesto() {
         trigger: el,
         start: "top bottom",
         end: pinned ? "bottom bottom" : "bottom 60%",
-        reveal: true, // mobil/dokunmatikte kelimeler baştan tam renkte
         render: (p, st, rest) => {
           let q = 1;
           if (!rest) {
@@ -55,7 +54,7 @@ export default function Manifesto() {
   );
 
   return (
-    <section ref={ref} className="relative" style={pinned ? { height: "260vh" } : undefined}>
+    <section ref={ref} className="relative" data-rv="" style={pinned ? { height: "260vh" } : undefined}>
       <div className={pinned ? "sticky top-0 flex h-svh items-center" : "py-20 sm:py-32"}>
         <p className="lx-display lx-mega mx-auto w-full max-w-[1360px] px-5 text-slate-100 sm:px-8 lg:px-10">
           {words.map(({ w, accent }, i) => (

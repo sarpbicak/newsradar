@@ -22,12 +22,12 @@ export default function ArchitectureDiagram() {
     ref,
     (engine, el) => {
       const nodes = el.querySelectorAll("[data-fx]");
-      return scrub(engine, { trigger: el, end: "bottom 75%", reveal: true, render: (p) => paintSegs(nodes, p) });
+      return scrub(engine, { trigger: el, end: "bottom 75%", render: (p) => paintSegs(nodes, p) });
     },
     [t]
   );
   return (
-    <ol ref={ref} className="divide-y divide-ink-600 border-y border-ink-600" aria-label={t("land.stack.title")}>
+    <ol ref={ref} data-rv="" className="divide-y divide-ink-600 border-y border-ink-600" aria-label={t("land.stack.title")}>
       {lanes.map((lane, j) => {
         const base = j * LANE;
         return (

@@ -27,6 +27,12 @@
           document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
           document.querySelector('meta[name="theme-color"]').setAttribute("content", dark ? "#0B0F14" : "#F7F8FA");
         } catch (e) {}
+        // Dokunmatik landing belirmeleri: gizli başlangıç hali ilk boyamadan önce CSS'te
+        // (index.css .lx-reveal). Sorgu scroll.js LENIS_MQ'nun tersi; motor gelmezse kaldırılır.
+        try {
+          if (!window.matchMedia("(min-width: 1024px) and (pointer: fine)").matches && !window.matchMedia("(prefers-reduced-motion: reduce)").matches)
+            document.documentElement.classList.add("lx-reveal");
+        } catch (e) {}
       })();
     </script>
   </head>

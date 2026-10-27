@@ -1,14 +1,17 @@
 // Landing kaydırma (iPhone Safari hatası: başlık ekranın altında görünürken bir an kaybolup
-// animasyonla yeniden beliriyordu). Mobil/dokunmatikte belirme yok: ekrandaki hiçbir başlık
-// hiçbir an 1'in altına inmez. Adres çubuğu taklidi: yön değişince viewport yüksekliği +86px.
-// Masaüstü scrub'ı çift yönlü kalır. Mobil testler iPhone projelerinde (WebKit: iPhone 14 ve
-// 402×874), masaüstü testi "local"de.
+// yeniden beliriyordu). Dokunmatikte her başlık bir kez belirir ve kalır; "görünür → kaybolur →
+// yeniden belirir" yok, belirme animasyonu yine oynar. Görünür alan = viewport + yüzen yarı
+// saydam Safari çubuğunun arkası (BEHIND_BAR). Adres çubuğu taklidi: yön değişince viewport
+// yüksekliği +86px. Masaüstü scrub'ı çift yönlü kalır. Mobil testler iPhone projelerinde
+// (WebKit: iPhone 14 ve 402×874), masaüstü testi "local"de.
 import { test as base, expect } from "@playwright/test";
 
 const test = base.extend({ apiURL: ["", { option: true }], target: ["local", { option: true }] });
 
 // Başlığın görünürlüğü: opaklık zinciri × maskeli satırların görünen payı × kelime opaklığı.
-function sample() {
+const BEHIND_BAR = 150; // px: viewport'un altında, çubuğun arkasından görünen şerit
+
+function sample(behind = 0) {
   const op = (el) => { let o = 1; for (let e = el; e; e = e.parentElement) o *= +getComputedStyle(e).opacity; return o; };
   const vis = (el) => {
     let o = op(el);
@@ -30,13 +33,13 @@ function sample() {
     .filter((el, i, a) => a.indexOf(el) === i);
   return els.map((el, i) => {
     const r = el.getBoundingClientRect();
-    return { k: `${i}:${(el.id || el.textContent).trim().slice(0, 30)}`, inView: r.bottom > 0 && r.top < window.innerHeight, v: vis(el) };
+    return { k: `${i}:${(el.id || el.textContent).trim().slice(0, 30)}`, inView: r.bottom > 0 && r.top < window.innerHeight + behind, v: vis(el) };
   });
 }
 
 const IPHONE = /^iphone/;
 
-test("iPhone: ekrandaki başlıklar kaydırma boyunca hep tam görünür", async ({ page }, info) => {
+test("iPhone: başlıklar bir kez belirir, çubuğun arkasında bile sönmez; animasyon oynar", async ({ page }, info) => {
   test.skip(!IPHONE.test(info.project.name), "yalnızca WebKit iPhone projelerinde");
   test.setTimeout(120_000);
   const { width, height: bar } = page.viewportSize();
@@ -44,14 +47,18 @@ test("iPhone: ekrandaki başlıklar kaydırma boyunca hep tam görünür", async
   await page.goto("/?welcome");
   await expect(page.locator("h1")).toBeVisible();
   await page.waitForTimeout(3500); // motor açılıştan sonra yüklenir
-  const hist = {};
+  const hist = {}; // görünür alandaki örnekler
+  const all = {}; // tüm örnekler (ekran dışı dahil)
   let h = bar;
   const step = async (dy) => {
     const want = dy > 0 ? full : bar;
     if (want !== h) await page.setViewportSize({ width, height: (h = want) });
     await page.evaluate((d) => window.scrollBy(0, d), dy);
     await page.waitForTimeout(30);
-    for (const e of await page.evaluate(sample)) if (e.inView) (hist[e.k] ||= []).push(e.v);
+    for (const e of await page.evaluate(sample, BEHIND_BAR)) {
+      (all[e.k] ||= []).push(e.v);
+      if (e.inView) (hist[e.k] ||= []).push(e.v);
+    }
   };
   const scrollY = () => page.evaluate(() => window.scrollY);
   const maxY = () => page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
@@ -68,7 +75,16 @@ test("iPhone: ekrandaki başlıklar kaydırma boyunca hep tam görünür", async
 
   const keys = Object.keys(hist);
   expect(keys.length).toBeGreaterThanOrEqual(8);
-  for (const k of keys) expect(Math.min(...hist[k]), `${k} ekrandayken 1'in altına indi`).toBeGreaterThanOrEqual(0.99);
+  let animated = 0;
+  for (const k of keys) {
+    const vs = hist[k];
+    const peak = vs.findIndex((v) => v >= 0.99);
+    expect(peak, `${k} hiç tam görünmedi`).toBeGreaterThanOrEqual(0);
+    expect(Math.min(...vs.slice(peak)), `${k} belirdikten sonra söndü`).toBeGreaterThanOrEqual(0.99);
+    // Animasyon: başlık önce 0'da (ekranın altında gizli), görünür alanda ara değerlerden 1'e çıkar.
+    if (all[k].some((v) => v <= 0.02) && vs.slice(0, peak).some((v) => v < 0.95)) animated++;
+  }
+  expect(animated, "mobilde belirme animasyonu oynamalı").toBeGreaterThanOrEqual(1);
 });
 
 test("masaüstü: manifesto scrub'ı çift yönlü kalır", async ({ page }, info) => {
