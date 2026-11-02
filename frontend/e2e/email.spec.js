@@ -55,6 +55,42 @@ test("şifremi unuttum: adres ne olursa olsun aynı genel mesaj", async ({ page 
   await expect(dialog).toContainText("Bu adres kayıtlıysa şifre sıfırlama bağlantısı gönderdik");
 });
 
+// EMAIL_BACKEND: /public/features → email. ses (ya da yerel) true; canlıda console false.
+const emailFeature = (target, email) =>
+  target.route("**/public/features", (route) => route.fulfill({
+    json: { email },
+    headers: {
+      "access-control-allow-origin": route.request().headers().origin || "*",
+      "access-control-allow-credentials": "true",
+    },
+  }));
+
+for (const [name, email] of [["ses: açık", true], ["console (canlı): kapalı", false]]) {
+  test(`e-posta özelliği ${name} → "Şifremi unuttum" ve doğrulama uyarısı ${email ? "görünür" : "gizli"}`, async ({ browser, apiURL }) => {
+    const { ctx, page, username } = await registered(browser, apiURL);
+    await emailFeature(ctx, email);
+    await page.reload();
+    const header = page.locator("header[data-nav-bar]");
+    await header.getByRole("button", { name: new RegExp(username) }).click();
+    await expect(page.getByRole("menuitem", { name: "Çıkış yap" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "E-postanı doğrula" })).toHaveCount(email ? 1 : 0);
+    await page.keyboard.press("Escape");
+
+    const guest = await browser.newContext({ ignoreHTTPSErrors: true });
+    await guest.addInitScript(() => localStorage.setItem("nr_lang", "tr"));
+    await emailFeature(guest, email);
+    const p2 = await guest.newPage();
+    const features = p2.waitForResponse("**/public/features");
+    await p2.goto("/app");
+    await features;
+    await p2.locator("header[data-nav-bar]").getByRole("button", { name: "Giriş yap", exact: true }).click();
+    await expect(p2.getByRole("dialog").getByLabel("Şifre", { exact: true })).toBeVisible();
+    await expect(p2.getByRole("dialog").getByRole("button", { name: "Şifremi unuttum" })).toHaveCount(email ? 1 : 0);
+    await guest.close();
+    await ctx.close();
+  });
+}
+
 test("bağlantı sayfaları: geçersiz token açıkça söylenir, token adres çubuğundan silinir", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("nr_lang", "tr"));
   await page.goto("/verify-email?token=uydurma-token");
