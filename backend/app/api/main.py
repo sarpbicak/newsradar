@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .. import scheduler
 from ..config import get_settings
+from ..mailer import config_problems as mailer_config_problems
 from ..db.database import init_db
 from ..db.models import PREFILTER_VERSION
 from . import (
@@ -121,6 +122,8 @@ async def lifespan(_app: FastAPI):
         logging.getLogger("newsradar").error(
             "EMAIL_BACKEND=console: doğrulama ve şifre sıfırlama e-postaları GÖNDERİLMİYOR "
             "(yalnızca log). Production'da EMAIL_BACKEND=ses kullanın (docs/DEPLOY_AWS.md, SES kurulumu).")
+    for problem in mailer_config_problems():
+        logging.getLogger("newsradar").error("E-posta ayarı: %s", problem)
     refresh_queue.ensure_worker()
     scheduler.start()
     yield

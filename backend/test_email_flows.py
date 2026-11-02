@@ -12,6 +12,8 @@ Doğrular:
       bağlantı kökü NEWSRADAR_PUBLIC_URL'den (Host başlığı değil)
 Çalıştır: python test_email_flows.py
 """
+import contextlib
+import logging
 import os
 import re
 import sys
@@ -40,7 +42,7 @@ from app.config import get_settings  # noqa: E402
 from app.api.main import app  # noqa: E402
 from app.db.database import SessionLocal  # noqa: E402
 from app.db.models import EmailToken, UsageEvent, User  # noqa: E402
-from app.mailer import get_mailer, send_email, EmailMessage  # noqa: E402
+from app.mailer import config_problems, get_mailer, send_email, EmailMessage  # noqa: E402
 
 PASS = FAIL = 0
 
@@ -192,15 +194,21 @@ class FakeSes:
 
 
 fake_boto3 = types.ModuleType("boto3")
-fake_boto3.client = lambda name, region_name=None: (calls.append(("client", name, region_name)), FakeSes())[1]
+fake_boto3.client = lambda name, region_name=None, config=None: (calls.append(("client", name, region_name, config)), FakeSes())[1]
 sys.modules["boto3"] = fake_boto3
-os.environ.update(EMAIL_BACKEND="ses", EMAIL_FROM="NewsRadar <no-reply@newsradar.example>", EMAIL_SES_REGION="eu-west-1")
+fake_botocore_config = types.ModuleType("botocore.config")
+fake_botocore_config.Config = lambda **kw: kw
+sys.modules.setdefault("botocore", types.ModuleType("botocore"))
+sys.modules["botocore.config"] = fake_botocore_config
+os.environ.update(EMAIL_BACKEND="ses", EMAIL_FROM="NewsRadar <noreply@newsradar.example>", EMAIL_SES_REGION="eu-west-1")
 get_settings.cache_clear() if hasattr(get_settings, "cache_clear") else None
 ok = send_email(EmailMessage(to="a@example.com", subject="Konu", text="metin", html="<p>html</p>"))
 check(get_mailer().name == "ses" and ok, "EMAIL_BACKEND=ses → SES arka ucu")
-check(("client", "sesv2", "eu-west-1") in calls, "boto3 sesv2 istemcisi doğru bölgede (anahtar parametresi yok)")
+cl = [x for x in calls if isinstance(x, tuple)][0]
+check(cl[:3] == ("client", "sesv2", "eu-west-1"), "boto3 sesv2 istemcisi doğru bölgede (anahtar parametresi yok)")
+check(cl[3]["connect_timeout"] <= 5 and cl[3]["read_timeout"] <= 10, "kısa zaman aşımları (takılan bağlantı thread tutmaz)")
 kw = [x for x in calls if isinstance(x, dict)][0]
-check(kw["FromEmailAddress"] == "NewsRadar <no-reply@newsradar.example>" and kw["Destination"] == {"ToAddresses": ["a@example.com"]}
+check(kw["FromEmailAddress"] == "NewsRadar <noreply@newsradar.example>" and kw["Destination"] == {"ToAddresses": ["a@example.com"]}
       and kw["Content"]["Simple"]["Body"]["Html"]["Data"] == "<p>html</p>", "gönderen, alıcı, HTML + metin gövde")
 
 
@@ -211,6 +219,46 @@ class BoomSes:
 
 get_mailer()._client = BoomSes()
 check(send_email(EmailMessage(to="a@example.com", subject="K", text="t", html="h")) is False, "SES hatası akışı bozmaz (False döner)")
+
+
+@contextlib.contextmanager
+def _capture_mail_log():
+    lines = []
+
+    class H(logging.Handler):
+        def emit(self, record):
+            lines.append(record.getMessage())
+
+    h = H()
+    log = logging.getLogger("newsradar.mail")
+    log.addHandler(h)
+    try:
+        yield lines
+    finally:
+        log.removeHandler(h)
+
+
+class DeniedSes:
+    def send_email(self, **kw):
+        err = Exception("not authorized to send from a@example.com")
+        err.response = {"Error": {"Code": "AccessDeniedException", "Message": "a@example.com"}}
+        raise err
+
+
+get_mailer()._client = DeniedSes()
+with _capture_mail_log() as lines:
+    check(send_email(EmailMessage(to="a@example.com", subject="K", text="t", html="h")) is False, "IAM reddi akışı bozmaz")
+check(any("AccessDeniedException" in x for x in lines) and not any("a@example.com" in x for x in lines),
+      "log'da SES hata kodu var, alıcı adresi yok")
+
+print("== E2: SES ayar denetimi")
+check(config_problems() == [], "doğru EMAIL_FROM + https bağlantı kökü → sorun yok")
+os.environ.update(EMAIL_FROM="NewsRadar <no-reply@localhost>", NEWSRADAR_PUBLIC_URL="http://localhost:5173")
+get_settings.cache_clear()
+problems = config_problems()
+check(any("EMAIL_FROM" in p for p in problems) and any("NEWSRADAR_PUBLIC_URL" in p for p in problems), "varsayılan gönderen ve https olmayan kök yakalanır")
+os.environ.update(EMAIL_FROM="NewsRadar <noreply@newsradar.example>", NEWSRADAR_PUBLIC_URL="https://newsradar.example")
+get_settings.cache_clear()
 
 print("== F: arayüz özellik bayrağı")
 from fastapi import Response  # noqa: E402

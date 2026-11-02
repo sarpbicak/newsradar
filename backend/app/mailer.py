@@ -2,8 +2,8 @@
 
 - console: e-postayı log'a yazar (geliştirme ve testler; hiçbir yere gönderilmez).
 - ses: Amazon SES v2 (boto3 `sesv2.send_email`). Kimlik bilgileri boto3'ün varsayılan
-  zincirinden gelir — EC2'de instance rolü; koda/ortama ANAHTAR konmaz. boto3 yalnızca bu
-  arka uç seçilince içe aktarılır (geliştirme ortamında gerekmez).
+  zincirinden gelir — EC2'de instance rolü (IMDS); koda/ortama ANAHTAR konmaz. boto3 yalnızca
+  bu arka uç seçilince içe aktarılır (testlerde sahte istemci).
 
 Gönderim hatası kullanıcı akışını bozmaz: loglanır, çağıran False alır (ör. "tekrar gönder").
 Testler `sent` listesinden (console) son gönderilenleri okuyabilir.
@@ -57,10 +57,16 @@ class SesBackend:
         if self._client is None:
             try:
                 import boto3  # noqa: PLC0415 — yalnızca ses arka ucunda gerekir
+                from botocore.config import Config  # noqa: PLC0415
             except ImportError as exc:
-                raise RuntimeError("boto3 kurulu değil (requirements.txt'e ekleyin; DEPLOY_AWS.md Ek C6)") from exc
+                raise RuntimeError("boto3 kurulu değil (requirements.txt)") from exc
 
-            self._client = boto3.client("sesv2", region_name=get_settings().email_ses_region)
+            # Kısa zaman aşımları: gönderim arka plan görevinde; takılan bağlantı thread tutmasın
+            # (botocore varsayılanı 60 sn + 60 sn).
+            self._client = boto3.client(
+                "sesv2", region_name=get_settings().email_ses_region,
+                config=Config(connect_timeout=5, read_timeout=10, retries={"max_attempts": 3, "mode": "standard"}),
+            )
         return self._client
 
     def send(self, msg: EmailMessage) -> bool:
@@ -78,8 +84,11 @@ class SesBackend:
             logger.info("[mail:ses] gönderildi (konu=%r)", msg.subject)
             return True
         except Exception as exc:  # noqa: BLE001 — gönderim hatası akışı bozmasın
-            # Alıcı adresi log'a yazılmaz (kişisel veri); yalnızca hata türü.
-            detail = str(exc) if isinstance(exc, RuntimeError) else exc.__class__.__name__
+            # Alıcı adresi log'a yazılmaz (kişisel veri): SES'in hata METNİ adres içerebilir, yalnızca
+            # hata kodu/türü yazılır (AccessDeniedException, MessageRejected, NoCredentialsError…).
+            response = getattr(exc, "response", None)
+            code = response.get("Error", {}).get("Code") if isinstance(response, dict) else None
+            detail = str(exc) if isinstance(exc, RuntimeError) else code or exc.__class__.__name__
             logger.error("[mail:ses] gönderilemedi: %s", detail)
             return False
 
@@ -94,6 +103,19 @@ def get_mailer():
     if _backend is None or _backend.name != want:
         _backend = SesBackend() if want == "ses" else ConsoleBackend()
     return _backend
+
+
+def config_problems() -> list[str]:
+    """SES açıkken gönderimi ya da bağlantıları bozacak ayarlar (açılışta ERROR olarak loglanır)."""
+    s = get_settings()
+    if s.email_backend != "ses":
+        return []
+    out = []
+    if "localhost" in s.email_from:
+        out.append(f"EMAIL_FROM varsayılan değerde ({s.email_from}); SES reddeder")
+    if not s.public_url.startswith("https://"):
+        out.append(f"NEWSRADAR_PUBLIC_URL https değil ({s.public_url}); e-postadaki bağlantılar çalışmaz")
+    return out
 
 
 def send_email(msg: EmailMessage) -> bool:
