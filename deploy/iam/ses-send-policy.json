@@ -1,0 +1,12 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SendAccountEmailOnly",
+      "Effect": "Allow",
+      "Action": ["ses:SendEmail", "ses:SendRawEmail"],
+      "Resource": "arn:aws:ses:__REGION__:__ACCOUNT_ID__:identity/__DOMAIN__",
+      "Condition": { "StringEquals": { "ses:FromAddress": "noreply@__DOMAIN__" } }
+    }
+  ]
+}

@@ -49,7 +49,7 @@ done
 
 echo "== IAM en az yetki"
 python3 - "$T/ec2-instance-policy.json" "$T/frontend-bucket-policy.json" "$T/github-backend-policy.json" \
-  "$T/github-frontend-policy.json" <<'PY' && ok "'*' yalnızca kaynak kısıtlaması desteklemeyen 2 eylemde; joker eylem yok" || bad "IAM'de beklenmeyen joker"
+  "$T/github-frontend-policy.json" "$T/ses-send-policy.json" <<'PY' && ok "'*' yalnızca kaynak kısıtlaması desteklemeyen 2 eylemde; joker eylem yok" || bad "IAM'de beklenmeyen joker"
 import json, sys
 bad = []
 for path in sys.argv[1:]:
@@ -74,6 +74,15 @@ c = st[0]["Condition"]
 assert set(c) == {"StringEquals"}, c
 assert c["StringEquals"]["token.actions.githubusercontent.com:sub"] == "repo:example@1001/newsradar@2002:ref:refs/heads/main"
 assert c["StringEquals"]["token.actions.githubusercontent.com:aud"] == "sts.amazonaws.com"
+PY
+
+python3 - "$T/ses-send-policy.json" <<'PY' && ok "SES: yalnızca SendEmail/SendRawEmail, tek kimlik, tek gönderen" || bad "SES politikası beklenenden geniş"
+import json, sys
+st = json.load(open(sys.argv[1]))["Statement"]
+assert len(st) == 1 and st[0]["Effect"] == "Allow"
+assert sorted(st[0]["Action"]) == ["ses:SendEmail", "ses:SendRawEmail"]
+assert st[0]["Resource"] == "arn:aws:ses:eu-central-1:123456789012:identity/example.com"
+assert st[0]["Condition"] == {"StringEquals": {"ses:FromAddress": "noreply@example.com"}}
 PY
 
 echo "== CloudFront Function (www → apex)"

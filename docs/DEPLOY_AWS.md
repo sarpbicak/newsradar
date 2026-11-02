@@ -604,7 +604,7 @@ aws ec2 wait instance-status-ok --region "$REGION" --instance-ids "$INSTANCE_ID"
 
 Bu ayarların nedenleri:
 - **Genel IP'siz açılış.** Instance bilerek genel IP'siz açılır (`AssociatePublicIpAddress=false`), çünkü EIP birkaç saniye sonra bağlanıyor. Böylece ikinci, ücretli bir genel IP oluşmuyor; user-data da internet gelene kadar bekliyor.
-- **`HttpPutResponseHopLimit=1`.** Container'lar instance rolünün kimlik bilgilerine IMDS'ten ulaşamaz. Bu ayar yalnızca host'taki Docker daemon'ının, aws CLI'ın ve SSM agent'ın kimlik almasına izin veriyor.
+- **`HttpPutResponseHopLimit=1`.** (SES açıkken 2 olur: [Ek C6](#c6--açılış-adımları).) Container'lar instance rolünün kimlik bilgilerine IMDS'ten ulaşamaz. Bu ayar yalnızca host'taki Docker daemon'ının, aws CLI'ın ve SSM agent'ın kimlik almasına izin veriyor.
 - **`CpuCredits=standard`.** t4g'nin varsayılanı olan "unlimited" moddaki sürpriz CPU ücretini kapatır.
 
 **Doğrulama:**
@@ -1318,6 +1318,7 @@ aws iam remove-role-from-instance-profile --instance-profile-name "$PROFILE_NAME
 aws iam delete-instance-profile --instance-profile-name "$PROFILE_NAME"
 aws iam detach-role-policy --role-name "$ROLE_NAME" --policy-arn arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
 aws iam delete-role-policy --role-name "$ROLE_NAME" --policy-name newsradar-ec2-inline
+aws iam delete-role-policy --role-name "$ROLE_NAME" --policy-name newsradar-ses-send   # SES açıldıysa
 aws iam delete-role --role-name "$ROLE_NAME"
 ```
 
@@ -1586,7 +1587,7 @@ Beklenen çıktı:
 | Log grubu | `/newsradar/prod` (`$LOG_GROUP`) | Adım 6 | 9, 13, 21, T14 |
 | SSM yolu | `/newsradar/prod/*` (`$SSM_PREFIX`) | Adım 7 | 9, 14, 22, T13 |
 | KMS anahtarı | `alias/aws/ssm` (`$SSM_KMS_KEY_ARN`) | Adım 8 | 9 |
-| IAM rolü | `newsradar-ec2-role` (`$ROLE_NAME`), inline policy `newsradar-ec2-inline` | Adım 9 | 13, T11 |
+| IAM rolü | `newsradar-ec2-role` (`$ROLE_NAME`), inline policy `newsradar-ec2-inline` (SES: ayrıca `newsradar-ses-send`, Ek C6) | Adım 9 | 13, T11 |
 | Instance profile | `newsradar-ec2-profile` (`$PROFILE_NAME`) | Adım 9 | 13, T11 |
 | Security group | `newsradar-api-sg` (`$SG_NAME`, `$SG_ID`) | Adım 10 | 13, T10 |
 | Elastic IP | etiket `newsradar-api-eip` (`$EIP_ALLOC`, `$EIP_IP`) | Adım 11 | 12, 13, T8, T9 |
@@ -1625,11 +1626,9 @@ Repo dosyaları:
 
 ## Ek C — SES kurulumu (e-posta doğrulama ve şifre sıfırlama)
 
-**Durum (karar):** Şimdilik `EMAIL_BACKEND=console`. Production'da e-posta gönderilmez; arayüz "Şifremi unuttum" bağlantısını ve "E-postanı doğrula" uyarısını gizler (`/public/features` → `email: false`). Açılışta ERROR seviyesinde bir uyarı log'a düşer. IMDS atlama sınırı **1** kalır, container'lar instance rolüne ulaşamaz. Aşağıdaki adımlar yalnızca belgedir; SES'e geçmeye karar verilince sırayla uygulanır.
+**Durum (karar):** SES production erişimi onaylandı (`eu-central-1`, sandbox dışı, DKIM doğrulanmış). Kimlik bilgisi yolu **instance rolü**: uzun ömürlü anahtar yok, IMDS atlama sınırı 2, Caddy container'ı IMDS'e erişemez. `EMAIL_BACKEND=console` iken e-posta gönderilmez; arayüz "Şifremi unuttum" bağlantısını ve "E-postanı doğrula" uyarısını gizler (`/public/features` → `email: false`, 5 dk önbellek), açılışta ERROR log'u düşer.
 
-Kod tarafı hazırdır ([backend/app/mailer.py](../backend/app/mailer.py)):
-- `EMAIL_BACKEND=ses` olunca boto3 `sesv2.send_email` kullanılır.
-- Kimlik bilgileri boto3'ün varsayılan zincirinden gelir. Koda ya da ortama anahtar konmaz; (b) yolu seçilirse ayrı bir anahtar gerekir, bkz. C5.
+Kod tarafı ([backend/app/mailer.py](../backend/app/mailer.py)): `EMAIL_BACKEND=ses` olunca boto3 `sesv2.send_email` kullanılır; kimlik boto3'ün varsayılan zincirinden (instance rolü) gelir. Gönderim hatası kullanıcı akışını bozmaz; log'a yalnızca SES hata kodu yazılır (`[mail:ses] gönderilemedi: AccessDeniedException`).
 
 ### C1 — Alan adını SES'te doğrula (Easy DKIM, Route 53)
 
@@ -1672,7 +1671,7 @@ aws sesv2 get-email-identity --region "$REGION" --email-identity "$DOMAIN" \
 
 ### C3 — Sandbox'tan çıkış talebi
 
-Yeni hesaplar sandbox'tadır: yalnızca doğrulanmış alıcılara gönderilebilir ve günlük kota düşüktür. Talep:
+Tamamlandı. Yeni bir hesapta gerekirse:
 
 ```bash
 aws sesv2 put-account-details --region "$REGION" --production-access-enabled \
@@ -1681,58 +1680,100 @@ aws sesv2 put-account-details --region "$REGION" --production-access-enabled \
 aws sesv2 get-account --region "$REGION" --query '[ProductionAccessEnabled,SendQuota]'
 ```
 
-Onay genellikle 1 iş günü sürer. Beklerken kendi adresinizi alıcı olarak doğrulayıp sandbox'ta deneyebilirsiniz: `aws sesv2 create-email-identity --email-identity siz@ornek.com`.
-
 ### C4 — En dar IAM izni
 
-Yalnızca bu alan adı kimliğinden ve yalnızca bu gönderen adresinden `ses:SendEmail` izni verilir:
+[deploy/iam/ses-send-policy.json](../deploy/iam/ses-send-policy.json): yalnızca `ses:SendEmail` ve `ses:SendRawEmail`, yalnızca alan adı kimliği, yalnızca `noreply@$DOMAIN` gönderen (`ses:FromAddress`). Role ayrı bir inline policy (`newsradar-ses-send`) olarak eklenir; SES kapatılırsa tek başına silinir. `ses:*` verilmez.
 
-```json
-{
-  "Sid": "SendAccountEmailOnly",
-  "Effect": "Allow",
-  "Action": "ses:SendEmail",
-  "Resource": "arn:aws:ses:__REGION__:__ACCOUNT_ID__:identity/__DOMAIN__",
-  "Condition": { "StringEquals": { "ses:FromAddress": "no-reply@__DOMAIN__" } }
-}
-```
+### C5 — Kimlik bilgisinin backend container'ına ulaşması
 
-- **Sandbox'tayken** SES alıcı kimliğini de yetkilendirir. Test alıcısı için kaynağa `arn:aws:ses:__REGION__:__ACCOUNT_ID__:identity/siz@ornek.com` eklenir; production erişimi gelince bu satır kaldırılır.
-- `ses:SendRawEmail` ve `ses:*` **verilmez**. Bağlanacağı yer C5'teki seçime göre değişir: instance rolüne ([deploy/iam/ec2-instance-policy.json](../deploy/iam/ec2-instance-policy.json)) ya da ayrı kullanıcıya.
+Instance rolü, atlama sınırı 2:
+- Container'dan IMDS'e iki atlama vardır (köprü + host); sınır 1 iken yanıt container'a ulaşmaz.
+- Caddy internete açıktır; rolü ona açmamak için sabit IP'sinden (`172.28.0.10`, [docker-compose.yml](../deploy/docker-compose.yml)) IMDS'e giden trafik `DOCKER-USER` zincirinde düşürülür: [deploy/imds-guard.sh](../deploy/imds-guard.sh). Kuralı `deploy.sh` her deploy'da (kurulamazsa deploy durur), [systemd birimi](../deploy/systemd/newsradar-imds-guard.service) her açılışta Docker'dan önce kurar. Yeni instance'ta user-data kurar.
+- Bedeli: backend container'ı rolün TÜM izinlerine (SSM okuma, yedek bucket'ı, ECR, SES) ulaşabilir. Rol dar tutulduğu için etki sınırlı, ama savunma katmanı bir azalır.
 
-### C5 — Kimlik bilgisinin backend container'ına ulaşması (karar sonra verilecek)
+### C6 — Açılış adımları
 
-Backend Docker container'ında çalışır. Bugün `HttpPutResponseHopLimit=1` olduğu için container'lar instance rolüne ulaşamaz (Adım 13). İki yol var:
+Önkoşul: kod push edildi, `deploy-backend` yeşil (imajda boto3 var, kural kurulu). Komutlar repo kökünde, `source ~/newsradar-env.sh` sonrası (`$REGION`, `$INSTANCE_ID`, `$ROLE_NAME`, `$ACCOUNT_ID`, `$DOMAIN`, `put_param`). "(sunucu)" yazanlar `aws ssm start-session --region "$REGION" --target "$INSTANCE_ID"` oturumunda. **Sıra önemli:** kural doğrulanmadan atlama sınırı yükseltilmez.
 
-- **(a) Atlama sınırı 2 + Caddy'nin IMDS erişimini engellemek.** Anahtarsız; kimlik instance rolünden gelir.
-  ```bash
-  aws ec2 modify-instance-metadata-options --region "$REGION" --instance-id "$INSTANCE_ID" \
-    --http-tokens required --http-put-response-hop-limit 2
-  # Host'ta (Session Manager): Caddy'nin sabit iç IP'sinden IMDS'e giden trafiği düşür.
-  sudo iptables -I DOCKER-USER -s 172.28.0.10 -d 169.254.169.254 -j DROP
-  ```
-  - iptables kuralı yeniden başlatmada kaybolur. Kalıcı olması için user-data'ya ya da bir systemd unit'ine (`ExecStart=/usr/sbin/iptables -I DOCKER-USER …`) eklenmelidir.
-  - Backend container'ı rolün TÜM izinlerine (SSM okuma, yedek bucket'ı, ECR) ulaşabilir hale gelir. Rol zaten dar tutulduğu için etki sınırlı, ama savunma katmanı bir azalır.
-- **(b) Yalnızca `ses:SendEmail` izinli ayrı bir yol.** IMDS kapalı kalır.
-  - Yalnızca C4 politikasını taşıyan ayrı bir IAM kullanıcısı açılır.
-  - Erişim anahtarı SSM'e SecureString olarak yazılır: `AWS_ACCESS_KEY_ID` ve `AWS_SECRET_ACCESS_KEY`. boto3 bunları ortamdan kendiliğinden okur.
-  - Bedeli uzun ömürlü bir anahtardır: 90 günde bir yenilenmeli, CloudTrail'de izlenmelidir.
-  - Bu iki ad uygulama ayarı değildir. PARAMETERS.md'ye yalnızca bu yol seçilirse eklenir.
-
-### C6 — SSM parametreleri ve imaj
+**1. Politikayı role ekle**
 
 ```bash
-put_param EMAIL_BACKEND String ses
-put_param EMAIL_FROM String "NewsRadar <no-reply@${DOMAIN}>"
-put_param EMAIL_SES_REGION String "$REGION"
-put_param NEWSRADAR_PUBLIC_URL String "https://${DOMAIN}"   # e-postadaki bağlantıların kökü
+python3 deploy/aws/render.py deploy/iam/ses-send-policy.json > /tmp/newsradar-ses-send.json
+aws iam put-role-policy --role-name "$ROLE_NAME" --policy-name newsradar-ses-send --policy-document file:///tmp/newsradar-ses-send.json
+# allowed, allowed
+aws iam simulate-principal-policy --policy-source-arn "arn:aws:iam::$ACCOUNT_ID:role/$ROLE_NAME" --action-names ses:SendEmail ses:SendRawEmail --resource-arns "arn:aws:ses:$REGION:$ACCOUNT_ID:identity/$DOMAIN" --context-entries "ContextKeyName=ses:FromAddress,ContextKeyValues=noreply@$DOMAIN,ContextKeyType=string" --query 'EvaluationResults[].[EvalActionName,EvalDecision]' --output text
+# implicitDeny (başka gönderen)
+aws iam simulate-principal-policy --policy-source-arn "arn:aws:iam::$ACCOUNT_ID:role/$ROLE_NAME" --action-names ses:SendEmail --resource-arns "arn:aws:ses:$REGION:$ACCOUNT_ID:identity/$DOMAIN" --context-entries "ContextKeyName=ses:FromAddress,ContextKeyValues=baska@$DOMAIN,ContextKeyType=string" --query 'EvaluationResults[].EvalDecision' --output text
+# None olmalı (kimlikte varsayılan configuration set varsa politikaya onun ARN'i de gerekir)
+aws sesv2 get-email-identity --region "$REGION" --email-identity "$DOMAIN" --query ConfigurationSetName --output text
 ```
 
-- `backend/requirements.txt`'e `boto3` eklenip imaj yeniden derlenir. SES kapalıyken imaj büyümesin diye (botocore ~100 MB) bugün eklenmedi.
-- boto3 yoksa `ses` arka ucu her gönderimde "boto3 kurulu değil" hatasını log'a yazar; kullanıcı akışı bozulmaz.
+**2. Kuralı kontrol et (sunucu)**
 
-### C7 — Deneme
+```bash
+sudo /opt/newsradar/deploy/imds-guard.sh check     # "kural var"
+sudo iptables -L DOCKER-USER -n -v --line-numbers  # 1. satır: DROP 172.28.0.10 → 169.254.169.254
+systemctl is-enabled newsradar-imds-guard.service  # enabled
+```
 
-- Production'da kendi hesabınızla "Şifremi unuttum"u kullanın, gelen e-postadaki bağlantıyla şifreyi değiştirin. Diğer cihazdaki oturumun kapandığını görün.
-- `docker compose logs backend | grep mail:ses` → `gönderildi`.
-- SES konsolunda "Reputation metrics" bölümünde bounce ve complaint oranlarını izleyin. %5 bounce ya da %0,1 complaint üstü hesabı riske sokar.
+**3. Atlama sınırını 2 yap, iki yönü doğrula**
+
+```bash
+aws ec2 modify-instance-metadata-options --region "$REGION" --instance-id "$INSTANCE_ID" --http-tokens required --http-put-response-hop-limit 2
+aws ec2 describe-instances --region "$REGION" --instance-ids "$INSTANCE_ID" --query 'Reservations[0].Instances[0].MetadataOptions.[State,HttpTokens,HttpPutResponseHopLimit]' --output text   # applied required 2
+```
+
+Sunucuda (yeniden başlatma gerekmez):
+
+```bash
+# Caddy: "download timed out" olmalı. "401 Unauthorized" görürseniz kural çalışmıyor → atlama sınırını hemen 1'e alın.
+sudo docker exec newsradar-caddy-1 wget -T 3 -qO- http://169.254.169.254/latest/meta-data/
+# Backend: arn:aws:sts::…:assumed-role/newsradar-ec2-role/i-…
+sudo docker exec newsradar-backend-1 python -c "import boto3;print(boto3.client('sts',region_name='eu-central-1').get_caller_identity()['Arn'])"
+```
+
+**4. SSM parametreleri** (`EMAIL_BACKEND` en son)
+
+```bash
+put_param EMAIL_FROM String "NewsRadar <noreply@${DOMAIN}>"
+put_param EMAIL_SES_REGION String "$REGION"
+put_param NEWSRADAR_PUBLIC_URL String "https://${DOMAIN}"
+put_param EMAIL_BACKEND String ses
+```
+
+**5. Yeniden yükle ve doğrula (sunucu)**
+
+```bash
+sudo -i bash -c 'cd /opt/newsradar && git pull --ff-only && AWS_REGION=eu-central-1 deploy/deploy.sh'
+sudo docker exec newsradar-backend-1 printenv EMAIL_BACKEND EMAIL_FROM EMAIL_SES_REGION NEWSRADAR_PUBLIC_URL
+sudo docker logs --since 10m newsradar-backend-1 2>&1 | grep -E "E-posta ayarı|EMAIL_BACKEND=console"   # çıktı OLMAMALI
+```
+
+Mac'te: `curl -s "https://api.$DOMAIN/public/features"` → `{"email":true}`. Tarayıcıdaki eski yanıt en çok 5 dk önbellekte kalır.
+
+### C7 — Canlı doğrulama
+
+1. **Simülatör (gerçek alıcı yok, itibarı etkilemez; sunucu):**
+   ```bash
+   sudo docker exec newsradar-backend-1 python -c "from app.mailer import EmailMessage,send_email;print(send_email(EmailMessage('success@simulator.amazonses.com','NewsRadar SES test','test','<p>test</p>')))"
+   ```
+   `True` yazmalı. `False` ise hemen üstünde SES hata kodu görünür: `AccessDeniedException` → C4/C6 adım 1 ve gönderen adresi; `NoCredentialsError` → atlama sınırı; `MessageRejected` → kimlik ya da içerik. Kota sayacı (gecikmeli): `aws sesv2 get-account --region "$REGION" --query SendQuota.SentLast24Hours`.
+2. **Doğrulama postası:** kendi hesabınızla giriş yapın; kullanıcı menüsü → "E-postanı doğrula" → "Tekrar gönder" (60 sn bekleme, günde 10). E-posta adresi olmayan hesapta önce hesap menüsünden ekleyin; ekleyince posta kendiliğinden gider. Bağlantı `https://$DOMAIN/verify-email?token=…` (24 saat); tıklayınca uyarı kaybolur.
+3. **Şifre sıfırlama postası:** çıkış yapın; "Giriş yap" → "Şifremi unuttum" → adresinizi yazın (adres başına saatte 3, IP başına 5; aşılırsa yanıt aynı ama posta gitmez). Bağlantı `https://$DOMAIN/reset-password?token=…` (1 saat, tek kullanımlık). Şifre değişince diğer cihazdaki oturum kapanır.
+4. **Başlıklar:** posta istemcisinde "orijinali göster": gönderen `NewsRadar <noreply@$DOMAIN>`, `DKIM=pass`, `DMARC=pass`.
+5. **Log ve itibar:** `sudo docker logs --since 30m newsradar-backend-1 2>&1 | grep mail:ses` → `gönderildi`. SES konsolu "Reputation metrics": %5 bounce ya da %0,1 complaint üstü hesabı riske sokar.
+
+### C8 — Geri alma
+
+Sırayla (ilk ikisi gönderimi durdurur ve arayüzü eski haline döndürür):
+
+```bash
+put_param EMAIL_BACKEND String console
+# sunucu:
+sudo -i bash -c 'cd /opt/newsradar && AWS_REGION=eu-central-1 deploy/deploy.sh'
+aws ec2 modify-instance-metadata-options --region "$REGION" --instance-id "$INSTANCE_ID" --http-tokens required --http-put-response-hop-limit 1
+aws iam delete-role-policy --role-name "$ROLE_NAME" --policy-name newsradar-ses-send
+```
+
+- IMDS kuralı atlama sınırı 1 iken zararsızdır, kaldırılmaz. boto3 imajda kalır; console'da içe aktarılmaz.
+- Daha önce gönderilmiş bağlantılar süreleri dolana kadar çalışır.

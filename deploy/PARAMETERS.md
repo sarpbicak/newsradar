@@ -84,8 +84,8 @@ Varsayılanlar Render'a göre ayarlıdır. AWS'de bu değerleri vermek gerekir.
 | `NEWSRADAR_SESSION_COOKIE_DAYS` | Cihaz cookie'sinin ömrü (gün). | String | `365` | `365` |
 | `NEWSRADAR_SCHEDULER` | Otomatik yenileme (`on`/`off`). | String | `on` | `on` |
 | `NEWSRADAR_SCHEDULER_HOURS` | Otomatik yenileme aralığı (saat). | String | `6` | `6` |
-| `EMAIL_BACKEND` | Hesap e-postaları (doğrulama, şifre sıfırlama): `console` (gönderilmez, yalnızca log; production'da "Şifremi unuttum" ve doğrulama uyarısı gizlenir) ya da `ses` (Amazon SES v2, boto3; kimlik AWS varsayılan zincirinden). Bkz. DEPLOY_AWS.md Ek C. İsteğe bağlı. | String | `console` | `console` |
-| `EMAIL_FROM` | Gönderen adres (`ses`). SES'te doğrulanmış alan adından olmalı. İsteğe bağlı. | String | `NewsRadar <no-reply@localhost>` | `NewsRadar <no-reply@${DOMAIN}>` |
+| `EMAIL_BACKEND` | Hesap e-postaları (doğrulama, şifre sıfırlama): `console` (gönderilmez, yalnızca log; production'da "Şifremi unuttum" ve doğrulama uyarısı gizlenir) ya da `ses` (Amazon SES v2, boto3; kimlik AWS varsayılan zincirinden). Bkz. DEPLOY_AWS.md Ek C. İsteğe bağlı. | String | `console` | `ses` |
+| `EMAIL_FROM` | Gönderen adres (`ses`). SES'te doğrulanmış alan adından olmalı. İsteğe bağlı. | String | `NewsRadar <no-reply@localhost>` | `NewsRadar <noreply@${DOMAIN}>` |
 | `EMAIL_SES_REGION` | SES bölgesi (`ses`). İsteğe bağlı. | String | `eu-central-1` | `$REGION` |
 | `NEWSRADAR_PUBLIC_URL` | E-postadaki bağlantıların kökü (`https://alanadi`). Boşsa ilk CORS kökeni; isteğin Host başlığı asla kullanılmaz. İsteğe bağlı. | String | — | `https://${DOMAIN}` |
 | `NEWSRADAR_ANON_CLEANUP` | Günlük misafir temizliği: `on` (ilk çalıştırma deneme — hiçbir şey silinmez, sayı admin panelde görünür; sonrakiler siler), `dry-run` (her çalıştırma deneme), `off`. Kural: şirketsiz misafir 30, şirketli misafir 90 gün görülmezse silinir; kayıtlı hesaplar ve analiz havuzu korunur. İsteğe bağlı. | String | `on` | `on` |

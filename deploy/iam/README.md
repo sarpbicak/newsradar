@@ -6,6 +6,7 @@ Yer tutucular (`__REGION__`, `__ACCOUNT_ID__` …) `deploy/aws/render.py` ile do
 |---|---|
 | `ec2-trust-policy.json` | `newsradar-ec2-role`'ü yalnızca EC2 üstlenebilir. |
 | `ec2-instance-policy.json` | Rolün inline policy'si (`newsradar-ec2-inline`). AWS-managed `AmazonSSMManagedInstanceCore` ayrıca eklenir (Session Manager). |
+| `ses-send-policy.json` | Rolün ayrı inline policy'si (`newsradar-ses-send`; SES kapatılınca tek başına silinir). Yalnızca `ses:SendEmail` + `ses:SendRawEmail`, yalnızca alan adı kimliği, yalnızca `noreply@` gönderen. Komutlar: DEPLOY_AWS.md Ek C. |
 | `frontend-bucket-policy.json` | Frontend bucket'ını yalnızca bu CloudFront dağıtımı (OAC) okuyabilir. |
 | `github-oidc-trust-policy.json` | GitHub Actions rollerini yalnızca bu reponun `main` dalındaki iş akışları üstlenebilir (OIDC; anahtar yok). |
 | `github-backend-policy.json` | `newsradar-github-backend`: tek ECR reposuna push + etiket, yalnızca API instance'ına `AWS-RunShellScript`, komut sonucunu okuma. |
