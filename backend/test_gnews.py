@@ -58,14 +58,19 @@ class Resp:
         return self._j
 
 
+def _ago(hours):
+    """Göreli tarih: alım penceresi (NEWSRADAR_LOOKBACK_HOURS) dışına düşmesin."""
+    return (datetime.now(timezone.utc) - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 GN = {"totalArticles": 2, "articles": [
     {"title": "Anthropic raises new funding", "description": "The AI company...", "url": "https://ex.com/a",
-     "image": "https://ex.com/a.jpg", "publishedAt": "2026-10-26T08:00:00Z", "source": {"name": "Example", "url": "https://ex.com"}},
+     "image": "https://ex.com/a.jpg", "publishedAt": _ago(2), "source": {"name": "Example", "url": "https://ex.com"}},
     {"title": "", "url": "https://ex.com/empty"},
     {"title": "Anthropic opens Berlin office", "description": "", "url": "https://ex.de/b",
-     "publishedAt": "2026-10-25T18:30:00Z", "source": {"name": "Beispiel"}},
+     "publishedAt": _ago(14), "source": {"name": "Beispiel"}},
 ]}
-GD = {"articles": [{"url": "https://gd.com/x", "title": "Anthropic GDELT story", "seendate": "20261026T090000Z", "domain": "gd.com"}]}
+GD = {"articles": [{"url": "https://gd.com/x", "title": "Anthropic GDELT story", "seendate": (datetime.now(timezone.utc) - timedelta(hours=1)).strftime("%Y%m%dT%H%M%SZ"), "domain": "gd.com"}]}
 
 gn_calls, gd_calls, slept, clock = [], [], [], [1000.0]
 
