@@ -87,8 +87,9 @@ haber akışına dayalı bir hisse/varlık risk analistisin.
    (ISO ülke kodu: US, TR, DE...) ve `exchange` (ana borsa: NASDAQ, NYSE, BIST...) doldur; \
    emin değilsen null. Bu bilgi şirketin ticker mı yoksa keyword olarak mı izleneceğini \
    belirler (ABD borsası dışındakiler keyword olur). Ayrıca her şirket için `why_relevant`: \
-   O ŞİRKETİN (analiz edilen varlığın değil) neden gündemde olduğunu tek cümle yaz \
-   (ör. "AMD, MI400 ile NVIDIA'nın veri merkezi payını hedefliyor"). Emin değilsen null.
+   O ŞİRKETİN (analiz edilen varlığın değil) neden gündemde olduğunu tek cümle İNGİLİZCE yaz \
+   (ör. "AMD is targeting NVIDIA's data center share with its MI400 chips."). Bu alan istekteki \
+   çıktı dilinden bağımsız, her zaman İngilizcedir. Emin değilsen null.
 
 DİL: Metin alanlarının ÇIKTI DİLİ her istekte AYRICA belirtilir; o dile KESİNLİKLE uy \
 (akıcı/doğal, karışık dil yok; yalnızca özel adlar — şirket/ürün/kişi — olduğu gibi kalır). \
@@ -156,7 +157,7 @@ def output_language_directive(out_lang: str) -> str:
         )
     return (
         "ÇIKTI DİLİ (KATI): TÜM metin alanları (rationale, summary, ai_take, "
-        "headline_verdict, top_drivers, what_to_verify, invalidation, why_relevant, "
+        "headline_verdict, top_drivers, what_to_verify, invalidation, "
         "short_term/long_term drivers + summary) "
         "AKICI ve DOĞAL TÜRKÇE olacak. YALNIZCA Türkçe yaz: İngilizce kelime/bağlaç "
         "(already, however, although, because, while, still, which, also, the, thus, "
@@ -185,9 +186,12 @@ def build_article_batch_prompt(
         f"Varlık: {entity_name} (arama: {entity_query}).",
         entity_type_line(entity_type),
         language_line(language),
-        # Makale-başı analiz TEK sefer üretilir → çıktı (rationale/why_relevant) TÜRKÇE.
+        # Makale-başı analiz TEK sefer üretilir → çıktı (rationale) TÜRKÇE.
         # (Entity değerlendirmesi ayrıca tr+en üretilir; makale metni ona bağlam.)
         output_language_directive("tr"),
+        # Öneri gerekçesi tek kaynak EN; diğer diller çevrilir (pipeline.translate_suggestions).
+        "İSTİSNA: co_mentioned_entities içindeki `why_relevant` HER ZAMAN AKICI İNGİLİZCE olacak "
+        "(Türkçe kelime ve Türkçe harf yok; yalnızca özel adlar olduğu gibi kalır).",
         utc_context_line(),
         "",
         "Aşağıdaki haberleri BU varlık açısından analiz et. Her makale için "

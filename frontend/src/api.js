@@ -292,7 +292,7 @@ export const api = {
   cancelRefresh: () => req("/refresh", { method: "DELETE" }), // sıradaki yenilemeden vazgeç
   searchSymbols: (q) => req(`/symbol-search?q=${encodeURIComponent(q)}`),
   // Öneriler (co-mentioned şirketler)
-  listSuggestions: () => req("/suggestions"),
+  listSuggestions: () => req(`/suggestions?lang=${getLang()}`),
   dismissSuggestion: (id) => req(`/suggestions/${id}/dismiss`, { method: "POST" }),
   addSuggestion: (id) => req(`/suggestions/${id}/add`, { method: "POST" }),
 };

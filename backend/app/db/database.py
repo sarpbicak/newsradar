@@ -81,6 +81,7 @@ def init_db() -> None:
     _ensure_column("suggestions", "country", "VARCHAR(60)")
     _ensure_column("suggestions", "exchange", "VARCHAR(60)")
     _ensure_column("suggestions", "why_relevant", "TEXT")
+    _ensure_column("suggestions", "why_texts", "JSON")
     _ensure_column("analyst_snapshots", "target_consensus", "FLOAT")
     _ensure_column("users", "guide_dismissed", "BOOLEAN NOT NULL DEFAULT 0")
     _ensure_column("users", "tutorial_done", "BOOLEAN NOT NULL DEFAULT 0")

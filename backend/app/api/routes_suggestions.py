@@ -7,7 +7,7 @@ burada, LİSTELEME anında yapılır.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -17,18 +17,18 @@ from sqlalchemy import exists
 from ..languages import user_language
 from .errors import ApiError
 from ..db.database import get_db
-from ..db.models import Entity, Suggestion, SuggestionDismissal, User
+from ..db.models import SUGGESTION_MIN_MENTIONS, Entity, Suggestion, SuggestionDismissal, User
 from ..entity_names import company_keys, display_name_for, entity_keys
 from ..watchlist import add_to_watchlist, can_add_entity, in_watchlist, user_entity_ids
 from .routes_auth import get_current_user
 from .routes_entities import _add_lock, duplicate_response, find_watchlist_duplicate
 from .schemas import EntityCardOut, SuggestionOut
-from .serializers import entity_card
+from .serializers import content_language, entity_card
 from .usage import record_event
 
 router = APIRouter(prefix="/suggestions", tags=["suggestions"])
 
-MIN_MENTIONS = 3   # bu sayının altındaki öneriler gösterilmez (gürültü filtresi)
+MIN_MENTIONS = SUGGESTION_MIN_MENTIONS
 MAX_RESULTS = 10
 
 # ABD borsası sinyalleri (Finnhub ücretsiz katmanı yalnızca bunları kapsar).
@@ -72,7 +72,15 @@ def _in_watchlist(sug: Suggestion, terms: set[str]) -> bool:
     return False
 
 
-def _suggestion_out(db: Session, sug: Suggestion, name_by_id: dict[int, str]) -> SuggestionOut:
+def _localized_why(sug: Suggestion, language: str) -> str | None:
+    """Gerekçe yalnızca istenen dilde; yoksa None (kart satırı gizlenir, başka dil gösterilmez).
+    why_texts'i olmayan eski kayıtlarda why_relevant vardır ve hep Türkçedir."""
+    if sug.why_texts:
+        return sug.why_texts.get(language) or None
+    return sug.why_relevant if language == "tr" else None
+
+
+def _suggestion_out(db: Session, sug: Suggestion, name_by_id: dict[int, str], language: str) -> SuggestionOut:
     names = [name_by_id[i] for i in (sug.source_entity_ids or []) if i in name_by_id]
     add_type, _query, add_lang = resolve_add_target(sug)
     return SuggestionOut(
@@ -81,7 +89,7 @@ def _suggestion_out(db: Session, sug: Suggestion, name_by_id: dict[int, str]) ->
         ticker=sug.ticker,
         is_public=sug.is_public,
         mention_count=sug.mention_count,
-        why_relevant=sug.why_relevant,
+        why_relevant=_localized_why(sug, language),
         source_entity_names=names,
         last_seen_at=sug.last_seen_at,
         add_as_type=add_type,
@@ -91,6 +99,7 @@ def _suggestion_out(db: Session, sug: Suggestion, name_by_id: dict[int, str]) ->
 
 @router.get("", response_model=list[SuggestionOut])
 def list_suggestions(
+    lang: str | None = Query(None, description="AI içeriği dili (tr|en); yoksa kullanıcının dili"),
     db: Session = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> list[SuggestionOut]:
@@ -127,6 +136,7 @@ def list_suggestions(
         .order_by(Suggestion.mention_count.desc(), Suggestion.last_seen_at.desc())
     ).all()
 
+    language = content_language(user, lang)
     out: list[SuggestionOut] = []
     for s in rows:
         if s.id in dismissed:
@@ -136,7 +146,7 @@ def list_suggestions(
             continue
         if _in_watchlist(s, my_terms) or (company_keys(s.name) & my_keys):
             continue
-        out.append(_suggestion_out(db, s, name_by_id))
+        out.append(_suggestion_out(db, s, name_by_id, language))
         if len(out) >= MAX_RESULTS:
             break
     return out

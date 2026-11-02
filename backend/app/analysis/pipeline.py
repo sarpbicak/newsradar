@@ -32,8 +32,8 @@ from ..languages import de_enabled
 from ..messages import msg
 from ..db.database import session_scope
 from ..db.models import (
-    ALL_LANGUAGES, PREFILTER_VERSION, Article, DiscardedArticle, Entity, EntityAnalysis,
-    PriceSnapshot, Suggestion,
+    ALL_LANGUAGES, PREFILTER_VERSION, SUGGESTION_MIN_MENTIONS, Article, DiscardedArticle, Entity,
+    EntityAnalysis, PriceSnapshot, Suggestion,
 )
 from ..analyst import analyst_context_for
 from ..prices import price_context_for
@@ -54,6 +54,7 @@ from .schemas import (
     ENTITY_ANALYSIS_TOOL,
     HORIZON_FIELDS,
     RELEVANCE_THRESHOLD,
+    SUGGESTION_TRANSLATION_TOOL,
     TRANSLATION_TOOL,
     apply_horizon_floor,
     horizon_consistent,
@@ -110,6 +111,7 @@ def assessment_languages() -> tuple[str, ...]:
 ASSESSMENT_MAX_AGE_HOURS = 24
 ASSESSMENT_PRICE_MOVE_PCT = 3.0
 SUGGESTION_TTL_DAYS = 30    # bu süreden eski + az anılan öneriler temizlenir
+SUGGESTION_TRANSLATIONS_PER_RUN = 30  # tarama başına çevrilen öneri tavanı; kalanı sonraki taramada
 
 
 # MALİYET BARİYERİ: Haiku 5.5'te prompt >100k token olursa çağrının TÜM kalemleri 5×
@@ -340,11 +342,15 @@ def _accumulate_suggestions(
     source_language: co-mention'ın geldiği entity'nin dili — keyword olarak
     eklenecekse bu dil miras alınır (ilk görülende sabitlenir).
     Gerekçe olarak her şirketin KENDİ `why_relevant`'ı kullanılır (makale-alaka
-    gerekçesi DEĞİL — o iç not kullanıcıya sızmasın).
+    gerekçesi DEĞİL — o iç not kullanıcıya sızmasın). Tek kaynak EN: Türkçe sızan metin
+    kaynak sayılmaz, diğer dillere translate_suggestions çevirir.
     """
     now = datetime.now(timezone.utc)
     for c in co_list:
         why = c.get("why_relevant")
+        if why and language_leak_hits(why, ASSESSMENT_SOURCE_LANG):
+            logger.warning("[öneri] %s: gerekçe İngilizce değil, yazılmadı.", c["name"])
+            why = None
         key = _suggestion_key(c["name"], c["ticker"])
         sug = session.scalar(select(Suggestion).where(Suggestion.norm_key == key))
         if sug is None:
@@ -354,7 +360,8 @@ def _accumulate_suggestions(
                     country=c.get("country"), exchange=c.get("exchange"),
                     source_language=source_language or "en",
                     norm_key=key, mention_count=1, source_entity_ids=[entity_id],
-                    why_relevant=why, first_seen_at=now, last_seen_at=now,
+                    why_texts={ASSESSMENT_SOURCE_LANG: why} if why else None,
+                    first_seen_at=now, last_seen_at=now,
                 )
             )
             # autoflush=False: aynı session'da sonraki aynı-şirket aramaları bunu
@@ -363,8 +370,10 @@ def _accumulate_suggestions(
         else:
             sug.mention_count += 1
             sug.last_seen_at = now
-            if why:
-                sug.why_relevant = why  # en güncel şirket-özel gerekçe
+            if why and (sug.why_texts or {}).get(ASSESSMENT_SOURCE_LANG) != why:
+                # En güncel şirket-özel gerekçe: eski çeviriler ve eski kolon artık geçersiz.
+                sug.why_texts = {ASSESSMENT_SOURCE_LANG: why}
+                sug.why_relevant = None
             # Eksik bilgiyi sonradan öğrenilirse doldur.
             if not sug.ticker and c["ticker"]:
                 sug.ticker = c["ticker"]
@@ -802,7 +811,8 @@ def _translation_notes(texts: dict, lang: str) -> list[str]:
     return notes
 
 
-def _translate_texts(client, source: dict, target: str, name: str) -> dict | None:
+def _translate_texts(client, source: dict, target: str, name: str,
+                     tool: dict = TRANSLATION_TOOL) -> dict | None:
     """Tek kaynak değerlendirmenin metinlerini `target` diline çevirir (makale modeli, Haiku).
     Hüküm/risk/yön istemde yok → değişemez. Geçersiz ya da sorunlu çıktı BİR KEZ notla yeniden
     istenir; yine geçersizse None (kayıt bu dil olmadan yazılır, sonraki yenileme tamamlar)."""
@@ -813,7 +823,7 @@ def _translate_texts(client, source: dict, target: str, name: str) -> dict | Non
     for attempt in range(2):
         try:
             raw = client.call_tool(system=_TRANSLATE_SYSTEM, user=f"{base}{note}",
-                                   tool=TRANSLATION_TOOL, max_tokens=max_tokens)
+                                   tool=tool, max_tokens=max_tokens)
         except ProviderQuotaError:
             raise
         except ClaudeError as exc:
@@ -879,16 +889,64 @@ def _backfill_translations(translate_client, entity_id: int, name: str) -> list[
     return list(done)
 
 
-def _translate_missing(translate_client, source: dict, missing: list[str], name: str) -> dict[str, dict]:
+def _translate_missing(translate_client, source: dict, missing: list[str], name: str,
+                       tool: dict = TRANSLATION_TOOL) -> dict[str, dict]:
     """Eksik dillerin çevirisi (DB'ye dokunmaz); başarısız dil sonuçta yer almaz."""
     done = {}
     for lang in missing:
-        out = _translate_texts(translate_client, source, lang, name)
+        out = _translate_texts(translate_client, source, lang, name, tool)
         if out is not None:
             done[lang] = out
     if done:
         logger.info("[%s] eksik çeviri tamamlandı: %s", name, ", ".join(done))
     return done
+
+
+def _suggestions_to_translate() -> list[tuple[int, str, str, list[str]]]:
+    """Gösterilebilir önerilerin eksik çevirileri, en çok anılan önce:
+    (öneri_id, ad, EN_gerekçe, eksik_diller)."""
+    with session_scope() as session:
+        rows = session.scalars(
+            select(Suggestion)
+            .where(Suggestion.dismissed.is_(False), Suggestion.mention_count >= SUGGESTION_MIN_MENTIONS)
+            .order_by(Suggestion.mention_count.desc(), Suggestion.last_seen_at.desc())
+        ).all()
+        out = []
+        for s in rows:
+            texts = s.why_texts or {}
+            source = texts.get(ASSESSMENT_SOURCE_LANG)
+            missing = [lang for lang in assessment_languages() if lang not in texts]
+            if source and missing:
+                out.append((s.id, s.name, source, missing))
+        return out[:SUGGESTION_TRANSLATIONS_PER_RUN]
+
+
+def _store_suggestion_translations(suggestion_id: int, source: str, done: dict[str, dict]) -> None:
+    """Çevirileri öneriye ekler; gerekçe bu arada değiştiyse yazmaz (sonraki tarama çevirir)."""
+    with session_scope() as session:
+        row = session.get(Suggestion, suggestion_id)
+        texts = dict((row.why_texts or {}) if row is not None else {})
+        if texts.get(ASSESSMENT_SOURCE_LANG) != source:
+            return
+        texts.update({lang: out["why_relevant"] for lang, out in done.items()})
+        row.why_texts = texts  # yeni dict ata → değişiklik algılansın
+
+
+def translate_suggestions(translate_client) -> int:
+    """Öneri gerekçelerinin eksik dillerini EN kaynaktan çevirir (makale modeli, Haiku). Başarısız
+    dil yazılmaz, kart o dilde açıklamasız görünür; sonraki tarama yeniden dener. Çevrilen dil
+    sayısı döner."""
+    count = 0
+    try:
+        for suggestion_id, name, source, missing in _suggestions_to_translate():
+            done = _translate_missing(translate_client, {"why_relevant": source}, missing, name,
+                                      SUGGESTION_TRANSLATION_TOOL)
+            if done:
+                _store_suggestion_translations(suggestion_id, source, done)
+                count += len(done)
+    except ProviderQuotaError as exc:
+        logger.warning("[öneri] kota doldu, çeviri durdu: %s", exc)
+    return count
 
 
 def _assess_and_translate(assess_client, translate_client, build_fn, payload, name):
@@ -1294,6 +1352,12 @@ async def analyze_all_async(
     async with db_lock:
         await asyncio.to_thread(prune_stale_suggestions)
 
+    if not _quota_stopped["flag"] and not _over_budget():
+        try:
+            await asyncio.to_thread(translate_suggestions, translate_client)
+        except Exception:  # noqa: BLE001 — öneri çevirisi taramanın sonucunu bozmasın
+            logger.exception("Öneri çevirisi çöktü")
+
     return totals
 
 
@@ -1416,4 +1480,5 @@ def analyze_entity_sync(entity_id: int, client: ClaudeClient, assess_client=None
     elif not needed:
         totals.translations_backfilled += len(_backfill_translations(translate_client, entity_id, name))
 
+    translate_suggestions(translate_client)
     return totals

@@ -341,6 +341,10 @@ class Feedback(Base):
     )
 
 
+# Bu sayının altındaki öneriler gösterilmez (gürültü filtresi) ve gerekçesi çevrilmez.
+SUGGESTION_MIN_MENTIONS = 3
+
+
 class Suggestion(Base):
     """Öneri: analiz edilen haberlerde geçen ama izleme listesinde OLMAYAN şirketler.
 
@@ -365,8 +369,10 @@ class Suggestion(Base):
     mention_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     # Hangi entity'lerin haberlerinde geçti (id listesi).
     source_entity_ids: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
-    # ÖNERİLEN şirketin neden gündemde olduğu (şirket-özel, tek cümle). Eski
-    # kayıtlarda NULL → kartta hiç gösterilmez.
+    # ÖNERİLEN şirketin neden gündemde olduğu (şirket-özel, tek cümle), dil başına:
+    # {"en": kaynak, "tr": çeviri}. Bir dil yoksa o dilde kartta gösterilmez.
+    why_texts: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # ESKİ tek dilli gerekçe (hep Türkçe üretildi); şirket yeniden anılınca why_texts'e geçer.
     why_relevant: Mapped[str | None] = mapped_column(Text, nullable=True)
     first_seen_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
     last_seen_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)

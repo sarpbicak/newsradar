@@ -38,6 +38,7 @@ HARD_CAPS = {
     "horizon_summary": 50,   # vade başına tek cümle
     "top_drivers": 40,       # madde başına
     "what_to_verify": 60,    # madde başına
+    "why_relevant": 40,      # öneri gerekçesi, tek cümle
 }
 
 

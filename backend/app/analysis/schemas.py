@@ -101,9 +101,9 @@ ARTICLE_ANALYSIS_TOOL = {
                                         "type": ["string", "null"],
                                         "description": (
                                             "BU şirketin (analiz edilen varlık değil, önerilen "
-                                            "şirket) neden gündemde olduğu — tek cümle TÜRKÇE, "
-                                            "ör. 'AMD, MI400 ile NVIDIA'nın veri merkezi payını "
-                                            "hedefliyor'. Emin değilsen null."
+                                            "şirket) neden gündemde olduğu — tek cümle İNGİLİZCE, "
+                                            "ör. 'AMD is targeting NVIDIA's data center share "
+                                            "with its MI400 chips.' Emin değilsen null."
                                         ),
                                     },
                                 },
@@ -529,6 +529,19 @@ TRANSLATION_TOOL = {
         },
         "required": [*TEXT_FIELDS, *TEXT_LIST_FIELDS,
                      *(f"{h}_{k}" for h in HORIZON_FIELDS for k in ("summary", "drivers"))],
+        "additionalProperties": False,
+    },
+}
+
+
+# Öneri gerekçesinin çevirisi: aynı yöntem, tek alan.
+SUGGESTION_TRANSLATION_TOOL = {
+    "name": TRANSLATION_TOOL_NAME,
+    "description": TRANSLATION_TOOL["description"],
+    "input_schema": {
+        "type": "object",
+        "properties": {"why_relevant": _str},
+        "required": ["why_relevant"],
         "additionalProperties": False,
     },
 }
