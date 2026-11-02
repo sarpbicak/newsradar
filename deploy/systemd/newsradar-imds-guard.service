@@ -1,0 +1,15 @@
+# Caddy container'ının IMDS erişimini engelleyen iptables kuralı (deploy/imds-guard.sh). iptables
+# kuralları yeniden başlatmada kaybolur; bu birim her açılışta, Docker'dan önce yeniden ekler.
+# Kurulum: deploy.sh ve user-data otomatik (deploy/imds-guard.sh install).
+# Durum: sudo /opt/newsradar/deploy/imds-guard.sh check
+[Unit]
+Description=NewsRadar: Caddy'nin IMDS erisimini engelle
+Before=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/newsradar/deploy/imds-guard.sh apply
+
+[Install]
+WantedBy=docker.service

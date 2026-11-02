@@ -114,7 +114,7 @@ fi
 case "$code" in
   1) log "HATA: yeni sürüm sağlıksız; EC2 önceki image ile ayakta" ;;
   2) log "KRİTİK: EC2'de geri dönüş de başarısız — elle müdahale (docs/DEPLOY_AWS.md, Adım 22)" ;;
-  3) log "HATA: deploy.sh deploy'dan önce durdu (load-secrets/ECR/pull); servis değişmedi" ;;
+  3) log "HATA: deploy.sh deploy'dan önce durdu (load-secrets/IMDS kuralı/ECR/pull); servis değişmedi" ;;
   *) log "HATA: SSM komutu '$status' (kod $code) — deploy tamamlanmadı" ;;
 esac
 rollback_tag

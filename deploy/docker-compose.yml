@@ -3,7 +3,8 @@
 # Dışarıya YALNIZCA Caddy açılır (80/443); backend yalnızca iç ağda, Caddy'nin arkasında.
 name: newsradar
 
-# Caddy'nin sabit iç IP'si: backend'in X-Forwarded-For'una güvendiği TEK adres.
+# Caddy'nin sabit iç IP'si: backend'in X-Forwarded-For'una güvendiği TEK adres. Bu adresten IMDS'e
+# giden trafik host'ta düşürülür (imds-guard.sh bu satırı okur); backend instance rolüne ulaşır.
 x-caddy-ip: &caddy_ip 172.28.0.10
 
 services:
@@ -14,10 +15,13 @@ services:
     image: ${BACKEND_IMAGE:-newsradar-api:local}
     env_file:
       - .env
+    # AWS_METADATA_*: boto3 → IMDS (instance rolü, SES). Varsayılan 1 sn / tek deneme; anlık gecikme gönderimi düşürmesin.
     environment:
       NEWSRADAR_DB: /data/newsradar.db
       NEWSRADAR_TRUSTED_PROXY: caddy
       NEWSRADAR_CADDY_IP: *caddy_ip
+      AWS_METADATA_SERVICE_TIMEOUT: "2"
+      AWS_METADATA_SERVICE_NUM_ATTEMPTS: "3"
     volumes:
       - data:/data
     networks:

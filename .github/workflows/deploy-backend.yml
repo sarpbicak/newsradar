@@ -56,6 +56,7 @@ jobs:
           python3 deploy/tests/check-parameters.py
           deploy/tests/test-aws-templates.sh
           deploy/tests/test-load-secrets.sh
+          deploy/tests/test-imds-guard.sh
           deploy/tests/test-release-backend.sh
 
   build:

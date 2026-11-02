@@ -30,7 +30,7 @@ for i in $(seq 1 120); do
 done
 
 # 1) Paketler (awscli-2, curl ve python3 AL2023 AMI'sinde hazır; yoksa kurulur).
-dnf -y install docker git sqlite gzip tar python3
+dnf -y install docker git sqlite gzip tar python3 iptables-nft
 command -v aws >/dev/null || dnf -y install awscli-2
 systemctl enable --now docker
 
@@ -122,6 +122,9 @@ install -m 644 "$APP_DIR"/deploy/systemd/newsradar-backup.service "$APP_DIR"/dep
   /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now newsradar-backup.timer
+
+# 6) Caddy'nin IMDS erişimini engelle (birim + kural; ayrıntı deploy/imds-guard.sh).
+"$APP_DIR"/deploy/imds-guard.sh install
 
 install -d /var/lib/newsradar
 date -u +%Y-%m-%dT%H:%M:%SZ >/var/lib/newsradar/user-data.done

@@ -123,6 +123,10 @@ Bunlar ya `docker-compose.yml` / Dockerfile tarafından sabitlenir, ya yalnızca
 | `SAFETY_DIR` | restore.sh (host) | Restore öncesi DB kopyalarının klasörü. | `deploy/local-backups/pre-restore` |
 | `HEALTH_TIMEOUT` | restore.sh (host) | Restore sonrası healthy bekleme süresi (sn). | `120` |
 | `DEPLOY_SKIP_SECRETS` | deploy.sh (host) | `1` ise `load-secrets.sh` atlanır. Yalnızca yerel test için: yerel `deploy/.env`'yi ezmemek. | boş |
+| `DEPLOY_SKIP_IMDS_GUARD` | deploy.sh (host) | `1` ise `imds-guard.sh` atlanır. Yalnızca yerel test için (yerelde IMDS ve DOCKER-USER yok). | boş |
+| `SYSTEMD_DIR` | imds-guard.sh (host) | systemd birim klasörü. Testler dışında değiştirilmez. | `/etc/systemd/system` |
+| `AWS_METADATA_SERVICE_TIMEOUT` | backend (compose) | boto3'ün IMDS isteği zaman aşımı (sn). SSM'den gelmez; compose'da sabit. | `2` |
+| `AWS_METADATA_SERVICE_NUM_ATTEMPTS` | backend (compose) | boto3'ün IMDS deneme sayısı. SSM'den gelmez; compose'da sabit. | `3` |
 | `DB_IN_CONTAINER` | backup/restore (host) | Container içindeki DB yolu. Testler dışında değiştirilmez. | `/data/newsradar.db` |
 
 Yerel `backend/.env` dosyasında bulunabilecek `NVIDIA_API_KEY` kodda okunmaz, bu yüzden gerekmez.

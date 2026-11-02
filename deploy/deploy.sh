@@ -4,14 +4,16 @@
 #   git -C /opt/newsradar pull --ff-only && /opt/newsradar/deploy/deploy.sh     # instance, root
 #
 # GitHub Actions bunu SSM Run Command ile çağırır (deploy/ci/release-backend.sh); elle de çalışır.
-# Sıra: load-secrets.sh → ECR login → compose pull backend → up -d --no-build → healthy +
+# Sıra: load-secrets.sh → IMDS kalkanı (imds-guard.sh) → ECR login → compose pull backend →
+# up -d --no-build → healthy +
 # smoke-test.sh. Başarısızsa önceki image ID'si aynı etikete geri bağlanıp servis yeniden kurulur.
 # Çıkış: 0 yeni sürüm ayakta · 1 yeni sürüm sağlıksız, ÖNCEKİ image ile ayakta · 2 geri dönüş de
 # başarısız (elle müdahale) · 3 deploy'dan önce beklenmeyen hata (ör. load-secrets, pull; servis
 # değişmedi). Kod çekme (git pull) bu betiğin dışında: çalışan betik değişmesin.
 #
 # Yerel test: BACKEND_IMAGE ortamdan verilebilir (compose da ortamdakini kullanır);
-# DEPLOY_SKIP_SECRETS=1 load-secrets.sh'i atlar (yerel deploy/.env'yi ezmemek için).
+# DEPLOY_SKIP_SECRETS=1 load-secrets.sh'i atlar (yerel deploy/.env'yi ezmemek için);
+# DEPLOY_SKIP_IMDS_GUARD=1 iptables adımını atlar (yerelde IMDS yok).
 set -Eeuo pipefail
 DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_TAG=deploy
@@ -25,6 +27,10 @@ need docker curl
 
 if [[ "${DEPLOY_SKIP_SECRETS:-}" != 1 ]]; then
   "$DEPLOY_DIR/load-secrets.sh"
+fi
+# Kural eklenemezse deploy durur (çıkış 3, servis değişmez): Caddy korumasız yayına çıkmasın.
+if [[ "${DEPLOY_SKIP_IMDS_GUARD:-}" != 1 ]]; then
+  "$DEPLOY_DIR/imds-guard.sh" install
 fi
 BACKEND_IMAGE="${BACKEND_IMAGE:-$(dotenv_get BACKEND_IMAGE)}"
 DOMAIN="${DOMAIN:-$(dotenv_get DOMAIN)}"

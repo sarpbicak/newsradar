@@ -49,6 +49,7 @@ Local tests, which need no AWS access: `tests/aws` is a fake AWS CLI.
 ```bash
 tests/test-backup-restore.sh      # needs the running stack; restores the DB and returns it to its starting state
 tests/test-load-secrets.sh
+tests/test-imds-guard.sh
 python3 tests/check-parameters.py # every env var read in code is listed in PARAMETERS.md
 ```
 
